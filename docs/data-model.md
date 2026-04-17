@@ -7,6 +7,7 @@ Prisma schema spec for Conduit.
 - **Nodes live inside `Workflow.definition` JSON** (single source of truth, version-able, no join gymnastics). Persist per-run state per-node via `NodeRun`.
 - **Credentials are normalized** — they're reused across workflows and need rotation, so `PlatformCredential` + `WorkflowConnection` are their own tables.
 - **`ExecutionLog`** for audit + live streaming replay.
+- **`TicketBranch`** is a naming cache for persistent `ticket-branch` workspaces — the branch state itself lives on the remote; this table just stores the stable slug so iteration N+1 finds the same branch as iteration N.
 - **`db:push` during dev**, migrations once schema stabilizes.
 
 ## Models
@@ -77,6 +78,28 @@ model PollSnapshot {
   polledAt     DateTime @default(now())
 
   workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+}
+
+// One row per (platform, repo, ticket) that has been touched by a `ticket-branch` workflow.
+// Purely a naming cache — the branch itself lives on the remote. Keeps the slug stable
+// across runs even if the ticket title is edited later. Shared across workflows: if
+// a Worker workflow and a Critic workflow both target the same ticket on the same repo,
+// they resolve to the same row and the same branch name.
+// See docs/design-docs/branch-management.md.
+model TicketBranch {
+  id         String    @id @default(cuid())
+  platform   Platform
+  owner      String    // repo owner/org
+  repo       String    // repo name
+  ticketId   String    // populated from TriggerEvent.issue.key — user-visible identifier as a string ("42" for GitHub, "PROJ-123" for Jira). Never the opaque issue.id.
+  slug       String    // derived from ticket title at first creation — kebab-case, truncated
+  branchName String    // stored verbatim: conduit/<ticketId>-<slug>
+  baseRef    String?   // base ref used at branch creation (informational; defaults to repo default branch)
+  createdAt  DateTime  @default(now())
+  lastRunAt  DateTime?
+
+  @@unique([platform, owner, repo, ticketId])
+  @@index([platform, owner, repo])
 }
 
 model WorkflowRun {
@@ -191,3 +214,5 @@ The run history page uses `NodeRun` for per-node status; the run detail page use
 - `NodeRun(runId)` — load all nodes for a run
 - `ExecutionLog(runId, ts)` — chronological replay
 - `Workflow(isActive)` — webhook matching loop
+- `TicketBranch(platform, owner, repo, ticketId)` unique — lookup at `ticket-branch` workspace resolve
+- `TicketBranch(platform, owner, repo)` — "list all conduit/* branches Conduit has created for this repo"

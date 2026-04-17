@@ -30,7 +30,7 @@ Failure handling: per-activity retry policy. Workflow-level `try/catch` marks ru
 | `runAgentNode(node, context)` | Create workspace, spin up MCP servers, invoke provider, stream updates, final prompts (`.conduit/` summary + merge-back), tear down MCP |
 | `mergeWorktreeActivity(node, targetBranch)` | Spins up a lightweight agent session to merge a parallel agent's worktree back to the target branch — resolves conflicts via LLM if needed. See "Merge-back agent" below. |
 | `copyConduitFilesActivity(group)` | Copy `.conduit/` files from each parallel worktree into the target workspace after merge |
-| `cleanupRunActivity(runId)` | Best-effort cleanup after run ends — deletes workspace tmpdirs, prunes git worktrees, deletes `.conduit/` folder |
+| `cleanupRunActivity(runId)` | Best-effort cleanup after run ends — deletes workspace tmpdirs, prunes git worktrees, deletes `.conduit/` folder. `ticket-branch` workspaces have extra semantics; see [Cleanup for `ticket-branch` workspaces](#cleanup-for-ticket-branch-workspaces) below. |
 
 Activities use Temporal **heartbeats** so long-running agent sessions don't get killed for inactivity. Heartbeat payload carries current tool call + token count — doubles as the live update stream.
 
@@ -39,9 +39,17 @@ Activities use Temporal **heartbeats** so long-running agent sessions don't get 
 ```
 1. Build AgentContext from triggerEvent (slim: { trigger, workflow, run })
 2. Resolve workspace:
-     - fresh-tmpdir → mkdtemp
-     - repo-clone   → workspaceManager.seed(connection, ref)
-     - inherit      → branch worktree from upstream's HEAD (or reuse if sequential)
+     - fresh-tmpdir   → mkdtemp
+     - repo-clone     → workspaceManager.seed(connection, ref)
+     - inherit        → branch worktree from upstream's HEAD (or reuse if sequential).
+                        If the upstream chain traces back to a `ticket-branch` ancestor, the push env + credential helper are carried through — any agent in the chain can `git push`.
+     - ticket-branch  → derive branch name `conduit/<ticket-id>-<slug>` (slug stored in TicketBranch row at first creation).
+                        Check remote:
+                          - if exists: `git worktree add <tmpdir> conduit/<ticket-id>-<slug>` off the base clone.
+                          - if not:    `git worktree add -b conduit/<ticket-id>-<slug> <tmpdir> <baseRef>`.
+                        Check-then-create is serialized by a local file lock on the base clone (handles retry and cross-workflow races on the same host).
+                        Inject platform token into agent process env and configure a git credential helper reading from env — token never written to `.git/config` or remote URL. See [SECURITY.md](../SECURITY.md).
+                        Must be idempotent under Temporal activity retries.
 3. Enable workspace tools:
      - Configure provider's SDK built-in tools (file read/write/edit, shell, glob, grep)
      - Set workspace path as CWD — scopes all file operations to workspace root
@@ -113,8 +121,9 @@ Lives in `@conduit/agent/workspace`. Responsibilities:
 - **Base clones** cached under `~/.conduit/base-clones/<host>/<owner>/<repo>.git` (bare clone, fetched on first use, periodically refreshed).
 - **Seed a worktree** for a run: `git worktree add <tmpdir> <ref>` off the base clone. Fast — no network for repeat runs.
 - **Branch a worktree** for `inherit` + parallel fan-out: `git worktree add <tmpdir> HEAD` off the upstream's worktree, creating a throwaway branch.
-- **Strip auth from remote URLs** after seeding (prevents tokens leaking into agent-visible config).
-- **Cleanup** on activity finish (tmpdir rm + `git worktree prune`).
+- **Resolve a `ticket-branch` worktree**: check the remote for `conduit/<ticket-id>-<slug>`, add worktree from it (or create with `-b <baseRef>` on first run). Check-then-create guarded by a local file lock on the base clone.
+- **Strip auth from remote URLs** after seeding — prevents tokens leaking into agent-visible `.git/config`. For `ticket-branch`, push auth is provided via env var + credential helper instead; see [SECURITY.md](../SECURITY.md).
+- **Cleanup** on activity finish (tmpdir rm + `git worktree prune`). `ticket-branch` remote branches are preserved; only the local worktree is cleaned.
 
 Credentials for cloning come from the referenced `WorkflowConnection`, not from MCP servers — the workspace manager clones *before* the agent runs.
 
@@ -169,6 +178,31 @@ Frontend flow:
 - Activity's `CancelledFailure` handler calls `abortController.abort()` on the provider.
 - Provider aborts SDK call, flushes partial events, throws.
 - SDK tears down its MCP servers on abort. Workspace manager runs cleanup in `finally`.
+
+## Per-ticket concurrency
+
+For workflows with a `ticket-branch` workspace, concurrent runs on the same ticket would race on `git worktree add` and push. Intent: one active run per `(workflow, ticket)` at a time; duplicate triggers during that run are silently dropped; once the run terminates (any status), a new trigger starts fresh so board cycles (Dev → Review → Dev) keep re-firing the workflow. Handled at the Temporal boundary:
+
+- `agentWorkflow` for a `ticket-branch` workflow is started with deterministic ID `run-<workflowId>-<ticketId>`.
+- `WorkflowIdReusePolicy = ALLOW_DUPLICATE` (Temporal default; stated explicitly because it's load-bearing for board cycles) — after termination, the same ID can be reused, so a ticket re-entering `Dev` triggers a fresh Worker run.
+- `WorkflowIdConflictPolicy = FAIL` (Temporal's default for an already-running ID) — starting a second workflow with the ID of an in-flight one throws `WorkflowExecutionAlreadyStarted`. The API / trigger handler catches it, logs at debug, and drops the trigger: webhook handlers return 200 so the platform doesn't retry; poll-loop skips are internal. No `WorkflowRun` row is created for the dropped trigger.
+
+For non-`ticket-branch` workflows, the workflow ID is per-run (`run-<runId>`) with no dedup key — concurrent runs on the same ticket are allowed and operate on independent ephemeral worktrees.
+
+The base-clone file lock mentioned in the lifecycle step 2 covers the smaller window where two *different* workflows or tickets might race on `git worktree add` against the same shared base clone.
+
+See [branch-management.md](./branch-management.md) for the full concurrency model.
+
+## Cleanup for `ticket-branch` workspaces
+
+`cleanupRunActivity` runs at end-of-workflow for all workspace kinds. For `ticket-branch`, two things differ:
+
+1. **Remote branch preserved.** The local worktree is cleaned (tmpdir rm + `git worktree prune`), but the remote branch and its pushed commits stay put — they're the persistent state that iteration N+1 consumes.
+2. **Unpushed-commits warning.** Before cleanup, the runtime checks whether local commits were pushed, using **local state only** (no `git fetch`):
+   - If `origin/<branch>` doesn't exist yet, all local commits are treated as unpushed.
+   - Otherwise, `git log origin/<branch>..HEAD` gives the diff.
+   - The no-fetch choice means the check can false-positive if the remote advanced during the run — acceptable tradeoff, since the goal is catching the "no agent ever pushed" footgun, not perfectly accounting for concurrent pushers.
+   - A warning is emitted to `ExecutionLog` without blocking the run.
 
 ## Constraints enforcement
 

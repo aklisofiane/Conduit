@@ -5,12 +5,14 @@ Pre-built workflow blueprints shipped with Conduit to help users get started qui
 ## How it works
 
 1. Templates live as JSON files in `/templates/` at the repo root.
-2. API endpoint `GET /api/templates` reads the directory and returns the list (name, description, category).
+2. API endpoint `GET /api/templates` reads the directory and returns the list (id, name, description, category, contained workflow count).
 3. User clicks "Create from template" in the UI and picks one.
-4. `POST /api/workflows/from-template/:templateId` reads the template file and creates a fresh `Workflow` row with the template's `definition` copied in.
-5. From that point on, the new workflow is a normal DB row — fully editable, independent of the template file.
+4. `POST /api/workflows/from-template/:templateId` reads the template file and creates one or more fresh `Workflow` rows atomically (in a single transaction) from the template's `workflows` array.
+5. From that point on, the new workflows are normal DB rows — fully editable, independent of the template file.
 
 Templates are **static seed data**, not first-class DB entities. They never link back to the workflows created from them. Editing a template file doesn't affect existing workflows.
+
+A template can contain **one or more workflow definitions**. Single-workflow templates (`analyze`, `pr-review`) have a one-element `workflows` array; multi-workflow bundles (`board-loop`'s Worker + Critic pair) ship multiple definitions that share connection bindings and are created together.
 
 ## File shape
 
@@ -20,27 +22,34 @@ Templates are **static seed data**, not first-class DB entities. They never link
   "name": "Analyze",
   "description": "Review a new issue's intent and propose an implementation approach based on the source code.",
   "category": "triage",
-  "definition": {
-    "trigger": { /* TriggerConfig */ },
-    "nodes": [ /* Node[] */ ],
-    "edges": [ /* Edge[] */ ],
-    "mcpServers": [ /* WorkflowMcpServer[] */ ],
-    "ui": { /* CanvasUI — node positions, viewport */ }
-  }
+  "workflows": [
+    {
+      "name": "Analyze",
+      "description": "...",
+      "definition": {
+        "trigger": { /* TriggerConfig */ },
+        "nodes": [ /* Node[] */ ],
+        "edges": [ /* Edge[] */ ],
+        "mcpServers": [ /* WorkflowMcpServer[] */ ],
+        "ui": { /* CanvasUI — node positions, viewport */ }
+      }
+    }
+  ]
 }
 ```
 
-The `definition` object matches `Workflow.definition` in the DB. Same Zod schema validates both — templates that fail validation at startup are logged and skipped.
+Each entry's `definition` matches `Workflow.definition` in the DB. Same Zod schema validates both — templates that fail validation at startup are logged and skipped. The template's top-level `name`/`description`/`category` describe the bundle; each entry's `name`/`description` become the created `Workflow` row's fields.
 
-**Credential references**: template definitions reference `connectionId` placeholders (e.g., `"connectionId": "<github>"`). When the user creates a workflow from the template, the UI prompts them to bind each placeholder to a real `WorkflowConnection` before saving.
+**Credential references**: template definitions reference `connectionId` placeholders (e.g., `"connectionId": "<github>"`). Placeholders are **bundle-scoped** — the same `<github>` placeholder used in multiple workflows of a bundle binds to the same real `WorkflowConnection`. When the user creates from a template, the UI prompts once per unique placeholder, then each workflow is created with its connection references resolved.
 
 ## Templates shipped with v1
 
-| Template | Trigger | Pipeline |
+| Template | Workflows | Pipeline |
 |---|---|---|
-| `analyze` | GitHub `issues.opened` | Single agent — reads the issue, inspects the source code, posts a comment with a proposed approach, moves issue to "Analyzed" column |
-| `develop` | Polling trigger on `status = "Dev"` | Multi-agent parallel: Dev agent + Test agent + Docs agent running in parallel with workspace fan-out → merge-back → QA/Review agent consumes the merged workspace and opens a PR |
-| `pr-review` | GitHub `pull_request.opened` | Single agent — reviews the PR diff, posts inline comments and a summary review |
+| `analyze` | 1 | GitHub `issues.opened` → single agent reads the issue, inspects the source code, posts a comment with a proposed approach, moves the issue to "Analyzed" |
+| `develop` | 1 | Polling on `status = "Dev"` → multi-agent parallel: Dev + Test + Docs agents fan out → merge-back → QA/Review agent consumes the merged workspace and opens a PR |
+| `pr-review` | 1 | GitHub `pull_request.opened` → single agent reviews the PR diff, posts inline comments and a summary review |
+| `board-loop` | 2 | **Worker** (polling on `status = "Dev"` → `ticket-branch` agent commits and pushes, opens a draft PR on first push, moves to `"AIReview"`) + **Critic** (polling on `status = "AIReview"` → reads the branch / PR, either approves or moves back to `"Dev"` to re-trigger the Worker). Shares a GitHub connection placeholder. |
 
 ## Why static files, not DB
 

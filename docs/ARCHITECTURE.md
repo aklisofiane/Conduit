@@ -50,7 +50,7 @@
 |---|---|
 | `@conduit/shared` | Types: `Workflow`, `Node`, `TriggerConfig`, `AgentConfig`, `AgentContext`, `TriggerEvent`, MCP server configs. Zod schemas for API + UI validation. |
 | `@conduit/database` | Prisma schema + `PrismaClient` re-export. See [data-model.md](./data-model.md). |
-| `@conduit/agent` | Agent provider abstraction (`AgentProvider` interface), Claude + Codex providers, workspace manager (git worktree seeding, tmpdir sandboxing), MCP config resolution (decrypt credentials, substitute `{{credential}}`, hand to SDK). **Core of the system.** |
+| `@conduit/agent` | Agent provider abstraction (`AgentProvider` interface), Claude + Codex providers, workspace manager (git worktree seeding, tmpdir sandboxing, persistent branch resolution for `ticket-branch`), MCP config resolution (decrypt credentials, substitute `{{credential}}`, hand to SDK). **Core of the system.** |
 
 ## Dependency graph
 
@@ -129,7 +129,7 @@ All routes prefixed `/api`. Non-webhook routes require `X-API-Key` header (see [
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/hooks/:workflowId` | Inbound webhook from GitHub/GitLab/generic — signature verified, triggers a run |
+| `POST` | `/hooks/:workflowId` | Inbound webhook from GitHub or generic source — signature verified, triggers a run |
 
 ### Credentials & Connections
 

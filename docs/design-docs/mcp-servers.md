@@ -18,7 +18,6 @@ Conduit ships preset configs for common MCP servers that users can add with one 
 | Preset | Server | Transport | Required credential |
 |---|---|---|---|
 | GitHub | `@modelcontextprotocol/server-github` | stdio | GitHub PAT |
-| GitLab | `@modelcontextprotocol/server-gitlab` | stdio | GitLab PAT |
 | Slack | `@modelcontextprotocol/server-slack` | stdio | Slack Bot Token |
 | PostgreSQL | `@modelcontextprotocol/server-postgres` | stdio | Connection string |
 | Brave Search | `@modelcontextprotocol/server-brave-search` | stdio | Brave API key |

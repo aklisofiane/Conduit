@@ -32,7 +32,7 @@ React Flow with a small palette. Two node types.
 Opens on node click. Form driven by Zod schema from `@conduit/shared`.
 
 - **Trigger panel**: platform picker → event picker → filter builder → connection picker.
-- **Agent panel**: name field (identifier validation), provider + model dropdown, instructions textarea (monospace, generous height), MCP server picker (presets with one-click add + custom server config), skill picker (see below), workspace picker (fresh tmpdir / repo-clone / inherit), constraints (collapsible).
+- **Agent panel**: name field (identifier validation), provider + model dropdown, instructions textarea (monospace, generous height), MCP server picker (presets with one-click add + custom server config), skill picker (see below), workspace picker (fresh tmpdir / repo-clone / inherit / ticket-branch), constraints (collapsible).
 
 ### Skill picker
 

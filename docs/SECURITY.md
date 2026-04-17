@@ -16,17 +16,19 @@ Not in scope for v1: supply-chain attacks, side-channel attacks, compromised wor
 ## Webhook authentication
 
 - `POST /api/hooks/:workflowId` → `WebhookSignatureGuard` verifies HMAC-SHA256 using the platform's signing secret (stored on the `WorkflowConnection` or a dedicated webhook secret field).
-- GitHub uses `X-Hub-Signature-256`, GitLab uses `X-Gitlab-Token`, generic webhook uses a Conduit-generated shared secret.
+- GitHub uses `X-Hub-Signature-256`; generic webhook uses a Conduit-generated shared secret.
 - **Dev escape hatch**: if `WEBHOOK_DEV_SECRET` env var is set, the guard accepts any request carrying that value as the signature. Must be unset in production (enforced by a startup check).
 - Replay protection: reject events older than 5 minutes (using the platform timestamp header where available).
 
 ## Credential storage
 
-- `PlatformCredential.secret` is encrypted at rest using AES-256-GCM with a key from env (`CONDUIT_ENCRYPTION_KEY`).
+- `PlatformCredential.secret` is encrypted at rest using AES-256-GCM. On first boot, the worker generates a random key and writes it to `~/.conduit/key` (chmod 600). Subsequent boots read from there. For deployments with DB and app on separate hosts, set `CONDUIT_ENCRYPTION_KEY` explicitly and the file-based fallback is skipped. Key rotation is not supported in v1.
+  - *Rationale*: zero-config for the self-host case. An attacker with FS access on the same host as the DB can decrypt either way (key-file on disk ≈ env-var in shell profile — same blast radius). The env-var path exists so split-host deployments can keep the key off the DB host entirely.
 - Decryption happens **at MCP server startup** — injected as env vars (stdio) or headers (SSE/HTTP). Plaintext lives in the MCP server process's memory for its lifetime, then falls out of scope when the process is killed.
 - **Never written to**: logs, `ExecutionLog`, agent prompts, Temporal workflow history, Redis channels.
-- The workspace manager clones repos with a tokenized URL, then **rewrites the remote URL to strip the token** before the agent sees the workspace. Agents that run `git remote -v` see the clean URL.
-- Key rotation: out of scope for v1 (document the key-change process manually).
+- **Remote URL hygiene**: the workspace manager clones repos with a tokenized URL, then rewrites the remote URL to strip the token. `git remote -v` shows the clean URL, and `.git/config` never contains credentials.
+- **Push credentials for `ticket-branch` workspaces**: iterative board-loop workflows need the agent to push. The workspace manager sets the platform token (e.g. `GITHUB_TOKEN`) in the agent process env and configures a git credential helper that reads from env. Token is scoped to the agent activity lifetime — never written to `.git/config`, never persisted on disk, never in the remote URL. The agent *can* read it from its own env; this is an accepted trust-surface expansion, justified by the fact that an agent with a `ticket-branch` workspace already holds platform write access via its MCP servers (post comment, open PR, move column). Push is equivalent in blast radius. See [branch-management.md](./design-docs/branch-management.md).
+- **Stdio MCP servers spawned as children of the agent process inherit that env**, including the push token. For built-in presets like GitHub MCP this is usually the same credential the server would receive via explicit injection anyway, so it changes nothing. For **custom MCP servers added to a `ticket-branch` workflow**, this is an additional trust expansion beyond the one above — the custom server sees push creds whether or not the user bound them to it. V1 accepts this; scoped env injection (token set only at the git-shell-invocation boundary, not process-wide) is the future mitigation.
 
 ## Sandboxing
 
@@ -58,6 +60,7 @@ Mitigations for v1:
 - **Per-server tool filtering**: `allowedTools` on `McpServerRef` limits which tools from a server the agent can call. An injection can't invoke `merge_pull_request` if it's not in the allowed list.
 - **Constraints**: `maxToolCalls` acts as a blast-radius limiter.
 - **Document the risk** prominently in the agent config UI when the trigger is a public-facing source.
+- **`ticket-branch` workspaces widen the surface**: the agent has a platform token in its env for git push. A prompt-injected agent could exfiltrate it via ticket comment or `.conduit/` summary. Mitigation is the same as for MCP write tools — gate destructive flows behind a Critic workflow (the "Board-level review" pattern above), use `maxToolCalls` as a blast limiter, and don't run `ticket-branch` workflows triggered from untrusted issue bodies without scrutiny.
 
 v1.1+: add a "trust level" flag on triggers; auto-disable write tools on untrusted trigger sources unless explicitly unlocked.
 

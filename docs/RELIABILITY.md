@@ -10,8 +10,12 @@ Temporal carries most of the load. This doc covers what Conduit does on top of i
 | Agent provider API error (rate limit, 5xx) | Activity retries with exponential backoff (Temporal retry policy). Max 3 attempts for transient, 0 for invalid-request errors. |
 | MCP server crash | Activity fails, Temporal retries. On retry, MCP servers are re-spawned fresh. |
 | MCP tool call fails (e.g. GitHub 422) | Returned to the agent as a tool result with error. The agent decides whether to retry, adapt, or give up. We do **not** retry tool calls at the runtime level — that's the agent's judgment call. |
+| Agent's shell tool returns non-zero (e.g. `git push` rejected as non-fast-forward, `npm install` fails, `tsc` errors) | Returned to the agent as a tool result with stdout + stderr + exit code. Does **not** fail the activity. The agent decides whether to retry, adapt, or give up — same policy as MCP tool failures. |
 | Agent hits `maxTurns` / `maxTokens` / `maxToolCalls` | Node marked FAILED with `ConstraintExceededError`. Run fails. |
-| Concurrent workflows on same issue (race condition) | Known unsolved problem. Fast column moves on a board can trigger multiple workflows targeting the same issue simultaneously. Deferred to a later phase — see [PLANS.md](./PLANS.md). |
+| Concurrent triggers on a `ticket-branch` workflow for the same ticket, while a run is in flight | Silently dropped at the Temporal boundary. Workflow ID `run-<workflowId>-<ticketId>` collides with the in-flight run, Temporal throws `WorkflowExecutionAlreadyStarted`, the trigger handler catches it and swallows the trigger (webhook handler returns 200 so the platform doesn't retry; poll-loop skip is internal). No `WorkflowRun` row created. After termination, a new trigger on the same ticket starts a fresh run (`WorkflowIdReusePolicy = ALLOW_DUPLICATE`) — this is how board cycles (Dev → Review → Dev) keep re-firing. See [branch-management.md](./design-docs/branch-management.md#concurrency). |
+| Concurrent runs on the same ticket across **different** workflows (e.g. Worker + Critic) | Allowed by design — each workflow has its own ID. Workflows coordinate via board column state, not by mutual exclusion. Concurrent pushes to the same `conduit/*` branch fall through to git's non-fast-forward rejection; see [branch-management.md#concurrency](./design-docs/branch-management.md#concurrency). |
+| Concurrent runs of non-`ticket-branch` workflows on the same ticket | Allowed — each run gets an independent ephemeral worktree. |
+| Webhook storms / redundant queued runs | Known gap. Polling set-diff dedup collapses most of this; Temporal workflow-ID uniqueness catches the rest for `ticket-branch`. Beyond that, backpressure and storm collapse are deferred to a later phase. |
 | Workflow cancellation (user clicks cancel) | Temporal cancels workflow → activities receive `CancelledFailure` → provider `AbortController.abort()` → MCP servers torn down → cleanup in `finally`. Run marked CANCELLED. |
 | Webhook during DB down | API returns 503 to platform. Platform retries (GitHub retries webhook delivery). |
 
@@ -49,7 +53,7 @@ Activity-level timeouts:
 
 Workspaces live under `~/.conduit/runs/<runId>/<nodeName>/`. Per-agent worktrees persist for the **duration of the workflow run** — they're needed by `mergeWorktreeActivity` and `copyConduitFilesActivity` which run after parallel agents finish. Cleanup in two layers:
 
-1. **`cleanupRunActivity(runId)`** — called once at the end of the workflow (success, failure, or cancel). Deletes workspace tmpdirs for this run, prunes git worktrees, deletes `.conduit/` folder.
+1. **`cleanupRunActivity(runId)`** — called once at the end of the workflow (success, failure, or cancel). Deletes workspace tmpdirs for this run, prunes git worktrees, deletes `.conduit/` folder. For `ticket-branch` specifics (remote branch preservation, unpushed-commits warning), see [agent-execution.md](./design-docs/agent-execution.md#cleanup-for-ticket-branch-workspaces).
 2. **Periodic janitor** — cron job (or a Temporal schedule) that removes `~/.conduit/runs/*` directories older than 24h whose runId is in a terminal state. Handles worker-crash orphans where `cleanupRunActivity` didn't get to run.
 
 MCP servers are torn down by the Claude/Codex SDK when the agent session ends — Conduit doesn't manage their lifecycle (see [mcp-servers.md](./design-docs/mcp-servers.md)).

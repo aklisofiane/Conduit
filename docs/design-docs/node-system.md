@@ -39,7 +39,9 @@ type TriggerFilter = {
 
 **Polling mode**: a Temporal schedule (or cron) calls the platform API every `intervalSec` seconds. Queries for issues matching the filters (e.g., `status = "Dev"`). Triggers a run for each matching issue that hasn't been processed for this specific transition yet.
 
-**Dedup for polling**: on each poll cycle, Conduit compares the current set of matching issues against the previous poll's set (stored in `PollSnapshot` — one row per workflow, overwritten each cycle within a transaction). Issues that are **new to the set** (not present in the last poll) trigger a run. This handles re-entry naturally: if an issue moves `Dev → Review → Dev`, it drops from the matching set when it leaves `Dev` and reappears as new when it re-enters — triggering again. Simple set diff, no transition history needed from the API.
+#### Dedup for polling
+
+On each poll cycle, Conduit compares the current set of matching issues against the previous poll's set (stored in `PollSnapshot` — one row per workflow, overwritten each cycle within a transaction). Issues that are **new to the set** (not present in the last poll) trigger a run. This handles re-entry naturally: if an issue moves `Dev → Review → Dev`, it drops from the matching set when it leaves `Dev` and reappears as new when it re-enters — triggering again. Simple set diff, no transition history needed from the API.
 
 **Manual run**: any workflow can be run manually from the UI via `POST /api/workflows/:id/run`. This is a dev/debug action available on every workflow, not a trigger mode configured in `TriggerConfig`. The user can optionally provide a specific issue/PR to run against. Manual runs produce a `TriggerEvent` with `mode: 'manual'` so the agent knows how it was triggered.
 
@@ -54,12 +56,14 @@ type TriggerEvent = {
   event: string;                          // e.g. 'status.changed', 'issues.opened', 'manual.run'
   payload: Record<string, unknown>;       // platform-specific fields, normalized by mapper
   repo?: { owner: string; name: string }; // present for repo-scoped events
-  issue?: { id: string; number: number; title: string; url: string }; // present for issue-scoped events
+  issue?: { id: string; key: string; title: string; url: string }; // present for issue-scoped events — `key` is the user-visible identifier as a string
   actor?: string;                         // who/what triggered the event
 };
 ```
 
 Each platform has its own mapper that normalizes the raw event/API response into this shape. The Zod schema in `@conduit/shared` is the source of truth for `payload` shapes per platform.
+
+`issue.id` is the platform's opaque identifier (e.g., GitHub's `node_id`) — used for API calls. `issue.key` is the user-visible identifier as a string: `"42"` for GitHub, `"PROJ-123"` for Jira (matches Jira's native "issue key" term). Downstream code that needs a stable, human-readable ticket identifier (branch names, DB keys, Temporal workflow IDs) reads `issue.key`, never `issue.id`.
 
 **UI**: one node at the top of the canvas, no input handles, one output handle. Config panel shows: platform picker → connection picker → mode toggle (webhook / polling) → event picker (webhook) or interval config (polling) → filter builder.
 
@@ -92,9 +96,10 @@ type McpServerRef = {
 };
 
 type WorkspaceSpec =
-  | { kind: 'fresh-tmpdir' }                                // empty sandbox (no repo, edge case)
-  | { kind: 'repo-clone'; connectionId: string; ref?: string }  // seeded from base clone
-  | { kind: 'inherit'; fromNode: string };                  // reuse upstream agent's workspace
+  | { kind: 'fresh-tmpdir' }                                           // empty sandbox (no repo, edge case)
+  | { kind: 'repo-clone'; connectionId: string; ref?: string }         // seeded from base clone, ephemeral
+  | { kind: 'inherit'; fromNode: string }                              // reuse upstream agent's workspace
+  | { kind: 'ticket-branch'; connectionId: string; baseRef?: string }; // persistent branch scoped to a ticket
 ```
 
 **What it emits**: a `NodeOutput` — `{ files?: string[], workspacePath: string }`. The agent's actual output to downstream agents is the `.conduit/<NodeName>.md` file it writes in the workspace. No structured JSON output, no schema validation.
@@ -132,7 +137,7 @@ type McpTransport =
   | { kind: 'streamable-http'; url: string; headers?: Record<string, string> };
 ```
 
-Conduit ships a set of **preset MCP server configs** (GitHub, GitLab, Slack, filesystem, etc.) that users can add with one click. Users can also add any custom MCP server by providing a transport config.
+Conduit ships a set of **preset MCP server configs** (GitHub, Slack, filesystem, etc.) that users can add with one click. Users can also add any custom MCP server by providing a transport config.
 
 Credentials are injected as environment variables when spawning `stdio` servers, or as headers for `sse`/`streamable-http` servers — resolved from the linked `WorkflowConnection` at runtime.
 
@@ -145,7 +150,13 @@ The key primitive for multi-agent pipelines. If *Triage* clones a repo and class
 
 **Merge-back after parallel execution**: after all parallel agents in a group complete, the runtime runs merge-back steps **sequentially** as separate activities — one agent at a time merges its worktree back to the target branch, resolving conflicts. Since `.conduit/` is gitignored, the runtime copies `.conduit/` files from each parallel worktree into the target workspace after merging code (simple file copy, no git involved).
 
-Rule: `inherit` requires the upstream node to have `kind: 'repo-clone'` or another `inherit`. Validated at workflow save time.
+Rule: `inherit` requires the upstream node to have `kind: 'repo-clone'`, `ticket-branch`, or another `inherit`. Validated at workflow save time.
+
+### `ticket-branch` workspaces
+
+The primitive for iterative board-loop workflows (Worker↔Critic). Unlike `repo-clone`, which is ephemeral per-run, `ticket-branch` persists a branch (`conduit/<ticket-id>-<slug>`) across runs on the same ticket. Each run adds a worktree from the current branch state, so iteration N+1 sees iteration N's commits. The agent commits and pushes via normal git; runtime sets up the push auth in-env at activity start. See [branch-management.md](./branch-management.md) for ownership, lifecycle, and concurrency.
+
+Agents inheriting from a `ticket-branch` upstream — sequentially or via parallel fan-out — receive the same push env and credential helper; any agent in the chain can `git push`. Convention is that the agent responsible for the final commit also pushes, typically after reading upstream `.conduit/` summaries and handling ticket/comment updates. The runtime does not enforce which agent pushes — DAGs with multiple terminal agents work fine (fast-forward push is idempotent) — and the unpushed-commits check at run end surfaces the "nobody pushed" footgun. Save-time enforcement of a single designated pusher is deferred; see [PLANS.md](../PLANS.md).
 
 ### Skills
 
@@ -219,8 +230,17 @@ type NodeOutput = {
 
 1. Exactly one trigger node.
 2. All node names unique and valid identifiers (`^[A-Za-z_][A-Za-z0-9_]*$`).
-3. No cycles.
+3. No cycles within a single workflow graph. Cross-run cycles — via board transitions that re-trigger the same workflow — are the intended loop mechanism; see "Cross-run iteration" below.
 4. Every non-trigger node is reachable from the trigger.
-5. `workspace.inherit.fromNode` points to an ancestor with a filesystem workspace.
+5. `workspace.inherit.fromNode` points to an ancestor with a `repo-clone`, `ticket-branch`, or `inherit` workspace.
 6. Every `mcpServers[].serverId` references a server defined at the workflow level.
 7. MCP servers with a `connectionId` must reference a valid `WorkflowConnection`.
+8. `ticket-branch` workspaces require a trigger that produces a populated `triggerEvent.issue`. Validated against the trigger's platform + event type at save time — webhook events that don't carry an issue (e.g., `push`, `release`, `workflow_run`) fail validation when combined with `ticket-branch`.
+
+## Cross-run iteration
+
+Iteration across runs is expressed by **board transitions, not cycles in the graph**. A Worker workflow fires on `status = Dev`, commits to a `ticket-branch`, and moves the ticket to `AIReview`. A Critic workflow fires on `status = AIReview`, reviews the branch, and either approves or moves the ticket back to `Dev` — which re-triggers the Worker.
+
+The polling trigger's set-diff dedup (see [Dedup for polling](#dedup-for-polling) above) is what makes this natural: when a ticket re-enters a matching column it looks "new to the set" and triggers again. That existing behavior is the loop primitive; `ticket-branch` is what makes the iteration stateful.
+
+Webhook triggers also re-enter — each column move fires its own event — but without polling's dedup layer they're more exposed to storm scenarios. Polling is the more robust mode for board-loop workflows in v1.
