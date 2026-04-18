@@ -17,7 +17,13 @@
     "dev": "turbo run dev",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
-    "test": "turbo run test",
+    "test": "vitest run",
+    "test:unit": "vitest run --project unit",
+    "test:integration": "vitest run --project integration",
+    "test:api": "vitest run --project api",
+    "pretest:e2e": "turbo run build --filter=@conduit/api --filter=@conduit/worker",
+    "test:e2e": "vitest run --project e2e",
+    "test:watch": "vitest",
     "format": "prettier --write \"**/*.{ts,tsx,js,mjs,cjs,json,md,yaml,yml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,cjs,json,md,yaml,yml}\"",
     "db:push": "dotenv -e .env -- npm --workspace @conduit/database run db:push",
@@ -25,10 +31,14 @@
     "db:studio": "dotenv -e .env -- npm --workspace @conduit/database run db:studio",
     "infra:up": "docker compose up -d",
     "infra:down": "docker compose down",
-    "infra:logs": "docker compose logs -f"
+    "infra:logs": "docker compose logs -f",
+    "test:infra:up": "docker compose -f docker-compose.test.yml up -d --wait",
+    "test:infra:down": "docker compose -f docker-compose.test.yml down -v",
+    "test:infra:logs": "docker compose -f docker-compose.test.yml logs -f"
   },
   "devDependencies": {
     "@eslint/js": "^9.18.0",
+    "@temporalio/testing": "^1.16.0",
     "@types/node": "^22.10.5",
     "dotenv-cli": "^8.0.0",
     "eslint": "^9.18.0",
@@ -36,6 +46,7 @@
     "prettier": "^3.4.2",
     "turbo": "^2.3.3",
     "typescript": "^5.7.3",
-    "typescript-eslint": "^8.20.0"
+    "typescript-eslint": "^8.20.0",
+    "vitest": "^2.1.8"
   }
 }

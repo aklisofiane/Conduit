@@ -1,0 +1,32 @@
+{
+  "name": "Phase 1 manual run",
+  "description": "Single-agent fresh-tmpdir workflow used by the Phase 1 exit-criterion E2E test. Runs against StubProvider.",
+  "definition": {
+    "trigger": {
+      "platform": "github",
+      "connectionId": "placeholder-connection",
+      "mode": { "kind": "webhook", "event": "issues.opened", "active": false },
+      "filters": []
+    },
+    "nodes": [
+      {
+        "id": "agent-main",
+        "name": "Main",
+        "provider": "claude",
+        "model": "stub-model",
+        "instructions": "You are the Main agent for the Phase 1 E2E test.",
+        "mcpServers": [],
+        "skills": [],
+        "workspace": { "kind": "fresh-tmpdir" }
+      }
+    ],
+    "edges": [],
+    "mcpServers": [],
+    "ui": {
+      "nodePositions": {
+        "Main": { "x": 240, "y": 160 }
+      },
+      "viewport": { "x": 0, "y": 0, "zoom": 1 }
+    }
+  }
+}

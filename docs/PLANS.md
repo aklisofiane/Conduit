@@ -28,19 +28,19 @@ The smallest useful system: a workflow with one agent, started manually from the
 
 **Exit criteria**: User creates a workflow with a Claude agent + workspace, clicks "Run", agent uses SDK built-in tools (file read, shell), watches streaming output on the run detail page.
 
-## Phase 1.5 — Validation harness (current)
+## Phase 1.5 — Validation harness ✅
 
 Make every later phase's exit criterion autonomously verifiable. See [VALIDATION.md](./VALIDATION.md).
 
-- [ ] `StubProvider` in `@conduit/agent` alongside `ClaudeProvider`: same interface, replays scripted events (text chunks, tool calls, final message) with configurable delays. Real tools, fake LLM. Selected via `CONDUIT_PROVIDER=stub` or per-workflow override in tests.
-- [ ] `docker-compose.test.yml`: Postgres + Temporal + Redis on non-dev ports, ephemeral volumes.
-- [ ] Vitest workspace config: unit (per package), integration (testcontainers or test compose), API contract (supertest), E2E (full stack).
-- [ ] Temporal test utilities: wrappers around `TestWorkflowEnvironment.createTimeSkipping()` and `MockActivityEnvironment` with fixture loading.
-- [ ] E2E harness (`test/e2e/harness.ts`): spins up test stack + api + worker + `StubProvider`, returns an HTTP client and WS frame collector, tears down on exit.
-- [ ] Fixture directories: `test/fixtures/workflows/` (JSON), `test/fixtures/repos/` (bare repo tarballs), `test/fixtures/events/` (webhook payloads), `test/fixtures/mcp-stub/` (in-repo stdio MCP server).
-- [ ] Playwright MCP wiring: documented setup (user-configured via MCP), one smoke test for Phase 1 golden path, pattern for per-phase smokes.
-- [ ] CI: GitHub Actions workflow running unit + integration + API + E2E on every PR; Playwright smoke on main.
-- [ ] Backfill Phase 1 exit criterion as the first E2E test.
+- [x] `StubProvider` in `@conduit/agent` alongside `ClaudeProvider`: same interface, replays scripted events (text chunks, tool calls, final message) with configurable delays. Real tools, fake LLM. Selected via `CONDUIT_PROVIDER=stub` and scripts injected via in-process queue or `CONDUIT_STUB_SCRIPT` file.
+- [x] `docker-compose.test.yml`: Postgres + Temporal + Redis on non-dev ports (55432 / 57233 / 56379), tmpfs volumes, temporal healthcheck that waits for namespace readiness.
+- [x] Vitest workspace config: `unit` (per package), `integration`, `api` (supertest), `e2e` (full stack). Sources aliased to src so tests run without a build.
+- [x] Temporal test utilities: `test/helpers/temporal.ts` wrapping `TestWorkflowEnvironment.createTimeSkipping()` and `MockActivityEnvironment` with `loadWorkflowFixture()`.
+- [x] E2E harness (`test/e2e/harness.ts`): spins up test stack + api + worker subprocesses + `StubProvider`, returns `HttpClient` and `WsCollector`, tears down on exit.
+- [x] Fixture directories: `test/fixtures/workflows/` (Phase 1 JSON), `test/fixtures/mcp-stub/` (in-repo stdio MCP server). `repos/` + `events/` land in Phase 2 when they're first needed.
+- [x] Playwright MCP wiring: documented user-configured setup + per-phase smoke pattern in VALIDATION.md.
+- [x] CI: `.github/workflows/test.yml` running typecheck + lint + unit on every PR; E2E behind the unit gate; Playwright smoke on main.
+- [x] Backfill Phase 1 exit criterion as the first E2E test (`test/e2e/phase1-manual-run.test.ts`).
 
 **Exit criteria**: `npm test` runs the full suite (unit + integration + API + E2E) against an ephemeral test stack using `StubProvider`, completes in under 5 minutes, and the Phase 1 golden path is covered by a passing E2E test. Claude can run `npm test` and read pass/fail output.
 

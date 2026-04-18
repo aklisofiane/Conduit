@@ -1,0 +1,83 @@
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: conduit-test-postgres
+    restart: no
+    environment:
+      POSTGRES_USER: conduit
+      POSTGRES_PASSWORD: conduit
+      POSTGRES_DB: conduit_test
+      # Postgres 18 wants major-version subdirs under the mount. Point PGDATA
+      # at a subdir and tmpfs-mount the parent so the image bootstraps cleanly.
+      PGDATA: /var/lib/postgresql/data/pg
+    ports:
+      - '55432:5432'
+    tmpfs:
+      - /var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U conduit -d conduit_test']
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  temporal-postgres:
+    image: postgres:18-alpine
+    container_name: conduit-test-temporal-postgres
+    restart: no
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+      POSTGRES_DB: temporal
+      PGDATA: /var/lib/postgresql/data/pg
+    tmpfs:
+      - /var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U temporal -d temporal']
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  temporal:
+    image: temporalio/auto-setup:1.25.2
+    container_name: conduit-test-temporal
+    restart: no
+    depends_on:
+      temporal-postgres:
+        condition: service_healthy
+    environment:
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=temporal
+      - POSTGRES_PWD=temporal
+      - POSTGRES_SEEDS=temporal-postgres
+    ports:
+      - '57233:7233'
+    healthcheck:
+      # Namespace describe covers both "server listening" and "namespace registered" —
+      # without this, `compose up --wait` races ahead of the auto-setup bootstrap and
+      # the first workflow start dies with NamespaceNotFoundError. `$(hostname -i)`
+      # because the server binds to the container interface, not 127.0.0.1.
+      test:
+        [
+          'CMD-SHELL',
+          'temporal --address "$$(hostname -i):7233" operator namespace describe -n default > /dev/null 2>&1',
+        ]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+      start_period: 5s
+
+  redis:
+    image: redis:8-alpine
+    container_name: conduit-test-redis
+    restart: no
+    command: redis-server --save ''
+    ports:
+      - '56379:6379'
+    tmpfs:
+      - /data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 2s
+      timeout: 2s
+      retries: 20

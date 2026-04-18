@@ -1,0 +1,20 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "noEmit": true,
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "types": ["node", "vitest/globals"],
+    "baseUrl": ".",
+    "paths": {
+      "@conduit/shared": ["../packages/shared/src/index.ts"],
+      "@conduit/shared/*": ["../packages/shared/src/*"],
+      "@conduit/agent": ["../packages/agent/src/index.ts"],
+      "@conduit/database": ["../packages/database/src/index.ts"]
+    }
+  },
+  "include": ["**/*.ts"]
+}

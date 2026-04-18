@@ -48,11 +48,21 @@ Harness spins up: Postgres + Temporal + Redis + api + worker + `StubProvider`. D
 
 ### 5. UI smoke tests (Playwright, via MCP)
 
-**Setup**: user configures Playwright MCP server. Claude does not install or configure Playwright directly.
+**Setup**: the user configures the Playwright MCP server in Claude Code:
 
-**Usage**: Claude drives Playwright via MCP tools to exercise the real UI against a running dev stack. One smoke test per phase's golden path — the minimum that proves the UI wires up to the backend. Assertions on visible DOM, not snapshots.
+```
+claude mcp add playwright "npx -y @playwright/mcp@latest"
+```
+
+Claude does not install or configure Playwright directly — the MCP server brings its own bundled Chromium and Playwright runtime. The smoke tests live alongside the E2E harness so both can share the same test stack.
+
+**Usage**: when a phase adds UI surface, the author writes a short smoke script (repo path: `test/smoke/<phase>.smoke.md`) containing the golden-path interaction as plain prose. Claude reads the script, starts the dev stack (`npm run infra:up` + `npm run dev`), then drives Playwright via MCP tools to exercise the flow. Assertions are on visible DOM text, not snapshots.
+
+One smoke per phase's golden path — the minimum that proves the UI wires up to the backend. Everything else (timeline rendering, edge cases, error states) is covered by the unit/integration/E2E layers.
 
 **Scope limit**: smoke only. Visual regression, accessibility audits, cross-browser matrices are not in scope for v1.
+
+**CI**: the Playwright smoke runs on `push` to main (not on every PR) — it needs a display server and is comparatively slow. See `.github/workflows/test.yml`.
 
 ## The `StubProvider`
 

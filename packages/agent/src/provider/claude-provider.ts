@@ -1,5 +1,5 @@
 import type { AgentEvent, AgentRequest, ProviderCapabilities } from '@conduit/shared';
-import { ConstraintExceededError } from '../errors/index';
+import { applyCounters, checkConstraints, newCounters } from './constraints';
 import type { AgentProvider } from './types';
 
 /**
@@ -30,8 +30,8 @@ export class ClaudeProvider implements AgentProvider {
     );
 
     const startedAt = Date.now();
-    const counters = { turns: 0, toolCalls: 0, inputTokens: 0, outputTokens: 0 };
-    const check = () => checkConstraints(req, counters, startedAt);
+    const counters = newCounters();
+    const check = (): void => checkConstraints(req, counters, startedAt);
 
     const iter = sdk.query({
       prompt: req.userMessage,
@@ -177,40 +177,3 @@ function stringifyOutput(c: unknown): string {
   }
 }
 
-function applyCounters(
-  event: AgentEvent,
-  counters: { turns: number; toolCalls: number; inputTokens: number; outputTokens: number },
-): void {
-  if (event.type === 'tool_call') counters.toolCalls += 1;
-  if (event.type === 'usage') {
-    counters.inputTokens += event.inputTokens;
-    counters.outputTokens += event.outputTokens;
-    counters.turns += 1;
-  }
-}
-
-function checkConstraints(
-  req: AgentRequest,
-  counters: { turns: number; toolCalls: number; inputTokens: number; outputTokens: number },
-  startedAt: number,
-): void {
-  const c = req.constraints;
-  if (c.maxTurns && counters.turns > c.maxTurns) {
-    throw new ConstraintExceededError('maxTurns', c.maxTurns, counters.turns);
-  }
-  if (c.maxToolCalls && counters.toolCalls > c.maxToolCalls) {
-    throw new ConstraintExceededError('maxToolCalls', c.maxToolCalls, counters.toolCalls);
-  }
-  if (c.maxTokens) {
-    const total = counters.inputTokens + counters.outputTokens;
-    if (total > c.maxTokens) {
-      throw new ConstraintExceededError('maxTokens', c.maxTokens, total);
-    }
-  }
-  if (c.timeoutSec) {
-    const elapsed = (Date.now() - startedAt) / 1000;
-    if (elapsed > c.timeoutSec) {
-      throw new ConstraintExceededError('timeoutSec', c.timeoutSec, Math.floor(elapsed));
-    }
-  }
-}

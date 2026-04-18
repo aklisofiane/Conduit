@@ -1,0 +1,48 @@
+name: test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run test:unit
+
+  e2e:
+    name: e2e
+    runs-on: ubuntu-latest
+    needs: unit
+    env:
+      # Harness prints api+worker output when set — invaluable on CI failure.
+      CONDUIT_TEST_STREAM_LOGS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # `pretest:e2e` builds the apps so the harness can spawn dist/main.js.
+      - name: Build api + worker
+        run: npm run build -- --filter=@conduit/api --filter=@conduit/worker
+      - name: Run E2E
+        run: npm run test:e2e
+      - name: Dump compose logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.test.yml logs --no-color
