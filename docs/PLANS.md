@@ -2,33 +2,33 @@
 
 Phased rollout. Each phase ends with something runnable end-to-end.
 
-## Phase 0 — Spec & scaffolding (current)
+## Phase 0 — Spec & scaffolding ✅
 
 - [x] `docs/` spec written
-- [ ] Review & iterate
-- [ ] Fresh repo initialized
-- [ ] Monorepo skeleton: npm workspaces + Turborepo, tsconfig bases, Tailwind v4 + shadcn preset, Vite alias, root `.env` convention
-- [ ] Docker compose with Postgres (5434), Temporal (7233), Redis (6379), Temporal UI (8080)
-- [ ] `@conduit/shared` package with the core types from `node-system.md` + `agent-context.md` + Zod schemas
-- [ ] `@conduit/database` with the Prisma schema from `data-model.md`
-- [ ] ESLint + Prettier config at the root
+- [x] Review & iterate
+- [x] Fresh repo initialized
+- [x] Monorepo skeleton: npm workspaces + Turborepo, tsconfig bases, Tailwind v4 + shadcn preset, Vite alias, root `.env` convention
+- [x] Docker compose with Postgres (5434), Temporal (7233), Redis (6379), Temporal UI (8080)
+- [x] `@conduit/shared` package with the core types from `node-system.md` + `agent-context.md` + Zod schemas
+- [x] `@conduit/database` with the Prisma schema from `data-model.md`
+- [x] ESLint + Prettier config at the root
 
 **Exit criteria**: `npm run db:push` works, shared types compile, no apps yet.
 
-## Phase 1 — Single agent, manual run
+## Phase 1 — Single agent, manual run ✅
 
 The smallest useful system: a workflow with one agent, started manually from the UI, streaming live output.
 
-- [ ] `@conduit/agent` package: provider interface, Claude provider (wraps `@anthropic-ai/claude-agent-sdk`), workspace manager.
-- [ ] Codex provider stubbed (implement in Phase 2 if SDK work is gnarly).
-- [ ] `apps/api` (NestJS): workflow CRUD, `POST /workflows/:id/run` (manual run endpoint), `RunsGateway` WS, credential CRUD, Temporal client.
-- [ ] `apps/worker`: `agentWorkflow` (single-node case), `runAgentNode` activity with SDK built-in tools, heartbeat → Redis.
-- [ ] Skill discovery: `GET /skills` scans repo + worker for `SKILL.md` files, copy selected skills into workspace at runtime.
-- [ ] `apps/web`: workflow list, canvas with `TriggerNode` + `AgentNode` (design only), skill picker in agent config, manual "Run" button, run detail page with live streaming logs.
+- [x] `@conduit/agent` package: provider interface, Claude provider (wraps `@anthropic-ai/claude-agent-sdk`), workspace manager.
+- [x] Codex provider stubbed (implement in Phase 2 if SDK work is gnarly).
+- [x] `apps/api` (NestJS): workflow CRUD, `POST /workflows/:id/run` (manual run endpoint), `RunsGateway` WS, credential CRUD, Temporal client.
+- [x] `apps/worker`: `agentWorkflow` (single-node case), `runAgentNode` activity with SDK built-in tools, heartbeat → Redis.
+- [x] Skill discovery: `GET /skills` scans repo + worker for `SKILL.md` files, copy selected skills into workspace at runtime.
+- [x] `apps/web`: workflow list, canvas with `TriggerNode` + `AgentNode` (design only), skill picker in agent config, manual "Run" button, run detail page with live streaming logs.
 
 **Exit criteria**: User creates a workflow with a Claude agent + workspace, clicks "Run", agent uses SDK built-in tools (file read, shell), watches streaming output on the run detail page.
 
-## Phase 1.5 — Validation harness
+## Phase 1.5 — Validation harness (current)
 
 Make every later phase's exit criterion autonomously verifiable. See [VALIDATION.md](./VALIDATION.md).
 

@@ -22,7 +22,7 @@ Not in scope for v1: supply-chain attacks, side-channel attacks, compromised wor
 
 ## Credential storage
 
-- `PlatformCredential.secret` is encrypted at rest using AES-256-GCM. On first boot, the worker generates a random key and writes it to `~/.conduit/key` (chmod 600). Subsequent boots read from there. For deployments with DB and app on separate hosts, set `CONDUIT_ENCRYPTION_KEY` explicitly and the file-based fallback is skipped. Key rotation is not supported in v1.
+- `PlatformCredential.secret` is encrypted at rest using AES-256-GCM. The format and key loader live in `@conduit/shared/crypto` so the API (which encrypts on write) and the worker (which decrypts at run time) stay bit-identical. The API auto-seeds `~/.conduit/key` (chmod 600) on first use; the worker refuses to auto-generate so a missing key fails loudly instead of producing an unrecoverable random. `CONDUIT_ENCRYPTION_KEY` overrides the file — 64 hex chars used raw, anything else SHA-256-derived so self-host users can paste a passphrase. Key rotation is not supported in v1.
   - *Rationale*: zero-config for the self-host case. An attacker with FS access on the same host as the DB can decrypt either way (key-file on disk ≈ env-var in shell profile — same blast radius). The env-var path exists so split-host deployments can keep the key off the DB host entirely.
 - Decryption happens **at MCP server startup** — injected as env vars (stdio) or headers (SSE/HTTP). Plaintext lives in the MCP server process's memory for its lifetime, then falls out of scope when the process is killed.
 - **Never written to**: logs, `ExecutionLog`, agent prompts, Temporal workflow history, Redis channels.

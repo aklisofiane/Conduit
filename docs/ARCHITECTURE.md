@@ -48,7 +48,7 @@
 
 | Package | Responsibility |
 |---|---|
-| `@conduit/shared` | Types: `Workflow`, `Node`, `TriggerConfig`, `AgentConfig`, `AgentContext`, `TriggerEvent`, MCP server configs. Zod schemas for API + UI validation. |
+| `@conduit/shared` | Types + Zod schemas, plus the cross-process contracts API/worker/web all import (AES-256-GCM crypto, Redis run-updates channel, Temporal task queue name, `AgentEvent → ExecutionLogKind` mapping). `"sideEffects": false` so Vite tree-shakes `node:crypto` out of the web bundle. |
 | `@conduit/database` | Prisma schema + `PrismaClient` re-export. See [data-model.md](./data-model.md). |
 | `@conduit/agent` | Agent provider abstraction (`AgentProvider` interface), Claude + Codex providers, workspace manager (git worktree seeding, tmpdir sandboxing, persistent branch resolution for `ticket-branch`), MCP config resolution (decrypt credentials, substitute `{{credential}}`, hand to SDK). **Core of the system.** |
 
@@ -57,7 +57,7 @@
 ```
 @conduit/shared   ←── api, web, worker, agent
 @conduit/database ←── api, worker
-@conduit/agent    ←── worker
+@conduit/agent    ←── api, worker   # api uses it for skill discovery
 ```
 
 ## Data flow: webhook → live UI
@@ -171,7 +171,7 @@ All routes prefixed `/api`. Non-webhook routes require `X-API-Key` header (see [
 ## Key conventions
 
 - **Zod in `@conduit/shared`** = single source of truth. Same schemas validate API requests and UI forms.
-- **Domain subpath exports from `@conduit/shared`** — consumers import `@conduit/shared/agent`, `/trigger`, `/mcp`, `/workflow`, `/runtime`, `/workspace`, `/skill`, `/platform` rather than a single barrel, so each app only pulls the schemas it actually uses. The root barrel still re-exports everything for convenience.
+- **Domain subpath exports from `@conduit/shared`** — consumers import `@conduit/shared/agent`, `/trigger`, `/mcp`, `/workflow`, `/runtime`, `/temporal`, `/workspace`, `/skill`, `/platform` rather than a single barrel, so each app only pulls the schemas it actually uses. The root barrel still re-exports everything for convenience.
 - **Node names are stable identifiers** (user-editable, validated unique within a workflow). Each agent writes `.conduit/<NodeName>.md` in the workspace; downstream agents read the folder for upstream context.
 - **Tools are MCP servers.** No custom tool registry. Agent nodes declare which MCP servers to connect to; credentials are injected as env vars when spawning the server process.
 - **Vite alias** `@conduit/shared` → `packages/shared/src/index.ts` (no build step during web dev).

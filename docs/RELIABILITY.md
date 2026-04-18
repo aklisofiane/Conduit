@@ -88,7 +88,7 @@ v1 is deliberately light:
 
 If Redis is down:
 - Runs still execute (Temporal + Postgres are the critical path).
-- Live updates stop — UI falls back to polling `GET /runs/:id` every 2 seconds.
+- Per-event timelines freeze until Redis returns. `useRun` already polls `GET /runs/:id` every 15s while a run is `PENDING`/`RUNNING` (a backstop for dropped Socket.IO frames), so node-level rows keep refreshing at that cadence.
 - `ExecutionLog` still writes.
 
 If Postgres is down:
