@@ -12,10 +12,10 @@ export interface AgentWorkflowInput {
 }
 
 /**
- * Thin wrapper around Temporal's `@temporalio/client`. Workflows are started
- * with `startWorkflow` (handle returned to capture temporalRunId for the DB).
- * All workflow IDs are currently per-run (`run-<runId>`). Phase 5 swaps in
- * deterministic `run-<workflowId>-<ticketId>` for `ticket-branch` workflows.
+ * Thin wrapper around Temporal's `@temporalio/client`. Workflows are
+ * started with `startWorkflow` (handle returned to capture temporalRunId
+ * for the DB). Workflow IDs are per-run (`run-<runId>`); ticket-branch
+ * workflows will swap in a deterministic id when that workspace kind ships.
  */
 @Injectable()
 export class TemporalService implements OnModuleInit, OnModuleDestroy {

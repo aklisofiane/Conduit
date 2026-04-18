@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import type { ExecutionLogKind } from '@conduit/shared';
 import { PrismaService } from '../../common/prisma.service';
 import { TemporalService } from '../../temporal/temporal.service';
 
@@ -39,7 +40,11 @@ export class RunsService {
   }
 
   async cancel(runId: string) {
-    const run = await this.get(runId);
+    const run = await this.prisma.workflowRun.findUnique({
+      where: { id: runId },
+      select: { temporalWorkflowId: true },
+    });
+    if (!run) throw new NotFoundException(`Run ${runId} not found`);
     if (!run.temporalWorkflowId) {
       throw new NotFoundException(`Run ${runId} has no Temporal workflow id — already finished?`);
     }
@@ -51,13 +56,12 @@ export class RunsService {
   }
 
   async logs(runId: string, query: LogsQuery) {
-    await this.get(runId);
     const take = Math.min(Math.max(query.limit ?? 500, 1), 5000);
     return this.prisma.executionLog.findMany({
       where: {
         runId,
         nodeName: query.nodeName,
-        kind: query.kind as 'TEXT' | 'TOOL_CALL' | 'TOOL_RESULT' | 'USAGE' | 'SYSTEM' | undefined,
+        kind: query.kind as ExecutionLogKind | undefined,
       },
       orderBy: { ts: 'asc' },
       take,

@@ -80,8 +80,10 @@ export function useRun(runId: string | undefined) {
     queryFn: () => api.get<RunDetail>(`/runs/${runId!}`),
     enabled: !!runId,
     refetchInterval: (q) => {
+      // Socket.IO drives most live updates; this poll is a coarse fallback
+      // so node-level rows refresh even if a frame was dropped.
       const data = q.state.data as RunDetail | undefined;
-      return data && (data.status === 'PENDING' || data.status === 'RUNNING') ? 3000 : false;
+      return data && (data.status === 'PENDING' || data.status === 'RUNNING') ? 15000 : false;
     },
   });
 }

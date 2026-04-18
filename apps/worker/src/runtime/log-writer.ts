@@ -1,13 +1,5 @@
-import type { AgentEvent } from '@conduit/shared';
+import { agentEventToLogKind, type AgentEvent } from '@conduit/shared';
 import { prisma } from './prisma';
-
-const KIND_BY_EVENT: Record<AgentEvent['type'], 'TEXT' | 'TOOL_CALL' | 'TOOL_RESULT' | 'USAGE' | 'SYSTEM'> = {
-  text: 'TEXT',
-  tool_call: 'TOOL_CALL',
-  tool_result: 'TOOL_RESULT',
-  usage: 'USAGE',
-  done: 'SYSTEM',
-};
 
 /**
  * Append one `ExecutionLog` row per `AgentEvent`. Called from inside
@@ -23,7 +15,7 @@ export async function writeAgentEventLog(
     data: {
       runId,
       nodeName,
-      kind: KIND_BY_EVENT[event.type],
+      kind: agentEventToLogKind(event.type),
       payload: event as unknown as object,
     },
   });

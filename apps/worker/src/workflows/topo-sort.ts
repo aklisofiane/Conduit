@@ -1,22 +1,16 @@
+import type { Edge } from '@conduit/shared';
+
 /**
- * Tiny Kahn's-algorithm topological sort that groups independent nodes into
- * parallel buckets. Lives in the workflow file's scope because the V8
- * sandbox forbids Node-specific imports — so this can't reach for e.g.
- * `graphlib`.
- *
- * Phase 1 workflows are single-node, so this degenerates into `[[theNode]]`.
- * Parallel groups land in Phase 3 but the function already handles them.
+ * Tiny Kahn's-algorithm topological sort that groups independent nodes
+ * into parallel buckets. Inlined into the workflow scope because Temporal's
+ * V8 sandbox forbids Node-specific imports — so this can't pull in e.g.
+ * `graphlib`. Pure-data type imports from `@conduit/shared` are fine.
  */
 export interface GraphNode {
   name: string;
 }
 
-export interface GraphEdge {
-  from: string;
-  to: string;
-}
-
-export function topoSortGroups<T extends GraphNode>(nodes: T[], edges: GraphEdge[]): T[][] {
+export function topoSortGroups<T extends GraphNode>(nodes: T[], edges: Edge[]): T[][] {
   if (nodes.length === 0) return [];
   const byName = new Map(nodes.map((n) => [n.name, n]));
   const indegree = new Map<string, number>(nodes.map((n) => [n.name, 0]));

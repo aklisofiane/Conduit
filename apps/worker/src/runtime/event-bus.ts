@@ -1,15 +1,8 @@
 import { Redis } from 'ioredis';
-import type { AgentEvent } from '@conduit/shared';
+import { RUN_UPDATES_CHANNEL, type RunUpdateMessage } from '@conduit/shared';
 import { config } from '../config';
 
-export const RUN_UPDATES_CHANNEL = 'conduit:run-updates';
-
-export interface RunUpdateMessage {
-  runId: string;
-  nodeName: string;
-  event: AgentEvent | { type: 'system'; message: string };
-  ts: string;
-}
+export type { RunUpdateMessage };
 
 let client: Redis | undefined;
 

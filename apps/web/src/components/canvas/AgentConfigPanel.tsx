@@ -114,7 +114,7 @@ export function AgentConfigPanel({
               <option value="fresh-tmpdir">fresh-tmpdir</option>
               <option value="repo-clone">repo-clone</option>
               <option value="inherit">inherit</option>
-              <option value="ticket-branch">ticket-branch (phase 5)</option>
+              <option value="ticket-branch">ticket-branch (coming soon)</option>
             </select>
           </Field>
 

@@ -1,5 +1,7 @@
+import { execFile } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { promisify } from 'node:util';
 import { Context } from '@temporalio/activity';
 import {
   WorkspaceManager,
@@ -86,8 +88,11 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
       upstreamPath: input.upstreamWorkspacePath,
     });
 
-    await publishSystemEvent(runId, node.name, systemMessage(node, workspace.path));
-    await writeSystemLog(runId, node.name, systemMessage(node, workspace.path));
+    const startupMessage = systemMessage(node, workspace.path);
+    await Promise.all([
+      publishSystemEvent(runId, node.name, startupMessage),
+      writeSystemLog(runId, node.name, startupMessage),
+    ]);
 
     const skills = node.skills.length > 0 ? await discoverSkills({ cwd: workspace.path }) : [];
     const selected = skills.filter((s) => node.skills.some((r) => r.skillId === s.id));
@@ -142,8 +147,6 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
       },
     });
 
-    // Single-node Phase 1 runs terminate here — the `.conduit/` folder is
-    // cleaned up by `cleanupRunActivity` once the whole workflow finishes.
     return { files, workspacePath: workspace.path };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -200,6 +203,8 @@ function systemMessage(node: AgentConfig, workspacePath: string): string {
   return `workspace ${node.workspace.kind} · ${node.provider}/${node.model} · ${workspacePath}`;
 }
 
+const execFileAsync = promisify(execFile);
+
 /**
  * Write a minimal `.conduit/<NodeName>.md` placeholder so downstream agents
  * always see a file — even if the agent forgot to write one. Agents are
@@ -207,18 +212,17 @@ function systemMessage(node: AgentConfig, workspacePath: string): string {
  */
 async function writeConduitSummary(workspacePath: string, node: AgentConfig): Promise<void> {
   const file = path.join(workspacePath, '.conduit', `${node.name}.md`);
-  try {
-    await fs.access(file);
-    return; // agent already wrote it
-  } catch {
-    // fall through
-  }
   await fs.mkdir(path.dirname(file), { recursive: true });
-  await fs.writeFile(
-    file,
-    `# ${node.name}\n\n(Agent did not write a summary for this run.)\n`,
-    'utf8',
-  );
+  try {
+    await fs.writeFile(
+      file,
+      `# ${node.name}\n\n(Agent did not write a summary for this run.)\n`,
+      { encoding: 'utf8', flag: 'wx' },
+    );
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
+    // Agent already wrote a summary — leave it intact.
+  }
 }
 
 /**
@@ -227,22 +231,12 @@ async function writeConduitSummary(workspacePath: string, node: AgentConfig): Pr
  */
 async function listChangedFiles(workspacePath: string): Promise<string[]> {
   try {
-    const { spawn } = await import('node:child_process');
-    return await new Promise((resolve) => {
-      const child = spawn('git', ['status', '--porcelain'], { cwd: workspacePath });
-      const chunks: Buffer[] = [];
-      child.stdout.on('data', (c: Buffer) => chunks.push(c));
-      child.on('close', () => {
-        const out = Buffer.concat(chunks).toString('utf8');
-        const files = out
-          .split('\n')
-          .filter(Boolean)
-          .map((line) => line.slice(3).trim())
-          .filter(Boolean);
-        resolve(files);
-      });
-      child.on('error', () => resolve([]));
-    });
+    const { stdout } = await execFileAsync('git', ['status', '--porcelain'], { cwd: workspacePath });
+    return stdout
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => line.slice(3).trim())
+      .filter(Boolean);
   } catch {
     return [];
   }

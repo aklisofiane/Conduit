@@ -9,7 +9,11 @@
     "emitDecoratorMetadata": true,
     "composite": false,
     "declaration": false,
-    "declarationMap": false
+    "declarationMap": false,
+    "baseUrl": ".",
+    "paths": {
+      "@conduit/shared/crypto": ["../../packages/shared/src/crypto/index.ts"]
+    }
   },
   "include": ["src"],
   "references": [

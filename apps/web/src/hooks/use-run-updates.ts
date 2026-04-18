@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { io, type Socket } from 'socket.io-client';
+import { agentEventToLogKind } from '@conduit/shared';
 import { apiBaseUrl } from '../api/client.js';
 import { runKey, runLogsKey } from '../api/hooks.js';
 import type { ExecutionLogRow, RunUpdateFrame } from '../api/types.js';
@@ -42,25 +43,23 @@ export function useRunUpdates(runId: string | undefined): RunUpdateFrame | undef
   return latest;
 }
 
+function frameKind(frame: RunUpdateFrame): ExecutionLogRow['kind'] {
+  return frame.event.type === 'system'
+    ? 'SYSTEM'
+    : agentEventToLogKind(frame.event.type);
+}
+
 function appendFrameToCache(
   qc: ReturnType<typeof useQueryClient>,
   frame: RunUpdateFrame,
 ): void {
-  const kindByType: Record<string, ExecutionLogRow['kind']> = {
-    text: 'TEXT',
-    tool_call: 'TOOL_CALL',
-    tool_result: 'TOOL_RESULT',
-    usage: 'USAGE',
-    done: 'SYSTEM',
-    system: 'SYSTEM',
-  };
   const row: ExecutionLogRow = {
     id: `live-${frame.ts}-${Math.random().toString(36).slice(2, 8)}`,
     runId: frame.runId,
     nodeName: frame.nodeName,
     ts: frame.ts,
     level: 'INFO',
-    kind: kindByType[frame.event.type] ?? 'SYSTEM',
+    kind: frameKind(frame),
     payload: frame.event,
   };
 

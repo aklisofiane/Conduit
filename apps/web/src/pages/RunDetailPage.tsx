@@ -6,6 +6,7 @@ import { RunTimeline } from '../components/run/RunTimeline.js';
 import { useRunUpdates } from '../hooks/use-run-updates.js';
 import { duration, relativeFromNow } from '../lib/time.js';
 import { cn } from '../lib/cn.js';
+import { statusClass } from '../lib/status.js';
 
 export function RunDetailPage() {
   const { runId } = useParams<{ runId: string }>();
@@ -15,10 +16,12 @@ export function RunDetailPage() {
   const [selectedNode, setSelectedNode] = useState<string | undefined>(undefined);
 
   useEffect(() => {
-    if (!selectedNode && run?.nodes?.[0]) setSelectedNode(run.nodes[0].nodeName);
-  }, [run, selectedNode]);
+    const first = run?.nodes?.[0]?.nodeName;
+    if (first) setSelectedNode((prev) => prev ?? first);
+  }, [run]);
 
   const { data: logs = [] } = useRunLogs(runId, selectedNode);
+  const orderedEvents = useOrderedEvents(logs);
 
   const status = run?.status ?? 'PENDING';
   const streaming = status === 'RUNNING' || status === 'PENDING';
@@ -138,7 +141,7 @@ export function RunDetailPage() {
             )}
           </div>
           <div className="min-h-0 flex-1">
-            <RunTimeline events={useOrderedEvents(logs)} streaming={streaming} />
+            <RunTimeline events={orderedEvents} streaming={streaming} />
           </div>
         </section>
       </div>
@@ -199,21 +202,6 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function statusClass(status: string): string {
-  switch (status) {
-    case 'COMPLETED':
-      return 'ok';
-    case 'RUNNING':
-      return 'running';
-    case 'FAILED':
-      return 'error';
-    case 'CANCELLED':
-      return 'paused';
-    default:
-      return 'pending';
-  }
-}
-
 function labelForStatus(status: string): string {
   switch (status) {
     case 'COMPLETED':
@@ -246,10 +234,9 @@ function statusBadgeClass(status: string): string {
   }
 }
 
-/** Dedupe live frames that duplicated a server row once it persisted. */
 function useOrderedEvents(events: ExecutionLogRow[]) {
-  return useMemo(() => {
-    const sorted = [...events].sort((a, b) => new Date(a.ts).getTime() - new Date(b.ts).getTime());
-    return sorted;
-  }, [events]);
+  return useMemo(
+    () => [...events].sort((a, b) => new Date(a.ts).getTime() - new Date(b.ts).getTime()),
+    [events],
+  );
 }

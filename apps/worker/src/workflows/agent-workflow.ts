@@ -30,9 +30,9 @@ export interface AgentWorkflowInput {
 }
 
 /**
- * Phase 1 workflow: single-group, sequential execution. Parallel fan-out
- * + merge-back + `.conduit/` copy land in Phase 3. The topo-sort helper is
- * wired in now so callers never change — only the per-group body does.
+ * Sequential, group-at-a-time execution. Each topo group runs in parallel
+ * and the next group waits for the previous one. The handler is graph-shape
+ * agnostic so adding parallel fan-out only requires the data side.
  */
 export async function agentWorkflow(input: AgentWorkflowInput): Promise<void> {
   const { workflowId, runId, triggerEvent } = input;
@@ -42,7 +42,8 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<void> {
     const groups = topoSortGroups(graph.nodes, graph.edges);
 
     // Workspace handoff for inherited workspaces — maps upstream node name
-    // to its resolved workspace path. Phase 1: sequential only.
+    // to its resolved workspace path so downstream `inherit` nodes can pick
+    // up where the parent left off.
     const workspacePaths = new Map<string, string>();
 
     for (const group of groups) {

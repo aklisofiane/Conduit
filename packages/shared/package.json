@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "description": "Shared types and Zod schemas for Conduit (workflows, agents, triggers, MCP, runtime events).",
+  "sideEffects": false,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -41,6 +42,10 @@
     "./runtime": {
       "types": "./dist/runtime/index.d.ts",
       "default": "./dist/runtime/index.js"
+    },
+    "./temporal": {
+      "types": "./dist/temporal/index.d.ts",
+      "default": "./dist/temporal/index.js"
     }
   },
   "files": [

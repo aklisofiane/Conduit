@@ -3,13 +3,13 @@ import { useCreateWorkflow, useWorkflows } from '../api/hooks.js';
 import type { WorkflowRow } from '../api/types.js';
 import { duration, relativeFromNow } from '../lib/time.js';
 import { cn } from '../lib/cn.js';
+import { statusClass } from '../lib/status.js';
 
 /**
  * Workflow list — the landing screen. Matches the mockup's layout: greeting
- * strip + attention band (when something failed) + stats (aggregated) +
- * workflow table. Attention band is skipped in Phase 1 until failure
- * aggregation is wired up; stats card row is kept as a visual placeholder so
- * the page shape stays recognizable.
+ * strip + stats (aggregated) + workflow table. The mockup also has an
+ * attention band when something failed; that's gated on failure aggregation
+ * which doesn't exist yet, so the band is omitted.
  */
 export function HomePage() {
   const { data: workflows = [], isLoading } = useWorkflows();
@@ -163,21 +163,6 @@ function EmptyRow({ text }: { text: string }) {
       {text}
     </div>
   );
-}
-
-function statusClass(status: string | undefined): string {
-  switch (status) {
-    case 'COMPLETED':
-      return 'ok';
-    case 'RUNNING':
-      return 'running';
-    case 'FAILED':
-      return 'error';
-    case 'CANCELLED':
-      return 'paused';
-    default:
-      return 'pending';
-  }
 }
 
 function triggerSummary(def: WorkflowRow['definition']): string {

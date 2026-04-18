@@ -49,21 +49,29 @@ export class WorkflowsService {
   }
 
   async update(id: string, dto: UpdateWorkflowDto) {
-    await this.get(id);
-    return this.prisma.workflow.update({
-      where: { id },
-      data: {
-        name: dto.name,
-        description: dto.description,
-        definition: dto.definition as unknown as object | undefined,
-        isActive: dto.isActive,
-      },
-    });
+    try {
+      return await this.prisma.workflow.update({
+        where: { id },
+        data: {
+          name: dto.name,
+          description: dto.description,
+          definition: dto.definition as unknown as object | undefined,
+          isActive: dto.isActive,
+        },
+      });
+    } catch (err) {
+      if (isPrismaNotFound(err)) throw new NotFoundException(`Workflow ${id} not found`);
+      throw err;
+    }
   }
 
   async delete(id: string) {
-    await this.get(id);
-    await this.prisma.workflow.delete({ where: { id } });
+    try {
+      await this.prisma.workflow.delete({ where: { id } });
+    } catch (err) {
+      if (isPrismaNotFound(err)) throw new NotFoundException(`Workflow ${id} not found`);
+      throw err;
+    }
   }
 
   /**
@@ -99,6 +107,14 @@ export class WorkflowsService {
       throw err;
     }
   }
+}
+
+function isPrismaNotFound(err: unknown): boolean {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    (err as { code?: string }).code === 'P2025'
+  );
 }
 
 function buildManualTriggerEvent(

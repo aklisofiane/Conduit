@@ -4,9 +4,9 @@ import { makeCredentialLookup } from './credential-lookup';
 
 /**
  * Hydrate the subset of `WorkflowConnection` the workspace manager needs
- * for a clone. Phase 1 only supports GitHub repos, so missing owner/repo
- * on a `repo-clone` workspace is an error at this layer rather than a
- * silent-clone-of-something-wrong.
+ * for a clone. Missing owner/repo on a `repo-clone` workspace surfaces as
+ * `undefined` here so the caller can throw rather than silently cloning
+ * the wrong thing.
  */
 export async function loadConnectionContext(
   connectionId: string,

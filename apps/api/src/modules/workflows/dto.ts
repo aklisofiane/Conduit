@@ -2,9 +2,9 @@ import { z } from 'zod';
 import { workflowDefinitionSchema } from '@conduit/shared';
 
 /**
- * Phase 1 intentionally accepts partial definitions — the UI may save
- * drafts without a fully-wired trigger. Deep validation (cycles, name
- * uniqueness, workspace inheritance) is layered on top at run time.
+ * Accepts partial definitions so the UI can save drafts without a
+ * fully-wired trigger. Deep validation (cycles, name uniqueness, workspace
+ * inheritance) is layered on top at run time.
  */
 export const createWorkflowDtoSchema = z.object({
   name: z.string().min(1).max(120),

@@ -5,9 +5,9 @@ interface NodePaletteProps {
 }
 
 /**
- * Left rail palette — mimics the mockup's design. Phase 1 only surfaces
- * the "add agent" cards; triggers are editable via the trigger node click
- * rather than dragged from the palette (only one trigger per workflow).
+ * Left rail palette — mimics the mockup's design. Only "add agent" cards
+ * are surfaced; triggers are editable via the trigger node click rather
+ * than dragged from the palette (only one trigger per workflow).
  */
 export function NodePalette({ onAddAgent }: NodePaletteProps) {
   return (

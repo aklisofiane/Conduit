@@ -71,30 +71,48 @@ export async function discoverSkills(opts: DiscoverOptions = {}): Promise<Discov
   return out;
 }
 
+/** Frontmatter rarely exceeds a few hundred bytes; cap the read so a giant
+ * SKILL.md doesn't get fully loaded into memory just to list skills. */
+const FRONT_MATTER_READ_BYTES = 2048;
+
 async function scanRoot(
   base: string,
   source: 'repo' | 'worker',
   provider: 'claude' | 'codex',
 ): Promise<DiscoveredSkill[]> {
   const entries = await fs.readdir(base, { withFileTypes: true }).catch(() => []);
-  const skills: DiscoveredSkill[] = [];
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
-    const dir = path.join(base, entry.name);
-    const skillFile = path.join(dir, 'SKILL.md');
-    const raw = await fs.readFile(skillFile, 'utf8').catch(() => undefined);
-    if (raw === undefined) continue;
-    const meta = parseFrontMatter(raw);
-    skills.push({
-      id: meta.name ?? entry.name,
-      name: meta.name ?? entry.name,
-      description: meta.description ?? '',
-      path: dir,
-      source,
-      provider,
-    });
+  const dirs = entries.filter((e) => e.isDirectory());
+  const results = await Promise.all(
+    dirs.map(async (entry): Promise<DiscoveredSkill | undefined> => {
+      const dir = path.join(base, entry.name);
+      const head = await readFileHead(path.join(dir, 'SKILL.md'), FRONT_MATTER_READ_BYTES);
+      if (head === undefined) return undefined;
+      const meta = parseFrontMatter(head);
+      return {
+        id: meta.name ?? entry.name,
+        name: meta.name ?? entry.name,
+        description: meta.description ?? '',
+        path: dir,
+        source,
+        provider,
+      };
+    }),
+  );
+  return results.filter((s): s is DiscoveredSkill => s !== undefined);
+}
+
+async function readFileHead(file: string, bytes: number): Promise<string | undefined> {
+  let handle: Awaited<ReturnType<typeof fs.open>> | undefined;
+  try {
+    handle = await fs.open(file, 'r');
+    const buffer = Buffer.alloc(bytes);
+    const { bytesRead } = await handle.read(buffer, 0, bytes, 0);
+    return buffer.slice(0, bytesRead).toString('utf8');
+  } catch {
+    return undefined;
+  } finally {
+    await handle?.close().catch(() => undefined);
   }
-  return skills;
 }
 
 function parseFrontMatter(src: string): { name?: string; description?: string } {

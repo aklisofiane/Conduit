@@ -10,11 +10,10 @@ import type {
 } from './types';
 
 /**
- * Workspace manager for Phase 1: covers `fresh-tmpdir`, `repo-clone`, and
- * sequential `inherit`. Parallel branching, `ticket-branch`, merge-back are
- * added in later phases (see docs/PLANS.md). Design goal here is to expose a
- * single `resolve()` call that runAgentNode can await without knowing about
- * git internals.
+ * Resolves a workspace spec into a concrete on-disk path. Currently
+ * supports `fresh-tmpdir`, `repo-clone`, and `inherit`; `ticket-branch`
+ * is reserved (see docs/PLANS.md). Goal of the abstraction: runAgentNode
+ * gets a single `resolve()` call without touching git internals.
  */
 export class WorkspaceManager {
   async resolve(input: WorkspaceResolveInput): Promise<ResolvedWorkspace> {
@@ -42,7 +41,7 @@ export class WorkspaceManager {
         return { path: input.upstreamPath, kind: 'inherit' };
       }
       case 'ticket-branch':
-        throw new WorkspaceError('ticket-branch workspaces land in Phase 5 (see docs/PLANS.md)');
+        throw new WorkspaceError('ticket-branch workspaces are not yet supported (see docs/PLANS.md)');
       default: {
         const _exhaustive: never = spec;
         throw new WorkspaceError(`Unknown workspace kind: ${String(_exhaustive)}`);

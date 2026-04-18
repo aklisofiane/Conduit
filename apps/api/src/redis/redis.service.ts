@@ -1,15 +1,9 @@
 import { Injectable, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { Redis } from 'ioredis';
+import { RUN_UPDATES_CHANNEL, type RunUpdateMessage } from '@conduit/shared';
 import { config } from '../config';
 
-export const RUN_UPDATES_CHANNEL = 'conduit:run-updates';
-
-export interface RunUpdateMessage {
-  runId: string;
-  nodeName: string;
-  event: unknown;
-  ts: string;
-}
+export type { RunUpdateMessage };
 
 /**
  * One Redis connection for publishing, one for subscribing — required by

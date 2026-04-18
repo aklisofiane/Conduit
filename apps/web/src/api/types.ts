@@ -1,6 +1,11 @@
 import type {
   AgentEvent,
   DiscoveredTool,
+  ExecutionLogKind,
+  LogLevel,
+  NodeType,
+  RunStatus,
+  RunUpdateMessage,
   WorkflowDefinition,
 } from '@conduit/shared';
 
@@ -24,8 +29,6 @@ export interface WorkflowRunSummary {
   error: string | null;
 }
 
-export type RunStatus = 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
-
 export interface RunDetail extends WorkflowRunSummary {
   workflowId: string;
   workflow: { id: string; name: string; definition: WorkflowDefinition };
@@ -46,7 +49,7 @@ export interface NodeRunRow {
   id: string;
   runId: string;
   nodeName: string;
-  nodeType: 'AGENT' | 'TRIGGER';
+  nodeType: NodeType;
   status: RunStatus;
   startedAt: string | null;
   finishedAt: string | null;
@@ -61,8 +64,8 @@ export interface ExecutionLogRow {
   runId: string;
   nodeName: string | null;
   ts: string;
-  level: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
-  kind: 'TEXT' | 'TOOL_CALL' | 'TOOL_RESULT' | 'USAGE' | 'SYSTEM';
+  level: LogLevel;
+  kind: ExecutionLogKind;
   payload: unknown;
 }
 
@@ -86,11 +89,6 @@ export interface DiscoveredSkill {
   provider: 'claude' | 'codex' | 'both';
 }
 
-export type { AgentEvent, DiscoveredTool };
+export type { AgentEvent, DiscoveredTool, RunStatus, NodeType, ExecutionLogKind };
 
-export interface RunUpdateFrame {
-  runId: string;
-  nodeName: string;
-  event: AgentEvent | { type: 'system'; message: string };
-  ts: string;
-}
+export type RunUpdateFrame = RunUpdateMessage;
