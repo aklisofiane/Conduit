@@ -23,7 +23,7 @@
 ## Tech stack
 
 **Runtime & tooling**
-- Node.js 25
+- Node.js 22 (see `.nvmrc`)
 - npm workspaces + Turborepo
 - TypeScript
 - ESLint + Prettier (lint/format)
@@ -171,6 +171,7 @@ All routes prefixed `/api`. Non-webhook routes require `X-API-Key` header (see [
 ## Key conventions
 
 - **Zod in `@conduit/shared`** = single source of truth. Same schemas validate API requests and UI forms.
+- **Domain subpath exports from `@conduit/shared`** — consumers import `@conduit/shared/agent`, `/trigger`, `/mcp`, `/workflow`, `/runtime`, `/workspace`, `/skill`, `/platform` rather than a single barrel, so each app only pulls the schemas it actually uses. The root barrel still re-exports everything for convenience.
 - **Node names are stable identifiers** (user-editable, validated unique within a workflow). Each agent writes `.conduit/<NodeName>.md` in the workspace; downstream agents read the folder for upstream context.
 - **Tools are MCP servers.** No custom tool registry. Agent nodes declare which MCP servers to connect to; credentials are injected as env vars when spawning the server process.
 - **Vite alias** `@conduit/shared` → `packages/shared/src/index.ts` (no build step during web dev).

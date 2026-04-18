@@ -23,6 +23,29 @@ Conduit connects to your project board (GitHub Projects, GitLab boards, Jira) an
 - **Run observability** — live timeline of agent events (text, tools, tokens) on the run detail page
 - **Temporal for durability** — crash recovery, retries, cancellation out of the box
 
+## Development
+
+Prerequisites: Node.js 22 (`nvm use`), npm 10+, Docker.
+
+```bash
+nvm use
+npm install
+cp .env.example .env
+npm run infra:up           # Postgres (5434), Temporal (7233 / UI 8080), Redis (6379)
+npm run db:push            # apply Prisma schema
+```
+
+Common scripts (all run through Turborepo where applicable):
+
+| Command | What it does |
+|---|---|
+| `npm run dev` / `build` / `typecheck` / `lint` / `test` | Pipeline across all workspaces |
+| `npm run format` / `format:check` | Prettier |
+| `npm run db:push` / `db:generate` / `db:studio` | Prisma (dev uses `db push`; migrations once schema stabilizes) |
+| `npm run infra:up` / `infra:down` / `infra:logs` | Manage Docker infra |
+
+Workspaces: `packages/*` (libraries) and `apps/*` (services, added in later phases). A single root `.env` is read by every app — `dotenv-cli` forwards it into the Prisma CLI.
+
 ## Documentation
 
 See [docs/INDEX.md](docs/INDEX.md) for the full spec.
