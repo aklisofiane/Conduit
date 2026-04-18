@@ -3,45 +3,44 @@
   "version": "0.0.0",
   "private": true,
   "description": "Shared types and Zod schemas for Conduit (workflows, agents, triggers, MCP, runtime events).",
-  "type": "module",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
-      "default": "./src/index.ts"
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
     },
     "./platform": {
-      "types": "./src/platform/index.ts",
-      "default": "./src/platform/index.ts"
+      "types": "./dist/platform/index.d.ts",
+      "default": "./dist/platform/index.js"
     },
     "./trigger": {
-      "types": "./src/trigger/index.ts",
-      "default": "./src/trigger/index.ts"
+      "types": "./dist/trigger/index.d.ts",
+      "default": "./dist/trigger/index.js"
     },
     "./mcp": {
-      "types": "./src/mcp/index.ts",
-      "default": "./src/mcp/index.ts"
+      "types": "./dist/mcp/index.d.ts",
+      "default": "./dist/mcp/index.js"
     },
     "./workspace": {
-      "types": "./src/workspace/index.ts",
-      "default": "./src/workspace/index.ts"
+      "types": "./dist/workspace/index.d.ts",
+      "default": "./dist/workspace/index.js"
     },
     "./skill": {
-      "types": "./src/skill/index.ts",
-      "default": "./src/skill/index.ts"
+      "types": "./dist/skill/index.d.ts",
+      "default": "./dist/skill/index.js"
     },
     "./agent": {
-      "types": "./src/agent/index.ts",
-      "default": "./src/agent/index.ts"
+      "types": "./dist/agent/index.d.ts",
+      "default": "./dist/agent/index.js"
     },
     "./workflow": {
-      "types": "./src/workflow/index.ts",
-      "default": "./src/workflow/index.ts"
+      "types": "./dist/workflow/index.d.ts",
+      "default": "./dist/workflow/index.js"
     },
     "./runtime": {
-      "types": "./src/runtime/index.ts",
-      "default": "./src/runtime/index.ts"
+      "types": "./dist/runtime/index.d.ts",
+      "default": "./dist/runtime/index.js"
     }
   },
   "files": [
@@ -49,8 +48,9 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "tsc --build",
+    "dev": "tsc --build --watch --preserveWatchOutput",
+    "typecheck": "tsc --noEmit",
     "lint": "eslint src",
     "test": "vitest run"
   },

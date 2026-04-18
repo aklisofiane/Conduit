@@ -5,7 +5,7 @@ import type {
   ResolvedMcpServer,
   WorkflowMcpServer,
 } from '@conduit/shared';
-import { ValidationError } from '../errors/index.js';
+import { ValidationError } from '../errors/index';
 
 /**
  * Credential secret looked up by connectionId. Plaintext lives in memory

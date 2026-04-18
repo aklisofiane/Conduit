@@ -9,15 +9,15 @@ import {
   Put,
   UseGuards,
 } from '@nestjs/common';
-import { ApiKeyGuard } from '../../common/api-key.guard.js';
-import { ZodBodyPipe } from '../../common/zod-body.pipe.js';
-import { CredentialsService } from './credentials.service.js';
+import { ApiKeyGuard } from '../../common/api-key.guard';
+import { ZodBodyPipe } from '../../common/zod-body.pipe';
+import { CredentialsService } from './credentials.service';
 import {
   type CreateCredentialDto,
   type UpdateCredentialDto,
   createCredentialDtoSchema,
   updateCredentialDtoSchema,
-} from './dto.js';
+} from './dto';
 
 @UseGuards(ApiKeyGuard)
 @Controller('credentials')

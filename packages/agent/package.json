@@ -3,33 +3,32 @@
   "version": "0.0.0",
   "private": true,
   "description": "Agent provider abstraction, workspace manager, MCP config resolver, skill discovery for Conduit.",
-  "type": "module",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
-      "default": "./src/index.ts"
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
     },
     "./provider": {
-      "types": "./src/provider/index.ts",
-      "default": "./src/provider/index.ts"
+      "types": "./dist/provider/index.d.ts",
+      "default": "./dist/provider/index.js"
     },
     "./workspace": {
-      "types": "./src/workspace/index.ts",
-      "default": "./src/workspace/index.ts"
+      "types": "./dist/workspace/index.d.ts",
+      "default": "./dist/workspace/index.js"
     },
     "./mcp": {
-      "types": "./src/mcp/index.ts",
-      "default": "./src/mcp/index.ts"
+      "types": "./dist/mcp/index.d.ts",
+      "default": "./dist/mcp/index.js"
     },
     "./skill": {
-      "types": "./src/skill/index.ts",
-      "default": "./src/skill/index.ts"
+      "types": "./dist/skill/index.d.ts",
+      "default": "./dist/skill/index.js"
     },
     "./errors": {
-      "types": "./src/errors/index.ts",
-      "default": "./src/errors/index.ts"
+      "types": "./dist/errors/index.d.ts",
+      "default": "./dist/errors/index.js"
     }
   },
   "files": [
@@ -37,8 +36,9 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "tsc --build",
+    "dev": "tsc --build --watch --preserveWatchOutput",
+    "typecheck": "tsc --noEmit",
     "lint": "eslint src",
     "test": "vitest run"
   },

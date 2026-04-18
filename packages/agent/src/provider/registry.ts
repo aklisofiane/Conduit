@@ -1,6 +1,6 @@
 import type { AgentProviderId } from '@conduit/shared';
-import { ClaudeProvider } from './claude-provider.js';
-import type { AgentProvider } from './types.js';
+import { ClaudeProvider } from './claude-provider';
+import type { AgentProvider } from './types';
 
 /**
  * Selects a provider adapter by id. Codex lands in Phase 2; for Phase 1 a

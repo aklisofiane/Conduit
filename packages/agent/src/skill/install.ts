@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import type { DiscoveredSkill } from './discover.js';
+import type { DiscoveredSkill } from './discover';
 
 const DEST_BY_PROVIDER: Record<'claude' | 'codex', string> = {
   claude: '.claude/skills',

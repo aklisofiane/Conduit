@@ -8,6 +8,9 @@
     "jsx": "react-jsx",
     "lib": ["DOM", "DOM.Iterable", "ES2023"],
     "types": ["vite/client"],
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
     "baseUrl": ".",
     "paths": {
       "@conduit/shared": ["../../packages/shared/src/index.ts"],
@@ -15,5 +18,5 @@
       "@/*": ["src/*"]
     }
   },
-  "include": ["src/**/*"]
+  "include": ["src"]
 }

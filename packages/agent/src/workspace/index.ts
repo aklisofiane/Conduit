@@ -1,15 +1,15 @@
-export { WorkspaceManager } from './manager.js';
+export { WorkspaceManager } from './manager';
 export type {
   ConnectionContext,
   ResolvedWorkspace,
   WorkspaceResolveInput,
   WorkspaceSpec,
-} from './types.js';
+} from './types';
 export {
   conduitHome,
   runsRoot,
   baseClonesRoot,
   runDir,
   nodeWorkspacePath,
-} from './paths.js';
-export { readConduitSummaries, clearConduitFolder } from './conduit-folder.js';
+} from './paths';
+export { readConduitSummaries, clearConduitFolder } from './conduit-folder';

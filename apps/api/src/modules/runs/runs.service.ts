@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../common/prisma.service.js';
-import { TemporalService } from '../../temporal/temporal.service.js';
+import { PrismaService } from '../../common/prisma.service';
+import { TemporalService } from '../../temporal/temporal.service';
 
 export interface LogsQuery {
   nodeName?: string;

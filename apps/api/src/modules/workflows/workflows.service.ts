@@ -1,9 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { TriggerEvent, WorkflowDefinition } from '@conduit/shared';
-import { PrismaService } from '../../common/prisma.service.js';
-import { TemporalService } from '../../temporal/temporal.service.js';
-import type { CreateWorkflowDto, ManualRunDto, UpdateWorkflowDto } from './dto.js';
-import { defaultDefinition } from './defaults.js';
+import { PrismaService } from '../../common/prisma.service';
+import { TemporalService } from '../../temporal/temporal.service';
+import type { CreateWorkflowDto, ManualRunDto, UpdateWorkflowDto } from './dto';
+import { defaultDefinition } from './defaults';
 
 @Injectable()
 export class WorkflowsService {

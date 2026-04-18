@@ -1,8 +1,8 @@
 import { Body, Controller, Post, UseGuards } from '@nestjs/common';
-import { ApiKeyGuard } from '../../common/api-key.guard.js';
-import { ZodBodyPipe } from '../../common/zod-body.pipe.js';
-import { type IntrospectMcpDto, introspectMcpDtoSchema } from './dto.js';
-import { McpService } from './mcp.service.js';
+import { ApiKeyGuard } from '../../common/api-key.guard';
+import { ZodBodyPipe } from '../../common/zod-body.pipe';
+import { type IntrospectMcpDto, introspectMcpDtoSchema } from './dto';
+import { McpService } from './mcp.service';
 
 @UseGuards(ApiKeyGuard)
 @Controller('mcp')

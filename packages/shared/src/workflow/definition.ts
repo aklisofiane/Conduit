@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { agentConfigSchema } from '../agent/index.js';
-import { triggerConfigSchema } from '../trigger/index.js';
-import { workflowMcpServerSchema } from '../mcp/index.js';
-import { edgeSchema } from './edge.js';
-import { canvasUiSchema } from './canvas.js';
+import { agentConfigSchema } from '../agent/index';
+import { triggerConfigSchema } from '../trigger/index';
+import { workflowMcpServerSchema } from '../mcp/index';
+import { edgeSchema } from './edge';
+import { canvasUiSchema } from './canvas';
 
 /**
  * Full workflow definition stored in `Workflow.definition` (JSON column).

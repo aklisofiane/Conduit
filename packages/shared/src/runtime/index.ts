@@ -1,3 +1,3 @@
-export * from './event.js';
-export * from './request.js';
-export * from './capabilities.js';
+export * from './event';
+export * from './request';
+export * from './capabilities';

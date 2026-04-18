@@ -3,11 +3,18 @@
   "compilerOptions": {
     "rootDir": "src",
     "outDir": "dist",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext"
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false
   },
-  "include": ["src/**/*"]
+  "include": ["src"],
+  "references": [
+    { "path": "../../packages/shared" },
+    { "path": "../../packages/database" },
+    { "path": "../../packages/agent" }
+  ]
 }

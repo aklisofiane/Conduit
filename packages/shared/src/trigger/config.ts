@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { triggerSourceSchema } from '../platform/index.js';
-import { triggerFilterSchema } from './filter.js';
-import { triggerModeSchema } from './mode.js';
+import { triggerSourceSchema } from '../platform/index';
+import { triggerFilterSchema } from './filter';
+import { triggerModeSchema } from './mode';
 
 /** Persisted trigger shape on `WorkflowDefinition.trigger`. */
 export const triggerConfigSchema = z.object({

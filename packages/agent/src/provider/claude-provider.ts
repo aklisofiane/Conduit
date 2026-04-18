@@ -1,6 +1,6 @@
 import type { AgentEvent, AgentRequest, ProviderCapabilities } from '@conduit/shared';
-import { ConstraintExceededError } from '../errors/index.js';
-import type { AgentProvider } from './types.js';
+import { ConstraintExceededError } from '../errors/index';
+import type { AgentProvider } from './types';
 
 /**
  * ClaudeProvider wraps `@anthropic-ai/claude-agent-sdk`. Deliberately kept as

@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { mcpTransportSchema } from './transport.js';
-import { discoveredToolSchema } from './tool.js';
+import { mcpTransportSchema } from './transport';
+import { discoveredToolSchema } from './tool';
 
 /**
  * MCP server declared at the workflow level and referenced by agent nodes.

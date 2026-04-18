@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { nodeNameSchema } from '../agent/node-name.js';
+import { nodeNameSchema } from '../agent/node-name';
 
 /**
  * Edges declare execution order only — they carry no config and no condition.

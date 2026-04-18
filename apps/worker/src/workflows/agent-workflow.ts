@@ -1,7 +1,7 @@
 import { proxyActivities } from '@temporalio/workflow';
 import type { NodeOutput, TriggerEvent } from '@conduit/shared';
-import type * as activities from '../activities/index.js';
-import { topoSortGroups } from './topo-sort.js';
+import type * as activities from '../activities/index';
+import { topoSortGroups } from './topo-sort';
 
 const {
   loadGraphActivity,

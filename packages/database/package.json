@@ -3,13 +3,12 @@
   "version": "0.0.0",
   "private": true,
   "description": "Prisma schema and client for Conduit.",
-  "type": "module",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
-      "default": "./src/index.ts"
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
     }
   },
   "files": [
@@ -18,8 +17,9 @@
     "prisma"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "tsc --build",
+    "dev": "tsc --build --watch --preserveWatchOutput",
+    "typecheck": "tsc --noEmit",
     "lint": "eslint src",
     "db:push": "prisma db push --skip-generate && prisma generate",
     "db:generate": "prisma generate",

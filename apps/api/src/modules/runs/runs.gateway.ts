@@ -1,8 +1,8 @@
 import type { OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect } from '@nestjs/websockets';
 import { WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import type { Server, Socket } from 'socket.io';
-import { config } from '../../config.js';
-import { RedisService } from '../../redis/redis.service.js';
+import { config } from '../../config';
+import { RedisService } from '../../redis/redis.service';
 
 /**
  * Socket.IO gateway that fans Redis run-update messages out to subscribed

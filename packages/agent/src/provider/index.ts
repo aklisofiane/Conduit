@@ -1,3 +1,3 @@
-export { ClaudeProvider } from './claude-provider.js';
-export { resolveProvider } from './registry.js';
-export type { AgentProvider } from './types.js';
+export { ClaudeProvider } from './claude-provider';
+export { resolveProvider } from './registry';
+export type { AgentProvider } from './types';

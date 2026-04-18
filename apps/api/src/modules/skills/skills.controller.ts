@@ -1,6 +1,6 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
 import { discoverSkills } from '@conduit/agent';
-import { ApiKeyGuard } from '../../common/api-key.guard.js';
+import { ApiKeyGuard } from '../../common/api-key.guard';
 
 @UseGuards(ApiKeyGuard)
 @Controller('skills')

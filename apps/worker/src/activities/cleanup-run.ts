@@ -1,6 +1,6 @@
 import { WorkspaceManager } from '@conduit/agent';
-import { prisma } from '../runtime/prisma.js';
-import { writeSystemLog } from '../runtime/log-writer.js';
+import { prisma } from '../runtime/prisma';
+import { writeSystemLog } from '../runtime/log-writer';
 
 /**
  * End-of-workflow cleanup. Deletes workspace tmpdirs for the run; `.conduit/`

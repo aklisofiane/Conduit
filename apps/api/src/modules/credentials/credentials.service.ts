@@ -1,7 +1,7 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../common/prisma.service.js';
-import type { CreateCredentialDto, UpdateCredentialDto } from './dto.js';
-import { decrypt, encrypt, redactedSuffix } from './crypto.js';
+import { PrismaService } from '../../common/prisma.service';
+import type { CreateCredentialDto, UpdateCredentialDto } from './dto';
+import { decrypt, encrypt, redactedSuffix } from './crypto';
 
 @Injectable()
 export class CredentialsService {

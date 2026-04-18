@@ -1,6 +1,6 @@
 import type { ConnectionContext } from '@conduit/agent';
-import { prisma } from './prisma.js';
-import { makeCredentialLookup } from './credential-lookup.js';
+import { prisma } from './prisma';
+import { makeCredentialLookup } from './credential-lookup';
 
 /**
  * Hydrate the subset of `WorkflowConnection` the workspace manager needs

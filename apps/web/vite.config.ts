@@ -8,6 +8,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   plugins: [react(), tailwind()],
+  // Load VITE_* from the monorepo root .env — matches what apps/api and apps/worker read.
+  envDir: path.resolve(__dirname, '../..'),
   resolve: {
     alias: {
       '@conduit/shared': path.resolve(__dirname, '../../packages/shared/src/index.ts'),

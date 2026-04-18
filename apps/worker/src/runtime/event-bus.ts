@@ -1,6 +1,6 @@
 import { Redis } from 'ioredis';
 import type { AgentEvent } from '@conduit/shared';
-import { config } from '../config.js';
+import { config } from '../config';
 
 export const RUN_UPDATES_CHANNEL = 'conduit:run-updates';
 

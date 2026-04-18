@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { CredentialLookup } from '@conduit/agent';
-import { prisma } from './prisma.js';
+import { prisma } from './prisma';
 
 /**
  * Worker-side mirror of `apps/api/src/modules/credentials/crypto.ts`. Same

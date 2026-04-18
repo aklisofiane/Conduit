@@ -1,5 +1,5 @@
 import type { AgentEvent } from '@conduit/shared';
-import { prisma } from './prisma.js';
+import { prisma } from './prisma';
 
 const KIND_BY_EVENT: Record<AgentEvent['type'], 'TEXT' | 'TOOL_CALL' | 'TOOL_RESULT' | 'USAGE' | 'SYSTEM'> = {
   text: 'TEXT',

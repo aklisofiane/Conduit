@@ -9,8 +9,8 @@ import {
   Put,
   UseGuards,
 } from '@nestjs/common';
-import { ApiKeyGuard } from '../../common/api-key.guard.js';
-import { ZodBodyPipe } from '../../common/zod-body.pipe.js';
+import { ApiKeyGuard } from '../../common/api-key.guard';
+import { ZodBodyPipe } from '../../common/zod-body.pipe';
 import {
   type CreateWorkflowDto,
   type ManualRunDto,
@@ -18,8 +18,8 @@ import {
   createWorkflowDtoSchema,
   manualRunDtoSchema,
   updateWorkflowDtoSchema,
-} from './dto.js';
-import { WorkflowsService } from './workflows.service.js';
+} from './dto';
+import { WorkflowsService } from './workflows.service';
 
 @UseGuards(ApiKeyGuard)
 @Controller('workflows')

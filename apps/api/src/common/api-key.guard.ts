@@ -5,7 +5,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import type { Request } from 'express';
-import { config } from '../config.js';
+import { config } from '../config';
 
 /**
  * Minimal API-key guard: single shared secret in env, checked on every

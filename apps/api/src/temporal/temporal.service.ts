@@ -1,7 +1,7 @@
 import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { Client, Connection } from '@temporalio/client';
 import type { TriggerEvent } from '@conduit/shared';
-import { config } from '../config.js';
+import { config } from '../config';
 
 export const AGENT_WORKFLOW_TYPE = 'agentWorkflow';
 

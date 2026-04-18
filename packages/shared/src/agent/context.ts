@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { triggerEventSchema } from '../trigger/index.js';
+import { triggerEventSchema } from '../trigger/index';
 
 /**
  * Context passed to every agent invocation. Delivered as the provider

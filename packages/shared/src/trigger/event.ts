@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { triggerSourceSchema } from '../platform/index.js';
+import { triggerSourceSchema } from '../platform/index';
 
 /**
  * Normalized event produced by every trigger mode (webhook, polling, manual).

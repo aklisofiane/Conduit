@@ -1,2 +1,2 @@
-export { resolveMcpServers, CREDENTIAL_PLACEHOLDER } from './resolve.js';
-export type { CredentialLookup } from './resolve.js';
+export { resolveMcpServers, CREDENTIAL_PLACEHOLDER } from './resolve';
+export type { CredentialLookup } from './resolve';

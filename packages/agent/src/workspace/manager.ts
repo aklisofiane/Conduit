@@ -1,13 +1,13 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { WorkspaceError } from '../errors/index.js';
-import { git } from './git.js';
-import { baseClonesRoot, nodeWorkspacePath, runDir } from './paths.js';
+import { WorkspaceError } from '../errors/index';
+import { git } from './git';
+import { baseClonesRoot, nodeWorkspacePath, runDir } from './paths';
 import type {
   ConnectionContext,
   ResolvedWorkspace,
   WorkspaceResolveInput,
-} from './types.js';
+} from './types';
 
 /**
  * Workspace manager for Phase 1: covers `fresh-tmpdir`, `repo-clone`, and

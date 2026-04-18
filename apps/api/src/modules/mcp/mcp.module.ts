@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { McpController } from './mcp.controller.js';
-import { McpService } from './mcp.service.js';
+import { McpController } from './mcp.controller';
+import { McpService } from './mcp.service';
 
 @Module({
   controllers: [McpController],

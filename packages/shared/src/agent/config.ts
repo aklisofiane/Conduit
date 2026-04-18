@@ -1,10 +1,10 @@
 import { z } from 'zod';
-import { mcpServerRefSchema } from '../mcp/index.js';
-import { skillRefSchema } from '../skill/index.js';
-import { workspaceSpecSchema } from '../workspace/index.js';
-import { nodeNameSchema } from './node-name.js';
-import { agentProviderIdSchema } from './provider.js';
-import { agentConstraintsSchema } from './constraints.js';
+import { mcpServerRefSchema } from '../mcp/index';
+import { skillRefSchema } from '../skill/index';
+import { workspaceSpecSchema } from '../workspace/index';
+import { nodeNameSchema } from './node-name';
+import { agentProviderIdSchema } from './provider';
+import { agentConstraintsSchema } from './constraints';
 
 /**
  * Agent node — the canvas's second and only runtime node type (trigger is

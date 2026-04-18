@@ -1,13 +1,13 @@
 import { Module } from '@nestjs/common';
-import { CommonModule } from './common/common.module.js';
-import { RedisModule } from './redis/redis.module.js';
-import { TemporalModule } from './temporal/temporal.module.js';
-import { CredentialsModule } from './modules/credentials/credentials.module.js';
-import { HealthModule } from './modules/health/health.module.js';
-import { McpModule } from './modules/mcp/mcp.module.js';
-import { RunsModule } from './modules/runs/runs.module.js';
-import { SkillsModule } from './modules/skills/skills.module.js';
-import { WorkflowsModule } from './modules/workflows/workflows.module.js';
+import { CommonModule } from './common/common.module';
+import { RedisModule } from './redis/redis.module';
+import { TemporalModule } from './temporal/temporal.module';
+import { CredentialsModule } from './modules/credentials/credentials.module';
+import { HealthModule } from './modules/health/health.module';
+import { McpModule } from './modules/mcp/mcp.module';
+import { RunsModule } from './modules/runs/runs.module';
+import { SkillsModule } from './modules/skills/skills.module';
+import { WorkflowsModule } from './modules/workflows/workflows.module';
 
 @Module({
   imports: [

@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { resolvedMcpServerSchema } from '../mcp/index.js';
-import { agentConstraintsSchema } from '../agent/index.js';
+import { resolvedMcpServerSchema } from '../mcp/index';
+import { agentConstraintsSchema } from '../agent/index';
 
 /**
  * Provider-facing request. Populated by `runAgentNode` after workspace

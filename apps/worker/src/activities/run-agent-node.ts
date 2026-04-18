@@ -18,12 +18,12 @@ import type {
   TriggerEvent,
   WorkflowMcpServer,
 } from '@conduit/shared';
-import { config } from '../config.js';
-import { loadConnectionContext } from '../runtime/connection-context.js';
-import { makeCredentialLookup } from '../runtime/credential-lookup.js';
-import { publishRunUpdate } from '../runtime/event-bus.js';
-import { writeAgentEventLog, writeSystemLog } from '../runtime/log-writer.js';
-import { prisma } from '../runtime/prisma.js';
+import { config } from '../config';
+import { loadConnectionContext } from '../runtime/connection-context';
+import { makeCredentialLookup } from '../runtime/credential-lookup';
+import { publishRunUpdate } from '../runtime/event-bus';
+import { writeAgentEventLog, writeSystemLog } from '../runtime/log-writer';
+import { prisma } from '../runtime/prisma';
 
 export interface RunAgentNodeInput {
   workflowId: string;

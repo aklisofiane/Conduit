@@ -1,9 +1,15 @@
 import 'reflect-metadata';
+import path from 'node:path';
+import dotenv from 'dotenv';
+
+// Load the monorepo root .env before any app code reads process.env.
+dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
+
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { IoAdapter } from '@nestjs/platform-socket.io';
-import { AppModule } from './app.module.js';
-import { config } from './config.js';
+import { AppModule } from './app.module';
+import { config } from './config';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, {
@@ -19,7 +25,6 @@ async function bootstrap(): Promise<void> {
 }
 
 bootstrap().catch((err: unknown) => {
-   
   console.error('API bootstrap failed:', err);
   process.exit(1);
 });

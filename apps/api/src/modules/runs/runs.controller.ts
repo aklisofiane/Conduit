@@ -1,6 +1,6 @@
 import { Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
-import { ApiKeyGuard } from '../../common/api-key.guard.js';
-import { RunsService } from './runs.service.js';
+import { ApiKeyGuard } from '../../common/api-key.guard';
+import { RunsService } from './runs.service';
 
 @UseGuards(ApiKeyGuard)
 @Controller()

@@ -1,6 +1,6 @@
 import type { AgentConfig, Edge, WorkflowDefinition } from '@conduit/shared';
 import { workflowDefinitionSchema } from '@conduit/shared';
-import { prisma } from '../runtime/prisma.js';
+import { prisma } from '../runtime/prisma';
 
 export interface LoadedGraph {
   workflowId: string;
