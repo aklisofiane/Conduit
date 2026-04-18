@@ -205,6 +205,7 @@ model ExecutionLog {
   run WorkflowRun @relation(fields: [runId], references: [id], onDelete: Cascade)
 
   @@index([runId, ts])
+  @@index([runId, nodeName, ts])
 }
 
 enum ExecutionLogKind {
