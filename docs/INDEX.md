@@ -16,4 +16,5 @@ Agent-first workflow automation for dev teams. Board-driven orchestration, atomi
 10. [FRONTEND.md](./FRONTEND.md) — canvas (design), run history, run detail page
 11. [SECURITY.md](./SECURITY.md) — auth, credentials, sandboxing
 12. [RELIABILITY.md](./RELIABILITY.md) — retries, crash recovery, cancellation
-13. [PLANS.md](./PLANS.md) — phased rollout
+13. [VALIDATION.md](./VALIDATION.md) — testing strategy, E2E harness, `StubProvider`
+14. [PLANS.md](./PLANS.md) — phased rollout
