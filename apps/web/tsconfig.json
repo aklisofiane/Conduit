@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "lib": ["DOM", "DOM.Iterable", "ES2023"],
+    "types": ["vite/client"],
+    "baseUrl": ".",
+    "paths": {
+      "@conduit/shared": ["../../packages/shared/src/index.ts"],
+      "@conduit/shared/*": ["../../packages/shared/src/*"],
+      "@/*": ["src/*"]
+    }
+  },
+  "include": ["src/**/*"]
+}

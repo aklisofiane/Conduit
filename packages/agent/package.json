@@ -1,0 +1,53 @@
+{
+  "name": "@conduit/agent",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Agent provider abstraction, workspace manager, MCP config resolver, skill discovery for Conduit.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./provider": {
+      "types": "./src/provider/index.ts",
+      "default": "./src/provider/index.ts"
+    },
+    "./workspace": {
+      "types": "./src/workspace/index.ts",
+      "default": "./src/workspace/index.ts"
+    },
+    "./mcp": {
+      "types": "./src/mcp/index.ts",
+      "default": "./src/mcp/index.ts"
+    },
+    "./skill": {
+      "types": "./src/skill/index.ts",
+      "default": "./src/skill/index.ts"
+    },
+    "./errors": {
+      "types": "./src/errors/index.ts",
+      "default": "./src/errors/index.ts"
+    }
+  },
+  "files": [
+    "src",
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.0",
+    "@conduit/shared": "0.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}

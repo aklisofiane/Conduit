@@ -1,0 +1,316 @@
+@import 'tailwindcss';
+@import '@xyflow/react/dist/style.css';
+
+/* Design tokens mirror conduit-mockup_5.html — Zinc base palette, New York shadcn variant. */
+@theme {
+  --color-bg: #09090b;
+  --color-bg-1: #0f0f11;
+  --color-bg-2: #18181b;
+  --color-bg-3: #1f1f23;
+  --color-line: #24242a;
+  --color-line-2: #2e2e36;
+  --color-text: #f4f4f5;
+  --color-text-2: #a1a1aa;
+  --color-text-3: #71717a;
+  --color-text-4: #52525b;
+
+  --color-claude: #f5a623;
+  --color-claude-bg: rgba(245, 166, 35, 0.08);
+  --color-claude-border: rgba(245, 166, 35, 0.3);
+  --color-codex: #14b8a6;
+  --color-codex-bg: rgba(20, 184, 166, 0.08);
+  --color-codex-border: rgba(20, 184, 166, 0.3);
+
+  --color-success: #22c55e;
+  --color-running: #3b82f6;
+  --color-pending: #71717a;
+  --color-error: #ef4444;
+  --color-warn: #f59e0b;
+
+  --font-sans: 'Inter', -apple-system, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-serif: 'Fraunces', Georgia, serif;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-line-2);
+  border-radius: 999px;
+  border: 2px solid var(--color-bg);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-2);
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+/* ----- React Flow overrides to match the mockup canvas ----- */
+.react-flow {
+  background: var(--color-bg);
+}
+.react-flow__edge-path {
+  stroke: #3f3f46;
+  stroke-width: 1.5;
+}
+.react-flow__edge.selected .react-flow__edge-path,
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke: var(--color-claude);
+}
+.react-flow__handle {
+  background: var(--color-line-2);
+  border-color: var(--color-bg);
+}
+.react-flow__attribution {
+  display: none;
+}
+
+/* ----- Reusable component primitives tuned to the mockup's look ----- */
+.btn {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 6px;
+  border: 1px solid var(--color-line);
+  color: var(--color-text-2);
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    color 150ms ease,
+    border-color 150ms ease;
+}
+.btn:hover {
+  color: var(--color-text);
+  background: var(--color-bg-3);
+  border-color: var(--color-line-2);
+}
+.btn.primary {
+  background: var(--color-text);
+  color: var(--color-bg-2);
+  border-color: var(--color-text);
+}
+.btn.primary:hover {
+  background: #ffffff;
+}
+.btn.danger {
+  color: var(--color-error);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--color-text-2);
+  background: var(--color-bg-2);
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+}
+.chip .dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--color-text-3);
+}
+.chip.claude {
+  color: var(--color-claude);
+  background: var(--color-claude-bg);
+  border-color: var(--color-claude-border);
+}
+.chip.claude .dot {
+  background: var(--color-claude);
+}
+.chip.codex {
+  color: var(--color-codex);
+  background: var(--color-codex-bg);
+  border-color: var(--color-codex-border);
+}
+.chip.codex .dot {
+  background: var(--color-codex);
+}
+
+.field-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-2);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.field-label .hint {
+  color: var(--color-text-4);
+  font-weight: 400;
+}
+
+.field-input {
+  width: 100%;
+  height: 30px;
+  background: var(--color-bg-2);
+  border: 1px solid var(--color-line);
+  border-radius: 6px;
+  padding: 0 10px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-text);
+  outline: none;
+}
+.field-input:focus {
+  border-color: var(--color-text-2);
+}
+textarea.field-input {
+  height: auto;
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+.kbd {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-text-3);
+  background: var(--color-bg-3);
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid var(--color-line);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-2);
+  background: var(--color-bg-2);
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+}
+.pill .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--color-success);
+  box-shadow: 0 0 6px var(--color-success);
+}
+.pill.error .dot {
+  background: var(--color-error);
+  box-shadow: 0 0 6px var(--color-error);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.status-dot.ok {
+  background: var(--color-success);
+}
+.status-dot.running {
+  background: var(--color-running);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+.status-dot.error {
+  background: var(--color-error);
+}
+.status-dot.pending {
+  background: var(--color-text-4);
+}
+.status-dot.paused {
+  background: var(--color-text-4);
+  opacity: 0.5;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+/* Provider glyphs (the "C" / "X" tiles) */
+.prov-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+}
+.prov-glyph.claude {
+  background: var(--color-claude-bg);
+  color: var(--color-claude);
+  border: 1px solid var(--color-claude-border);
+}
+.prov-glyph.codex {
+  background: var(--color-codex-bg);
+  color: var(--color-codex);
+  border: 1px solid var(--color-codex-border);
+}
+
+.cursor {
+  display: inline-block;
+  width: 6px;
+  height: 12px;
+  margin-left: 1px;
+  background: var(--color-text);
+  animation: blink 1s steps(1) infinite;
+  vertical-align: middle;
+}
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}

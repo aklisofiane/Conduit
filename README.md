@@ -44,7 +44,19 @@ Common scripts (all run through Turborepo where applicable):
 | `npm run db:push` / `db:generate` / `db:studio` | Prisma (dev uses `db push`; migrations once schema stabilizes) |
 | `npm run infra:up` / `infra:down` / `infra:logs` | Manage Docker infra |
 
-Workspaces: `packages/*` (libraries) and `apps/*` (services, added in later phases). A single root `.env` is read by every app — `dotenv-cli` forwards it into the Prisma CLI.
+Workspaces: `packages/*` (libraries) and `apps/*` (services). A single root `.env` is read by every app — `dotenv-cli` forwards it into the Prisma CLI.
+
+### Running the Phase 1 stack
+
+After `infra:up` and `db:push`, boot the three apps in separate terminals:
+
+```bash
+npm --workspace @conduit/api dev        # Nest API + Socket.IO on :3001
+npm --workspace @conduit/worker dev     # Temporal worker (task queue: conduit-workflows)
+npm --workspace @conduit/web dev        # Vite dev server on :5173
+```
+
+Open http://localhost:5173, create a workflow, drop an agent, save, and click **Test run**. The run detail page streams `ExecutionLog` events over Socket.IO as the agent executes.
 
 ## Documentation
 
