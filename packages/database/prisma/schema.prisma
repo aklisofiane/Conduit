@@ -1,0 +1,223 @@
+// Conduit data model — see docs/data-model.md for the authoritative spec.
+//
+// Principles:
+// - Nodes live inside `Workflow.definition` JSON (one atomic write, trivial versioning).
+// - Credentials are normalized because they're reused across workflows and need rotation.
+// - `ExecutionLog` = append-only high-volume stream for audit + live replay.
+// - `TicketBranch` is a naming cache for `ticket-branch` workspaces (branch state lives on the remote).
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "darwin-arm64", "debian-openssl-3.0.x", "linux-musl-arm64-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// -----------------------------------------------------------------------------
+// Workflows
+// -----------------------------------------------------------------------------
+
+model Workflow {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  // { trigger, nodes: Node[], edges: Edge[], mcpServers: WorkflowMcpServer[], ui: CanvasUI }
+  // See @conduit/shared `WorkflowDefinition` for the Zod-validated shape.
+  definition  Json
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  connections  WorkflowConnection[]
+  runs         WorkflowRun[]
+  pollSnapshot PollSnapshot?
+
+  @@index([isActive])
+}
+
+// -----------------------------------------------------------------------------
+// Connections & credentials
+// -----------------------------------------------------------------------------
+
+model WorkflowConnection {
+  id           String @id @default(cuid())
+  workflowId   String
+  alias        String
+  credentialId String
+  // Platform-specific bindings (nullable — e.g. Slack connection has no repo).
+  owner        String?
+  repo         String?
+
+  workflow   Workflow           @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  credential PlatformCredential @relation(fields: [credentialId], references: [id])
+
+  @@unique([workflowId, alias])
+  @@index([credentialId])
+}
+
+model PlatformCredential {
+  id        String   @id @default(cuid())
+  platform  Platform
+  name      String
+  // Encrypted at rest (AES-256-GCM). See docs/SECURITY.md.
+  secret    String
+  metadata  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  connections WorkflowConnection[]
+}
+
+// Superset covering every platform Conduit stores credentials for.
+// TriggerEvent.source is the subset that can trigger workflows (github, gitlab, jira).
+enum Platform {
+  GITHUB
+  GITLAB
+  JIRA
+  SLACK
+  DISCORD
+}
+
+// -----------------------------------------------------------------------------
+// Polling dedup
+// -----------------------------------------------------------------------------
+
+// One row per polling-mode workflow. Overwritten each poll cycle within a transaction.
+// Created on first poll, deleted on workflow delete (cascade). No history — just the last state.
+// The poll activity diffs current matching IDs against this snapshot to find new entries.
+model PollSnapshot {
+  id          String   @id @default(cuid())
+  workflowId  String   @unique
+  matchingIds Json
+  polledAt    DateTime @default(now())
+
+  workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+}
+
+// -----------------------------------------------------------------------------
+// ticket-branch naming cache
+// -----------------------------------------------------------------------------
+
+// One row per (platform, repo, ticket) touched by a `ticket-branch` workflow.
+// Purely a naming cache — the branch itself lives on the remote. Keeps the slug
+// stable across runs even if the ticket title is edited later. Shared across
+// workflows: a Worker and a Critic targeting the same ticket converge on one row.
+// See docs/design-docs/branch-management.md.
+model TicketBranch {
+  id         String    @id @default(cuid())
+  platform   Platform
+  owner      String
+  repo       String
+  // TriggerEvent.issue.key — user-visible identifier as a string ("42" for GitHub,
+  // "PROJ-123" for Jira). Never the opaque issue.id.
+  ticketId   String
+  slug       String
+  // Stored verbatim: conduit/<ticketId>-<slug>.
+  branchName String
+  baseRef    String?
+  createdAt  DateTime  @default(now())
+  lastRunAt  DateTime?
+
+  @@unique([platform, owner, repo, ticketId])
+  @@index([platform, owner, repo])
+}
+
+// -----------------------------------------------------------------------------
+// Runs
+// -----------------------------------------------------------------------------
+
+model WorkflowRun {
+  id                 String    @id @default(cuid())
+  workflowId         String
+  status             RunStatus @default(PENDING)
+  // Normalized TriggerEvent.
+  trigger            Json
+  startedAt          DateTime  @default(now())
+  finishedAt         DateTime?
+  error              String?
+  // Populated when the run is started.
+  temporalWorkflowId String?
+  temporalRunId      String?
+
+  workflow Workflow       @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  nodes    NodeRun[]
+  logs     ExecutionLog[]
+
+  @@index([workflowId, startedAt])
+  @@index([status])
+}
+
+// WorkflowRun: PENDING (row created) -> RUNNING (Temporal started) -> COMPLETED | FAILED | CANCELLED.
+// NodeRun:     PENDING (graph loaded) -> RUNNING (activity started) -> COMPLETED | FAILED | CANCELLED.
+enum RunStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model NodeRun {
+  id            String    @id @default(cuid())
+  runId         String
+  // Matches definition.nodes[i].name.
+  nodeName      String
+  nodeType      NodeType
+  status        RunStatus @default(PENDING)
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  // { files?: string[], workspacePath: string } — real output lives in .conduit/<nodeName>.md.
+  output        Json?
+  error         String?
+  // { inputTokens, outputTokens, toolCalls, turns } — agent nodes only.
+  usage         Json?
+  // Populated if inherited downstream.
+  workspacePath String?
+
+  run WorkflowRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, nodeName])
+  @@index([runId])
+}
+
+enum NodeType {
+  TRIGGER
+  AGENT
+}
+
+// -----------------------------------------------------------------------------
+// Execution logs (append-only, high volume)
+// -----------------------------------------------------------------------------
+
+model ExecutionLog {
+  id       String           @id @default(cuid())
+  runId    String
+  nodeName String?
+  ts       DateTime         @default(now())
+  level    LogLevel         @default(INFO)
+  // One row per AgentEvent or system event. Kept narrow for fast append.
+  kind     ExecutionLogKind
+  payload  Json
+
+  run WorkflowRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId, ts])
+}
+
+enum ExecutionLogKind {
+  TEXT
+  TOOL_CALL
+  TOOL_RESULT
+  USAGE
+  SYSTEM
+}
+
+enum LogLevel {
+  DEBUG
+  INFO
+  WARN
+  ERROR
+}

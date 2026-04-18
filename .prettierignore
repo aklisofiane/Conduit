@@ -1,0 +1,17 @@
+node_modules
+dist
+build
+.turbo
+.next
+coverage
+packages/database/src/generated
+*.tsbuildinfo
+package-lock.json
+
+# Docs maintained manually in their own style.
+docs/
+README.md
+LICENSE
+
+# Editor / tooling
+.claude/
