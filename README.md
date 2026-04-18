@@ -20,7 +20,7 @@ Conduit connects to your project board (GitHub Projects, GitLab boards, Jira) an
 - **Skills** — reusable instruction bundles from Claude Code and Codex, attachable to agents
 - **Workspace-native** — every agent operates on a git workspace with full file and shell access
 - **Multi-agent pipelines** — fan-out, parallel execution, workspace inheritance, sequential merge-back
-- **Live streaming** — watch agents work in real-time on the canvas
+- **Run observability** — live timeline of agent events (text, tools, tokens) on the run detail page
 - **Temporal for durability** — crash recovery, retries, cancellation out of the box
 
 ## Documentation
