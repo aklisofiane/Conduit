@@ -8,6 +8,7 @@ import {
   discoverSkills,
   finalSummaryPrompt,
   git,
+  installPushCredentials,
   installSkillsIntoWorkspace,
   readConduitSummary,
   resolveMcpServers,
@@ -27,6 +28,7 @@ import { makeCredentialLookup } from '../runtime/credential-lookup';
 import { publishRunUpdate } from '../runtime/event-bus';
 import { writeAgentEventLog, writeSystemLog } from '../runtime/log-writer';
 import { prisma } from '../runtime/prisma';
+import { makeTicketBranchStore } from '../runtime/ticket-branch-store';
 
 export interface RunAgentNodeInput {
   workflowId: string;
@@ -92,15 +94,28 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
   });
 
   try {
-    const connection =
-      node.workspace.kind === 'repo-clone'
-        ? await loadConnectionContext(node.workspace.connectionId)
+    const connectionId =
+      node.workspace.kind === 'repo-clone' || node.workspace.kind === 'ticket-branch'
+        ? node.workspace.connectionId
         : undefined;
-    if (node.workspace.kind === 'repo-clone' && !connection) {
+    const connection = connectionId
+      ? await loadConnectionContext(connectionId)
+      : undefined;
+    if (connectionId && !connection) {
       throw new Error(
-        `repo-clone workspace on node "${node.name}" references unknown connection ${node.workspace.connectionId}`,
+        `${node.workspace.kind} workspace on node "${node.name}" references unknown connection ${connectionId}`,
       );
     }
+
+    // ticket-branch extras — the ticket id/title come from the trigger event,
+    // and the store owns slug derivation + row upsert. Thrown from the
+    // resolver with a clearer message if `ticket` is missing.
+    const ticket =
+      node.workspace.kind === 'ticket-branch' && triggerEvent.issue
+        ? { id: triggerEvent.issue.key, title: triggerEvent.issue.title }
+        : undefined;
+    const ticketBranchStore =
+      node.workspace.kind === 'ticket-branch' ? makeTicketBranchStore() : undefined;
 
     const workspace = await workspaceManager.resolve({
       runId,
@@ -110,7 +125,25 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
       upstreamPath: upstreamWorkspacePath,
       upstreamHead,
       parallelBranch,
+      ticket,
+      ticketBranchStore,
     });
+
+    if (workspace.ticketBranchId) {
+      await ticketBranchStore?.markRunStart(workspace.ticketBranchId);
+    }
+
+    // Push auth for ticket-branch worktrees — installed on the resolved
+    // worktree's shared .git/config so inherit-chain children pick it up
+    // automatically. Cleaned up when cleanupRunActivity wipes the run dir.
+    if (workspace.kind === 'ticket-branch' && connection?.token) {
+      await installPushCredentials({
+        runId,
+        nodeName: node.name,
+        worktreePath: workspace.path,
+        token: connection.token,
+      });
+    }
 
     const startupMessage = systemMessage(node, workspace.path, parallelBranch);
     await Promise.all([
@@ -179,6 +212,7 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
       head: workspace.head,
       workspaceKind: workspace.kind,
       isBranchedWorktree: workspace.isBranchedWorktree ?? false,
+      branchName: workspace.branchName,
     };
 
     await prisma().nodeRun.update({

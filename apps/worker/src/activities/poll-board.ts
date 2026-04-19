@@ -1,11 +1,15 @@
+import { WorkflowExecutionAlreadyStartedError } from '@temporalio/client';
 import {
   AGENT_WORKFLOW_TYPE,
+  agentWorkflowId,
   applyFilter,
   matchesTrigger,
+  ticketLockFor,
   type PollCycleResult,
   type PollWorkflowInput,
   type TriggerEvent,
   type TriggerFilter,
+  type WorkflowDefinition,
   workflowDefinitionSchema,
 } from '@conduit/shared';
 import { decryptSecret, loadEncryptionKey } from '@conduit/shared/crypto';
@@ -86,7 +90,9 @@ export async function pollBoardActivity(
     .map((item) => toTriggerEvent(item))
     .filter((event) => matchesTrigger(event, trigger));
   const startedRunIds = (
-    await Promise.all(eventsToStart.map((event) => startAgentWorkflow(workflowId, event)))
+    await Promise.all(
+      eventsToStart.map((event) => startAgentWorkflow(workflowId, definition, event)),
+    )
   ).filter((id): id is string => id !== undefined);
 
   const snapshotChanged =
@@ -186,8 +192,14 @@ function toTriggerEvent(item: ProjectBoardItem): TriggerEvent {
 
 async function startAgentWorkflow(
   workflowId: string,
+  definition: WorkflowDefinition,
   triggerEvent: TriggerEvent,
 ): Promise<string | undefined> {
+  // ticket-branch poll-starts use the deterministic `run-<wfId>-<ticketKey>`
+  // ID so a second poll tick (or a webhook arriving while a poll-fired run
+  // is in flight) collides with the in-flight ID. Temporal rejects with
+  // WorkflowExecutionAlreadyStartedError, caught below and dropped silently.
+  const ticketLock = ticketLockFor(definition, workflowId, triggerEvent);
   const run = await prisma().workflowRun.create({
     data: {
       workflowId,
@@ -197,7 +209,7 @@ async function startAgentWorkflow(
   });
   try {
     const client = await getTemporalClient();
-    const temporalWorkflowId = `run-${run.id}`;
+    const temporalWorkflowId = agentWorkflowId(run.id, ticketLock);
     const handle = await client.workflow.start(AGENT_WORKFLOW_TYPE, {
       args: [{ workflowId, runId: run.id, triggerEvent }],
       taskQueue: config.temporal.taskQueue,
@@ -213,6 +225,11 @@ async function startAgentWorkflow(
     });
     return run.id;
   } catch (err) {
+    if (err instanceof WorkflowExecutionAlreadyStartedError) {
+      // Another Conduit start is in flight for this ticket — drop this one.
+      await prisma().workflowRun.delete({ where: { id: run.id } }).catch(() => undefined);
+      return undefined;
+    }
     await prisma().workflowRun.update({
       where: { id: run.id },
       data: {

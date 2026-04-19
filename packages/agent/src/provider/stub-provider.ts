@@ -1,3 +1,4 @@
+import { spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import type {
@@ -33,6 +34,16 @@ export type StubScriptStep =
     }
   | { kind: 'done'; delayMs?: number }
   | { kind: 'write-file'; path: string; content: string; delayMs?: number }
+  | {
+      kind: 'shell';
+      command: string;
+      args?: string[];
+      /** Run in a subdirectory of the workspace. Absolute paths allowed too. */
+      cwd?: string;
+      /** Fail the session if the command exits non-zero. Default true. */
+      failOnNonZero?: boolean;
+      delayMs?: number;
+    }
   | { kind: 'delay'; ms: number };
 
 export interface StubScript {
@@ -161,6 +172,16 @@ export class StubProvider implements AgentProvider {
           continue;
         }
 
+        if (step.kind === 'shell') {
+          const cwd = step.cwd
+            ? path.isAbsolute(step.cwd)
+              ? step.cwd
+              : path.join(req.workspacePath, step.cwd)
+            : req.workspacePath;
+          await runShell(step.command, step.args ?? [], cwd, step.failOnNonZero ?? true);
+          continue;
+        }
+
         const event = toEvent(step);
         applyCounters(event, counters);
         checkConstraints(req, counters, startedAt);
@@ -200,9 +221,48 @@ function toEvent(step: StubScriptStep): AgentEvent {
     case 'done':
       return { type: 'done' };
     case 'write-file':
+    case 'shell':
     case 'delay':
       throw new Error(`Step kind ${step.kind} does not emit an event`);
   }
+}
+
+/**
+ * Run a shell command for the stub's `shell` step. Used by the Phase 5
+ * E2E to drive `git commit` + `git push` from inside a scripted session so
+ * we exercise the real push auth / credential helper. Output is discarded —
+ * the test asserts on resulting filesystem + remote state, not on stdout.
+ */
+async function runShell(
+  command: string,
+  args: string[],
+  cwd: string,
+  failOnNonZero: boolean,
+): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(command, args, {
+      cwd,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const out: Buffer[] = [];
+    const err: Buffer[] = [];
+    child.stdout.on('data', (c: Buffer) => out.push(c));
+    child.stderr.on('data', (c: Buffer) => err.push(c));
+    child.on('error', reject);
+    child.on('close', (code) => {
+      if (code !== 0 && failOnNonZero) {
+        const stdout = Buffer.concat(out).toString().trim();
+        const stderr = Buffer.concat(err).toString().trim();
+        const detail = [stderr, stdout].filter(Boolean).join(' / ');
+        return reject(
+          new Error(
+            `stub shell \`${command} ${args.join(' ')}\` exited ${code}: ${detail || '(no output)'}`,
+          ),
+        );
+      }
+      resolve();
+    });
+  });
 }
 
 async function loadSessionTurns(systemPrompt: string): Promise<StubScript[]> {
@@ -215,12 +275,11 @@ async function loadSessionTurns(systemPrompt: string): Promise<StubScript[]> {
     );
   }
 
-  // Reload when the bundle rule set hasn't been cached (or is for a
-  // different file path). Re-reads are cheap — the harness rewrites this
-  // file between test scenarios.
-  if (!envBundleCursor || envBundleCursor.file !== file) {
-    await reloadEnvBundle(file);
-  }
+  // Always reload the bundle on session start. Tests rewrite this file
+  // between scenarios (setStubBundle in the E2E harness) and stale rule
+  // caches silently route later cycles to the wrong session. Reads are
+  // cheap relative to the activity that follows.
+  await reloadEnvBundle(file);
 
   // Prompt-matched routing wins when a rule matches — this is the reliable
   // dispatch for parallel groups where `startSession` order isn't
@@ -231,18 +290,10 @@ async function loadSessionTurns(systemPrompt: string): Promise<StubScript[]> {
 
   // FIFO fallback — one bundle entry per startSession().
   const next = envBundleCursor!.queue.shift();
-  if (next) return [...next.turns];
-
-  // Exhausted the bundle's FIFO queue — re-read in case the harness swapped
-  // in new content after the worker first saw this file.
-  await reloadEnvBundle(file);
-  const matchAfter = envBundleCursor!.byPrompt.find((r) => systemPrompt.includes(r.match));
-  if (matchAfter) return [...matchAfter.session.turns];
-  const fresh = envBundleCursor!.queue.shift();
-  if (!fresh) {
+  if (!next) {
     throw new Error(`CONDUIT_STUB_SCRIPT exhausted — no more sessions at ${file}`);
   }
-  return [...fresh.turns];
+  return [...next.turns];
 }
 
 async function reloadEnvBundle(file: string): Promise<void> {

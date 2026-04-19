@@ -15,5 +15,11 @@ export const nodeOutputSchema = z.object({
   head: z.string().optional(),
   workspaceKind: z.enum(['fresh-tmpdir', 'repo-clone', 'inherit', 'ticket-branch']).optional(),
   isBranchedWorktree: z.boolean().optional(),
+  /**
+   * Ref name the workspace was provisioned on. Populated for `repo-clone`
+   * and `ticket-branch`; surfaced on the run detail page so users can see
+   * which `conduit/*` branch an iteration wrote to.
+   */
+  branchName: z.string().optional(),
 });
 export type NodeOutput = z.infer<typeof nodeOutputSchema>;

@@ -1,7 +1,20 @@
-import { Injectable, Logger, NotFoundException, type OnModuleInit } from '@nestjs/common';
-import type { TriggerEvent, WorkflowDefinition } from '@conduit/shared';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  type OnModuleInit,
+} from '@nestjs/common';
+import {
+  WorkflowValidationError,
+  assertValidWorkflowDefinition,
+  ticketLockFor,
+  workflowDefinitionSchema,
+  type TriggerEvent,
+  type WorkflowDefinition,
+} from '@conduit/shared';
 import { PrismaService } from '../../common/prisma.service';
-import { TemporalService } from '../../temporal/temporal.service';
+import { DuplicateRunError, TemporalService } from '../../temporal/temporal.service';
 import type { CreateWorkflowDto, ManualRunDto, UpdateWorkflowDto } from './dto';
 import { defaultDefinition } from './defaults';
 
@@ -59,11 +72,13 @@ export class WorkflowsService implements OnModuleInit {
   }
 
   async create(dto: CreateWorkflowDto) {
+    const definition = dto.definition ?? defaultDefinition();
+    assertDefinitionValid(definition);
     const wf = await this.prisma.workflow.create({
       data: {
         name: dto.name,
         description: dto.description,
-        definition: (dto.definition ?? defaultDefinition()) as unknown as object,
+        definition: definition as unknown as object,
         isActive: false,
       },
     });
@@ -72,6 +87,7 @@ export class WorkflowsService implements OnModuleInit {
   }
 
   async update(id: string, dto: UpdateWorkflowDto) {
+    if (dto.definition) assertDefinitionValid(dto.definition);
     try {
       const wf = await this.prisma.workflow.update({
         where: { id },
@@ -149,8 +165,20 @@ export class WorkflowsService implements OnModuleInit {
    * `WorkflowRun` row, starts the Temporal workflow, flips the row to
    * `RUNNING` on success or `FAILED` on start failure. Callers handle
    * trigger-matching / auth before invoking this.
+   *
+   * For `ticket-branch` workflows: the Temporal start uses a deterministic
+   * ID keyed on `(workflowId, ticketKey)`. A duplicate trigger arriving
+   * while a run is in flight surfaces as `DuplicateRunError` — we delete
+   * the placeholder row and return `null`. Callers propagate that as a
+   * soft-drop (HTTP 200 `status: 'duplicate-dropped'` on the webhook path).
    */
   async startRun(workflowId: string, triggerEvent: TriggerEvent) {
+    const wf = await this.get(workflowId);
+    const definition = workflowDefinitionSchema.safeParse(wf.definition);
+    const ticketLock = definition.success
+      ? ticketLockFor(definition.data, workflowId, triggerEvent)
+      : undefined;
+
     const run = await this.prisma.workflowRun.create({
       data: {
         workflowId,
@@ -159,16 +187,24 @@ export class WorkflowsService implements OnModuleInit {
       },
     });
     try {
-      const { temporalWorkflowId, temporalRunId } = await this.temporal.startAgentWorkflow({
-        workflowId,
-        runId: run.id,
-        triggerEvent,
-      });
+      const { temporalWorkflowId, temporalRunId } = await this.temporal.startAgentWorkflow(
+        { workflowId, runId: run.id, triggerEvent },
+        { ticketLock },
+      );
       return this.prisma.workflowRun.update({
         where: { id: run.id },
         data: { status: 'RUNNING', temporalWorkflowId, temporalRunId },
       });
     } catch (err) {
+      if (err instanceof DuplicateRunError) {
+        // ticket-branch collapse: swallow the duplicate and remove the row
+        // we just created so the run history doesn't fill with phantoms.
+        await this.prisma.workflowRun.delete({ where: { id: run.id } }).catch(() => undefined);
+        this.logger.debug(
+          `Duplicate ticket-branch trigger for workflow ${workflowId} (${err.temporalWorkflowId}) — dropped`,
+        );
+        return null;
+      }
       await this.prisma.workflowRun.update({
         where: { id: run.id },
         data: { status: 'FAILED', error: String(err), finishedAt: new Date() },
@@ -180,6 +216,24 @@ export class WorkflowsService implements OnModuleInit {
 
 function errMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
+}
+
+/**
+ * Run semantic validation (ticket-branch trigger compatibility, etc.) and
+ * re-throw as a 400 so the UI gets a useful error body instead of a 500.
+ */
+function assertDefinitionValid(definition: WorkflowDefinition): void {
+  try {
+    assertValidWorkflowDefinition(definition);
+  } catch (err) {
+    if (err instanceof WorkflowValidationError) {
+      throw new BadRequestException({
+        message: err.message,
+        issues: err.issues,
+      });
+    }
+    throw err;
+  }
 }
 
 function isPrismaNotFound(err: unknown): boolean {

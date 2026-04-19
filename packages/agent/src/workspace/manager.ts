@@ -3,6 +3,7 @@ import path from 'node:path';
 import { WorkspaceError } from '../errors/index';
 import { git } from './git';
 import { baseClonesRoot, nodeWorkspacePath, runDir } from './paths';
+import { resolveTicketBranchWorkspace } from './ticket-branch';
 import type {
   ConnectionContext,
   ResolvedWorkspace,
@@ -10,10 +11,9 @@ import type {
 } from './types';
 
 /**
- * Resolves a workspace spec into a concrete on-disk path. Currently
- * supports `fresh-tmpdir`, `repo-clone`, and `inherit`; `ticket-branch`
- * is reserved (see docs/PLANS.md). Goal of the abstraction: runAgentNode
- * gets a single `resolve()` call without touching git internals.
+ * Resolves a workspace spec into a concrete on-disk path. Single entrypoint
+ * for all four kinds (`fresh-tmpdir`, `repo-clone`, `inherit`, `ticket-branch`)
+ * so `runAgentNode` gets one `resolve()` call without touching git internals.
  */
 export class WorkspaceManager {
   async resolve(input: WorkspaceResolveInput): Promise<ResolvedWorkspace> {
@@ -43,8 +43,31 @@ export class WorkspaceManager {
         }
         return { path: input.upstreamPath, kind: 'inherit' };
       }
-      case 'ticket-branch':
-        throw new WorkspaceError('ticket-branch workspaces are not yet supported (see docs/PLANS.md)');
+      case 'ticket-branch': {
+        if (!input.connection) {
+          throw new WorkspaceError(
+            `ticket-branch workspace requires a connection for node "${nodeName}"`,
+          );
+        }
+        if (!input.ticket) {
+          throw new WorkspaceError(
+            `ticket-branch workspace on node "${nodeName}" requires a trigger that carries an issue/PR identifier`,
+          );
+        }
+        if (!input.ticketBranchStore) {
+          throw new WorkspaceError(
+            `ticket-branch workspace on node "${nodeName}" requires a TicketBranchStore`,
+          );
+        }
+        return resolveTicketBranchWorkspace({
+          runId,
+          nodeName,
+          spec,
+          connection: input.connection,
+          ticket: input.ticket,
+          store: input.ticketBranchStore,
+        });
+      }
       default: {
         const _exhaustive: never = spec;
         throw new WorkspaceError(`Unknown workspace kind: ${String(_exhaustive)}`);

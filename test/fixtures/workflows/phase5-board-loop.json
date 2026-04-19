@@ -1,0 +1,64 @@
+{
+  "worker": {
+    "name": "Phase 5 Worker — ticket-branch on status=Dev",
+    "description": "Polling trigger on status=Dev. One agent with a ticket-branch workspace; writes a file + commits + pushes on every iteration.",
+    "definition": {
+      "trigger": {
+        "platform": "github",
+        "connectionId": "__placeholder__",
+        "mode": { "kind": "polling", "intervalSec": 3600, "active": true },
+        "filters": [{ "field": "status", "op": "eq", "value": "Dev" }],
+        "board": { "ownerType": "org", "owner": "acme", "number": 5 }
+      },
+      "nodes": [
+        {
+          "id": "agent-worker",
+          "name": "Worker",
+          "provider": "claude",
+          "model": "stub-model",
+          "instructions": "Worker node — commit and push to the conduit/<ticket> branch.",
+          "mcpServers": [],
+          "skills": [],
+          "workspace": { "kind": "ticket-branch", "connectionId": "__placeholder__" }
+        }
+      ],
+      "edges": [],
+      "mcpServers": [],
+      "ui": {
+        "nodePositions": { "Worker": { "x": 240, "y": 160 } },
+        "viewport": { "x": 0, "y": 0, "zoom": 1 }
+      }
+    }
+  },
+  "critic": {
+    "name": "Phase 5 Critic — ticket-branch on status=AIReview",
+    "description": "Polling trigger on status=AIReview. Agent reads the branch the Worker pushed and either approves or rejects.",
+    "definition": {
+      "trigger": {
+        "platform": "github",
+        "connectionId": "__placeholder__",
+        "mode": { "kind": "polling", "intervalSec": 3600, "active": true },
+        "filters": [{ "field": "status", "op": "eq", "value": "AIReview" }],
+        "board": { "ownerType": "org", "owner": "acme", "number": 5 }
+      },
+      "nodes": [
+        {
+          "id": "agent-critic",
+          "name": "Critic",
+          "provider": "claude",
+          "model": "stub-model",
+          "instructions": "Critic node — read the branch and file a review.",
+          "mcpServers": [],
+          "skills": [],
+          "workspace": { "kind": "ticket-branch", "connectionId": "__placeholder__" }
+        }
+      ],
+      "edges": [],
+      "mcpServers": [],
+      "ui": {
+        "nodePositions": { "Critic": { "x": 240, "y": 160 } },
+        "viewport": { "x": 0, "y": 0, "zoom": 1 }
+      }
+    }
+  }
+}

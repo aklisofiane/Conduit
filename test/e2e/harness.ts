@@ -47,6 +47,18 @@ export interface Harness {
    * seed working clone so tests can inspect it if needed.
    */
   seedRepoClone(owner: string, repo: string, seedFiles?: Record<string, string>): Promise<string>;
+  /**
+   * Variant of `seedRepoClone` for `ticket-branch` tests — seeds a **bare**
+   * remote repo and sets `CONDUIT_TEST_REMOTE_BASE` so `loadConnectionContext`
+   * resolves `cloneUrl` against the seed instead of github.com. That lets
+   * the agent actually `git push` without touching the network. Returns
+   * the bare remote path so the test can `git log` against it directly.
+   */
+  seedTicketBranchRepo(
+    owner: string,
+    repo: string,
+    seedFiles?: Record<string, string>,
+  ): Promise<string>;
   stop(): Promise<void>;
 }
 
@@ -76,6 +88,11 @@ export async function startHarness(opts: HarnessOptions = {}): Promise<Harness> 
   // dequeue tasks from the shared `conduit-agent` queue and cross-run frames
   // end up on the wrong WS.
   const taskQueue = `conduit-agent-${path.basename(workspaceRoot)}`;
+  // Seed dir for ticket-branch tests — `seedTicketBranchRepo` writes bare
+  // remotes here. Also exported via `CONDUIT_TEST_REMOTE_BASE` so the
+  // worker's connection-context loader rewrites `cloneUrl` to point here
+  // instead of github.com.
+  const remoteBase = path.join(workspaceRoot, 'test-remotes');
   const env = {
     ...process.env,
     ...TEST_STACK_ENV,
@@ -85,6 +102,7 @@ export async function startHarness(opts: HarnessOptions = {}): Promise<Harness> 
     CONDUIT_CORS_ORIGIN: 'http://localhost',
     API_PORT: String(apiPort),
     CONDUIT_HOME: path.join(workspaceRoot, 'conduit-home'),
+    CONDUIT_TEST_REMOTE_BASE: remoteBase,
     TEMPORAL_TASK_QUEUE: taskQueue,
     ...opts.extraEnv,
   };
@@ -146,6 +164,9 @@ export async function startHarness(opts: HarnessOptions = {}): Promise<Harness> 
     },
     async seedRepoClone(owner, repo, seedFiles = {}) {
       return seedBaseClone(conduitHome, workspaceRoot, owner, repo, seedFiles);
+    },
+    async seedTicketBranchRepo(owner, repo, seedFiles = {}) {
+      return seedTicketBranchRemote(conduitHome, remoteBase, owner, repo, seedFiles);
     },
     async stop() {
       api.kill('SIGTERM');
@@ -309,6 +330,64 @@ async function seedBaseClone(
   // filesystem — bypasses the hardcoded github.com URL in connection-context.
   await gitCmd(baseBareDir, ['remote', 'set-url', 'origin', seedRoot]);
   return seedRoot;
+}
+
+/**
+ * Seed a *bare* remote at `<remoteBase>/<owner>/<repo>.git` + a pre-populated
+ * base clone at `<conduitHome>/base-clones/github/<owner>/<repo>.git` whose
+ * `origin` points at the bare remote. Agents running against this setup can
+ * `git push` successfully — the bare remote accepts pushes to any branch,
+ * including the `conduit/*` branches Phase 5 creates.
+ */
+async function seedTicketBranchRemote(
+  conduitHome: string,
+  remoteBase: string,
+  owner: string,
+  repo: string,
+  seedFiles: Record<string, string>,
+): Promise<string> {
+  const bareRemote = path.join(remoteBase, owner, `${repo}.git`);
+  const baseBareDir = path.join(conduitHome, 'base-clones', 'github', owner, `${repo}.git`);
+  if (
+    await fs
+      .stat(bareRemote)
+      .then((s) => s.isDirectory())
+      .catch(() => false)
+  ) {
+    return bareRemote;
+  }
+
+  await fs.mkdir(path.dirname(bareRemote), { recursive: true });
+  await gitCmd(path.dirname(bareRemote), ['init', '--bare', '-q', '-b', 'main', `${repo}.git`]);
+
+  // Seed the bare remote with an initial commit via a throwaway working clone.
+  const seedScratch = path.join(conduitHome, '.seed-scratch', owner, repo);
+  await fs.mkdir(seedScratch, { recursive: true });
+  await gitCmd(seedScratch, ['init', '-q', '-b', 'main']);
+  await gitCmd(seedScratch, ['config', 'user.email', 'seed@conduit.test']);
+  await gitCmd(seedScratch, ['config', 'user.name', 'Seed']);
+
+  const files: Record<string, string> = {
+    'README.md': '# Seed repo (ticket-branch)\n',
+    ...seedFiles,
+  };
+  for (const [rel, content] of Object.entries(files)) {
+    const abs = path.join(seedScratch, rel);
+    await fs.mkdir(path.dirname(abs), { recursive: true });
+    await fs.writeFile(abs, content);
+  }
+  await gitCmd(seedScratch, ['add', '-A']);
+  await gitCmd(seedScratch, ['commit', '-q', '-m', 'seed: initial commit']);
+  await gitCmd(seedScratch, ['remote', 'add', 'origin', bareRemote]);
+  await gitCmd(seedScratch, ['push', '-q', 'origin', 'main']);
+
+  // Prime the base clone so the workspace manager doesn't need to reach
+  // out on first resolve.
+  await fs.mkdir(path.dirname(baseBareDir), { recursive: true });
+  await gitCmd(path.dirname(baseBareDir), ['clone', '--bare', '-q', bareRemote, baseBareDir]);
+  await gitCmd(baseBareDir, ['remote', 'set-url', 'origin', bareRemote]);
+
+  return bareRemote;
 }
 
 function gitCmd(cwd: string, args: string[]): Promise<void> {

@@ -5,22 +5,50 @@ import {
   ScheduleAlreadyRunning,
   ScheduleClient,
   ScheduleOverlapPolicy,
+  WorkflowExecutionAlreadyStartedError,
   isGrpcServiceError,
 } from '@temporalio/client';
 import {
   AGENT_WORKFLOW_TYPE,
   POLL_WORKFLOW_TYPE,
+  agentWorkflowId,
   pollScheduleId,
   pollWorkflowId,
   type PollWorkflowInput,
+  type TicketLock,
   type TriggerEvent,
 } from '@conduit/shared';
 import { config } from '../config';
+
+/**
+ * Thrown when a `ticket-branch` workflow start collides with an in-flight
+ * run on the same ticket. Callers are expected to drop the trigger silently
+ * and return 200 to the platform (webhook) or skip to the next poll cycle.
+ */
+export class DuplicateRunError extends Error {
+  override readonly name = 'DuplicateRunError';
+  constructor(
+    public readonly temporalWorkflowId: string,
+    cause?: unknown,
+  ) {
+    super(`Temporal workflow ${temporalWorkflowId} is already running — duplicate trigger dropped`);
+    if (cause instanceof Error) this.stack = `${this.stack}\nCaused by: ${cause.stack ?? cause.message}`;
+  }
+}
 
 export interface AgentWorkflowInput {
   workflowId: string;
   runId: string;
   triggerEvent: TriggerEvent;
+}
+
+export interface StartAgentWorkflowOptions {
+  /**
+   * Populated for `ticket-branch` workflows — keys the Temporal workflow id
+   * on `(workflowId, ticketKey)` so concurrent triggers against an in-flight
+   * run collide and the second start throws `DuplicateRunError`.
+   */
+  ticketLock?: TicketLock;
 }
 
 export interface PollScheduleOptions {
@@ -65,20 +93,36 @@ export class TemporalService implements OnModuleInit, OnModuleDestroy {
     await this.connection?.close();
   }
 
-  async startAgentWorkflow(input: AgentWorkflowInput): Promise<{
+  async startAgentWorkflow(
+    input: AgentWorkflowInput,
+    opts: StartAgentWorkflowOptions = {},
+  ): Promise<{
     temporalWorkflowId: string;
     temporalRunId: string;
   }> {
     if (!this.client) {
       throw new Error('Temporal client not initialized — check TEMPORAL_ADDRESS');
     }
-    const temporalWorkflowId = `run-${input.runId}`;
-    const handle = await this.client.workflow.start(AGENT_WORKFLOW_TYPE, {
-      args: [input],
-      taskQueue: config.temporal.taskQueue,
-      workflowId: temporalWorkflowId,
-    });
-    return { temporalWorkflowId, temporalRunId: handle.firstExecutionRunId };
+    const temporalWorkflowId = agentWorkflowId(input.runId, opts.ticketLock);
+    try {
+      // Temporal defaults already match what ticket-branch needs:
+      //   - workflowIdReusePolicy = ALLOW_DUPLICATE — closed workflows' IDs
+      //     can be reused, so Dev → Review → Dev board cycles re-fire.
+      //   - workflowIdConflictPolicy = FAIL — a second start against a
+      //     *running* ID throws WorkflowExecutionAlreadyStartedError, which
+      //     we translate to DuplicateRunError below.
+      const handle = await this.client.workflow.start(AGENT_WORKFLOW_TYPE, {
+        args: [input],
+        taskQueue: config.temporal.taskQueue,
+        workflowId: temporalWorkflowId,
+      });
+      return { temporalWorkflowId, temporalRunId: handle.firstExecutionRunId };
+    } catch (err) {
+      if (err instanceof WorkflowExecutionAlreadyStartedError) {
+        throw new DuplicateRunError(temporalWorkflowId, err);
+      }
+      throw err;
+    }
   }
 
   async cancelAgentWorkflow(temporalWorkflowId: string): Promise<void> {

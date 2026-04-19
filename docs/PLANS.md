@@ -85,20 +85,21 @@ Ship the board-as-orchestrator pattern.
 
 **Exit criteria**: User configures a polling trigger on `status = "Dev"`, workflow runs whenever an issue enters that column. Covered by `test/e2e/phase4-polling-run.test.ts`.
 
-## Phase 5 — Board loops (`ticket-branch`)
+## Phase 5 — Board loops (`ticket-branch`) ✅
 
 Iterative Worker↔Critic workflows that persist state across runs. See [branch-management.md](./design-docs/branch-management.md).
 
-- [ ] `ticket-branch` workspace kind in `@conduit/agent/workspace`: branch name derivation, check-then-create against remote, worktree setup.
-- [ ] `TicketBranch` Prisma row (keyed by `(platform, owner, repo, ticketId)` — shared across workflows) storing the stable slug. Update [data-model.md](./data-model.md).
-- [ ] Push auth: platform token injected into agent process env + git credential helper that reads from env. Never written to `.git/config` or remote URL.
-- [ ] Local file lock on the base-clone path to serialize `git worktree add` races.
-- [ ] Temporal workflow-ID uniqueness for `ticket-branch` workflows: deterministic ID `run-<workflowId>-<ticketId>`, started with `WorkflowIdConflictPolicy = FAIL` (Temporal default — rejects starts against an in-flight ID with `WorkflowExecutionAlreadyStarted`, caught by the trigger handler to silently drop duplicate triggers) and `WorkflowIdReusePolicy = ALLOW_DUPLICATE` (lets the same ID be reused after termination, so board cycles re-fire).
-- [ ] `cleanupRunActivity` split: local worktree always cleaned; remote branch preserved for `ticket-branch`.
-- [ ] Save-time validation: `ticket-branch` requires a trigger that guarantees an issue/PR identifier.
-- [ ] Run detail page: show `conduit/*` branch name and link to the PR if one exists.
+- [x] `ticket-branch` workspace kind in `@conduit/agent/workspace`: branch name derivation, check-then-create against remote, worktree setup.
+- [x] `TicketBranch` Prisma row (keyed by `(platform, owner, repo, ticketId)` — shared across workflows) storing the stable slug. `TicketBranchStore` adapter in `apps/worker/src/runtime/ticket-branch-store.ts` owns slug derivation + upsert; the workspace manager never guesses a different slug than the one persisted.
+- [x] Push auth: platform token materialized via a per-run git credential helper script (`<runDir>/.credential-helpers/<node>.sh`, chmod 700) wired into the worktree's `.git/config` with `credential.helper !<script>`. Never written to `.git/config` directly or the remote URL. Cleaned up when `cleanupRunActivity` wipes the run dir.
+- [x] In-process path lock on the base-clone path (`withPathLock`) serializes concurrent `git worktree add` / fetch operations on the same base clone. Multi-worker file lock is deferred.
+- [x] Temporal workflow-ID uniqueness for `ticket-branch` workflows: deterministic ID `run-<workflowId>-<ticketKey>` via `agentWorkflowId(runId, ticketLock)`, with Temporal's default `WorkflowIdConflictPolicy = FAIL` catching duplicates as `WorkflowExecutionAlreadyStartedError` — translated to `DuplicateRunError` on the API path (webhook → `status: 'duplicate-dropped'`) and swallowed on the polling path so no phantom `WorkflowRun` row lands. Default `WorkflowIdReusePolicy = ALLOW_DUPLICATE` lets the ID be reused after termination (Dev → Review → Dev).
+- [x] `cleanupRunActivity` split: local worktree always cleaned; remote branch preserved for `ticket-branch`, plus a local-only unpushed-commits warning (`rev-list --count <resolvedHead>..HEAD`) that surfaces the "nobody ran git push" footgun without blocking the run.
+- [x] Save-time validation (`validateWorkflowDefinition` in `@conduit/shared/workflow/validate`): `ticket-branch` workflows require a trigger that carries an issue identifier — polling is OK, `issues.opened` / `pull_request.opened` / `issue_comment.created` webhooks are OK, `board.column.changed` + other event types reject. Wired through `WorkflowsService.create/update` as a 400.
+- [x] Run detail page surfaces the resolved `conduit/*` branch name in the run header for any node with a ticket-branch workspace.
+- [x] End-to-end board flow: `test/e2e/phase5-board-loop.test.ts` drives Worker → Critic → Worker via the stub's new `shell` step, proves iteration N+1 sees iteration N's commits off the pushed branch.
 
-**Exit criteria**: user builds a Worker workflow (triggered on `status = Dev`) and a Critic workflow (triggered on `status = AIReview`), runs them against a real issue, sees iteration N+1 build on iteration N's commits, sees the Critic's comments flow back to the Worker on the next iteration.
+**Exit criteria**: user builds a Worker workflow (triggered on `status = Dev`) and a Critic workflow (triggered on `status = AIReview`), runs them against a real issue, sees iteration N+1 build on iteration N's commits. Covered by `test/e2e/phase5-board-loop.test.ts`.
 
 ## Phase 6 — Workflow templates
 

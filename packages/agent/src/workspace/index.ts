@@ -2,6 +2,9 @@ export { WorkspaceManager } from './manager';
 export type {
   ConnectionContext,
   ResolvedWorkspace,
+  TicketBranchRow,
+  TicketBranchStore,
+  TicketContext,
   WorkspaceResolveInput,
   WorkspaceSpec,
 } from './types';
@@ -11,6 +14,7 @@ export {
   baseClonesRoot,
   runDir,
   nodeWorkspacePath,
+  baseClonePath,
 } from './paths';
 export {
   readConduitSummaries,
@@ -20,3 +24,6 @@ export {
 } from './conduit-folder';
 export { git, GitError } from './git';
 export { mergeBranchedWorktree, MergeConflictError } from './merge';
+export { deriveSlug, formatBranchName } from './slug';
+export { withPathLock } from './lock';
+export { installPushCredentials } from './push-auth';

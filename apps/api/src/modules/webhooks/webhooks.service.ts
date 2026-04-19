@@ -12,7 +12,7 @@ import { safeDecrypt } from '../credentials/crypto';
 import { WorkflowsService } from '../workflows/workflows.service';
 
 export interface WebhookResult {
-  status: 'started' | 'filtered' | 'unsupported';
+  status: 'started' | 'filtered' | 'unsupported' | 'duplicate-dropped';
   runId?: string;
 }
 
@@ -93,6 +93,12 @@ export class WebhooksService {
     }
 
     const run = await this.workflows.startRun(workflowId, triggerEvent);
+    if (!run) {
+      // ticket-branch workflow already running on this ticket — swallow the
+      // trigger so GitHub doesn't retry. See DuplicateRunError in the
+      // TemporalService and docs/design-docs/branch-management.md.
+      return { status: 'duplicate-dropped' };
+    }
     return { status: 'started', runId: run.id };
   }
 

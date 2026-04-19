@@ -59,6 +59,7 @@ export interface NodeRunRow {
     head?: string;
     workspaceKind?: 'fresh-tmpdir' | 'repo-clone' | 'inherit' | 'ticket-branch';
     isBranchedWorktree?: boolean;
+    branchName?: string;
   } | null;
   usage: { inputTokens?: number; outputTokens?: number; toolCalls?: number; turns?: number } | null;
   workspacePath: string | null;

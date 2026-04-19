@@ -106,6 +106,11 @@ export function RunDetailPage() {
               <span>
                 tokens: {tokens.input.toLocaleString()} in · {tokens.output.toLocaleString()} out
               </span>
+              {ticketBranchName(run.nodes) && (
+                <span className="text-[var(--color-text-2)]">
+                  branch · <span className="text-[var(--color-text)]">{ticketBranchName(run.nodes)}</span>
+                </span>
+              )}
             </div>
           </div>
           <div className="flex gap-2">
@@ -292,6 +297,19 @@ function labelForStatus(status: string): string {
     default:
       return status.toLowerCase();
   }
+}
+
+/**
+ * Return the `conduit/*` branch name from any node whose workspace resolved
+ * to a ticket-branch. Board-loop workflows always have exactly one.
+ */
+function ticketBranchName(nodes: NodeRunRow[]): string | undefined {
+  for (const node of nodes) {
+    if (node.output?.workspaceKind === 'ticket-branch' && node.output.branchName) {
+      return node.output.branchName;
+    }
+  }
+  return undefined;
 }
 
 function statusBadgeClass(status: string): string {

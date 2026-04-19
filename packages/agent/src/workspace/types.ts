@@ -24,7 +24,7 @@ export interface ResolvedWorkspace {
   kind: WorkspaceSpec['kind'];
   /** Populated for repo-clone, parallel-branched inherit, and ticket-branch. */
   head?: string;
-  /** Populated for repo-clone. */
+  /** Populated for repo-clone and ticket-branch. */
   branchName?: string;
   /**
    * True when the workspace is a throwaway git worktree owned by this node
@@ -32,6 +32,14 @@ export interface ResolvedWorkspace {
    * should be merged back into its upstream after the parallel group ends.
    */
   isBranchedWorktree?: boolean;
+  /** Populated for ticket-branch — the `TicketBranch` row id. */
+  ticketBranchId?: string;
+  /**
+   * True when the remote branch existed before this run (i.e. iteration N+1
+   * resumed a branch iteration N created). False on the first run for a ticket.
+   * Used by the cleanup activity for the unpushed-commits warning.
+   */
+  remoteBranchExisted?: boolean;
 }
 
 export interface WorkspaceResolveInput {
@@ -54,4 +62,54 @@ export interface WorkspaceResolveInput {
    * when the group size > 1.
    */
   parallelBranch?: boolean;
+  /**
+   * Populated for `ticket-branch`. Identifies the ticket the branch is
+   * scoped to — `id` is the user-visible key (issue number / Jira key),
+   * `title` seeds the slug on first create.
+   */
+  ticket?: TicketContext;
+  /** Populated for `ticket-branch`. Lets the manager look up / create the `TicketBranch` row. */
+  ticketBranchStore?: TicketBranchStore;
+}
+
+/** Ticket identity passed into `ticket-branch` resolution. */
+export interface TicketContext {
+  /** User-visible identifier as a string ("42" for GitHub, "PROJ-123" for Jira). */
+  id: string;
+  /** Ticket title — seeds the slug on *first* creation only. */
+  title: string;
+}
+
+/** Row-shaped view of a `TicketBranch` DB entry — see `packages/database`. */
+export interface TicketBranchRow {
+  id: string;
+  platform: ConnectionContext['platform'];
+  owner: string;
+  repo: string;
+  ticketId: string;
+  slug: string;
+  branchName: string;
+  baseRef: string | null;
+}
+
+/**
+ * Adapter around the `TicketBranch` Prisma model. Lives outside
+ * `@conduit/agent` (implemented in `apps/worker/src/runtime`) so this
+ * package stays DB-agnostic.
+ *
+ * Semantics: `upsert` is idempotent — on the first call for a ticket it
+ * derives the slug from `ticketTitle` and persists `baseRef`; subsequent
+ * calls return the existing row verbatim so branch name + base stay
+ * stable across workflows (Worker + Critic converge on one row).
+ */
+export interface TicketBranchStore {
+  upsert(input: {
+    platform: ConnectionContext['platform'];
+    owner: string;
+    repo: string;
+    ticketId: string;
+    ticketTitle: string;
+    baseRef: string;
+  }): Promise<TicketBranchRow>;
+  markRunStart(id: string): Promise<void>;
 }
