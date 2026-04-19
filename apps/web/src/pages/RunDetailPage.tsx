@@ -70,6 +70,7 @@ export function RunDetailPage() {
       ),
     [run.nodes],
   );
+  const branchName = ticketBranchName(run.nodes);
 
   return (
     <div className="flex flex-1 flex-col">
@@ -106,9 +107,9 @@ export function RunDetailPage() {
               <span>
                 tokens: {tokens.input.toLocaleString()} in · {tokens.output.toLocaleString()} out
               </span>
-              {ticketBranchName(run.nodes) && (
+              {branchName && (
                 <span className="text-[var(--color-text-2)]">
-                  branch · <span className="text-[var(--color-text)]">{ticketBranchName(run.nodes)}</span>
+                  branch · <span className="text-[var(--color-text)]">{branchName}</span>
                 </span>
               )}
             </div>

@@ -107,9 +107,6 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
       );
     }
 
-    // ticket-branch extras — the ticket id/title come from the trigger event,
-    // and the store owns slug derivation + row upsert. Thrown from the
-    // resolver with a clearer message if `ticket` is missing.
     const ticket =
       node.workspace.kind === 'ticket-branch' && triggerEvent.issue
         ? { id: triggerEvent.issue.key, title: triggerEvent.issue.title }
@@ -133,9 +130,8 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
       await ticketBranchStore?.markRunStart(workspace.ticketBranchId);
     }
 
-    // Push auth for ticket-branch worktrees — installed on the resolved
-    // worktree's shared .git/config so inherit-chain children pick it up
-    // automatically. Cleaned up when cleanupRunActivity wipes the run dir.
+    // Installed on the shared .git/config so inherit-chain children pick it
+    // up automatically; cleanupRunActivity wipes the run dir after.
     if (workspace.kind === 'ticket-branch' && connection?.token) {
       await installPushCredentials({
         runId,

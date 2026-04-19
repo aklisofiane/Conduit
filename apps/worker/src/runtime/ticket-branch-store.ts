@@ -15,7 +15,11 @@ export function makeTicketBranchStore(): TicketBranchStore {
   return {
     async upsert(input) {
       const platform = input.platform === 'github' ? 'GITHUB' : 'GITLAB';
-      const existing = await prisma().ticketBranch.findUnique({
+      const slug = deriveSlug(input.ticketTitle);
+      const branchName = formatBranchName(input.ticketId, slug);
+      // On collision, `update: {}` preserves the first-write slug/branchName —
+      // later runs must read back the row that iteration 1 created verbatim.
+      const row = await prisma().ticketBranch.upsert({
         where: {
           platform_owner_repo_ticketId: {
             platform,
@@ -24,14 +28,7 @@ export function makeTicketBranchStore(): TicketBranchStore {
             ticketId: input.ticketId,
           },
         },
-      });
-      if (existing) {
-        return toRow(existing);
-      }
-      const slug = deriveSlug(input.ticketTitle);
-      const branchName = formatBranchName(input.ticketId, slug);
-      const created = await prisma().ticketBranch.create({
-        data: {
+        create: {
           platform,
           owner: input.owner,
           repo: input.repo,
@@ -40,8 +37,9 @@ export function makeTicketBranchStore(): TicketBranchStore {
           branchName,
           baseRef: input.baseRef,
         },
+        update: {},
       });
-      return toRow(created);
+      return toRow(row);
     },
     async markRunStart(id) {
       await prisma().ticketBranch.update({

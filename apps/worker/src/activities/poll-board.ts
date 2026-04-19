@@ -195,10 +195,6 @@ async function startAgentWorkflow(
   definition: WorkflowDefinition,
   triggerEvent: TriggerEvent,
 ): Promise<string | undefined> {
-  // ticket-branch poll-starts use the deterministic `run-<wfId>-<ticketKey>`
-  // ID so a second poll tick (or a webhook arriving while a poll-fired run
-  // is in flight) collides with the in-flight ID. Temporal rejects with
-  // WorkflowExecutionAlreadyStartedError, caught below and dropped silently.
   const ticketLock = ticketLockFor(definition, workflowId, triggerEvent);
   const run = await prisma().workflowRun.create({
     data: {

@@ -4,7 +4,6 @@ import { WorkspaceError } from '../errors/index';
 import { git, GitError } from './git';
 import { withPathLock } from './lock';
 import { baseClonePath, nodeWorkspacePath } from './paths';
-import { formatBranchName } from './slug';
 import type {
   ConnectionContext,
   ResolvedWorkspace,
@@ -20,8 +19,6 @@ export interface TicketBranchResolveInput {
   connection: ConnectionContext;
   ticket: TicketContext;
   store: TicketBranchStore;
-  /** Optional hook injected by the worker for token-in-env fetching. Defaults to no extra env. */
-  withAuth?: (args: string[], cwd: string) => Promise<void>;
 }
 
 /**
@@ -69,7 +66,10 @@ export async function resolveTicketBranchWorkspace(
     // Keep the base clone's mirrored refs fresh so `git worktree add <branch>`
     // can resolve a branch someone else pushed between runs. Fetch uses the
     // tokenized URL so private repos still authenticate.
-    await fetchWithAuth(bare, connection);
+    await Promise.all([
+      fetchWithAuth(bare, connection),
+      fs.mkdir(path.dirname(target), { recursive: true }),
+    ]);
 
     const baseRef = spec.baseRef ?? (await defaultBranch(bare));
     const row = await store.upsert({
@@ -82,13 +82,6 @@ export async function resolveTicketBranchWorkspace(
     });
 
     const branchName = row.branchName;
-    const expectedBranchName = formatBranchName(ticket.id, row.slug);
-    if (branchName !== expectedBranchName) {
-      // Defensive — means the row was written with a slug we can't reproduce.
-      // Trust the stored branch name; the slug is cosmetic.
-    }
-
-    await fs.mkdir(path.dirname(target), { recursive: true });
 
     const remoteExists = await remoteBranchExists(bare, branchName);
     if (remoteExists) {
