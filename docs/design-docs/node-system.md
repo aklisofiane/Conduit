@@ -16,11 +16,18 @@ type TriggerConfig = {
   connectionId: string;
   mode: TriggerMode;
   filters: TriggerFilter[];              // e.g. [{ field: 'status', op: 'eq', value: 'Dev' }]
+  board?: BoardRef;                      // required for polling mode + `board.column.changed` webhook
 };
 
 type TriggerMode =
-  | { kind: 'webhook'; event: string; active: boolean }        // platform pushes events (e.g. 'projects_v2_item.moved', 'issues.opened')
+  | { kind: 'webhook'; event: string; active: boolean }        // platform pushes events (e.g. 'issues.opened', 'board.column.changed')
   | { kind: 'polling'; intervalSec: number; active: boolean }; // Conduit polls the board API on an interval (default 60s)
+
+type BoardRef = {
+  ownerType: 'user' | 'org';  // GitHub Projects v2 are owned by a user or an org
+  owner: string;              // the login of that user/org
+  number: number;             // Projects v2 project number (scoped to owner)
+};
 
 type TriggerFilter = {
   field: string;       // e.g. 'status', 'label', 'assignee'
@@ -35,9 +42,9 @@ type TriggerFilter = {
 // Multiple filters on the same trigger combine with AND.
 ```
 
-**Webhook mode**: platform sends an event to `POST /api/hooks/:workflowId`. Conduit verifies the signature, normalizes the event, checks filters, and triggers a run if matched.
+**Webhook mode**: platform sends an event to `POST /api/hooks/:workflowId`. Conduit verifies the signature, normalizes the event, checks filters, and triggers a run if matched. GitHub webhooks currently normalize four events: `issues.opened`, `pull_request.opened`, `issue_comment.created` (PR-scoped), and `board.column.changed` (from `projects_v2_item.edited` single-select field moves). The `board.column.changed` webhook carries only the Projects v2 item's `content_node_id` — no issue number — so `ticket-branch` workspaces cannot use this event (polling is the supported mode for those).
 
-**Polling mode**: a Temporal schedule (or cron) calls the platform API every `intervalSec` seconds. Queries for issues matching the filters (e.g., `status = "Dev"`). Triggers a run for each matching issue that hasn't been processed for this specific transition yet.
+**Polling mode**: a Temporal Schedule fires `pollWorkflow` every `intervalSec` seconds. The activity queries the platform API (GitHub Projects v2 GraphQL for v1 — the `TriggerConfig.board` reference picks which project), filters on the returned items, and triggers a run for each matching item that hasn't been processed for this specific transition yet. Polling mode **requires** `TriggerConfig.board` — the poller has nothing to query without it. See [agent-execution.md](./agent-execution.md#polling-pipeline) for the activity lifecycle.
 
 #### Dedup for polling
 
@@ -235,7 +242,8 @@ type NodeOutput = {
 5. `workspace.inherit.fromNode` points to an ancestor with a `repo-clone`, `ticket-branch`, or `inherit` workspace.
 6. Every `mcpServers[].serverId` references a server defined at the workflow level.
 7. MCP servers with a `connectionId` must reference a valid `WorkflowConnection`.
-8. `ticket-branch` workspaces require a trigger that produces a populated `triggerEvent.issue`. Validated against the trigger's platform + event type at save time — webhook events that don't carry an issue (e.g., `push`, `release`, `workflow_run`) fail validation when combined with `ticket-branch`.
+8. `ticket-branch` workspaces require a trigger that produces a populated `triggerEvent.issue`. Validated against the trigger's platform + event type at save time — webhook events that don't carry an issue (e.g., `push`, `release`, `workflow_run`, `board.column.changed`) fail validation when combined with `ticket-branch`.
+9. Polling-mode triggers require `TriggerConfig.board` to be populated. Webhook-mode triggers may omit it unless `event === 'board.column.changed'`, which also needs it so the poller / column-move handler knows which Projects v2 board to read.
 
 ## Cross-run iteration
 

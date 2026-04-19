@@ -40,6 +40,8 @@ src/
   main.ts, config.ts                   worker bootstrap, registers workflows + activities
   workflows/
     agent-workflow.ts                  sandboxed — NO node:* / Prisma / Redis imports
+    poll-workflow.ts                   sandboxed shell that calls pollBoardActivity; scheduled
+                                       by the API via Temporal Schedule
     topo-sort.ts                       pure graph ordering
   activities/
     run-agent-node.ts                  invokes provider, streams events via heartbeat + Redis
@@ -48,8 +50,14 @@ src/
                                        (throws MergeConflictError on conflict — aborts the run)
     copy-conduit-files.ts              copies .conduit/<Node>.md from each parallel sibling into
                                        the merged upstream workspace (gitignored, so not in merge)
+    poll-board.ts                      one poll cycle: fetch board items, apply filters, set-diff
+                                       against PollSnapshot.matchingIds, start agentWorkflow per
+                                       new match, upsert snapshot
   runtime/                             activity-side helpers (Prisma, Redis event bus, log writer,
-                                       connection/credential lookup)
+                                       connection/credential lookup, plus the GitHub Projects v2
+                                       GraphQL client `github-projects.ts` and the standalone
+                                       `temporal-client.ts` singleton used by pollBoardActivity to
+                                       start agentWorkflows from inside an activity)
 ```
 
 If it touches I/O, it belongs under `activities/` or `runtime/`, never `workflows/`.
@@ -61,7 +69,9 @@ src/
   main.tsx, routes/router.tsx
   pages/                               HomePage, CanvasPage, RunDetailPage, CredentialsPage, ConnectionsPage
   components/
-    canvas/                            TriggerNode, AgentNode, NodePalette, AgentConfigPanel, McpServerPicker
+    canvas/                            TriggerNode, AgentNode, NodePalette, AgentConfigPanel,
+                                       TriggerConfigPanel (platform / connection / mode toggle /
+                                       event / interval / BoardRef / filter builder), McpServerPicker
     run/                               RunTimeline (live trace), NodeSummary (.conduit/ body),
                                        ChangedFiles (workspace diff), NodeError (failure details) —
                                        tabs on the run detail page
@@ -80,16 +90,21 @@ Zod schemas + cross-process contracts. Domain directories line up with subpath e
 ```
 src/
   agent/      AgentEvent, provider contract types
-  trigger/    TriggerEvent normalization shapes
+  trigger/    TriggerEvent + TriggerConfig (incl. `BoardRef` for Projects v2 polling),
+              filter/match logic, `poll.ts` (PollWorkflowInput + PollCycleResult)
   mcp/        MCP server config + tool schemas
   workflow/   Workflow.definition JSON schema (nodes, edges, ui)
   workspace/  workspace kind schemas (local, repo-clone, inherit, ticket-branch)
   skill/      skill manifest types
   platform/   Platform enum + per-platform connection shapes
   runtime/    AgentEvent → ExecutionLogKind mapping, Redis channel name
-  temporal/   task queue name, workflow input types
+  temporal/   task queue name + workflow-type constants (AGENT_WORKFLOW_TYPE,
+              POLL_WORKFLOW_TYPE) + deterministic id helpers (`pollScheduleId`,
+              `pollWorkflowId`)
   crypto/     AES-256-GCM helpers                              backend-only subpath
   webhook/    HMAC signature verify + GitHub event normalizer  backend-only subpath
+              (handles issues.opened / pull_request.opened / issue_comment.created /
+              projects_v2_item.edited → board.column.changed)
 ```
 
 `crypto` and `webhook` pull `node:crypto` — they're exposed as subpath exports only (not re-exported from the root barrel) so Vite can tree-shake them out of the web bundle.
@@ -135,14 +150,22 @@ src/index.ts                           re-exports PrismaClient + model types
 e2e/
   harness.ts                           spins up api + worker + StubProvider + test stack
   stack.ts, global-setup.ts
+  mock-github.ts                       local HTTP stand-in for GitHub's GraphQL API used by the
+                                       Phase 4 poller test — `startMockGithubGraphql()` +
+                                       `projectBoardResponse()` build canned Projects v2 payloads
   phase1-manual-run.test.ts            Phase 1 exit criterion as an E2E
   phase2-webhook-run.test.ts           Phase 2 — signed GitHub delivery → run → WS tool_call
+  phase3-parallel-run.test.ts          Phase 3 — parallel fan-out + merge-back + .conduit/ copy
+  phase4-polling-run.test.ts           Phase 4 — polling trigger, set-diff dedup, re-entry
 helpers/temporal.ts                    TestWorkflowEnvironment + MockActivityEnvironment wrappers
 fixtures/
-  workflows/                           seed JSON per topology
+  workflows/                           seed JSON per topology (phase1 / phase2 / phase3 / phase4)
   mcp-stub/                            in-repo stdio MCP server for tests
   events/github/                       GitHub webhook payload fixtures — see README in that folder
+                                       (includes projects_v2_item.status_changed.json)
   repos/                               reserved
+smoke/
+  phase4.smoke.md                      Playwright MCP prose script for the trigger config panel
 ```
 
 Per-package unit tests sit next to source (`*.test.ts`); integration tests live under `<package>/test/integration/`; API contract tests under `apps/api/test/contract/`. See [VALIDATION.md](./VALIDATION.md).

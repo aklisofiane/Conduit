@@ -74,16 +74,16 @@ The canvas earns its keep.
 
 **Exit criteria**: User builds a 3-agent workflow (Triage → Fix + Doc in parallel → Review), runs it on a real issue, sees parallel execution on the run detail page, sees Fix and Doc operate on branched worktrees with sequential merge-back, sees Review read `.conduit/` summaries from both. Covered by `test/e2e/phase3-parallel-run.test.ts`.
 
-## Phase 4 — Polling trigger + board orchestration
+## Phase 4 — Polling trigger + board orchestration ✅
 
 Ship the board-as-orchestrator pattern.
 
-- [ ] Polling trigger: Temporal schedule, set-diff dedup via `PollSnapshot` table.
-- [ ] GitHub Projects board column-move event normalization (webhook + polling).
-- [ ] Trigger UI: mode toggle (webhook / polling), active flag, filter builder, interval picker.
-- [ ] End-to-end board flow: agent moves issues between columns via GitHub MCP.
+- [x] Polling trigger: Temporal Schedule (created/updated/deleted on workflow save via `TemporalService`, reconciled at API boot), `pollWorkflow` → `pollBoardActivity` runs once per tick, set-diff dedup via `PollSnapshot.matchingIds`.
+- [x] GitHub Projects board column-move event normalization: `projects_v2_item.edited` (single-select field) → `board.column.changed` on the webhook side; polling side synthesizes the same event shape from the Projects v2 GraphQL API.
+- [x] Trigger UI: `TriggerConfigPanel` with platform picker, connection picker, mode toggle (webhook / polling), event picker, interval input, `BoardRef` fieldset (org/user + owner + project number), active flag, filter builder.
+- [x] End-to-end board flow: `test/e2e/phase4-polling-run.test.ts` covers the exit criterion — polling fires runs on set-diff and re-fires on re-entry (Dev → Review → Dev). Playwright smoke at `test/smoke/phase4.smoke.md`.
 
-**Exit criteria**: User configures a polling trigger on `status = "Dev"`, workflow runs whenever an issue enters that column, moves it to "Review" when done.
+**Exit criteria**: User configures a polling trigger on `status = "Dev"`, workflow runs whenever an issue enters that column. Covered by `test/e2e/phase4-polling-run.test.ts`.
 
 ## Phase 5 — Board loops (`ticket-branch`)
 

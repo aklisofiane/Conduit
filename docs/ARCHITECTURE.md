@@ -33,9 +33,9 @@
 
 | App | Stack | Responsibility |
 |---|---|---|
-| `apps/api` | NestJS 11, Socket.IO, Prisma | Webhook ingestion + signature verify, workflow CRUD, trigger matching, Temporal client, WS gateway for live run updates |
-| `apps/web` | React 19, Vite 8, `@xyflow/react`, TanStack Query, Zustand, Tailwind v4 + shadcn/ui (New York/Zinc), react-hook-form + Zod | Canvas editor (design only), agent config UI, run history + dedicated run detail page with streaming logs |
-| `apps/worker` | Temporal TS SDK, `@anthropic-ai/claude-agent-sdk`, `@openai/codex-sdk` | Executes `agentWorkflow` — loads nodes, topo sorts, invokes agent activity per node, streams updates to Redis |
+| `apps/api` | NestJS 11, Socket.IO, Prisma | Webhook ingestion + signature verify, workflow CRUD, trigger matching, Temporal client, WS gateway for live run updates. Owns polling-trigger `Schedule` lifecycle (create / update / delete on workflow save + boot-time reconcile) via `TemporalService.upsertPollSchedule` |
+| `apps/web` | React 19, Vite 8, `@xyflow/react`, TanStack Query, Zustand, Tailwind v4 + shadcn/ui (New York/Zinc), react-hook-form + Zod | Canvas editor (design only), agent config UI, trigger config UI (webhook / polling mode toggle, `BoardRef` fieldset, filter builder), run history + dedicated run detail page with streaming logs |
+| `apps/worker` | Temporal TS SDK, `@anthropic-ai/claude-agent-sdk`, `@openai/codex-sdk` | Executes `agentWorkflow` — loads nodes, topo sorts, invokes agent activity per node, streams updates to Redis. Also executes `pollWorkflow` → `pollBoardActivity` when a Temporal Schedule fires, which diffs the GitHub Projects v2 board against `PollSnapshot` and starts `agentWorkflow`s for new matches |
 
 **Infrastructure (via Docker Compose)**
 - Postgres 18 (port 5434)
@@ -63,7 +63,7 @@
 ## Data flow: webhook → live UI
 
 1. **Webhook arrives** → `POST /api/hooks/:workflowId` → signature verified (HMAC-SHA256).
-2. **Event normalized** → platform-specific mapper produces a `TriggerEvent` (stable shape across all platforms).
+2. **Event normalized** → platform-specific mapper produces a `TriggerEvent` (stable shape across all platforms). Polling triggers skip steps 1–2 — `pollBoardActivity` synthesizes the `TriggerEvent` directly off the GraphQL response.
 3. **Trigger match** → `WebhooksService.matchesTrigger()` compares event against the workflow's trigger config.
 4. **Run created** → `WorkflowRun` row in Postgres → Temporal workflow `agentWorkflow` started with `{ workflowId, runId, triggerEvent }`.
 5. **Workflow executes** → loads node graph, topo sorts, for each node invokes `runAgentNode` activity. Parallel groups run via `Promise.all`.

@@ -31,6 +31,7 @@ Failure handling: per-activity retry policy. Workflow-level `try/catch` marks ru
 | `mergeWorktreeActivity(node, targetBranch)` | Spins up a lightweight agent session to merge a parallel agent's worktree back to the target branch — resolves conflicts via LLM if needed. See "Merge-back agent" below. |
 | `copyConduitFilesActivity(group)` | Copy `.conduit/` files from each parallel worktree into the target workspace after merge |
 | `cleanupRunActivity(runId)` | Best-effort cleanup after run ends — deletes workspace tmpdirs, prunes git worktrees, deletes `.conduit/` folder. `ticket-branch` workspaces have extra semantics; see [Cleanup for `ticket-branch` workspaces](#cleanup-for-ticket-branch-workspaces) below. |
+| `pollBoardActivity(input)` | One poll cycle for a polling-mode workflow. Queries GitHub Projects v2, filters, set-diffs against `PollSnapshot`, starts `agentWorkflow`s for new matches, upserts the snapshot. See [Polling pipeline](#polling-pipeline) below. |
 
 Activities use Temporal **heartbeats** so long-running agent sessions don't get killed for inactivity. Heartbeat payload carries current tool call + token count — doubles as the live update stream.
 
@@ -217,3 +218,27 @@ See [branch-management.md](./branch-management.md) for the full concurrency mode
 ## Constraints enforcement
 
 `AgentConstraints` (max turns, tokens, tool calls, timeout) are enforced **inside the provider adapter** — it counts events and throws `ConstraintExceededError` when breached. Timeout is a Temporal activity-level `startToCloseTimeout` *and* a provider-level wall-clock guard (belt + suspenders).
+
+## Polling pipeline
+
+Polling triggers run on a separate Temporal workflow type (`pollWorkflow`) driven by a Temporal **Schedule**, one per Conduit workflow. Independent of `agentWorkflow` — the poller decides *whether* to start a run; `agentWorkflow` is the run itself.
+
+Lifecycle:
+
+1. **Schedule registration.** On workflow save, the API's `TemporalService.upsertPollSchedule` is called with `{ workflowId, intervalSec, active }`. It creates (or updates) a Schedule at the deterministic id `pollScheduleId(workflowId)` with:
+   - `spec.intervals = [{ every: '<intervalSec>s' }]`
+   - `action.type = 'startWorkflow'`, `workflowType = 'pollWorkflow'`, `workflowId = pollWorkflowId(workflowId)`
+   - `policies.overlap = SKIP` — a slow poll cycle never piles up behind its successor.
+   - `state.paused = !(workflow.isActive && trigger.mode.active)`.
+   Webhook-mode or non-existent triggers have their schedule deleted. Delete is idempotent (`NOT_FOUND` is swallowed).
+2. **Boot reconcile.** `WorkflowsService.onModuleInit` walks every polling workflow in the DB and calls `upsertPollSchedule` so a Temporal outage at boot doesn't leave schedules out of sync — any subsequent API restart re-asserts the state.
+3. **Tick.** The Schedule fires `pollWorkflow(workflowId)` — a sandboxed shell that just calls `pollBoardActivity`.
+4. **Poll cycle (`pollBoardActivity`):**
+   - Re-read the workflow + trigger config from Postgres (schedule definitions carry only the workflow id, so config edits take effect on the next tick).
+   - Decrypt the connection's platform token; query GitHub Projects v2 via the GraphQL client in `apps/worker/src/runtime/github-projects.ts`. Paginates via `endCursor` up to a hard cap.
+   - Apply the trigger's filters against the flattened single-select field view (`status = X`, etc.). The `status` field is surfaced from `singleSelectValues.Status` so one filter works for both modes.
+   - Diff the matching `itemNodeId` set against `PollSnapshot.matchingIds`. **New → start an `agentWorkflow`**; still-matching items do *not* re-fire. Re-entry (item leaves the matching set, comes back) is treated as new — this is the board-cycle primitive that makes Dev → Review → Dev loops work.
+   - Upsert `PollSnapshot` with the current matching set.
+5. **Run start from inside an activity.** `pollBoardActivity` starts `agentWorkflow`s directly via a worker-side `@temporalio/client` singleton (`apps/worker/src/runtime/temporal-client.ts`) — separate from the `NativeConnection` used to poll the worker task queue. Each new match gets a fresh `WorkflowRun` row and a per-run workflow id (`run-<runId>`).
+
+Failure handling: one retry per tick (`maximumAttempts: 2`) — if a cycle fails, the next scheduled tick retries from scratch rather than burning retries on a flaky upstream. Run-starts that succeed are committed before the snapshot upsert, so a crash between the two reprocesses those items on the next tick; worst case is a duplicate run, not a missed transition.

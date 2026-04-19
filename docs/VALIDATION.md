@@ -77,10 +77,11 @@ Part of Phase 1 deliverables alongside `ClaudeProvider`.
 
 ## Fixtures
 
-- **Seed workflows**: JSON files under `test/fixtures/workflows/` covering each node topology (single agent, parallel, ticket-branch, multi-trigger).
+- **Seed workflows**: JSON files under `test/fixtures/workflows/` covering each node topology (single agent, parallel, polling, ticket-branch, multi-trigger).
 - **Seed git repos**: tarballs under `test/fixtures/repos/` containing pre-built bare repos with commit history, ready to clone locally. No GitHub network access in tests.
-- **Seed trigger events**: JSON payloads for GitHub webhook events (issue opened, PR opened, PR comment, project column moved) captured from real payloads once, checked in.
+- **Seed trigger events**: JSON payloads for GitHub webhook events (issue opened, PR opened, PR comment, `projects_v2_item` single-select change) captured from real payloads once, checked in.
 - **Seed MCP servers**: a tiny in-repo stdio MCP server (`test/fixtures/mcp-stub/`) that exposes a handful of tools with predictable behavior, used instead of the real `@modelcontextprotocol/server-github` in tests.
+- **Mock GitHub GraphQL**: `test/e2e/mock-github.ts` stands up a local HTTP server that serves canned Projects v2 payloads. `startMockGithubGraphql()` returns `{ url, enqueue, close }`; the URL is injected into the worker subprocess via `GITHUB_GRAPHQL_URL`. Used by the Phase 4 E2E to drive `pollBoardActivity` deterministically across cycles.
 
 ## Temporal testing specifics
 
@@ -88,6 +89,7 @@ Part of Phase 1 deliverables alongside `ClaudeProvider`.
 - `MockActivityEnvironment` for activity-level tests — isolates activity logic from workflow orchestration.
 - Real `Worker` + real Temporal server (via testcontainers or local compose) for full E2E — slower but catches wiring bugs.
 - Workflow-ID uniqueness (Phase 5 `ticket-branch`): explicit test for `WorkflowIdConflictPolicy = FAIL` path — start twice concurrently, assert second start rejected, assert first completes cleanly.
+- Polling schedules (Phase 4): drive ticks deterministically via `ScheduleHandle.trigger()` rather than waiting on wall-clock intervals. Schedule-id lookups use `pollScheduleId(workflowId)` from `@conduit/shared/temporal`.
 
 ## What we don't test
 
