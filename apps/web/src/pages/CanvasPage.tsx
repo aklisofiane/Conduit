@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useState, type DragEvent as ReactDragEvent } from 'react';
 import {
   Background,
   Controls,
@@ -18,7 +18,11 @@ import { useNavigate, useParams } from 'react-router-dom';
 import type { AgentConfig, Edge, WorkflowDefinition } from '@conduit/shared';
 import { AgentNode } from '../components/canvas/AgentNode.js';
 import { AgentConfigPanel } from '../components/canvas/AgentConfigPanel.js';
-import { NodePalette } from '../components/canvas/NodePalette.js';
+import {
+  NodePalette,
+  PALETTE_DRAG_MIME,
+  type PaletteDragPayload,
+} from '../components/canvas/NodePalette.js';
 import { TriggerConfigPanel } from '../components/canvas/TriggerConfigPanel.js';
 import { TriggerNode } from '../components/canvas/TriggerNode.js';
 import {
@@ -57,103 +61,87 @@ function CanvasInner() {
   const updateAgent = useWorkflowEditor((s) => s.updateAgent);
   const updateTrigger = useWorkflowEditor((s) => s.updateTrigger);
 
+  // React Flow nodes/edges are kept in local state so that the library's
+  // measured dimensions (set via ResizeObserver on first render) survive
+  // across domain-model updates. Rebuilding FlowNode objects from `draft`
+  // on every render would strip `measured`, which keeps React Flow stuck
+  // on `visibility: hidden` and nothing ever renders on the canvas.
+  const [flowNodes, setFlowNodes] = useState<FlowNode[]>([]);
+  const [flowEdges, setFlowEdges] = useState<FlowEdge[]>([]);
+
   useEffect(() => {
     if (wf) reset(wf.definition);
   }, [wf, reset]);
 
-  const flowNodes = useMemo<FlowNode[]>(() => {
-    if (!draft) return [];
-    const triggerFilters = draft.trigger.filters.length;
-    const triggerNode: FlowNode = {
-      id: TRIGGER_NODE_ID,
-      type: 'trigger',
-      position: draft.ui.nodePositions[TRIGGER_NODE_ID] ?? { x: 80, y: 120 },
-      data: { trigger: draft.trigger, filterCount: triggerFilters },
-      selected: selectedNodeId === 'trigger',
-    };
-    const agents: FlowNode[] = draft.nodes.map((agent, i) => ({
-      id: agent.id,
-      type: 'agent',
-      position:
-        draft.ui.nodePositions[agent.name] ??
-        draft.ui.nodePositions[agent.id] ?? {
-          x: 440 + i * 360,
-          y: 120,
-        },
-      data: { agent },
-      selected: selectedNodeId === agent.id,
-    }));
-    return [triggerNode, ...agents];
+  useEffect(() => {
+    if (!draft) {
+      setFlowNodes([]);
+      setFlowEdges([]);
+      return;
+    }
+    setFlowNodes((prev) => buildFlowNodes(draft, selectedNodeId, prev));
+    setFlowEdges((prev) => buildFlowEdges(draft, prev));
   }, [draft, selectedNodeId]);
-
-  const flowEdges = useMemo<FlowEdge[]>(() => {
-    if (!draft) return [];
-    const edges: FlowEdge[] = [];
-    // Edge from trigger to every root agent (no incoming edges).
-    const withIncoming = new Set(draft.edges.map((e) => e.to));
-    for (const n of draft.nodes) {
-      if (!withIncoming.has(n.name)) {
-        edges.push({
-          id: `trigger-${n.id}`,
-          source: TRIGGER_NODE_ID,
-          target: n.id,
-        });
-      }
-    }
-    for (const e of draft.edges) {
-      const from = draft.nodes.find((n) => n.name === e.from);
-      const to = draft.nodes.find((n) => n.name === e.to);
-      if (!from || !to) continue;
-      edges.push({ id: `${from.id}-${to.id}`, source: from.id, target: to.id });
-    }
-    return edges;
-  }, [draft]);
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
-      if (!draft) return;
-      const next = applyNodeChanges(changes, flowNodes);
-      const ui = { ...draft.ui, nodePositions: { ...draft.ui.nodePositions } };
-      for (const n of next) {
-        const key = n.id === TRIGGER_NODE_ID ? TRIGGER_NODE_ID : nameForId(draft, n.id) ?? n.id;
-        ui.nodePositions[key] = { x: n.position.x, y: n.position.y };
-      }
-      setDraft({ ...draft, ui });
+      setFlowNodes((current) => {
+        const next = applyNodeChanges(changes, current);
+        const dragEnded = changes.some(
+          (c) => c.type === 'position' && c.dragging === false,
+        );
+        if (dragEnded && draft) {
+          const ui = { ...draft.ui, nodePositions: { ...draft.ui.nodePositions } };
+          for (const n of next) {
+            const key =
+              n.id === TRIGGER_NODE_ID ? TRIGGER_NODE_ID : nameForId(draft, n.id) ?? n.id;
+            ui.nodePositions[key] = { x: n.position.x, y: n.position.y };
+          }
+          setDraft({ ...draft, ui });
+        }
+        return next;
+      });
     },
-    [draft, flowNodes, setDraft],
+    [draft, setDraft],
   );
 
   const onEdgesChange = useCallback(
     (changes: EdgeChange[]) => {
-      if (!draft) return;
-      const next = applyEdgeChanges(changes, flowEdges);
-      const edges = flowEdgesToDomain(next, draft);
-      setDraft({ ...draft, edges });
+      setFlowEdges((current) => {
+        const next = applyEdgeChanges(changes, current);
+        if (draft && changes.some((c) => c.type === 'remove')) {
+          setDraft({ ...draft, edges: flowEdgesToDomain(next, draft) });
+        }
+        return next;
+      });
     },
-    [draft, flowEdges, setDraft],
+    [draft, setDraft],
   );
 
   const onConnect = useCallback(
     (conn: Connection) => {
-      if (!draft) return;
-      const next = addEdge(conn, flowEdges);
-      const edges = flowEdgesToDomain(next, draft);
-      setDraft({ ...draft, edges });
+      setFlowEdges((current) => {
+        const next = addEdge(conn, current);
+        if (draft) setDraft({ ...draft, edges: flowEdgesToDomain(next, draft) });
+        return next;
+      });
     },
-    [draft, flowEdges, setDraft],
+    [draft, setDraft],
   );
 
   const handleAddAgent = useCallback(
-    (provider: 'claude' | 'codex') => {
+    (provider: 'claude' | 'codex', position?: { x: number; y: number }) => {
       if (!draft) return;
       const name = uniqueAgentName(draft, provider === 'claude' ? 'Agent' : 'Codex');
-      const id = `agent_${Math.random().toString(36).slice(2, 10)}`;
-      const center = rf.screenToFlowPosition({
-        x: window.innerWidth / 2,
-        y: window.innerHeight / 2,
-      });
+      const agentId = `agent_${Math.random().toString(36).slice(2, 10)}`;
+      const drop =
+        position ??
+        rf.screenToFlowPosition({
+          x: window.innerWidth / 2,
+          y: window.innerHeight / 2,
+        });
       const agent: AgentConfig = {
-        id,
+        id: agentId,
         name,
         provider,
         model: provider === 'claude' ? 'claude-opus-4-6' : 'gpt-5-codex',
@@ -162,11 +150,54 @@ function CanvasInner() {
         skills: [],
         workspace: { kind: 'fresh-tmpdir' },
       };
-      const ui = { ...draft.ui, nodePositions: { ...draft.ui.nodePositions, [name]: center } };
+      const ui = {
+        ...draft.ui,
+        nodePositions: { ...draft.ui.nodePositions, [name]: drop },
+      };
       setDraft({ ...draft, nodes: [...draft.nodes, agent], ui });
-      setSelected(id);
+      setSelected(agentId);
     },
     [draft, rf, setDraft, setSelected],
+  );
+
+  const handleSelectTrigger = useCallback(() => {
+    const pos = flowNodes.find((n) => n.id === TRIGGER_NODE_ID)?.position;
+    if (pos) rf.setCenter(pos.x + 150, pos.y + 20, { zoom: 1, duration: 400 });
+    setSelected('trigger');
+  }, [flowNodes, rf, setSelected]);
+
+  const handleDragOver = useCallback((event: ReactDragEvent<HTMLDivElement>) => {
+    if (event.dataTransfer.types.includes(PALETTE_DRAG_MIME)) {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'move';
+    }
+  }, []);
+
+  const handleDrop = useCallback(
+    (event: ReactDragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      if (!draft) return;
+      const raw = event.dataTransfer.getData(PALETTE_DRAG_MIME);
+      if (!raw) return;
+      let payload: PaletteDragPayload;
+      try {
+        payload = JSON.parse(raw) as PaletteDragPayload;
+      } catch {
+        return;
+      }
+      const point = rf.screenToFlowPosition({ x: event.clientX, y: event.clientY });
+      if (payload.kind === 'agent') {
+        handleAddAgent(payload.provider, point);
+      } else {
+        const ui = {
+          ...draft.ui,
+          nodePositions: { ...draft.ui.nodePositions, [TRIGGER_NODE_ID]: point },
+        };
+        setDraft({ ...draft, ui });
+        setSelected('trigger');
+      }
+    },
+    [draft, rf, handleAddAgent, setDraft, setSelected],
   );
 
   const handleSave = async () => {
@@ -193,7 +224,7 @@ function CanvasInner() {
 
   return (
     <div className="flex flex-1 min-h-0">
-      <NodePalette onAddAgent={handleAddAgent} />
+      <NodePalette onAddAgent={handleAddAgent} onSelectTrigger={handleSelectTrigger} />
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex h-12 items-center gap-3 border-b border-[var(--color-line)] bg-[var(--color-bg-1)] px-4">
           <button
@@ -236,7 +267,11 @@ function CanvasInner() {
           </button>
         </div>
 
-        <div className="relative flex-1">
+        <div
+          className="relative flex-1"
+          onDragOver={handleDragOver}
+          onDrop={handleDrop}
+        >
           <ReactFlow
             nodes={flowNodes}
             edges={flowEdges}
@@ -307,3 +342,63 @@ function flowEdgesToDomain(edges: FlowEdge[], def: WorkflowDefinition): Edge[] {
   return result;
 }
 
+// Rebuild flow nodes from the domain model, carrying over React Flow's
+// internal `measured` / `width` / `height` (and the live dragging position)
+// from the previous array so we don't force a re-measure on every update.
+function buildFlowNodes(
+  draft: WorkflowDefinition,
+  selectedNodeId: string | 'trigger' | undefined,
+  prev: FlowNode[],
+): FlowNode[] {
+  const prevById = new Map(prev.map((n) => [n.id, n]));
+  const triggerPrev = prevById.get(TRIGGER_NODE_ID);
+  // Explicit `nodePositions` wins so drop-handlers can reposition nodes;
+  // `prev.position` is only the fallback for nodes that have never been
+  // saved (initial auto-layout before the first drag-end).
+  const triggerPosition =
+    draft.ui.nodePositions[TRIGGER_NODE_ID] ??
+    triggerPrev?.position ?? { x: 80, y: 120 };
+  const triggerNode: FlowNode = {
+    ...(triggerPrev ?? {}),
+    id: TRIGGER_NODE_ID,
+    type: 'trigger',
+    position: triggerPosition,
+    data: { trigger: draft.trigger, filterCount: draft.trigger.filters.length },
+    selected: selectedNodeId === 'trigger',
+  };
+  const agents: FlowNode[] = draft.nodes.map((agent, i) => {
+    const p = prevById.get(agent.id);
+    const position =
+      draft.ui.nodePositions[agent.name] ??
+      draft.ui.nodePositions[agent.id] ??
+      p?.position ?? { x: 440 + i * 360, y: 120 };
+    return {
+      ...(p ?? {}),
+      id: agent.id,
+      type: 'agent',
+      position,
+      data: { agent },
+      selected: selectedNodeId === agent.id,
+    };
+  });
+  return [triggerNode, ...agents];
+}
+
+function buildFlowEdges(draft: WorkflowDefinition, prev: FlowEdge[]): FlowEdge[] {
+  const prevById = new Map(prev.map((e) => [e.id, e]));
+  const edges: FlowEdge[] = [];
+  const withIncoming = new Set(draft.edges.map((e) => e.to));
+  for (const n of draft.nodes) {
+    if (withIncoming.has(n.name)) continue;
+    const id = `trigger-${n.id}`;
+    edges.push({ ...(prevById.get(id) ?? {}), id, source: TRIGGER_NODE_ID, target: n.id });
+  }
+  for (const e of draft.edges) {
+    const from = draft.nodes.find((n) => n.name === e.from);
+    const to = draft.nodes.find((n) => n.name === e.to);
+    if (!from || !to) continue;
+    const id = `${from.id}-${to.id}`;
+    edges.push({ ...(prevById.get(id) ?? {}), id, source: from.id, target: to.id });
+  }
+  return edges;
+}
