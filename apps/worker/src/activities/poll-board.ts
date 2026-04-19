@@ -5,6 +5,7 @@ import {
   type PollCycleResult,
   type PollWorkflowInput,
   type TriggerEvent,
+  type TriggerFilter,
   workflowDefinitionSchema,
 } from '@conduit/shared';
 import { decryptSecret, loadEncryptionKey } from '@conduit/shared/crypto';
@@ -18,21 +19,12 @@ import {
 import { getTemporalClient } from '../runtime/temporal-client';
 
 /**
- * One poll cycle for a single Conduit workflow.
- *
- *   1. Load the trigger config (re-parsed through Zod so schedule drift
- *      is impossible to miss — the schedule definition only carries the
- *      workflow id, so config edits take effect on the next tick).
- *   2. Hit the platform API (GitHub Projects v2 for v1) and filter the
- *      results through the trigger's filters.
- *   3. Diff the matching item ids against the previous `PollSnapshot`;
- *      start an `agentWorkflow` per *new* match. Re-entry (item leaves
- *      the matching set then returns) is therefore re-triggered, which
- *      is what board loops rely on (see [branch-management.md]).
- *   4. Upsert the snapshot atomically with the run starts so a crash
- *      between steps 3 and 4 reprocesses those items on next tick
- *      instead of silently dropping them. Worst case is a duplicate
- *      run, not a missed transition.
+ * One poll cycle. Diffs the current matching set against `PollSnapshot`;
+ * re-entry (item leaves then returns) re-triggers — board loops depend on
+ * this. Snapshot is upserted after run starts so a crash re-processes those
+ * items instead of silently dropping them (worst case: duplicate run).
+ * Trigger config is re-read + re-parsed on every tick so edits take effect
+ * on the next scheduled tick without needing to rewrite the schedule.
  */
 export async function pollBoardActivity(
   input: PollWorkflowInput,
@@ -87,22 +79,27 @@ export async function pollBoardActivity(
   const previousSet = new Set(previousIds);
   const newItems = matching.filter((item) => !previousSet.has(item.itemNodeId));
 
-  const startedRunIds: string[] = [];
-  for (const item of newItems) {
-    const event = toTriggerEvent(item);
-    // Second gate: the platform query filters by the API's current view, but
-    // `matchesTrigger` also enforces platform + filter-field parity against
-    // the normalized event. Cheap belt-and-braces.
-    if (!matchesTrigger(event, trigger)) continue;
-    const runId = await startAgentWorkflow(workflowId, event);
-    if (runId) startedRunIds.push(runId);
-  }
+  // Second gate: the platform query filters by the API's current view, but
+  // `matchesTrigger` also enforces platform + filter-field parity against
+  // the normalized event. Cheap belt-and-braces.
+  const eventsToStart = newItems
+    .map((item) => toTriggerEvent(item))
+    .filter((event) => matchesTrigger(event, trigger));
+  const startedRunIds = (
+    await Promise.all(eventsToStart.map((event) => startAgentWorkflow(workflowId, event)))
+  ).filter((id): id is string => id !== undefined);
 
-  await prisma().pollSnapshot.upsert({
-    where: { workflowId },
-    create: { workflowId, matchingIds: matchingIds as unknown as object },
-    update: { matchingIds: matchingIds as unknown as object, polledAt: new Date() },
-  });
+  const snapshotChanged =
+    startedRunIds.length > 0 ||
+    matchingIds.length !== previousIds.length ||
+    matchingIds.some((id, i) => id !== previousIds[i]);
+  if (snapshotChanged) {
+    await prisma().pollSnapshot.upsert({
+      where: { workflowId },
+      create: { workflowId, matchingIds: matchingIds as unknown as object },
+      update: { matchingIds: matchingIds as unknown as object, polledAt: new Date() },
+    });
+  }
 
   return {
     workflowId,
@@ -134,10 +131,7 @@ function readPreviousIds(raw: unknown): string[] {
  * `matchesTrigger` so the user can write one filter set and have it work
  * for either mode.
  */
-function itemPassesFilters(
-  item: ProjectBoardItem,
-  filters: Array<{ field: string; op: string; value: string | string[] }>,
-): boolean {
+function itemPassesFilters(item: ProjectBoardItem, filters: TriggerFilter[]): boolean {
   const fields: Record<string, string> = {};
   // Surface every single-select field under its own name so users can
   // filter on `Priority` etc., not just `Status`. `status` is always
@@ -156,9 +150,7 @@ function itemPassesFilters(
     fields['repo.name'] = item.repo.name;
   }
 
-  return filters.every((f) =>
-    applyFilter(fields, { field: f.field, op: f.op as 'eq', value: f.value }),
-  );
+  return filters.every((f) => applyFilter(fields, f));
 }
 
 function toTriggerEvent(item: ProjectBoardItem): TriggerEvent {

@@ -15,14 +15,7 @@ const { pollBoardActivity } = proxyActivities<typeof activities>({
   },
 });
 
-/**
- * Scheduled "poll once" workflow. The Temporal Schedule drives invocation
- * frequency; this workflow itself is trivial — it runs a single activity and
- * returns the cycle summary for Temporal history / event-log inspection.
- *
- * Runs one Conduit workflow at a time. Overlap between ticks is prevented
- * at the schedule level (`overlap = SKIP`), so a slow poll never piles up.
- */
+/** Scheduled "poll once" — cadence + overlap=SKIP live on the schedule. */
 export async function pollWorkflow(input: PollWorkflowInput): Promise<PollCycleResult> {
   return pollBoardActivity(input);
 }

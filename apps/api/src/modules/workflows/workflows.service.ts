@@ -15,39 +15,22 @@ export class WorkflowsService implements OnModuleInit {
   ) {}
 
   /**
-   * Boot-time reconciliation: make sure every active polling workflow in
-   * the DB has a matching Temporal Schedule. Cheap — calls `upsertPollSchedule`
-   * which is idempotent. Runs in the background so a Temporal outage at
-   * boot doesn't prevent the API from serving. Any failures are logged;
-   * they'll retry on the next save or restart.
+   * Fire-and-forget at boot so a Temporal outage doesn't block API startup;
+   * inconsistent schedules recover on next save or restart.
    */
-  async onModuleInit(): Promise<void> {
-    void this.reconcilePollSchedules().catch((err: unknown) => {
-      this.logger.warn(
-        `Poll schedule reconciliation failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
-    });
+  onModuleInit(): void {
+    void this.reconcilePollSchedules();
   }
 
   private async reconcilePollSchedules(): Promise<void> {
     const workflows = await this.prisma.workflow.findMany();
-    for (const wf of workflows) {
-      const trigger = (wf.definition as Partial<WorkflowDefinition> | null)?.trigger;
-      if (trigger?.mode.kind !== 'polling') continue;
-      try {
-        await this.temporal.upsertPollSchedule({
-          workflowId: wf.id,
-          intervalSec: trigger.mode.intervalSec,
-          active: wf.isActive && trigger.mode.active,
-        });
-      } catch (err) {
-        this.logger.warn(
-          `Reconcile schedule for workflow ${wf.id} failed: ${
-            err instanceof Error ? err.message : String(err)
-          }`,
-        );
-      }
-    }
+    const polling = workflows.filter(
+      (wf) =>
+        (wf.definition as Partial<WorkflowDefinition> | null)?.trigger?.mode.kind === 'polling',
+    );
+    await Promise.allSettled(
+      polling.map((wf) => this.syncPollSchedule(wf.id, wf.definition, wf.isActive)),
+    );
   }
 
   async list() {
@@ -84,10 +67,6 @@ export class WorkflowsService implements OnModuleInit {
         isActive: false,
       },
     });
-    // New workflows default to inactive, so the schedule is created paused
-    // (or not at all if the definition is webhook-mode). Still go through
-    // sync so a user-seeded definition with a polling trigger registers
-    // immediately.
     await this.syncPollSchedule(wf.id, wf.definition, wf.isActive);
     return wf;
   }
@@ -149,9 +128,7 @@ export class WorkflowsService implements OnModuleInit {
       }
     } catch (err) {
       this.logger.warn(
-        `Sync schedule for workflow ${workflowId} failed: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
+        `Sync schedule for workflow ${workflowId} failed: ${errMessage(err)}`,
       );
     }
   }
@@ -199,6 +176,10 @@ export class WorkflowsService implements OnModuleInit {
       throw err;
     }
   }
+}
+
+function errMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
 }
 
 function isPrismaNotFound(err: unknown): boolean {

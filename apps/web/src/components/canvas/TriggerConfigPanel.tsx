@@ -39,7 +39,7 @@ export function TriggerConfigPanel({
       onChange({
         mode: {
           kind: 'webhook',
-          event: defaultWebhookEvent(trigger.platform),
+          event: trigger.platform === 'github' ? 'issues.opened' : '',
           active: trigger.mode.active,
         },
       });
@@ -374,11 +374,6 @@ function ModeButton({
       <div className="mt-0.5 font-mono text-[10.5px] text-[var(--color-text-3)]">{hint}</div>
     </button>
   );
-}
-
-function defaultWebhookEvent(platform: TriggerConfig['platform']): string {
-  if (platform === 'github') return 'issues.opened';
-  return '';
 }
 
 const WEBHOOK_EVENTS: Array<{ value: string; label: string }> = [
