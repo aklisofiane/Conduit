@@ -27,6 +27,15 @@ Created workflows are paused — the user reviews the generated canvas before ac
 
 React Flow with a small palette. Two node types.
 
+### Palette
+
+Left rail (`apps/web/src/components/canvas/NodePalette.tsx`). Every card is both click-to-add and HTML5-draggable onto the canvas; the drag payload is a JSON-encoded `PaletteDragPayload` carried via the `application/conduit-node` MIME type so stray OS drags are ignored.
+
+- **Agent cards** (`Claude`, `Codex`) — click adds a new agent at canvas center; drag drops at the pointer. The drop handler in `CanvasPage` converts screen → flow coordinates via `rf.screenToFlowPosition` before inserting the node.
+- **Trigger card** — singleton. Click re-centers the existing trigger (`rf.setCenter`) and opens its config panel; drag repositions the same trigger to the cursor. Dragging the trigger card never creates a second trigger.
+
+Node positions are persisted to `Workflow.definition.ui.nodePositions` on drag-end only — see the `State` section below for the split between React Flow's measured layout and the persisted draft.
+
 ### Node components
 
 - **`TriggerNode`** — pill-shaped, platform icon, event label, filter count. Output handle only.
