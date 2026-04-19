@@ -129,7 +129,7 @@ All routes prefixed `/api`. Non-webhook routes require `X-API-Key` header (see [
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/hooks/:workflowId` | Inbound webhook from GitHub or generic source — signature verified, triggers a run |
+| `POST` | `/hooks/:workflowId` | Inbound platform webhook. HMAC-SHA256 verified against the connection's `webhookSecret` (GitHub: `X-Hub-Signature-256`). Unauthenticated by API key — the platform doesn't carry one. Normalizes the payload to a `TriggerEvent`, applies filters, starts a run. Returns `200 started | filtered | unsupported` so the platform doesn't retry soft drops; `401` only for auth failures, `404` for unknown workflow. |
 
 ### Credentials & Connections
 
@@ -139,8 +139,9 @@ All routes prefixed `/api`. Non-webhook routes require `X-API-Key` header (see [
 | `POST` | `/credentials` | Create a credential (encrypted at rest) |
 | `PUT` | `/credentials/:id` | Update credential (rotate secret) |
 | `DELETE` | `/credentials/:id` | Delete credential (fails if in use by connections) |
-| `GET` | `/workflows/:id/connections` | List connections for a workflow |
-| `POST` | `/workflows/:id/connections` | Create a workflow connection (alias + credential + platform bindings) |
+| `GET` | `/workflows/:id/connections` | List connections (secrets redacted — `hasWebhookSecret` + `webhookSecretSuffix` only) |
+| `POST` | `/workflows/:id/connections` | Create a connection (alias + credential + optional owner/repo + optional webhook signing secret) |
+| `PUT` | `/workflows/:id/connections/:connId` | Update bindings. `webhookSecret: ""` clears it; omitting the field leaves it alone |
 | `DELETE` | `/workflows/:id/connections/:connId` | Delete a connection |
 
 ### MCP
@@ -171,7 +172,7 @@ All routes prefixed `/api`. Non-webhook routes require `X-API-Key` header (see [
 ## Key conventions
 
 - **Zod in `@conduit/shared`** = single source of truth. Same schemas validate API requests and UI forms.
-- **Domain subpath exports from `@conduit/shared`** — consumers import `@conduit/shared/agent`, `/trigger`, `/mcp`, `/workflow`, `/runtime`, `/temporal`, `/workspace`, `/skill`, `/platform` rather than a single barrel, so each app only pulls the schemas it actually uses. The root barrel still re-exports everything for convenience.
+- **Domain subpath exports from `@conduit/shared`** — consumers import `@conduit/shared/agent`, `/trigger`, `/mcp`, `/workflow`, `/runtime`, `/temporal`, `/workspace`, `/skill`, `/platform` rather than a single barrel, so each app only pulls the schemas it actually uses. The root barrel re-exports those subpaths for convenience; **`/crypto` and `/webhook` are deliberately *not* in the root barrel** — they pull `node:crypto`, which Vite would otherwise drag into the web bundle. Backend-only code imports them via the narrow subpath.
 - **Node names are stable identifiers** (user-editable, validated unique within a workflow). Each agent writes `.conduit/<NodeName>.md` in the workspace; downstream agents read the folder for upstream context.
 - **Tools are MCP servers.** No custom tool registry. Agent nodes declare which MCP servers to connect to; credentials are injected as env vars when spawning the server process.
 - **Vite alias** `@conduit/shared` → `packages/shared/src/index.ts` (no build step during web dev).

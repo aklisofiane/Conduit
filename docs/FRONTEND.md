@@ -6,12 +6,12 @@ React 19 + Vite 8 + `@xyflow/react` + TanStack Query + Zustand + Tailwind v4 + s
 
 | Screen | Purpose |
 |---|---|
-| `/` | Workflow list (name, last run, status, active toggle) |
-| `/workflows/new` | Create — opens empty canvas with a single trigger node |
+| `/` | Workflow list (name, last run, status, active toggle) + "new workflow" entry point |
 | `/workflows/:id` | Edit — canvas + config side panel (design only, no runtime data) |
+| `/workflows/:id/connections` | Manage the workflow's `WorkflowConnection`s — alias → credential + owner/repo + optional webhook signing secret |
 | `/workflows/:id/runs` | Run history list (status, trigger, duration, started at) |
 | `/runs/:runId` | Run detail — dedicated observation page with live logs (not on the canvas) |
-| `/credentials` | Manage `PlatformCredential`s |
+| `/credentials` | Manage `PlatformCredential`s (global — reused across workflows via connections) |
 | `/settings` | User / org settings (minimal v1) |
 
 ## Canvas

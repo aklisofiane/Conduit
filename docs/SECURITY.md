@@ -15,10 +15,11 @@ Not in scope for v1: supply-chain attacks, side-channel attacks, compromised wor
 
 ## Webhook authentication
 
-- `POST /api/hooks/:workflowId` → `WebhookSignatureGuard` verifies HMAC-SHA256 using the platform's signing secret (stored on the `WorkflowConnection` or a dedicated webhook secret field).
+- `POST /api/hooks/:workflowId` → `WebhooksService` verifies HMAC-SHA256 over the **raw** request body (captured by the `express.json` `verify` hook in `apps/api/src/main.ts`) against the signing secret on the trigger's `WorkflowConnection.webhookSecret`. The secret is encrypted at rest with the same AES-256-GCM format as `PlatformCredential.secret` — one crypto path, no special case for webhooks.
 - GitHub uses `X-Hub-Signature-256`; generic webhook uses a Conduit-generated shared secret.
-- **Dev escape hatch**: if `WEBHOOK_DEV_SECRET` env var is set, the guard accepts any request carrying that value as the signature. Must be unset in production (enforced by a startup check).
+- **Dev escape hatch**: if `WEBHOOK_DEV_SECRET` env var is set, the service accepts any request carrying that value verbatim as the `X-Hub-Signature-256` header. Must be unset in production — `bootstrap()` in `main.ts` throws at startup if `NODE_ENV === 'production'` and the var is set.
 - Replay protection: reject events older than 5 minutes (using the platform timestamp header where available).
+- **Soft-drop semantics**: when the signature verifies but the delivery is filtered / inactive / an unsupported event type, the endpoint still returns `200` (with `status: 'filtered' | 'unsupported'` in the body) so the platform doesn't retry. `401` is reserved for auth failures — that's the only status GitHub should treat as retry-worthy.
 
 ## Credential storage
 
