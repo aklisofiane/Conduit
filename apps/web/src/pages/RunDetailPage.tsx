@@ -56,15 +56,19 @@ export function RunDetailPage() {
     );
   }
 
-  const tokens = run.nodes.reduce(
-    (acc, n) => {
-      const u = n.usage ?? {};
-      return {
-        input: acc.input + (u.inputTokens ?? 0),
-        output: acc.output + (u.outputTokens ?? 0),
-      };
-    },
-    { input: 0, output: 0 },
+  const tokens = useMemo(
+    () =>
+      run.nodes.reduce(
+        (acc, n) => {
+          const u = n.usage ?? {};
+          return {
+            input: acc.input + (u.inputTokens ?? 0),
+            output: acc.output + (u.outputTokens ?? 0),
+          };
+        },
+        { input: 0, output: 0 },
+      ),
+    [run.nodes],
   );
 
   return (

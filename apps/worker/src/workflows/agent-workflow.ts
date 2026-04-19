@@ -86,8 +86,6 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<void> {
         outputs.set(name, output);
       }
 
-      // Post-group merge-back: sequential, one activity at a time, in
-      // definition-order so conflicts resolve deterministically across runs.
       for (const [upstreamName, siblings] of inheritFanOut.entries()) {
         if (siblings.length <= 1) continue;
         const upstreamOutput = outputs.get(upstreamName);

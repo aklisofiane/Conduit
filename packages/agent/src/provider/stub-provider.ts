@@ -172,9 +172,7 @@ export class StubProvider implements AgentProvider {
       yield { type: 'done' };
     };
 
-    const dispose = (): void => {
-      // Nothing to clean up — script buffer is GC'd with the closure.
-    };
+    const dispose = (): void => {};
 
     return { run, dispose };
   }

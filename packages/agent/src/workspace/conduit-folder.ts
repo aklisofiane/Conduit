@@ -43,20 +43,19 @@ export async function copyConduitSummaries(
 ): Promise<string[]> {
   const targetDir = path.join(targetWorkspacePath, CONDUIT_DIR);
   await fs.mkdir(targetDir, { recursive: true });
-  const copied: string[] = [];
-  for (const src of sources) {
-    const from = path.join(src.workspacePath, CONDUIT_DIR, `${src.nodeName}.md`);
-    const to = path.join(targetDir, `${src.nodeName}.md`);
-    try {
-      await fs.copyFile(from, to);
-      copied.push(src.nodeName);
-    } catch {
-      // Agent didn't write a summary — the placeholder path in runAgentNode
-      // always writes one, so this should be rare. Missing file is ignored;
-      // downstream agents just won't see that node's summary.
-    }
-  }
-  return copied;
+  const results = await Promise.all(
+    sources.map(async (src) => {
+      const from = path.join(src.workspacePath, CONDUIT_DIR, `${src.nodeName}.md`);
+      const to = path.join(targetDir, `${src.nodeName}.md`);
+      try {
+        await fs.copyFile(from, to);
+        return src.nodeName;
+      } catch {
+        return null;
+      }
+    }),
+  );
+  return results.filter((n): n is string => n !== null);
 }
 
 /**

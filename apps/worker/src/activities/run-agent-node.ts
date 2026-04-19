@@ -1,7 +1,5 @@
-import { execFile } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { promisify } from 'node:util';
 import { Context } from '@temporalio/activity';
 import {
   WorkspaceManager,
@@ -9,6 +7,7 @@ import {
   clearConduitFolder,
   discoverSkills,
   finalSummaryPrompt,
+  git,
   installSkillsIntoWorkspace,
   readConduitSummary,
   resolveMcpServers,
@@ -174,31 +173,27 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
     const conduitSummary = await readConduitSummary(workspace.path, node.name);
     const files = await listChangedFiles(workspace.path);
 
-    await prisma().nodeRun.update({
-      where: { id: nodeRun.id },
-      data: {
-        status: 'COMPLETED',
-        finishedAt: new Date(),
-        output: {
-          files,
-          workspacePath: workspace.path,
-          head: workspace.head,
-          workspaceKind: workspace.kind,
-          isBranchedWorktree: workspace.isBranchedWorktree ?? false,
-        } as unknown as object,
-        usage: usage as unknown as object,
-        workspacePath: workspace.path,
-        conduitSummary: conduitSummary ?? undefined,
-      },
-    });
-
-    return {
+    const output: NodeOutput = {
       files,
       workspacePath: workspace.path,
       head: workspace.head,
       workspaceKind: workspace.kind,
       isBranchedWorktree: workspace.isBranchedWorktree ?? false,
     };
+
+    await prisma().nodeRun.update({
+      where: { id: nodeRun.id },
+      data: {
+        status: 'COMPLETED',
+        finishedAt: new Date(),
+        output: output as unknown as object,
+        usage: usage as unknown as object,
+        workspacePath: workspace.path,
+        conduitSummary: conduitSummary ?? undefined,
+      },
+    });
+
+    return output;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     await prisma().nodeRun.update({
@@ -255,8 +250,6 @@ function systemMessage(node: AgentConfig, workspacePath: string, parallelBranch?
   return `workspace ${node.workspace.kind}${branchHint} · ${node.provider}/${node.model} · ${workspacePath}`;
 }
 
-const execFileAsync = promisify(execFile);
-
 /**
  * Write a minimal `.conduit/<NodeName>.md` placeholder if the agent didn't
  * produce one during the summary turn. The workflow/UI always expect a file
@@ -285,29 +278,20 @@ async function ensureConduitSummaryPlaceholder(
  * if the workspace isn't a git repo (fresh-tmpdir).
  */
 async function listChangedFiles(workspacePath: string): Promise<string[]> {
-  try {
-    // `-uall` recurses into untracked directories — the default `-unormal`
-    // only shows the top-level dir (`docs/`) when everything inside is new,
-    // which is useless for the "changed files" view downstream.
-    const { stdout } = await execFileAsync(
-      'git',
-      ['status', '--porcelain', '--untracked-files=all'],
-      { cwd: workspacePath },
-    );
-    return stdout
-      .split('\n')
-      .filter(Boolean)
-      .map((line) => line.slice(3).trim())
-      .filter(Boolean)
-      // `.conduit/` is an internal scratch dir — never surface it as a
-      // "changed file" on the run detail page.
-      .filter((file) => file !== '.conduit' && !file.startsWith('.conduit/'));
-  } catch {
-    return [];
-  }
+  // `--untracked-files=all` recurses into untracked directories — the default
+  // `-unormal` collapses a fresh dir into its top-level path, which is useless
+  // for the "changed files" view.
+  const stdout = await git(['status', '--porcelain', '--untracked-files=all'], {
+    cwd: workspacePath,
+  }).catch(() => '');
+  return stdout
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => line.slice(3).trim())
+    .filter(Boolean)
+    .filter((file) => file !== '.conduit' && !file.startsWith('.conduit/'));
 }
 
-/** Exposed so the workflow can call it directly when a node errors out. */
 export async function cleanupConduitFolder(workspacePath: string): Promise<void> {
   await clearConduitFolder(workspacePath);
 }

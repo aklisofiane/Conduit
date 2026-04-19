@@ -1,6 +1,4 @@
-import fs from 'node:fs/promises';
-import path from 'node:path';
-import { git, mergeBranchedWorktree, MergeConflictError } from '@conduit/agent';
+import { git, GitError, mergeBranchedWorktree, MergeConflictError } from '@conduit/agent';
 import { writeSystemLog } from '../runtime/log-writer';
 
 export interface MergeWorktreeInput {
@@ -16,35 +14,25 @@ export interface MergeWorktreeInput {
 }
 
 /**
- * Merge a parallel-branched worktree back into its upstream. Phase 3 ships
- * the clean-merge happy path only: uncommitted changes in the branched
- * worktree are captured into a single "Conduit: <Node>" commit so the merge
- * has something to operate on, then a `git merge --no-edit --no-ff` is
- * performed in the target. If the merge conflicts, we throw
- * `MergeConflictError`; the conflict-resolution agent session (see
- * agent-execution.md) is deferred.
+ * Merge a parallel-branched worktree back into its upstream. Called once per
+ * parallel sibling, sequentially, in definition order — each merge sees the
+ * cumulative result of its predecessors (deterministic across re-runs).
  *
- * The activity is called once per parallel sibling, sequentially, in
- * definition order — each merge therefore sees the cumulative result of its
- * predecessors (deterministic across re-runs).
+ * Uncommitted changes in the source are folded into a single commit first so
+ * `git merge --no-edit --no-ff` has something to operate on. `.conduit/` is
+ * excluded from that commit via pathspec — it's gitignored by design, but
+ * we don't assume the user's repo carries that rule.
  */
 export async function mergeWorktreeActivity(input: MergeWorktreeInput): Promise<void> {
   const { runId, sourceWorkspacePath, targetWorkspacePath, sourceNodeName, targetNodeName } = input;
 
-  if (!(await isGitWorktree(sourceWorkspacePath)) || !(await isGitWorktree(targetWorkspacePath))) {
-    // fresh-tmpdir / non-repo workspaces never get merged — nothing to do.
-    return;
+  try {
+    await git(['add', '-A', '--', '.', ':(exclude).conduit'], { cwd: sourceWorkspacePath });
+  } catch (err) {
+    // Non-git workspaces (fresh-tmpdir) have nothing to merge — bail cleanly.
+    if (err instanceof GitError) return;
+    throw err;
   }
-
-  // Stage anything the agent left uncommitted and fold it into a single
-  // merge-friendly commit on the source worktree. `.conduit/` is gitignored
-  // by design (per docs/design-docs/agent-context.md) — but we don't assume
-  // the user's repo actually has that gitignore rule, so we explicitly
-  // unstage the folder here instead of relying on it.
-  await git(['add', '-A'], { cwd: sourceWorkspacePath });
-  await git(['reset', '--quiet', 'HEAD', '--', '.conduit'], {
-    cwd: sourceWorkspacePath,
-  }).catch(() => undefined);
   const hasStaged = await stagedChangesExist(sourceWorkspacePath);
   if (hasStaged) {
     await git(
@@ -61,8 +49,10 @@ export async function mergeWorktreeActivity(input: MergeWorktreeInput): Promise<
     );
   }
 
-  const sourceHead = (await git(['rev-parse', 'HEAD'], { cwd: sourceWorkspacePath })).trim();
-  const targetHead = (await git(['rev-parse', 'HEAD'], { cwd: targetWorkspacePath })).trim();
+  const [sourceHead, targetHead] = await Promise.all([
+    git(['rev-parse', 'HEAD'], { cwd: sourceWorkspacePath }).then((s) => s.trim()),
+    git(['rev-parse', 'HEAD'], { cwd: targetWorkspacePath }).then((s) => s.trim()),
+  ]);
   if (sourceHead === targetHead) {
     await writeSystemLog(
       runId,
@@ -93,15 +83,6 @@ export async function mergeWorktreeActivity(input: MergeWorktreeInput): Promise<
       );
     }
     throw err;
-  }
-}
-
-async function isGitWorktree(dir: string): Promise<boolean> {
-  try {
-    await fs.access(path.join(dir, '.git'));
-    return true;
-  } catch {
-    return false;
   }
 }
 
