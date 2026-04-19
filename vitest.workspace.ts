@@ -1,5 +1,5 @@
 import { defineWorkspace } from 'vitest/config';
-import { sharedVitestConfig } from './vitest.shared';
+import { SHARED_TEST_EXCLUDE, sharedVitestConfig } from './vitest.shared';
 
 /**
  * Four projects, each with its own include glob, timeouts, and (later) setup
@@ -16,7 +16,7 @@ export default defineWorkspace([
     test: {
       name: 'unit',
       include: ['packages/**/src/**/*.test.ts', 'apps/**/src/**/*.test.ts'],
-      exclude: ['**/node_modules/**', '**/dist/**'],
+      exclude: SHARED_TEST_EXCLUDE,
       testTimeout: 5_000,
     },
   },
@@ -25,7 +25,7 @@ export default defineWorkspace([
     test: {
       name: 'integration',
       include: ['packages/**/test/integration/**/*.test.ts', 'apps/**/test/integration/**/*.test.ts'],
-      exclude: ['**/node_modules/**', '**/dist/**'],
+      exclude: SHARED_TEST_EXCLUDE,
       testTimeout: 60_000,
       hookTimeout: 60_000,
     },
@@ -35,7 +35,7 @@ export default defineWorkspace([
     test: {
       name: 'api',
       include: ['apps/api/test/contract/**/*.test.ts'],
-      exclude: ['**/node_modules/**', '**/dist/**'],
+      exclude: SHARED_TEST_EXCLUDE,
       testTimeout: 30_000,
       hookTimeout: 60_000,
     },
@@ -45,7 +45,7 @@ export default defineWorkspace([
     test: {
       name: 'e2e',
       include: ['test/e2e/**/*.test.ts'],
-      exclude: ['**/node_modules/**', '**/dist/**'],
+      exclude: SHARED_TEST_EXCLUDE,
       testTimeout: 120_000,
       hookTimeout: 180_000,
       globalSetup: ['test/e2e/global-setup.ts'],

@@ -1,13 +1,8 @@
 #!/usr/bin/env node
 // @ts-check
 /**
- * Tiny stdio MCP server for tests. Implements the minimum JSON-RPC surface
- * (`initialize`, `tools/list`, `tools/call`) with a handful of deterministic
- * tools. Intended as a stand-in for real servers like
- * `@modelcontextprotocol/server-github` — introspection + tool-call paths
- * can be exercised without network access.
- *
- * Transport: newline-delimited JSON over stdio, per MCP spec.
+ * Tiny stdio MCP server for tests. Transport is newline-delimited JSON over
+ * stdio per MCP spec; surface is `initialize`, `tools/list`, `tools/call`.
  *
  * Tools:
  *   echo({ text })        → { text }

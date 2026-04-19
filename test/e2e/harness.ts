@@ -67,22 +67,40 @@ export async function startHarness(opts: HarnessOptions = {}): Promise<Harness> 
     ...opts.extraEnv,
   };
 
+  // Piping stdout/stderr without draining them will eventually block the child
+  // on a full kernel pipe buffer. Only open the pipes when we actually plan to
+  // read them.
+  const streamLogs = process.env.CONDUIT_TEST_STREAM_LOGS === '1';
+  const childStdio: ['ignore', 'ignore' | 'pipe', 'ignore' | 'pipe'] = streamLogs
+    ? ['ignore', 'pipe', 'pipe']
+    : ['ignore', 'ignore', 'ignore'];
+
   const api = spawn('node', ['dist/main.js'], {
     cwd: path.join(REPO_ROOT, 'apps', 'api'),
     env,
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: childStdio,
   });
   const worker = spawn('node', ['dist/main.js'], {
     cwd: path.join(REPO_ROOT, 'apps', 'worker'),
     env,
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: childStdio,
   });
 
-  pipeOutput('api', api);
-  pipeOutput('worker', worker);
+  if (streamLogs) {
+    pipeOutput('api', api);
+    pipeOutput('worker', worker);
+  }
 
   const apiUrl = `http://127.0.0.1:${apiPort}`;
-  await waitForHealth(`${apiUrl}/api/health`, 30_000);
+  try {
+    await waitForHealth(`${apiUrl}/api/health`, 30_000);
+  } catch (err) {
+    api.kill('SIGTERM');
+    worker.kill('SIGTERM');
+    await Promise.all([waitExit(api), waitExit(worker)]);
+    await fs.rm(workspaceRoot, { recursive: true, force: true });
+    throw err;
+  }
 
   const http = makeHttpClient(apiUrl, apiKey);
 
@@ -202,8 +220,6 @@ function sleep(ms: number): Promise<void> {
 }
 
 function pipeOutput(prefix: string, child: ChildProcess): void {
-  const keep = process.env.CONDUIT_TEST_STREAM_LOGS === '1';
-  if (!keep) return;
   (child.stdout as Readable | null)?.on('data', (chunk: Buffer) =>
     process.stdout.write(`[${prefix}] ${chunk}`),
   );
@@ -215,10 +231,14 @@ function pipeOutput(prefix: string, child: ChildProcess): void {
 function waitExit(child: ChildProcess): Promise<void> {
   return new Promise((resolve) => {
     if (child.exitCode !== null) return resolve();
-    child.once('exit', () => resolve());
     // Safety net — SIGKILL after 5s if SIGTERM was ignored.
-    setTimeout(() => {
+    const killTimer = setTimeout(() => {
       if (child.exitCode === null) child.kill('SIGKILL');
     }, 5_000);
+    killTimer.unref();
+    child.once('exit', () => {
+      clearTimeout(killTimer);
+      resolve();
+    });
   });
 }

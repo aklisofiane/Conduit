@@ -4,14 +4,10 @@ import { StubProvider } from './stub-provider';
 import type { AgentProvider } from './types';
 
 /**
- * Selects a provider adapter by id. The Codex adapter isn't implemented
- * yet — call sites that ask for it get a clear error rather than a silent
- * stub. See docs/PLANS.md for the rollout order.
- *
- * When `CONDUIT_PROVIDER=stub` is set, every call returns a `StubProvider`
- * masquerading as the requested id — the test harness lever described in
- * docs/VALIDATION.md. The stub consumes scripts from an in-process queue or
- * a JSON file via `CONDUIT_STUB_SCRIPT`.
+ * Selects a provider adapter by id. When `CONDUIT_PROVIDER=stub` is set,
+ * returns a `StubProvider` masquerading as the requested id so tests can
+ * exercise provider-specific code paths without the real SDK. See
+ * docs/VALIDATION.md.
  */
 export function resolveProvider(
   id: AgentProviderId,

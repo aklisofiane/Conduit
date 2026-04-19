@@ -20,3 +20,6 @@ export const sharedVitestConfig = defineConfig({
     },
   },
 });
+
+/** Shared Vitest `test.exclude` — spread into each project's `test` block. */
+export const SHARED_TEST_EXCLUDE = ['**/node_modules/**', '**/dist/**'];

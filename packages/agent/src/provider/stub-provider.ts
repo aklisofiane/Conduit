@@ -10,11 +10,10 @@ import { applyCounters, checkConstraints, newCounters } from './constraints';
 import type { AgentProvider } from './types';
 
 /**
- * A single step in a stub script. `text` / `tool_call` / `tool_result` /
- * `usage` / `done` map 1:1 to `AgentEvent`. `write-file` performs a real
- * filesystem write inside the workspace before the next event fires — lets
- * tests exercise the real workspace + cleanup paths without pretending to
- * hold an SDK built-in tool. `delay` emits nothing, just waits.
+ * A single step in a stub script. Most kinds map 1:1 to `AgentEvent`;
+ * `write-file` performs a real filesystem write inside the workspace before
+ * the next event fires, so tests exercise the real workspace + cleanup paths
+ * without pretending to hold an SDK built-in tool. `delay` emits nothing.
  */
 export type StubScriptStep =
   | { kind: 'text'; delta: string; delayMs?: number }

@@ -1,5 +1,6 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import path from 'node:path';
+import { DEFAULT_TEMPORAL_TASK_QUEUE } from '@conduit/shared';
 
 /**
  * Test-stack env. Ports match docker-compose.test.yml. Call sites read from
@@ -9,7 +10,7 @@ export const TEST_STACK_ENV = {
   DATABASE_URL: 'postgresql://conduit:conduit@localhost:55432/conduit_test?schema=public',
   TEMPORAL_ADDRESS: 'localhost:57233',
   TEMPORAL_NAMESPACE: 'default',
-  TEMPORAL_TASK_QUEUE: 'conduit-workflows',
+  TEMPORAL_TASK_QUEUE: DEFAULT_TEMPORAL_TASK_QUEUE,
   REDIS_URL: 'redis://localhost:56379',
 } as const;
 

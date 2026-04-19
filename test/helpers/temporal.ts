@@ -4,23 +4,15 @@ import { MockActivityEnvironment, TestWorkflowEnvironment } from '@temporalio/te
 import { workflowDefinitionSchema, type WorkflowDefinition } from '@conduit/shared';
 
 /**
- * Shared helpers for Temporal-level tests.
- *
- * Two modes, both exposed here so test files don't import `@temporalio/testing`
- * directly:
- *
- *   `createTestWorkflowEnv()` — `TestWorkflowEnvironment.createTimeSkipping()`
- *     wrapper. Use for workflow-level tests: skips sleeps, retry backoffs,
- *     schedule intervals. Activities are real (imported from the worker).
- *
- *   `createActivityEnv()` — thin `MockActivityEnvironment` wrapper. Use for
- *     activity-level tests that want heartbeat/cancellation semantics without
- *     spinning up a workflow environment.
- *
- * Fixture loaders live here too so workflow tests can say
- * `loadWorkflowFixture('phase1-manual-run')` instead of building paths by hand.
+ * Shared helpers for Temporal-level tests. Wraps `@temporalio/testing` so
+ * test files don't import it directly, and exposes fixture loaders alongside.
  */
 
+/**
+ * Time-skipping workflow environment. Sleeps, retry backoffs, and schedule
+ * intervals are fast-forwarded; activities imported from the worker run for
+ * real.
+ */
 export async function createTestWorkflowEnv(): Promise<TestWorkflowEnvironment> {
   return TestWorkflowEnvironment.createTimeSkipping();
 }

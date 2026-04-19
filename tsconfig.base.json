@@ -21,5 +21,11 @@
     "incremental": true,
     "composite": true
   },
-  "exclude": ["node_modules", "dist", ".turbo"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".turbo",
+    "src/**/*.test.ts",
+    "src/**/__tests__/**"
+  ]
 }

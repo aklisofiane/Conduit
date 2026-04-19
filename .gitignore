@@ -27,6 +27,7 @@ packages/database/.env
 # Tests
 coverage/
 .nyc_output/
+.playwright-mcp/
 
 # Editor
 .vscode/*
