@@ -22,4 +22,17 @@ export function decrypt(payload: string): string {
   return decryptSecret(payload, encryptionKey());
 }
 
+/**
+ * Like `decrypt` but swallows errors and returns `undefined`. Use from
+ * non-critical paths (list/redaction) where a corrupt blob shouldn't 500;
+ * never use when the caller must distinguish "wrong key" from "not set".
+ */
+export function safeDecrypt(payload: string): string | undefined {
+  try {
+    return decrypt(payload);
+  } catch {
+    return undefined;
+  }
+}
+
 export { redactedSuffix };

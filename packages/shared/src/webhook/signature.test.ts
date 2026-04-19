@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { isFreshEvent, verifyGithubSignature } from './signature';
+import { verifyGithubSignature } from './signature';
 
 function signed(secret: string, body: string): string {
   return `sha256=${createHmac('sha256', secret).update(body).digest('hex')}`;
@@ -42,26 +42,5 @@ describe('verifyGithubSignature', () => {
   it('is case-insensitive on the hex digest', () => {
     const sig = signed(secret, body).toUpperCase();
     expect(verifyGithubSignature(secret, body, sig)).toBe(true);
-  });
-});
-
-describe('isFreshEvent', () => {
-  it('accepts events without a timestamp (platforms that do not expose one)', () => {
-    expect(isFreshEvent(undefined)).toBe(true);
-  });
-
-  it('accepts recent events', () => {
-    const now = 1_700_000_000_000;
-    expect(isFreshEvent(now - 60_000, now)).toBe(true);
-  });
-
-  it('rejects stale events', () => {
-    const now = 1_700_000_000_000;
-    expect(isFreshEvent(now - 6 * 60_000, now)).toBe(false);
-  });
-
-  it('rejects NaN / infinite timestamps', () => {
-    expect(isFreshEvent(Number.NaN)).toBe(false);
-    expect(isFreshEvent(Number.POSITIVE_INFINITY)).toBe(false);
   });
 });

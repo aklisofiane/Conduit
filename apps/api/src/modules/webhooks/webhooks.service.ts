@@ -5,10 +5,10 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import type { Request } from 'express';
-import { matchesTrigger, type TriggerEvent, type WorkflowDefinition } from '@conduit/shared';
+import { matchesTrigger, type WorkflowDefinition } from '@conduit/shared';
 import { normalizeGithubWebhook, verifyGithubSignature } from '@conduit/shared/webhook';
 import { PrismaService } from '../../common/prisma.service';
-import { decrypt } from '../credentials/crypto';
+import { safeDecrypt } from '../credentials/crypto';
 import { WorkflowsService } from '../workflows/workflows.service';
 
 export interface WebhookResult {
@@ -26,6 +26,7 @@ export interface WebhookResult {
 @Injectable()
 export class WebhooksService {
   private readonly logger = new Logger(WebhooksService.name);
+  private readonly devSecret = process.env.WEBHOOK_DEV_SECRET;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -106,8 +107,7 @@ export class WebhooksService {
     rawBody: Buffer,
     header: string | undefined,
   ): boolean {
-    const devSecret = process.env.WEBHOOK_DEV_SECRET;
-    if (devSecret && header && header === devSecret) return true;
+    if (this.devSecret && header && header === this.devSecret) return true;
     if (!encryptedSecret || !header) return false;
     const secret = safeDecrypt(encryptedSecret);
     if (!secret) return false;
@@ -123,14 +123,3 @@ function headerString(v: string | string[] | undefined): string | undefined {
   if (Array.isArray(v)) return v[0];
   return v;
 }
-
-function safeDecrypt(encrypted: string): string | undefined {
-  try {
-    return decrypt(encrypted);
-  } catch {
-    return undefined;
-  }
-}
-
-// Re-export for controller prose.
-export type { TriggerEvent };

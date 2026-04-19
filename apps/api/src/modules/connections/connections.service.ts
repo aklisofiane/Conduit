@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
-import { decrypt, encrypt, redactedSuffix } from '../credentials/crypto';
+import { encrypt, redactedSuffix, safeDecrypt } from '../credentials/crypto';
 import type { CreateConnectionDto, UpdateConnectionDto } from './dto';
 
 /** Shape returned by the list endpoint — safe to render directly in the UI. */
@@ -46,7 +46,7 @@ export class ConnectionsService {
       owner: r.owner,
       repo: r.repo,
       hasWebhookSecret: Boolean(r.webhookSecret),
-      webhookSecretSuffix: r.webhookSecret ? safeSuffix(r.webhookSecret) : null,
+      webhookSecretSuffix: r.webhookSecret ? suffixOf(r.webhookSecret) : null,
     }));
   }
 
@@ -138,12 +138,9 @@ export class ConnectionsService {
   }
 }
 
-function safeSuffix(encrypted: string): string {
-  try {
-    return redactedSuffix(decrypt(encrypted));
-  } catch {
-    return '****';
-  }
+function suffixOf(encrypted: string): string {
+  const plain = safeDecrypt(encrypted);
+  return plain ? redactedSuffix(plain) : '****';
 }
 
 function isUniqueConstraint(err: unknown): boolean {

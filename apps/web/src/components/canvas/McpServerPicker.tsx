@@ -31,10 +31,17 @@ interface Props {
  * (`discoveredTools`), so reopening the panel doesn't re-hit the MCP binary.
  * "Refresh tools" re-runs introspection on demand.
  */
+const TRANSPORT_KINDS: ReadonlyArray<McpTransport['kind']> = [
+  'stdio',
+  'sse',
+  'streamable-http',
+];
+
 export function McpServerPicker({ agent, workflowId, onChange }: Props) {
   const addMcpServer = useWorkflowEditor((s) => s.addMcpServer);
   const removeMcpServer = useWorkflowEditor((s) => s.removeMcpServer);
   const servers = useWorkflowEditor((s) => s.draft?.mcpServers ?? []);
+  const { data: connections = [] } = useConnections(workflowId);
   const [showAdd, setShowAdd] = useState(false);
 
   const attachedByServerId = useMemo(
@@ -72,7 +79,7 @@ export function McpServerPicker({ agent, workflowId, onChange }: Props) {
         <ServerCard
           key={server.id}
           server={server}
-          workflowId={workflowId}
+          connections={connections}
           attachedRef={attachedByServerId.get(server.id)}
           onToggleAttached={() => toggleAttached(server.id)}
           onSetAllowedTools={(tools) => setAllowedTools(server.id, tools)}
@@ -85,7 +92,7 @@ export function McpServerPicker({ agent, workflowId, onChange }: Props) {
 
       {showAdd ? (
         <AddServerForm
-          workflowId={workflowId}
+          connections={connections}
           onCancel={() => setShowAdd(false)}
           onAdd={(server) => {
             addMcpServer(server);
@@ -106,21 +113,20 @@ export function McpServerPicker({ agent, workflowId, onChange }: Props) {
 
 function ServerCard({
   server,
-  workflowId,
+  connections,
   attachedRef,
   onToggleAttached,
   onSetAllowedTools,
   onRemoveFromWorkflow,
 }: {
   server: WorkflowMcpServer;
-  workflowId: string;
+  connections: ConnectionOption[];
   attachedRef: McpServerRef | undefined;
   onToggleAttached: () => void;
   onSetAllowedTools: (tools: string[] | undefined) => void;
   onRemoveFromWorkflow: () => void;
 }) {
   const updateMcpServer = useWorkflowEditor((s) => s.updateMcpServer);
-  const { data: connections = [] } = useConnections(workflowId);
   const introspect = useIntrospectMcp();
   const attached = !!attachedRef;
 
@@ -270,15 +276,14 @@ function ToolAllowList({
 }
 
 function AddServerForm({
-  workflowId,
+  connections,
   onAdd,
   onCancel,
 }: {
-  workflowId: string;
+  connections: ConnectionOption[];
   onAdd: (server: WorkflowMcpServer) => void;
   onCancel: () => void;
 }) {
-  const { data: connections = [] } = useConnections(workflowId);
   const [mode, setMode] = useState<'preset' | 'custom'>('preset');
 
   return (
@@ -302,27 +307,23 @@ function AddServerForm({
         </button>
       </div>
 
-      {mode === 'preset' && (
-        <PresetPicker
-          connections={connections}
-          onAdd={(server) => onAdd(server)}
-        />
-      )}
-      {mode === 'custom' && (
-        <CustomServerForm
-          connections={connections}
-          onAdd={(server) => onAdd(server)}
-        />
-      )}
+      {mode === 'preset' && <PresetPicker connections={connections} onAdd={onAdd} />}
+      {mode === 'custom' && <CustomServerForm connections={connections} onAdd={onAdd} />}
     </div>
   );
 }
+
+type ConnectionOption = {
+  id: string;
+  alias: string;
+  credential: { platform: string };
+};
 
 function PresetPicker({
   connections,
   onAdd,
 }: {
-  connections: Array<{ id: string; alias: string; credential: { platform: string } }>;
+  connections: ConnectionOption[];
   onAdd: (server: WorkflowMcpServer) => void;
 }) {
   const [selected, setSelected] = useState<McpPreset | null>(null);
@@ -405,7 +406,7 @@ function CustomServerForm({
   connections,
   onAdd,
 }: {
-  connections: Array<{ id: string; alias: string; credential: { platform: string } }>;
+  connections: ConnectionOption[];
   onAdd: (server: WorkflowMcpServer) => void;
 }) {
   const [name, setName] = useState('');
@@ -458,9 +459,11 @@ function CustomServerForm({
           value={kind}
           onChange={(e) => setKind(e.target.value as McpTransport['kind'])}
         >
-          <option value="stdio">stdio</option>
-          <option value="sse">sse</option>
-          <option value="streamable-http">streamable-http</option>
+          {TRANSPORT_KINDS.map((k) => (
+            <option key={k} value={k}>
+              {k}
+            </option>
+          ))}
         </select>
       </label>
 

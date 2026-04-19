@@ -26,18 +26,3 @@ export function verifyGithubSignature(
   if (a.length !== b.length) return false;
   return timingSafeEqual(a, b);
 }
-
-/**
- * Timestamp replay-protection. Returns `true` when the event is within
- * `maxAgeMs` of `now`. Platforms that don't expose a timestamp header
- * should skip this check (pass `undefined` — returns `true`).
- */
-export function isFreshEvent(
-  timestampMs: number | undefined,
-  now: number = Date.now(),
-  maxAgeMs = 5 * 60_000,
-): boolean {
-  if (timestampMs === undefined) return true;
-  if (!Number.isFinite(timestampMs)) return false;
-  return Math.abs(now - timestampMs) <= maxAgeMs;
-}
