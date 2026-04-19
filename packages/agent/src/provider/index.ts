@@ -3,8 +3,9 @@ export { CodexProvider } from './codex-provider';
 export {
   StubProvider,
   queueStubScript,
+  queueStubSession,
   clearStubScripts,
 } from './stub-provider';
-export type { StubScript } from './stub-provider';
+export type { StubScript, StubScriptStep, StubSessionScript } from './stub-provider';
 export { resolveProvider } from './registry';
-export type { AgentProvider } from './types';
+export type { AgentProvider, AgentSession } from './types';

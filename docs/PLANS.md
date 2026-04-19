@@ -61,18 +61,18 @@ Make it useful for real dev work.
 
 **Exit criteria**: User connects a GitHub repo, creates a workflow with "on issue opened" trigger → agent with GitHub MCP server + repo workspace → agent reads the issue, inspects the code, posts a comment. Covered by `test/e2e/phase2-webhook-run.test.ts`.
 
-## Phase 3 — Multi-agent, parallel, workspace inheritance
+## Phase 3 — Multi-agent, parallel, workspace inheritance ✅
 
 The canvas earns its keep.
 
-- [ ] Parallel group execution in `agentWorkflow` (topo sort into groups, `Promise.all`).
-- [ ] Workspace `inherit` kind: sequential passthrough + parallel branching.
-- [ ] `.conduit/` folder: agents write `.conduit/<NodeName>.md` summaries as a final prompt, downstream agents read them.
-- [ ] Sequential merge-back after parallel groups (`mergeWorktreeActivity` — lightweight agent session for conflict resolution).
-- [ ] `.conduit/` file copy from parallel worktrees into target workspace.
-- [ ] Run detail page polish: per-node timeline tabs, `.conduit/` summary view, changed files diff, error view.
+- [x] Parallel group execution in `agentWorkflow` (topo sort into groups, `Promise.all`).
+- [x] Workspace `inherit` kind: sequential passthrough + parallel branching.
+- [x] `.conduit/` folder: agents write `.conduit/<NodeName>.md` summaries as a final prompt, downstream agents read them. Provider sessions went multi-turn (`AgentProvider.startSession` → `AgentSession.run(userMessage)`) so the summary reuses the same SDK thread as the main turn.
+- [x] Sequential merge-back after parallel groups (`mergeWorktreeActivity`). Ships the clean-merge happy path; the conflict-resolution agent session is deferred — merge conflicts throw `MergeConflictError` with the conflicted file list and abort the merge cleanly.
+- [x] `.conduit/` file copy from parallel worktrees into target workspace (`copyConduitFilesActivity`).
+- [x] Run detail page polish: per-node timeline / summary / changed files / error tabs. `NodeRun.conduitSummary` persists the `.conduit/` body past workspace cleanup so the Summary tab still works after the run ends.
 
-**Exit criteria**: User builds a 3-agent workflow (Triage → Fix + Doc in parallel → Review), runs it on a real issue, sees parallel execution on the run detail page, sees Fix and Doc operate on branched worktrees with sequential merge-back, sees Review read `.conduit/` summaries from both.
+**Exit criteria**: User builds a 3-agent workflow (Triage → Fix + Doc in parallel → Review), runs it on a real issue, sees parallel execution on the run detail page, sees Fix and Doc operate on branched worktrees with sequential merge-back, sees Review read `.conduit/` summaries from both. Covered by `test/e2e/phase3-parallel-run.test.ts`.
 
 ## Phase 4 — Polling trigger + board orchestration
 
@@ -139,6 +139,7 @@ Not committed, in rough priority order:
 - Redundant-run dedup + webhook storm backpressure (beyond Temporal workflow-ID uniqueness)
 - Save-time designated pusher for `ticket-branch` workflows (e.g., `pushes: true` flag on the workspace spec, validator enforces exactly one) — removes the "who pushes?" ambiguity in multi-terminal DAGs
 - Scoped env injection for `ticket-branch` push credentials — set the token only at the git-shell-invocation boundary rather than process-wide, so stdio MCP servers spawned as children of the agent don't inherit it. See [SECURITY.md](./SECURITY.md#credential-storage).
+- Merge-back agent session for conflict resolution — Phase 3 ships clean merges only; a conflicted `mergeWorktreeActivity` currently aborts and fails the run. The design (see [agent-execution.md](./design-docs/agent-execution.md#merge-back-agent)) is a short-lived agent session with workspace tools that reads conflict markers, reconciles, and commits.
 
 ## Explicitly deferred
 

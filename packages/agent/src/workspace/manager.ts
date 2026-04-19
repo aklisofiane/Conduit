@@ -38,6 +38,9 @@ export class WorkspaceManager {
             `inherit workspace requires upstream path for node "${nodeName}"`,
           );
         }
+        if (input.parallelBranch) {
+          return this.inheritBranched(runId, nodeName, input.upstreamPath, input.upstreamHead);
+        }
         return { path: input.upstreamPath, kind: 'inherit' };
       }
       case 'ticket-branch':
@@ -76,7 +79,10 @@ export class WorkspaceManager {
     // already has auth baked in via the credential helper during clone).
     await git(['fetch', '--prune', 'origin'], { cwd: bare });
 
-    const checkoutRef = ref ?? `origin/${await defaultBranch(bare)}`;
+    // `clone --bare` mirrors remote heads into `refs/heads/*`, so the
+    // resolved checkout ref is the branch name itself — no `origin/` prefix
+    // (that would only exist for a non-bare clone's remote-tracking refs).
+    const checkoutRef = ref ?? (await defaultBranch(bare));
     await git(['worktree', 'add', '--detach', target, checkoutRef], { cwd: bare });
 
     // Strip tokens from remote URL so the agent's `git remote -v` is clean.
@@ -87,6 +93,33 @@ export class WorkspaceManager {
     const head = (await git(['rev-parse', 'HEAD'], { cwd: target })).trim();
     const branchName = checkoutRef.replace(/^origin\//, '');
     return { path: target, kind: 'repo-clone', head, branchName };
+  }
+
+  /**
+   * Parallel-fan-out `inherit`: create a detached worktree at the upstream's
+   * HEAD so this sibling edits in isolation. The workflow later merges the
+   * branched worktree back into the upstream via `mergeWorktreeActivity`.
+   *
+   * The worktree sits next to the upstream's `.git` dir — that's what makes
+   * a subsequent `git worktree add` work, since `upstreamPath` itself is
+   * a worktree (not a bare repo) and shares the same git dir.
+   */
+  private async inheritBranched(
+    runId: string,
+    nodeName: string,
+    upstreamPath: string,
+    upstreamHead: string | undefined,
+  ): Promise<ResolvedWorkspace> {
+    const target = nodeWorkspacePath(runId, nodeName);
+    await fs.mkdir(path.dirname(target), { recursive: true });
+    const ref = upstreamHead ?? (await git(['rev-parse', 'HEAD'], { cwd: upstreamPath })).trim();
+    await git(['worktree', 'add', '--detach', target, ref], { cwd: upstreamPath });
+    return {
+      path: target,
+      kind: 'inherit',
+      head: ref,
+      isBranchedWorktree: true,
+    };
   }
 
   private async ensureBaseClone(connection: ConnectionContext): Promise<string> {

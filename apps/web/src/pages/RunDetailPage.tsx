@@ -2,11 +2,23 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useCancelRun, useRun, useRunLogs } from '../api/hooks.js';
 import type { ExecutionLogRow, NodeRunRow } from '../api/types.js';
+import { ChangedFiles } from '../components/run/ChangedFiles.js';
+import { NodeError } from '../components/run/NodeError.js';
+import { NodeSummary } from '../components/run/NodeSummary.js';
 import { RunTimeline } from '../components/run/RunTimeline.js';
 import { useRunUpdates } from '../hooks/use-run-updates.js';
 import { duration, relativeFromNow } from '../lib/time.js';
 import { cn } from '../lib/cn.js';
 import { statusClass } from '../lib/status.js';
+
+type NodeTab = 'timeline' | 'summary' | 'files' | 'error';
+
+const NODE_TABS: Array<{ id: NodeTab; label: string }> = [
+  { id: 'timeline', label: 'Timeline' },
+  { id: 'summary', label: 'Summary' },
+  { id: 'files', label: 'Changed files' },
+  { id: 'error', label: 'Error' },
+];
 
 export function RunDetailPage() {
   const { runId } = useParams<{ runId: string }>();
@@ -14,11 +26,20 @@ export function RunDetailPage() {
   const cancelRun = useCancelRun();
   const latestFrame = useRunUpdates(runId);
   const [selectedNode, setSelectedNode] = useState<string | undefined>(undefined);
+  const [activeTab, setActiveTab] = useState<NodeTab>('timeline');
 
   useEffect(() => {
     const first = run?.nodes?.[0]?.nodeName;
     if (first) setSelectedNode((prev) => prev ?? first);
   }, [run]);
+
+  const selected = run?.nodes.find((n) => n.nodeName === selectedNode);
+  useEffect(() => {
+    // Auto-switch to Error tab when a node fails so users don't hunt for it.
+    if (selected?.status === 'FAILED' && activeTab === 'timeline') {
+      setActiveTab('error');
+    }
+  }, [selected?.status, activeTab]);
 
   const { data: logs = [] } = useRunLogs(runId, selectedNode);
   const orderedEvents = useOrderedEvents(logs);
@@ -109,7 +130,12 @@ export function RunDetailPage() {
                 key={node.id}
                 node={node}
                 selected={selectedNode === node.nodeName}
-                onClick={() => setSelectedNode(node.nodeName)}
+                onClick={() => {
+                  setSelectedNode(node.nodeName);
+                  // Reset to Timeline when the user picks a new node; the
+                  // failed-node auto-switch still fires after selection.
+                  setActiveTab('timeline');
+                }}
               />
             ))}
             {run.nodes.length === 0 && (
@@ -123,9 +149,25 @@ export function RunDetailPage() {
         <section className="flex min-w-0 flex-1 flex-col">
           <div className="flex h-10 items-center gap-4 border-b border-[var(--color-line)] bg-[var(--color-bg-1)] px-4">
             <div className="font-mono text-[12px] font-semibold">
-              {selectedNode ?? '—'} <span className="text-[var(--color-text-3)]">· live timeline</span>
+              {selectedNode ?? '—'}
             </div>
-            {streaming && (
+            <nav className="flex items-center gap-0.5">
+              {NODE_TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={cn(
+                    'rounded-md px-2.5 py-1 font-mono text-[11px] transition-colors',
+                    activeTab === tab.id
+                      ? 'bg-[var(--color-bg-2)] text-[var(--color-text)]'
+                      : 'text-[var(--color-text-3)] hover:text-[var(--color-text)]',
+                  )}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </nav>
+            {streaming && activeTab === 'timeline' && (
               <div className="flex items-center gap-1.5 font-mono text-[11px] text-[var(--color-running)]">
                 <span
                   className="h-1.5 w-1.5 animate-pulse rounded-full"
@@ -134,19 +176,48 @@ export function RunDetailPage() {
                 streaming
               </div>
             )}
-            {latestFrame && (
+            {latestFrame && activeTab === 'timeline' && (
               <div className="font-mono text-[11px] text-[var(--color-text-3)]">
                 last: {latestFrame.event.type}
               </div>
             )}
           </div>
           <div className="min-h-0 flex-1">
-            <RunTimeline events={orderedEvents} streaming={streaming} />
+            {selected ? (
+              <NodeTabBody tab={activeTab} node={selected} events={orderedEvents} streaming={streaming} />
+            ) : (
+              <div className="flex h-full items-center justify-center font-mono text-[12px] text-[var(--color-text-4)]">
+                Select a node to inspect.
+              </div>
+            )}
           </div>
         </section>
       </div>
     </div>
   );
+}
+
+function NodeTabBody({
+  tab,
+  node,
+  events,
+  streaming,
+}: {
+  tab: NodeTab;
+  node: NodeRunRow;
+  events: ExecutionLogRow[];
+  streaming: boolean;
+}) {
+  switch (tab) {
+    case 'timeline':
+      return <RunTimeline events={events} streaming={streaming} />;
+    case 'summary':
+      return <NodeSummary node={node} />;
+    case 'files':
+      return <ChangedFiles node={node} />;
+    case 'error':
+      return <NodeError node={node} />;
+  }
 }
 
 function NodeRailItem({

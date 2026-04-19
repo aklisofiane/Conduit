@@ -5,7 +5,8 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { io as ioClient, type Socket } from 'socket.io-client';
-import type { StubScript } from '@conduit/agent';
+import { spawn as spawnChild } from 'node:child_process';
+import type { StubScript, StubSessionBundle, StubSessionScript } from '@conduit/agent';
 import type { RunUpdateMessage } from '@conduit/shared';
 import { TEST_STACK_ENV } from './stack';
 
@@ -23,6 +24,8 @@ export interface Harness {
   wsUrl: string;
   apiKey: string;
   stubScriptPath: string;
+  /** Root dir used for workspace tmpdirs, base clones, etc. Same as CONDUIT_HOME env. */
+  conduitHome: string;
   http: HttpClient;
   /**
    * Subscribe to a run's Socket.IO room. Call `.frames()` to await frames,
@@ -30,8 +33,20 @@ export interface Harness {
    * on teardown.
    */
   collectRun(runId: string): WsCollector;
-  /** Write `script` to the stub script file so the next run consumes it. */
+  /** Write a single-turn `script` to the stub script file. */
   setStubScript(script: StubScript): Promise<void>;
+  /** Write a multi-turn `session` to the stub script file (one script per `run()`). */
+  setStubSession(session: StubSessionScript): Promise<void>;
+  /** Write a bundle of sessions (consumed FIFO, one per `startSession()` across nodes). */
+  setStubBundle(bundle: StubSessionBundle): Promise<void>;
+  /**
+   * Pre-seed a base clone under `conduitHome/base-clones/github/<owner>/<repo>.git`
+   * pointing at a freshly-initialized local repo with a handful of seed files.
+   * Skips the real GitHub clone step at run time — `repo-clone` workspaces
+   * resolve against this local bare repo instead. Returns the path of the
+   * seed working clone so tests can inspect it if needed.
+   */
+  seedRepoClone(owner: string, repo: string, seedFiles?: Record<string, string>): Promise<string>;
   stop(): Promise<void>;
 }
 
@@ -55,6 +70,12 @@ export async function startHarness(opts: HarnessOptions = {}): Promise<Harness> 
   const stubScriptPath = path.join(workspaceRoot, 'stub-script.json');
   await fs.writeFile(stubScriptPath, JSON.stringify({ steps: [{ kind: 'done' }] }));
 
+  // Each harness owns its own Temporal task queue so parallel e2e test files
+  // can't steal each other's agent workflows. Postgres rows are still unique
+  // per workflow, but without a queue split, worker subprocesses race to
+  // dequeue tasks from the shared `conduit-agent` queue and cross-run frames
+  // end up on the wrong WS.
+  const taskQueue = `conduit-agent-${path.basename(workspaceRoot)}`;
   const env = {
     ...process.env,
     ...TEST_STACK_ENV,
@@ -64,6 +85,7 @@ export async function startHarness(opts: HarnessOptions = {}): Promise<Harness> 
     CONDUIT_CORS_ORIGIN: 'http://localhost',
     API_PORT: String(apiPort),
     CONDUIT_HOME: path.join(workspaceRoot, 'conduit-home'),
+    TEMPORAL_TASK_QUEUE: taskQueue,
     ...opts.extraEnv,
   };
 
@@ -91,6 +113,7 @@ export async function startHarness(opts: HarnessOptions = {}): Promise<Harness> 
     pipeOutput('worker', worker);
   }
 
+  const conduitHome = env.CONDUIT_HOME;
   const apiUrl = `http://127.0.0.1:${apiPort}`;
   try {
     await waitForHealth(`${apiUrl}/api/health`, 30_000);
@@ -109,10 +132,20 @@ export async function startHarness(opts: HarnessOptions = {}): Promise<Harness> 
     wsUrl: `${apiUrl}/runs`,
     apiKey,
     stubScriptPath,
+    conduitHome,
     http,
     collectRun: (runId) => makeCollector(`${apiUrl}/runs`, runId),
     async setStubScript(script) {
       await fs.writeFile(stubScriptPath, JSON.stringify(script));
+    },
+    async setStubSession(session) {
+      await fs.writeFile(stubScriptPath, JSON.stringify(session));
+    },
+    async setStubBundle(bundle) {
+      await fs.writeFile(stubScriptPath, JSON.stringify(bundle));
+    },
+    async seedRepoClone(owner, repo, seedFiles = {}) {
+      return seedBaseClone(conduitHome, workspaceRoot, owner, repo, seedFiles);
     },
     async stop() {
       api.kill('SIGTERM');
@@ -226,6 +259,69 @@ function pipeOutput(prefix: string, child: ChildProcess): void {
   (child.stderr as Readable | null)?.on('data', (chunk: Buffer) =>
     process.stderr.write(`[${prefix}] ${chunk}`),
   );
+}
+
+/**
+ * Seed a bare repo at the path the workspace manager expects, plus a sibling
+ * working clone with an initial commit. Remote `origin` on the bare repo
+ * points at the working clone so the manager's `git fetch origin` succeeds
+ * against the local filesystem instead of hitting the real GitHub URL.
+ */
+async function seedBaseClone(
+  conduitHome: string,
+  workspaceRoot: string,
+  owner: string,
+  repo: string,
+  seedFiles: Record<string, string>,
+): Promise<string> {
+  const baseBareDir = path.join(conduitHome, 'base-clones', 'github', owner, `${repo}.git`);
+  const seedRoot = path.join(workspaceRoot, 'seed-repos', owner, repo);
+  if (
+    await fs
+      .stat(baseBareDir)
+      .then((s) => s.isDirectory())
+      .catch(() => false)
+  ) {
+    // Already seeded by an earlier test in this harness — nothing to do.
+    return seedRoot;
+  }
+
+  await fs.mkdir(seedRoot, { recursive: true });
+  await gitCmd(seedRoot, ['init', '-q', '-b', 'main']);
+  await gitCmd(seedRoot, ['config', 'user.email', 'seed@conduit.test']);
+  await gitCmd(seedRoot, ['config', 'user.name', 'Seed']);
+
+  const files: Record<string, string> = {
+    'README.md': '# Seed repo\n\nGenerated by Conduit e2e harness.\n',
+    ...seedFiles,
+  };
+  for (const [rel, content] of Object.entries(files)) {
+    const abs = path.join(seedRoot, rel);
+    await fs.mkdir(path.dirname(abs), { recursive: true });
+    await fs.writeFile(abs, content);
+  }
+  await gitCmd(seedRoot, ['add', '-A']);
+  await gitCmd(seedRoot, ['commit', '-q', '-m', 'seed: initial commit']);
+
+  await fs.mkdir(path.dirname(baseBareDir), { recursive: true });
+  await gitCmd(path.dirname(baseBareDir), ['clone', '--bare', '-q', seedRoot, baseBareDir]);
+  // Point the bare clone at the working seed so fetch can run off the
+  // filesystem — bypasses the hardcoded github.com URL in connection-context.
+  await gitCmd(baseBareDir, ['remote', 'set-url', 'origin', seedRoot]);
+  return seedRoot;
+}
+
+function gitCmd(cwd: string, args: string[]): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawnChild('git', args, { cwd, stdio: ['ignore', 'ignore', 'pipe'] });
+    const err: Buffer[] = [];
+    child.stderr?.on('data', (c: Buffer) => err.push(c));
+    child.on('error', reject);
+    child.on('close', (code) => {
+      if (code === 0) return resolve();
+      reject(new Error(`git ${args.join(' ')} (cwd=${cwd}) exited ${code}: ${Buffer.concat(err).toString()}`));
+    });
+  });
 }
 
 function waitExit(child: ChildProcess): Promise<void> {

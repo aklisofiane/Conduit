@@ -12,4 +12,11 @@ export {
   runDir,
   nodeWorkspacePath,
 } from './paths';
-export { readConduitSummaries, clearConduitFolder } from './conduit-folder';
+export {
+  readConduitSummaries,
+  readConduitSummary,
+  copyConduitSummaries,
+  clearConduitFolder,
+} from './conduit-folder';
+export { git, GitError } from './git';
+export { mergeBranchedWorktree, MergeConflictError } from './merge';

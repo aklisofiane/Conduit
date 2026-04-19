@@ -8,6 +8,7 @@ import {
   StubProvider,
   clearStubScripts,
   queueStubScript,
+  queueStubSession,
 } from '../index';
 
 async function collect(stream: AsyncIterable<AgentEvent>): Promise<AgentEvent[]> {
@@ -20,7 +21,6 @@ function baseRequest(overrides: Partial<AgentRequest> = {}): AgentRequest {
   return {
     model: 'stub-model',
     systemPrompt: 'do the thing',
-    userMessage: '{}',
     mcpServers: [],
     workspacePath: overrides.workspacePath ?? '/tmp/unused',
     constraints: {},
@@ -51,9 +51,11 @@ describe('StubProvider', () => {
       ],
     });
     const provider = new StubProvider();
-    const events = await collect(
-      provider.execute(baseRequest({ workspacePath: workspace }), new AbortController().signal),
+    const session = provider.startSession(
+      baseRequest({ workspacePath: workspace }),
+      new AbortController().signal,
     );
+    const events = await collect(session.run('hello'));
     expect(events.map((e) => e.type)).toEqual(['text', 'text', 'usage', 'done']);
   });
 
@@ -64,12 +66,11 @@ describe('StubProvider', () => {
         { kind: 'done' },
       ],
     });
-    const events = await collect(
-      new StubProvider().execute(
-        baseRequest({ workspacePath: workspace }),
-        new AbortController().signal,
-      ),
+    const session = new StubProvider().startSession(
+      baseRequest({ workspacePath: workspace }),
+      new AbortController().signal,
     );
+    const events = await collect(session.run(''));
     expect(events.map((e) => e.type)).toEqual(['done']);
     expect(await fs.readFile(path.join(workspace, 'out', 'hello.txt'), 'utf8')).toBe('hi');
   });
@@ -83,9 +84,8 @@ describe('StubProvider', () => {
       ],
     });
     const req = baseRequest({ workspacePath: workspace, constraints: { maxToolCalls: 1 } });
-    await expect(collect(new StubProvider().execute(req, new AbortController().signal))).rejects.toBeInstanceOf(
-      ConstraintExceededError,
-    );
+    const session = new StubProvider().startSession(req, new AbortController().signal);
+    await expect(collect(session.run(''))).rejects.toBeInstanceOf(ConstraintExceededError);
   });
 
   it('stops streaming when the caller aborts', async () => {
@@ -97,9 +97,11 @@ describe('StubProvider', () => {
       ],
     });
     const ctrl = new AbortController();
-    const iter = new StubProvider().execute(baseRequest({ workspacePath: workspace }), ctrl.signal)[
-      Symbol.asyncIterator
-    ]();
+    const session = new StubProvider().startSession(
+      baseRequest({ workspacePath: workspace }),
+      ctrl.signal,
+    );
+    const iter = session.run('')[Symbol.asyncIterator]();
 
     const first = await iter.next();
     expect(first.done).toBe(false);
@@ -115,11 +117,47 @@ describe('StubProvider', () => {
       JSON.stringify({ steps: [{ kind: 'text', delta: 'from-file' }, { kind: 'done' }] }),
     );
     process.env.CONDUIT_STUB_SCRIPT = scriptPath;
-    const events = await collect(
-      new StubProvider().execute(baseRequest({ workspacePath: workspace }), new AbortController().signal),
+    const session = new StubProvider().startSession(
+      baseRequest({ workspacePath: workspace }),
+      new AbortController().signal,
     );
+    const events = await collect(session.run(''));
     const first = events[0];
     expect(first?.type).toBe('text');
     if (first?.type === 'text') expect(first.delta).toBe('from-file');
+  });
+
+  it('drives multi-turn sessions from queueStubSession in order', async () => {
+    queueStubSession({
+      turns: [
+        { steps: [{ kind: 'text', delta: 'turn-1' }, { kind: 'done' }] },
+        {
+          steps: [
+            { kind: 'write-file', path: '.conduit/Agent.md', content: '# summary' },
+            { kind: 'done' },
+          ],
+        },
+      ],
+    });
+    const session = new StubProvider().startSession(
+      baseRequest({ workspacePath: workspace }),
+      new AbortController().signal,
+    );
+    const first = await collect(session.run(''));
+    expect((first[0] as { type: string; delta: string }).delta).toBe('turn-1');
+    const second = await collect(session.run('summarize'));
+    expect(second.map((e) => e.type)).toEqual(['done']);
+    expect(await fs.readFile(path.join(workspace, '.conduit/Agent.md'), 'utf8')).toBe('# summary');
+  });
+
+  it('synthesizes `done` on extra run() calls after the scripted turns are exhausted', async () => {
+    queueStubScript({ steps: [{ kind: 'text', delta: 'only' }, { kind: 'done' }] });
+    const session = new StubProvider().startSession(
+      baseRequest({ workspacePath: workspace }),
+      new AbortController().signal,
+    );
+    await collect(session.run(''));
+    const extra = await collect(session.run('summarize'));
+    expect(extra).toEqual([{ type: 'done' }]);
   });
 });

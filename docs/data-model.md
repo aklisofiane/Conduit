@@ -145,11 +145,12 @@ model NodeRun {
   status       RunStatus   @default(PENDING)
   startedAt    DateTime?
   finishedAt   DateTime?
-  output       Json?       // { files?: string[], workspacePath: string } — lightweight; real output is .conduit/<NodeName>.md
+  output       Json?       // { files?, workspacePath, head?, workspaceKind?, isBranchedWorktree? } — lightweight; real output is .conduit/<NodeName>.md
   error        String?
   // Provider usage summary (agent nodes only)
   usage        Json?       // { inputTokens, outputTokens, toolCalls, turns }
   workspacePath String?    // populated if inherited downstream
+  conduitSummary String?   // snapshot of .conduit/<nodeName>.md at run end (freeform markdown; survives workspace cleanup)
 
   run WorkflowRun @relation(fields: [runId], references: [id], onDelete: Cascade)
 

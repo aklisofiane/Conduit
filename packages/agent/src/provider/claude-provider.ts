@@ -1,14 +1,20 @@
 import type { AgentEvent, AgentRequest, ProviderCapabilities } from '@conduit/shared';
+import { AsyncQueue } from './async-queue';
 import { applyCounters, checkConstraints, newCounters } from './constraints';
-import type { AgentProvider } from './types';
+import type { AgentProvider, AgentSession } from './types';
 
 /**
  * ClaudeProvider wraps `@anthropic-ai/claude-agent-sdk`. Deliberately kept as
  * a thin adapter — no retries, no MCP lifecycle, no credential handling.
  *
+ * Sessions use the SDK's streaming-input mode: `query()` is called once with
+ * an AsyncIterable of user messages. Each `AgentSession.run(userMessage)`
+ * pushes a message onto the queue and yields translated events from the
+ * (shared) SDK event iterator until the turn's `result` arrives.
+ *
  * The SDK is loaded dynamically so this package stays usable in environments
  * where it isn't installed (tests that only use `StubProvider`, schema tools,
- * type-only consumers). The module is resolved on first `execute()` call.
+ * type-only consumers).
  */
 export class ClaudeProvider implements AgentProvider {
   readonly id = 'claude' as const;
@@ -23,41 +29,64 @@ export class ClaudeProvider implements AgentProvider {
     };
   }
 
-  async *execute(req: AgentRequest, signal: AbortSignal): AsyncIterable<AgentEvent> {
-    const sdk = await loadClaudeSdk();
+  startSession(req: AgentRequest, signal: AbortSignal): AgentSession {
+    const counters = newCounters();
+    const startedAt = Date.now();
     const mcpServers = Object.fromEntries(
       req.mcpServers.map((s) => [s.id, sdkMcpConfig(s)]),
     );
+    const input = new AsyncQueue<SdkUserMessage>();
+    let iterator: AsyncIterator<unknown> | undefined;
 
-    const startedAt = Date.now();
-    const counters = newCounters();
-    const check = (): void => checkConstraints(req, counters, startedAt);
+    const ensureIterator = async (): Promise<AsyncIterator<unknown>> => {
+      if (iterator) return iterator;
+      const sdk = await loadClaudeSdk();
+      const stream = sdk.query({
+        prompt: input,
+        options: {
+          model: req.model,
+          systemPrompt: { type: 'preset', preset: 'claude_code', append: req.systemPrompt },
+          cwd: req.workspacePath,
+          mcpServers,
+          maxTurns: req.constraints.maxTurns,
+          abortController: abortControllerFromSignal(signal),
+          includePartialMessages: true,
+        },
+      });
+      iterator = (stream as AsyncIterable<unknown>)[Symbol.asyncIterator]();
+      return iterator;
+    };
 
-    const iter = sdk.query({
-      prompt: req.userMessage,
-      options: {
-        model: req.model,
-        systemPrompt: { type: 'preset', preset: 'claude_code', append: req.systemPrompt },
-        cwd: req.workspacePath,
-        mcpServers,
-        maxTurns: req.constraints.maxTurns,
-        abortController: abortControllerFromSignal(signal),
-        includePartialMessages: true,
-      },
-    });
-
-    for await (const raw of iter) {
+    const run = async function* (userMessage: string): AsyncIterable<AgentEvent> {
       if (signal.aborted) return;
-      const events = translate(raw);
-      for (const event of events) {
-        applyCounters(event, counters);
-        check();
-        yield event;
-        if (event.type === 'done') return;
+      input.push({
+        type: 'user',
+        message: { role: 'user', content: userMessage },
+      });
+      const iter = await ensureIterator();
+      while (true) {
+        if (signal.aborted) return;
+        const next = await iter.next();
+        if (next.done) return;
+        const events = translate(next.value);
+        for (const event of events) {
+          applyCounters(event, counters);
+          checkConstraints(req, counters, startedAt);
+          yield event;
+          if (event.type === 'done') return;
+        }
       }
-    }
+    };
+
+    const dispose = (): void => {
+      input.close();
+    };
+
+    return { run, dispose };
   }
 }
+
+type SdkUserMessage = { type: 'user'; message: { role: 'user'; content: string } };
 
 type ClaudeSdk = {
   query(args: unknown): AsyncIterable<unknown>;
@@ -176,4 +205,3 @@ function stringifyOutput(c: unknown): string {
     return String(c);
   }
 }
-

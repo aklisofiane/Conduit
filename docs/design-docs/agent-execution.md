@@ -64,11 +64,10 @@ Activities use Temporal **heartbeats** so long-running agent sessions don't get 
      - Decrypt linked WorkflowConnection secrets and substitute `{{credential}}` in env/headers
      - Pass the resolved configs + allowedTools filtering to the provider
      - SDK handles spawning, connecting, tool invocation, and teardown
-5. Invoke provider.execute({ model, instructions, context, mcpServers, workspace, constraints })
-     - Stream events: text chunk, tool call start, tool call result, token delta
-     - For each event: heartbeat + publish to Redis conduit:run-updates
-6. Final prompt (appended to the agent conversation after main work):
-     - Write .conduit/<NodeName>.md — summary of what the agent did, issues, context for downstream
+5. Start a provider session and drive two turns on it:
+     a. `session.run(serializeAgentContext(ctx))` — main work. Events stream out: text chunk, tool call start, tool call result, token delta. Each is heartbeated + published to Redis `conduit:run-updates`.
+     b. `session.run(finalSummaryPrompt(nodeName))` — reuses the same session so conversation state is retained. The agent writes `.conduit/<NodeName>.md` via its file tools. A placeholder is dropped in by the runtime if the file is missing at the end.
+     Dispose the session in a `finally` (closes SDK thread / streaming-input queue).
 7. On finish:
      - Capture changed files (git diff vs. workspace base)
      - Return NodeOutput { files?, workspacePath }
@@ -84,19 +83,25 @@ Lives in `@conduit/agent`. Minimal interface:
 ```ts
 interface AgentProvider {
   readonly id: 'claude' | 'codex';
-  getCapabilities(): ProviderCapabilities;  // models, max tokens, MCP support
-  execute(req: AgentRequest): AsyncIterable<AgentEvent>;
-  // Cancellation via AbortSignal on req.signal
+  getCapabilities(): ProviderCapabilities;         // models, max tokens, MCP support
+  startSession(req: AgentRequest, signal: AbortSignal): AgentSession;
+}
+
+interface AgentSession {
+  // One turn. Yields events until the provider emits `done`. Reusing the
+  // same session across runs keeps conversation state (Claude: streaming-
+  // input `query()`; Codex: persistent `Thread`), so the final-summary turn
+  // sees everything the main turn did.
+  run(userMessage: string): AsyncIterable<AgentEvent>;
+  dispose(): Promise<void> | void;
 }
 
 type AgentRequest = {
   model: string;
-  systemPrompt: string;              // agent node's instructions
-  userMessage: string;               // serialized AgentContext: { trigger, workflow, run } (see agent-context.md)
+  systemPrompt: string;              // agent node's instructions — delivered as the SDK system prompt
   mcpServers: ResolvedMcpServer[];   // configs with credentials substituted; SDK spawns/manages them
   workspacePath: string;             // always present — workspace is required
   constraints: AgentConstraints;
-  signal: AbortSignal;
 };
 
 type AgentEvent =

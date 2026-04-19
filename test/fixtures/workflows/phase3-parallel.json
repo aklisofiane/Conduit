@@ -1,0 +1,70 @@
+{
+  "name": "Phase 3 — parallel fix + doc with review",
+  "description": "Triage clones the repo, Fix and Doc inherit in parallel branched worktrees, Review inherits the merged workspace. Exercises parallel execution, workspace branching, merge-back, and .conduit/ copy. Runs against StubProvider.",
+  "definition": {
+    "trigger": {
+      "platform": "github",
+      "connectionId": "__placeholder__",
+      "mode": { "kind": "webhook", "event": "issues.opened", "active": false },
+      "filters": []
+    },
+    "nodes": [
+      {
+        "id": "agent-triage",
+        "name": "Triage",
+        "provider": "claude",
+        "model": "stub-model",
+        "instructions": "Clone the repo and classify the issue.",
+        "mcpServers": [],
+        "skills": [],
+        "workspace": { "kind": "repo-clone", "connectionId": "__placeholder__" }
+      },
+      {
+        "id": "agent-fix",
+        "name": "Fix",
+        "provider": "claude",
+        "model": "stub-model",
+        "instructions": "Propose a patch in src/fix.ts.",
+        "mcpServers": [],
+        "skills": [],
+        "workspace": { "kind": "inherit", "fromNode": "Triage" }
+      },
+      {
+        "id": "agent-doc",
+        "name": "Doc",
+        "provider": "claude",
+        "model": "stub-model",
+        "instructions": "Update the README for the bug fix.",
+        "mcpServers": [],
+        "skills": [],
+        "workspace": { "kind": "inherit", "fromNode": "Triage" }
+      },
+      {
+        "id": "agent-review",
+        "name": "Review",
+        "provider": "claude",
+        "model": "stub-model",
+        "instructions": "Review the merged branches and leave a summary.",
+        "mcpServers": [],
+        "skills": [],
+        "workspace": { "kind": "inherit", "fromNode": "Triage" }
+      }
+    ],
+    "edges": [
+      { "from": "Triage", "to": "Fix" },
+      { "from": "Triage", "to": "Doc" },
+      { "from": "Fix", "to": "Review" },
+      { "from": "Doc", "to": "Review" }
+    ],
+    "mcpServers": [],
+    "ui": {
+      "nodePositions": {
+        "Triage": { "x": 240, "y": 80 },
+        "Fix": { "x": 120, "y": 240 },
+        "Doc": { "x": 360, "y": 240 },
+        "Review": { "x": 240, "y": 400 }
+      },
+      "viewport": { "x": 0, "y": 0, "zoom": 1 }
+    }
+  }
+}

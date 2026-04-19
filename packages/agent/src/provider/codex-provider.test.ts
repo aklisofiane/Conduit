@@ -78,17 +78,17 @@ describe('CodexProvider', () => {
 
     const events: unknown[] = [];
     const p = new CodexProvider();
-    for await (const e of p.execute(
+    const session = p.startSession(
       {
         model: 'gpt-5-codex',
         systemPrompt: 'sys',
-        userMessage: 'user',
         mcpServers: [],
         workspacePath: '/tmp/x',
         constraints: {},
       } as never,
       new AbortController().signal,
-    )) {
+    );
+    for await (const e of session.run('user')) {
       events.push(e);
     }
 
@@ -113,18 +113,18 @@ describe('CodexProvider', () => {
     });
 
     const p = new CodexProvider();
+    const session = p.startSession(
+      {
+        model: 'gpt-5-codex',
+        systemPrompt: '',
+        mcpServers: [],
+        workspacePath: '/tmp',
+        constraints: {},
+      } as never,
+      new AbortController().signal,
+    );
     await expect(async () => {
-      for await (const _ of p.execute(
-        {
-          model: 'gpt-5-codex',
-          systemPrompt: '',
-          userMessage: '',
-          mcpServers: [],
-          workspacePath: '/tmp',
-          constraints: {},
-        } as never,
-        new AbortController().signal,
-      )) {
+      for await (const _ of session.run('')) {
         void _;
       }
     }).rejects.toThrow(/codex blew up/);
@@ -162,17 +162,17 @@ describe('CodexProvider', () => {
 
     const p = new CodexProvider();
     const events: unknown[] = [];
-    for await (const e of p.execute(
+    const session = p.startSession(
       {
         model: 'gpt-5-codex',
         systemPrompt: '',
-        userMessage: '',
         mcpServers: [],
         workspacePath: '/tmp',
         constraints: {},
       } as never,
       new AbortController().signal,
-    )) {
+    );
+    for await (const e of session.run('')) {
       events.push(e);
     }
 

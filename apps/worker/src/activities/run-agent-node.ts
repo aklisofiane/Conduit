@@ -8,7 +8,9 @@ import {
   buildAgentContext,
   clearConduitFolder,
   discoverSkills,
+  finalSummaryPrompt,
   installSkillsIntoWorkspace,
+  readConduitSummary,
   resolveMcpServers,
   resolveProvider,
   serializeAgentContext,
@@ -36,24 +38,45 @@ export interface RunAgentNodeInput {
   triggerEvent: TriggerEvent;
   /** Populated when the node has a `workspace.inherit.fromNode`. */
   upstreamWorkspacePath?: string;
+  /** Upstream worktree HEAD — passed through to the workspace manager for parallel branching. */
+  upstreamHead?: string;
+  /**
+   * True when the node is one of several siblings inheriting the same
+   * upstream in a parallel group. Tells the workspace manager to carve a
+   * throwaway branched worktree instead of passing the upstream path
+   * through.
+   */
+  parallelBranch?: boolean;
 }
 
 /**
  * The workhorse activity. One invocation per agent node. Orchestrates:
  *   1. Create `NodeRun` row, flip to RUNNING.
- *   2. Resolve workspace (repo-clone / inherit / fresh-tmpdir).
+ *   2. Resolve workspace (repo-clone / inherit / fresh-tmpdir). Parallel
+ *      `inherit` siblings get a branched worktree so they don't stomp.
  *   3. Copy selected skills into the workspace.
  *   4. Resolve MCP configs (credentials substituted in-memory).
- *   5. Stream provider events → Redis (live UI) + ExecutionLog (replay) +
- *      Temporal heartbeats.
- *   6. Capture workspace path + .conduit/ summary for downstream nodes.
+ *   5. Start a provider session; drive turn 1 (`AgentContext`) and turn 2
+ *      (write `.conduit/<NodeName>.md` summary) through the same session
+ *      so the agent keeps conversation state across the summary step.
+ *   6. Capture workspace path + head + `.conduit/` summary for downstream.
  *   7. On error/cancel: flip `NodeRun` to FAILED/CANCELLED, propagate.
  *
  * The activity is idempotent up to the workspace step — Temporal retries
  * re-enter from the top. Real agent runs are not resumable mid-session.
  */
 export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput> {
-  const { runId, node, workflowId, workflowName, mcpServers, triggerEvent } = input;
+  const {
+    runId,
+    node,
+    workflowId,
+    workflowName,
+    mcpServers,
+    triggerEvent,
+    upstreamWorkspacePath,
+    upstreamHead,
+    parallelBranch,
+  } = input;
   const ctx = Context.current();
   const workspaceManager = new WorkspaceManager();
 
@@ -85,10 +108,12 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
       nodeName: node.name,
       spec: node.workspace,
       connection,
-      upstreamPath: input.upstreamWorkspacePath,
+      upstreamPath: upstreamWorkspacePath,
+      upstreamHead,
+      parallelBranch,
     });
 
-    const startupMessage = systemMessage(node, workspace.path);
+    const startupMessage = systemMessage(node, workspace.path, parallelBranch);
     await Promise.all([
       publishSystemEvent(runId, node.name, startupMessage),
       writeSystemLog(runId, node.name, startupMessage),
@@ -115,11 +140,11 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
       run: { id: runId, startedAt: nodeRun.startedAt ?? new Date() },
     });
 
-    const stream = provider.execute(
+    const usage = { inputTokens: 0, outputTokens: 0, toolCalls: 0, turns: 0 };
+    const session = provider.startSession(
       {
         model: node.model,
         systemPrompt: node.instructions,
-        userMessage: serializeAgentContext(agentCtx),
         mcpServers: resolvedMcp,
         workspacePath: workspace.path,
         constraints: node.constraints ?? {},
@@ -127,13 +152,26 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
       abortController.signal,
     );
 
-    const usage = { inputTokens: 0, outputTokens: 0, toolCalls: 0, turns: 0 };
-    for await (const event of stream) {
-      await onAgentEvent(runId, node.name, event, usage);
-      ctx.heartbeat({ nodeName: node.name, usage });
+    try {
+      // Turn 1 — main work. The agent reads upstream `.conduit/*.md` on its
+      // own via file tools; only the trigger/workflow/run shell is injected.
+      for await (const event of session.run(serializeAgentContext(agentCtx))) {
+        await onAgentEvent(runId, node.name, event, usage);
+        ctx.heartbeat({ nodeName: node.name, usage, phase: 'main' });
+      }
+
+      // Turn 2 — final summary. Same session, so conversation state is
+      // retained. The agent is expected to write `.conduit/<NodeName>.md`.
+      for await (const event of session.run(finalSummaryPrompt(node.name))) {
+        await onAgentEvent(runId, node.name, event, usage);
+        ctx.heartbeat({ nodeName: node.name, usage, phase: 'summary' });
+      }
+    } finally {
+      await session.dispose();
     }
 
-    await writeConduitSummary(workspace.path, node);
+    await ensureConduitSummaryPlaceholder(workspace.path, node);
+    const conduitSummary = await readConduitSummary(workspace.path, node.name);
     const files = await listChangedFiles(workspace.path);
 
     await prisma().nodeRun.update({
@@ -141,13 +179,26 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
       data: {
         status: 'COMPLETED',
         finishedAt: new Date(),
-        output: { files, workspacePath: workspace.path } as unknown as object,
+        output: {
+          files,
+          workspacePath: workspace.path,
+          head: workspace.head,
+          workspaceKind: workspace.kind,
+          isBranchedWorktree: workspace.isBranchedWorktree ?? false,
+        } as unknown as object,
         usage: usage as unknown as object,
         workspacePath: workspace.path,
+        conduitSummary: conduitSummary ?? undefined,
       },
     });
 
-    return { files, workspacePath: workspace.path };
+    return {
+      files,
+      workspacePath: workspace.path,
+      head: workspace.head,
+      workspaceKind: workspace.kind,
+      isBranchedWorktree: workspace.isBranchedWorktree ?? false,
+    };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     await prisma().nodeRun.update({
@@ -199,18 +250,22 @@ async function publishSystemEvent(
   });
 }
 
-function systemMessage(node: AgentConfig, workspacePath: string): string {
-  return `workspace ${node.workspace.kind} · ${node.provider}/${node.model} · ${workspacePath}`;
+function systemMessage(node: AgentConfig, workspacePath: string, parallelBranch?: boolean): string {
+  const branchHint = parallelBranch ? ' · branched-worktree' : '';
+  return `workspace ${node.workspace.kind}${branchHint} · ${node.provider}/${node.model} · ${workspacePath}`;
 }
 
 const execFileAsync = promisify(execFile);
 
 /**
- * Write a minimal `.conduit/<NodeName>.md` placeholder so downstream agents
- * always see a file — even if the agent forgot to write one. Agents are
- * expected to overwrite this during their run.
+ * Write a minimal `.conduit/<NodeName>.md` placeholder if the agent didn't
+ * produce one during the summary turn. The workflow/UI always expect a file
+ * to exist; downstream agents fall back to the placeholder gracefully.
  */
-async function writeConduitSummary(workspacePath: string, node: AgentConfig): Promise<void> {
+async function ensureConduitSummaryPlaceholder(
+  workspacePath: string,
+  node: AgentConfig,
+): Promise<void> {
   const file = path.join(workspacePath, '.conduit', `${node.name}.md`);
   await fs.mkdir(path.dirname(file), { recursive: true });
   try {
@@ -231,12 +286,22 @@ async function writeConduitSummary(workspacePath: string, node: AgentConfig): Pr
  */
 async function listChangedFiles(workspacePath: string): Promise<string[]> {
   try {
-    const { stdout } = await execFileAsync('git', ['status', '--porcelain'], { cwd: workspacePath });
+    // `-uall` recurses into untracked directories — the default `-unormal`
+    // only shows the top-level dir (`docs/`) when everything inside is new,
+    // which is useless for the "changed files" view downstream.
+    const { stdout } = await execFileAsync(
+      'git',
+      ['status', '--porcelain', '--untracked-files=all'],
+      { cwd: workspacePath },
+    );
     return stdout
       .split('\n')
       .filter(Boolean)
       .map((line) => line.slice(3).trim())
-      .filter(Boolean);
+      .filter(Boolean)
+      // `.conduit/` is an internal scratch dir — never surface it as a
+      // "changed file" on the run detail page.
+      .filter((file) => file !== '.conduit' && !file.startsWith('.conduit/'));
   } catch {
     return [];
   }

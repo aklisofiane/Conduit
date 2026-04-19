@@ -5,19 +5,25 @@ import type {
   ResolvedMcpServer,
 } from '@conduit/shared';
 import { applyCounters, checkConstraints, newCounters } from './constraints';
-import type { AgentProvider } from './types';
+import type { AgentProvider, AgentSession } from './types';
 
 /**
  * CodexProvider wraps `@openai/codex-sdk`. Same contract as ClaudeProvider
  * — translate `AgentRequest` to the SDK and stream-map its events into our
  * `AgentEvent` union.
  *
+ * Sessions are 1:1 with Codex threads — `startThread()` creates the thread;
+ * each `AgentSession.run(userMessage)` invokes `thread.runStreamed()` for one
+ * turn. The system prompt is prepended to the first turn's input only; Codex
+ * threads retain conversation history across `runStreamed()` calls, so we
+ * don't repeat the system block on later turns (e.g. the final `.conduit/`
+ * summary prompt).
+ *
  * Two Codex-isms worth calling out:
  *
  *   1. MCP servers are configured on the `Codex` instance, not per-turn.
- *      We construct a fresh instance per call, passing the resolved MCP
- *      configs via `options.config.mcp_servers`. Secrets were already
- *      substituted upstream by `resolveMcpServers`.
+ *      Resolved configs are passed via `options.config.mcp_servers`. Secrets
+ *      were already substituted upstream by `resolveMcpServers`.
  *
  *   2. The SDK doesn't emit character-level text deltas — it emits full
  *      message text on `item.updated` / `item.completed`. We diff against
@@ -37,43 +43,61 @@ export class CodexProvider implements AgentProvider {
     };
   }
 
-  async *execute(req: AgentRequest, signal: AbortSignal): AsyncIterable<AgentEvent> {
-    const { Codex } = await loadCodexSdk();
-    const codex = new Codex({
-      apiKey: this.opts.apiKey,
-      config: buildConfigOverrides(req.mcpServers),
-    });
-
-    const thread = codex.startThread({
-      model: req.model,
-      workingDirectory: req.workspacePath,
-      // SDK defaults (read-only) are incompatible with repo-clone / ticket-branch
-      // workflows where the agent is expected to commit and edit.
-      sandboxMode: 'workspace-write',
-      skipGitRepoCheck: true,
-      approvalPolicy: 'never',
-    });
-
-    const input = `<system>\n${req.systemPrompt}\n</system>\n\n${req.userMessage}`;
-    const { events } = await thread.runStreamed(input, { signal });
-
-    const seenText = new Map<string, string>();
-    const openToolCalls = new Set<string>();
-
+  startSession(req: AgentRequest, signal: AbortSignal): AgentSession {
     const counters = newCounters();
     const startedAt = Date.now();
-    const check = (): void => checkConstraints(req, counters, startedAt);
+    const seenText = new Map<string, string>();
+    const openToolCalls = new Set<string>();
+    let thread: CodexThread | undefined;
+    let firstTurn = true;
 
-    for await (const raw of events) {
+    const ensureThread = async (): Promise<CodexThread> => {
+      if (thread) return thread;
+      const { Codex } = await loadCodexSdk();
+      const codex = new Codex({
+        apiKey: this.opts.apiKey,
+        config: buildConfigOverrides(req.mcpServers),
+      });
+      thread = codex.startThread({
+        model: req.model,
+        workingDirectory: req.workspacePath,
+        // SDK defaults (read-only) are incompatible with repo-clone / ticket-branch
+        // workflows where the agent is expected to commit and edit.
+        sandboxMode: 'workspace-write',
+        skipGitRepoCheck: true,
+        approvalPolicy: 'never',
+      });
+      return thread;
+    };
+
+    const run = async function* (userMessage: string): AsyncIterable<AgentEvent> {
       if (signal.aborted) return;
-      const translated = translate(raw, seenText, openToolCalls);
-      for (const event of translated) {
-        applyCounters(event, counters);
-        check();
-        yield event;
-        if (event.type === 'done') return;
+      const t = await ensureThread();
+      const input = firstTurn
+        ? `<system>\n${req.systemPrompt}\n</system>\n\n${userMessage}`
+        : userMessage;
+      firstTurn = false;
+
+      const { events } = await t.runStreamed(input, { signal });
+      for await (const raw of events) {
+        if (signal.aborted) return;
+        const translated = translate(raw, seenText, openToolCalls);
+        for (const event of translated) {
+          applyCounters(event, counters);
+          checkConstraints(req, counters, startedAt);
+          yield event;
+          if (event.type === 'done') return;
+        }
       }
-    }
+    };
+
+    const dispose = (): void => {
+      // Codex SDK has no explicit thread teardown — dropping the reference
+      // is sufficient. Kept for symmetry with other providers.
+      thread = undefined;
+    };
+
+    return { run, dispose };
   }
 }
 

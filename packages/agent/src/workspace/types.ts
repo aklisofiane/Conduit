@@ -22,10 +22,16 @@ export interface ResolvedWorkspace {
   /** Absolute path the agent's CWD should be set to. */
   path: string;
   kind: WorkspaceSpec['kind'];
-  /** Populated for repo-clone / ticket-branch. */
+  /** Populated for repo-clone, parallel-branched inherit, and ticket-branch. */
   head?: string;
   /** Populated for repo-clone. */
   branchName?: string;
+  /**
+   * True when the workspace is a throwaway git worktree owned by this node
+   * (e.g. parallel-branched `inherit`). Tells the workflow this worktree
+   * should be merged back into its upstream after the parallel group ends.
+   */
+  isBranchedWorktree?: boolean;
 }
 
 export interface WorkspaceResolveInput {
@@ -35,4 +41,17 @@ export interface WorkspaceResolveInput {
   connection?: ConnectionContext;
   /** Populated for `inherit` — the upstream node's resolved workspace path. */
   upstreamPath?: string;
+  /**
+   * Populated for `inherit` when the node runs in a parallel fan-out group
+   * (multiple siblings inheriting from the same upstream). The manager adds
+   * a detached throwaway worktree off this commit so siblings don't stomp
+   * on each other's files. Sequential `inherit` ignores this.
+   */
+  upstreamHead?: string;
+  /**
+   * When true, `inherit` is resolved as a branched worktree off the upstream
+   * HEAD rather than a passthrough of the upstream path. Set by the workflow
+   * when the group size > 1.
+   */
+  parallelBranch?: boolean;
 }

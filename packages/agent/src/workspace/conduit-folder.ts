@@ -21,6 +21,44 @@ export async function readConduitSummaries(
   return out;
 }
 
+/** Read a single `.conduit/<NodeName>.md` — returns null if missing. */
+export async function readConduitSummary(
+  workspacePath: string,
+  nodeName: string,
+): Promise<string | null> {
+  const file = path.join(workspacePath, CONDUIT_DIR, `${nodeName}.md`);
+  return fs.readFile(file, 'utf8').catch(() => null);
+}
+
+/**
+ * Copy `.conduit/<nodeName>.md` from each source workspace into the target's
+ * `.conduit/` directory. Used after a parallel group merges back so the
+ * downstream node sees every sibling's summary in the merged workspace.
+ * `.conduit/` is gitignored — the git merge doesn't carry it, so this is
+ * a straight file copy.
+ */
+export async function copyConduitSummaries(
+  sources: Array<{ nodeName: string; workspacePath: string }>,
+  targetWorkspacePath: string,
+): Promise<string[]> {
+  const targetDir = path.join(targetWorkspacePath, CONDUIT_DIR);
+  await fs.mkdir(targetDir, { recursive: true });
+  const copied: string[] = [];
+  for (const src of sources) {
+    const from = path.join(src.workspacePath, CONDUIT_DIR, `${src.nodeName}.md`);
+    const to = path.join(targetDir, `${src.nodeName}.md`);
+    try {
+      await fs.copyFile(from, to);
+      copied.push(src.nodeName);
+    } catch {
+      // Agent didn't write a summary — the placeholder path in runAgentNode
+      // always writes one, so this should be rare. Missing file is ignored;
+      // downstream agents just won't see that node's summary.
+    }
+  }
+  return copied;
+}
+
 /**
  * Delete the workspace's `.conduit/` folder at run end. The folder is
  * gitignored — leaving it behind would leak prior-run state into any repo

@@ -53,9 +53,16 @@ export interface NodeRunRow {
   status: RunStatus;
   startedAt: string | null;
   finishedAt: string | null;
-  output: unknown;
+  output: {
+    files?: string[];
+    workspacePath?: string;
+    head?: string;
+    workspaceKind?: 'fresh-tmpdir' | 'repo-clone' | 'inherit' | 'ticket-branch';
+    isBranchedWorktree?: boolean;
+  } | null;
   usage: { inputTokens?: number; outputTokens?: number; toolCalls?: number; turns?: number } | null;
   workspacePath: string | null;
+  conduitSummary: string | null;
   error: string | null;
 }
 

@@ -181,6 +181,10 @@ model NodeRun {
   usage         Json?
   // Populated if inherited downstream.
   workspacePath String?
+  // Snapshot of `.conduit/<nodeName>.md` captured at the end of the node run.
+  // The workspace is deleted after the run — persisting the summary here lets
+  // the run detail page show it after cleanup. Freeform markdown, no schema.
+  conduitSummary String?
 
   run WorkflowRun @relation(fields: [runId], references: [id], onDelete: Cascade)
 
