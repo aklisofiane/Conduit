@@ -87,8 +87,12 @@ function getLabels(payload: Record<string, unknown>): string[] {
 }
 
 function getStatus(payload: Record<string, unknown>): string | undefined {
-  // GitHub projects_v2 item.moved carries column name on
-  // `changes.field_value.to.name`. Other platforms land here later.
+  // Webhook: GitHub projects_v2_item.edited carries the new column name at
+  // `changes.field_value.to.name`. Polling: the poller writes the current
+  // column name to `payload.status` directly so `status = X` filters work in
+  // either mode. Other platforms land here later.
+  const direct = (payload as { status?: unknown }).status;
+  if (typeof direct === 'string') return direct;
   const changes = (payload as { changes?: { field_value?: { to?: { name?: unknown } } } }).changes;
   const to = changes?.field_value?.to?.name;
   return typeof to === 'string' ? to : undefined;

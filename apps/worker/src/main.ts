@@ -9,6 +9,7 @@ import * as activities from './activities/index';
 import { config } from './config';
 import { closeEventBus } from './runtime/event-bus';
 import { closePrisma } from './runtime/prisma';
+import { closeTemporalClient } from './runtime/temporal-client';
 
 async function run(): Promise<void> {
   const connection = await NativeConnection.connect({ address: config.temporal.address });
@@ -28,6 +29,7 @@ async function run(): Promise<void> {
     worker.shutdown();
     await closeEventBus();
     await closePrisma();
+    await closeTemporalClient();
     await connection.close();
   };
 

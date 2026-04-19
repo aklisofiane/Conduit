@@ -1,0 +1,31 @@
+{
+  "name": "Phase 4 polling — status=Dev triage",
+  "description": "Polls a GitHub Projects v2 board on a long interval (schedule is triggered manually in the E2E test). One agent reacts per matching item.",
+  "definition": {
+    "trigger": {
+      "platform": "github",
+      "connectionId": "__placeholder__",
+      "mode": { "kind": "polling", "intervalSec": 3600, "active": true },
+      "filters": [{ "field": "status", "op": "eq", "value": "Dev" }],
+      "board": { "ownerType": "org", "owner": "acme", "number": 5 }
+    },
+    "nodes": [
+      {
+        "id": "agent-dev",
+        "name": "Dev",
+        "provider": "claude",
+        "model": "stub-model",
+        "instructions": "Pick up the ticket entering the Dev column.",
+        "mcpServers": [],
+        "skills": [],
+        "workspace": { "kind": "fresh-tmpdir" }
+      }
+    ],
+    "edges": [],
+    "mcpServers": [],
+    "ui": {
+      "nodePositions": { "Dev": { "x": 240, "y": 160 } },
+      "viewport": { "x": 0, "y": 0, "zoom": 1 }
+    }
+  }
+}

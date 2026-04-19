@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, type OnModuleInit } from '@nestjs/common';
 import type { TriggerEvent, WorkflowDefinition } from '@conduit/shared';
 import { PrismaService } from '../../common/prisma.service';
 import { TemporalService } from '../../temporal/temporal.service';
@@ -6,11 +6,49 @@ import type { CreateWorkflowDto, ManualRunDto, UpdateWorkflowDto } from './dto';
 import { defaultDefinition } from './defaults';
 
 @Injectable()
-export class WorkflowsService {
+export class WorkflowsService implements OnModuleInit {
+  private readonly logger = new Logger(WorkflowsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly temporal: TemporalService,
   ) {}
+
+  /**
+   * Boot-time reconciliation: make sure every active polling workflow in
+   * the DB has a matching Temporal Schedule. Cheap — calls `upsertPollSchedule`
+   * which is idempotent. Runs in the background so a Temporal outage at
+   * boot doesn't prevent the API from serving. Any failures are logged;
+   * they'll retry on the next save or restart.
+   */
+  async onModuleInit(): Promise<void> {
+    void this.reconcilePollSchedules().catch((err: unknown) => {
+      this.logger.warn(
+        `Poll schedule reconciliation failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    });
+  }
+
+  private async reconcilePollSchedules(): Promise<void> {
+    const workflows = await this.prisma.workflow.findMany();
+    for (const wf of workflows) {
+      const trigger = (wf.definition as Partial<WorkflowDefinition> | null)?.trigger;
+      if (trigger?.mode.kind !== 'polling') continue;
+      try {
+        await this.temporal.upsertPollSchedule({
+          workflowId: wf.id,
+          intervalSec: trigger.mode.intervalSec,
+          active: wf.isActive && trigger.mode.active,
+        });
+      } catch (err) {
+        this.logger.warn(
+          `Reconcile schedule for workflow ${wf.id} failed: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
+    }
+  }
 
   async list() {
     return this.prisma.workflow.findMany({
@@ -38,7 +76,7 @@ export class WorkflowsService {
   }
 
   async create(dto: CreateWorkflowDto) {
-    return this.prisma.workflow.create({
+    const wf = await this.prisma.workflow.create({
       data: {
         name: dto.name,
         description: dto.description,
@@ -46,11 +84,17 @@ export class WorkflowsService {
         isActive: false,
       },
     });
+    // New workflows default to inactive, so the schedule is created paused
+    // (or not at all if the definition is webhook-mode). Still go through
+    // sync so a user-seeded definition with a polling trigger registers
+    // immediately.
+    await this.syncPollSchedule(wf.id, wf.definition, wf.isActive);
+    return wf;
   }
 
   async update(id: string, dto: UpdateWorkflowDto) {
     try {
-      return await this.prisma.workflow.update({
+      const wf = await this.prisma.workflow.update({
         where: { id },
         data: {
           name: dto.name,
@@ -59,6 +103,8 @@ export class WorkflowsService {
           isActive: dto.isActive,
         },
       });
+      await this.syncPollSchedule(wf.id, wf.definition, wf.isActive);
+      return wf;
     } catch (err) {
       if (isPrismaNotFound(err)) throw new NotFoundException(`Workflow ${id} not found`);
       throw err;
@@ -68,9 +114,45 @@ export class WorkflowsService {
   async delete(id: string) {
     try {
       await this.prisma.workflow.delete({ where: { id } });
+      await this.temporal.deletePollSchedule(id);
     } catch (err) {
       if (isPrismaNotFound(err)) throw new NotFoundException(`Workflow ${id} not found`);
       throw err;
+    }
+  }
+
+  /**
+   * Keep Temporal's Schedule in sync with the workflow's current trigger:
+   *
+   *   - polling + isActive + mode.active → schedule exists + unpaused
+   *   - polling + (inactive anywhere)    → schedule exists + paused
+   *   - webhook / manual                 → no schedule (delete if it existed)
+   *
+   * Schedule failures are logged but never block the workflow write — an
+   * inconsistent schedule will be re-reconciled on next save or boot.
+   */
+  private async syncPollSchedule(
+    workflowId: string,
+    definition: unknown,
+    isActive: boolean,
+  ): Promise<void> {
+    const trigger = (definition as Partial<WorkflowDefinition> | null)?.trigger;
+    try {
+      if (trigger?.mode.kind === 'polling') {
+        await this.temporal.upsertPollSchedule({
+          workflowId,
+          intervalSec: trigger.mode.intervalSec,
+          active: isActive && trigger.mode.active,
+        });
+      } else {
+        await this.temporal.deletePollSchedule(workflowId);
+      }
+    } catch (err) {
+      this.logger.warn(
+        `Sync schedule for workflow ${workflowId} failed: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
     }
   }
 

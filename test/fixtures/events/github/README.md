@@ -11,6 +11,7 @@ Trimmed-but-realistic payloads used by `packages/shared/src/webhook/github.fixtu
 | `issue_comment.issue.json` | `issue_comment` | `created` | `null` (issue-only — not routed in v1) |
 | `push.json` | `push` | — | `null` (unsupported event type) |
 | `issues.opened.no-repo.json` | `issues` | `opened` | `issues.opened` with `repo` omitted |
+| `projects_v2_item.status_changed.json` | `projects_v2_item` | `edited` (Status single-select) | `board.column.changed` |
 
 ## Rules
 

@@ -77,4 +77,19 @@ describe('normalizeGithubWebhook — real payload fixtures', () => {
     expect(evt?.repo).toBeUndefined();
     expect(triggerEventSchema.safeParse(evt).success).toBe(true);
   });
+
+  it('projects_v2_item Status change → board.column.changed', () => {
+    const evt = normalizeGithubWebhook(
+      'projects_v2_item',
+      load('projects_v2_item.status_changed.json'),
+    );
+    expect(evt).toMatchObject({
+      source: 'github',
+      mode: 'webhook',
+      event: 'board.column.changed',
+      actor: 'alice',
+    });
+    // Schema round-trip — filter code downstream relies on parseable events.
+    expect(triggerEventSchema.safeParse(evt).success).toBe(true);
+  });
 });

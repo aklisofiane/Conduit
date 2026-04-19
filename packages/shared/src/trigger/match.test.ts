@@ -77,6 +77,43 @@ describe('matchesTrigger', () => {
       }),
     ).toBe(true);
   });
+
+  it('matches board.column.changed webhook via `status = Dev`', () => {
+    const webhookEvent: TriggerEvent = {
+      source: 'github',
+      mode: 'webhook',
+      event: 'board.column.changed',
+      payload: {
+        changes: { field_value: { field_name: 'Status', to: { name: 'Dev' } } },
+      },
+    };
+    const trigger: TriggerConfig = {
+      platform: 'github',
+      connectionId: 'conn_1',
+      mode: { kind: 'webhook', event: 'board.column.changed', active: true },
+      filters: [{ field: 'status', op: 'eq', value: 'Dev' }],
+    };
+    expect(matchesTrigger(webhookEvent, trigger)).toBe(true);
+  });
+
+  it('matches a polling-synthesized event via `status = Dev`', () => {
+    // Polling writes the column name directly to payload.status so the same
+    // filter works regardless of how the event arrived.
+    const pollingEvent: TriggerEvent = {
+      source: 'github',
+      mode: 'polling',
+      event: 'board.column.changed',
+      payload: { status: 'Dev' },
+      issue: { id: 'I_1', key: '42', title: 't', url: 'https://x' },
+    };
+    const trigger: TriggerConfig = {
+      platform: 'github',
+      connectionId: 'conn_1',
+      mode: { kind: 'polling', intervalSec: 60, active: true },
+      filters: [{ field: 'status', op: 'eq', value: 'Dev' }],
+    };
+    expect(matchesTrigger(pollingEvent, trigger)).toBe(true);
+  });
 });
 
 describe('applyFilter', () => {

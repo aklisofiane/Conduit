@@ -5,11 +5,13 @@ import type { TriggerEvent } from '../trigger/event';
  * Returns `null` for event types we don't route (push, release, etc.) so the
  * webhook endpoint can short-circuit with 202.
  *
- * v1 handles three events — the ones that surface an actionable issue/PR:
+ * v1 handles four events — the ones that surface an actionable issue/PR or
+ * the board state change that drives board-loop workflows:
  *
- *   - `issues` (action: `opened`)                  → `event = 'issues.opened'`
- *   - `pull_request` (action: `opened`)            → `event = 'pull_request.opened'`
- *   - `issue_comment` (action: `created`, on PR)   → `event = 'issue_comment.created'`
+ *   - `issues` (action: `opened`)                            → `event = 'issues.opened'`
+ *   - `pull_request` (action: `opened`)                      → `event = 'pull_request.opened'`
+ *   - `issue_comment` (action: `created`, on PR)             → `event = 'issue_comment.created'`
+ *   - `projects_v2_item` (action: `edited`, Status changed)  → `event = 'board.column.changed'`
  *
  * Other actions on those same event types (edited, closed, labeled…) are
  * intentionally dropped for now; wire them in when a workflow needs them.
@@ -78,6 +80,28 @@ export function normalizeGithubWebhook(
     };
   }
 
+  // Projects v2 column move. Fires only when a single-select field (any —
+  // typically the "Status" field) changes value on a board item. Drop other
+  // field types and actions so the rest of the pipeline only sees column
+  // transitions. The payload carries the item's `content_node_id` but not the
+  // human-readable issue number, so `issue` is intentionally omitted —
+  // downstream agents resolve the full issue via GitHub MCP if they need it.
+  // `ticket-branch` workflows therefore cannot use this webhook (save-time
+  // validator rejects the combo); polling mode, which fetches full issue
+  // details from the GraphQL API, is the recommended mode for board loops.
+  if (eventName === 'projects_v2_item' && action === 'edited') {
+    const fv = p.changes?.field_value;
+    if (fv?.field_type === 'single_select' && typeof fv.to?.name === 'string') {
+      return {
+        source: 'github',
+        mode: 'webhook',
+        event: 'board.column.changed',
+        payload: p as Record<string, unknown>,
+        actor,
+      };
+    }
+  }
+
   return null;
 }
 
@@ -100,6 +124,23 @@ interface GithubWebhookPayload {
     title?: string;
     html_url?: string;
   };
+  changes?: {
+    field_value?: {
+      field_name?: string;
+      field_type?: string;
+      project_number?: number;
+      from?: { name?: string };
+      to?: { name?: string };
+    };
+  };
+  projects_v2_item?: {
+    id?: number | string;
+    node_id?: string;
+    content_node_id?: string;
+    content_type?: string;
+    project_node_id?: string;
+  };
+  organization?: { login?: string };
 }
 
 function extractRepo(

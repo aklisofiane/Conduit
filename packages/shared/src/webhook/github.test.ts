@@ -84,6 +84,65 @@ describe('normalizeGithubWebhook', () => {
     expect(issueComment).toBeNull();
   });
 
+  it('normalizes projects_v2_item column change → board.column.changed', () => {
+    const evt = normalizeGithubWebhook('projects_v2_item', {
+      action: 'edited',
+      organization: { login: 'acme' },
+      sender: { login: 'alice' },
+      projects_v2_item: {
+        node_id: 'PVTI_xxx',
+        content_node_id: 'I_kgDOxxxx',
+        content_type: 'Issue',
+        project_node_id: 'PVT_xxx',
+      },
+      changes: {
+        field_value: {
+          field_name: 'Status',
+          field_type: 'single_select',
+          project_number: 5,
+          from: { name: 'Todo' },
+          to: { name: 'Dev' },
+        },
+      },
+    });
+
+    expect(evt).toMatchObject({
+      source: 'github',
+      mode: 'webhook',
+      event: 'board.column.changed',
+      actor: 'alice',
+    });
+    // Webhook payload has no issue number — downstream agents resolve via MCP.
+    expect(evt?.issue).toBeUndefined();
+    expect(evt?.repo).toBeUndefined();
+  });
+
+  it('drops projects_v2_item edits of non-single-select fields', () => {
+    const evt = normalizeGithubWebhook('projects_v2_item', {
+      action: 'edited',
+      organization: { login: 'acme' },
+      projects_v2_item: { node_id: 'PVTI_xxx', content_type: 'Issue' },
+      changes: {
+        field_value: {
+          field_name: 'Priority',
+          field_type: 'number',
+          from: { name: '1' },
+          to: { name: '2' },
+        },
+      },
+    });
+    expect(evt).toBeNull();
+  });
+
+  it('drops projects_v2_item non-edited actions (created/deleted/reordered)', () => {
+    expect(
+      normalizeGithubWebhook('projects_v2_item', {
+        action: 'created',
+        projects_v2_item: { node_id: 'PVTI_xxx' },
+      }),
+    ).toBeNull();
+  });
+
   it('returns null for unsupported actions', () => {
     expect(
       normalizeGithubWebhook('issues', {

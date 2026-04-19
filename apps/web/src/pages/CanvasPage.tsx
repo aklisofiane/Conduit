@@ -19,6 +19,7 @@ import type { AgentConfig, Edge, WorkflowDefinition } from '@conduit/shared';
 import { AgentNode } from '../components/canvas/AgentNode.js';
 import { AgentConfigPanel } from '../components/canvas/AgentConfigPanel.js';
 import { NodePalette } from '../components/canvas/NodePalette.js';
+import { TriggerConfigPanel } from '../components/canvas/TriggerConfigPanel.js';
 import { TriggerNode } from '../components/canvas/TriggerNode.js';
 import {
   useManualRun,
@@ -54,6 +55,7 @@ function CanvasInner() {
   const setSelected = useWorkflowEditor((s) => s.setSelected);
   const reset = useWorkflowEditor((s) => s.reset);
   const updateAgent = useWorkflowEditor((s) => s.updateAgent);
+  const updateTrigger = useWorkflowEditor((s) => s.updateTrigger);
 
   useEffect(() => {
     if (wf) reset(wf.definition);
@@ -260,6 +262,18 @@ function CanvasInner() {
           agent={selectedAgent}
           workflowId={id}
           onChange={(patch) => updateAgent(selectedAgent.id, patch)}
+          onSave={handleSave}
+          onDiscard={() => wf && reset(wf.definition)}
+          saving={updateWorkflow.isPending}
+          dirty={dirty}
+        />
+      )}
+
+      {selectedNodeId === 'trigger' && (
+        <TriggerConfigPanel
+          trigger={draft.trigger}
+          workflowId={id}
+          onChange={(patch) => updateTrigger(patch)}
           onSave={handleSave}
           onDiscard={() => wf && reset(wf.definition)}
           saving={updateWorkflow.isPending}
