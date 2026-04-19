@@ -8,6 +8,7 @@ import type {
   RunUpdateMessage,
   WorkflowDefinition,
 } from '@conduit/shared';
+import type { TemplateSummary } from '@conduit/shared/template';
 
 /** Row shape returned by `GET /workflows`. */
 export interface WorkflowRow {
@@ -104,15 +105,7 @@ export interface ConnectionRow {
   webhookSecretSuffix: string | null;
 }
 
-export interface TemplateSummary {
-  id: string;
-  name: string;
-  description: string;
-  category: 'triage' | 'develop' | 'review' | 'board-loop';
-  workflowCount: number;
-  /** Connection aliases the template references — one binding per entry. */
-  placeholders: string[];
-}
+export type { TemplateSummary };
 
 export type TemplateBinding =
   | { mode: 'existing'; connectionId: string }

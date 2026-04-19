@@ -1,25 +1,14 @@
-/**
- * Template placeholder convention: `<alias>` strings appear where a
- * `WorkflowConnection.id` would in a real `WorkflowDefinition`. They stand in
- * for connections the user hasn't bound yet. Placeholders are bundle-scoped —
- * the same `<github>` placeholder across every workflow in a multi-workflow
- * bundle binds to a single real `WorkflowConnection` per workflow (the
- * connection is recreated per workflow, but the alias + credential binding
- * chosen by the user is shared).
- *
- * Resolution happens exactly once, at `POST /workflows/from-template/:id`.
- * After resolution, definitions carry real cuids and no longer reference
- * `<...>` strings.
- */
+// `<alias>` strings stand in for WorkflowConnection ids in template JSON;
+// resolved once at POST /workflows/from-template/:id.
 const PLACEHOLDER_PATTERN = /^<([a-z][a-z0-9-]*)>$/i;
 
-export function isPlaceholder(value: unknown): value is string {
-  return typeof value === 'string' && PLACEHOLDER_PATTERN.test(value);
+export function placeholderAlias(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  return PLACEHOLDER_PATTERN.exec(value)?.[1];
 }
 
-export function placeholderAlias(value: string): string | undefined {
-  const match = PLACEHOLDER_PATTERN.exec(value);
-  return match?.[1];
+export function isPlaceholder(value: unknown): value is string {
+  return placeholderAlias(value) !== undefined;
 }
 
 export function formatPlaceholder(alias: string): string {

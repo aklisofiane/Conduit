@@ -1,19 +1,17 @@
 import {
-  BadRequestException,
   Injectable,
   Logger,
   NotFoundException,
   type OnModuleInit,
 } from '@nestjs/common';
 import {
-  WorkflowValidationError,
-  assertValidWorkflowDefinition,
   ticketLockFor,
   workflowDefinitionSchema,
   type TriggerEvent,
   type WorkflowDefinition,
 } from '@conduit/shared';
 import { PrismaService } from '../../common/prisma.service';
+import { assertDefinitionValid } from '../../common/assert-definition-valid';
 import { DuplicateRunError, TemporalService } from '../../temporal/temporal.service';
 import type { CreateWorkflowDto, ManualRunDto, UpdateWorkflowDto } from './dto';
 import { defaultDefinition } from './defaults';
@@ -216,24 +214,6 @@ export class WorkflowsService implements OnModuleInit {
 
 function errMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
-}
-
-/**
- * Run semantic validation (ticket-branch trigger compatibility, etc.) and
- * re-throw as a 400 so the UI gets a useful error body instead of a 500.
- */
-function assertDefinitionValid(definition: WorkflowDefinition): void {
-  try {
-    assertValidWorkflowDefinition(definition);
-  } catch (err) {
-    if (err instanceof WorkflowValidationError) {
-      throw new BadRequestException({
-        message: err.message,
-        issues: err.issues,
-      });
-    }
-    throw err;
-  }
 }
 
 function isPrismaNotFound(err: unknown): boolean {

@@ -6,13 +6,12 @@ import {
   type OnModuleInit,
 } from '@nestjs/common';
 import {
-  WorkflowValidationError,
-  assertValidWorkflowDefinition,
   resolveTemplate,
   type TemplateSummary,
   type WorkflowDefinition,
 } from '@conduit/shared';
 import { PrismaService } from '../../common/prisma.service';
+import { assertDefinitionValid } from '../../common/assert-definition-valid';
 import { TemporalService } from '../../temporal/temporal.service';
 import { encrypt } from '../credentials/crypto';
 import { loadTemplates, type LoadedTemplate } from './template-loader';
@@ -23,19 +22,6 @@ export interface CreatedFromTemplate {
   workflows: { id: string; name: string }[];
 }
 
-/**
- * Owns the on-disk template catalog and the "create workflows from
- * template" flow. Templates are loaded once at boot into an in-memory map;
- * editing a JSON file requires an API restart.
- *
- * Creation is a single Prisma `$transaction`: N workflow rows + one
- * `WorkflowConnection` per (workflow, unique placeholder) binding. If any
- * workflow fails `validateWorkflowDefinition` (e.g. a ticket-branch on a
- * webhook that can't carry an issue), the whole bundle rolls back.
- * Temporal Schedule upserts happen after the transaction commits — a
- * schedule failure doesn't undo the workflow rows (an inconsistent
- * schedule recovers on next save or API boot).
- */
 @Injectable()
 export class TemplatesService implements OnModuleInit {
   private readonly logger = new Logger(TemplatesService.name);
@@ -53,27 +39,13 @@ export class TemplatesService implements OnModuleInit {
   }
 
   list(): TemplateSummary[] {
-    return [...this.templates.values()].map((t) => ({
-      id: t.file.id,
-      name: t.file.name,
-      description: t.file.description,
-      category: t.file.category,
-      workflowCount: t.file.workflows.length,
-      placeholders: t.placeholders,
-    }));
+    return [...this.templates.values()].map(toSummary);
   }
 
   get(templateId: string): TemplateSummary {
     const t = this.templates.get(templateId);
     if (!t) throw new NotFoundException(`Template ${templateId} not found`);
-    return {
-      id: t.file.id,
-      name: t.file.name,
-      description: t.file.description,
-      category: t.file.category,
-      workflowCount: t.file.workflows.length,
-      placeholders: t.placeholders,
-    };
+    return toSummary(t);
   }
 
   async createFromTemplate(
@@ -88,19 +60,20 @@ export class TemplatesService implements OnModuleInit {
 
     const placeholderAliases = loaded.placeholders;
 
-    const createdIds = await this.prisma.$transaction(async (tx) => {
-      const results: { id: string; name: string }[] = [];
+    const created = await this.prisma.$transaction(async (tx) => {
+      const results: {
+        id: string;
+        name: string;
+        definition: WorkflowDefinition;
+        isActive: boolean;
+      }[] = [];
 
       for (const wf of loaded.file.workflows) {
-        // Per-workflow binding map from alias → real WorkflowConnection id.
-        // "existing" bindings reuse the given connectionId directly; "new"
-        // bindings create one connection row per workflow (connections are
-        // per-workflow in the schema).
-        const created = await tx.workflow.create({
+        const stub = await tx.workflow.create({
           data: {
             name: wf.name,
             description: wf.description,
-            definition: {} as unknown as object, // filled in after connections are created
+            definition: {} as unknown as object,
             isActive: false,
           },
         });
@@ -109,7 +82,6 @@ export class TemplatesService implements OnModuleInit {
         for (const alias of placeholderAliases) {
           const binding = dto.bindings[alias];
           if (!binding) {
-            // Defensive — assertBindingsCoverPlaceholders already rejected this.
             throw new BadRequestException(`Missing binding for <${alias}>`);
           }
           if (binding.mode === 'existing') {
@@ -117,7 +89,7 @@ export class TemplatesService implements OnModuleInit {
           } else {
             const conn = await tx.workflowConnection.create({
               data: {
-                workflowId: created.id,
+                workflowId: stub.id,
                 alias: binding.alias,
                 credentialId: binding.credentialId,
                 owner: binding.owner,
@@ -136,32 +108,29 @@ export class TemplatesService implements OnModuleInit {
           aliasToConn,
         );
         const resolvedDefinition = resolved[0]!.definition;
-        assertSemanticValid(resolvedDefinition);
+        assertDefinitionValid(resolvedDefinition);
 
         const finalWf = await tx.workflow.update({
-          where: { id: created.id },
+          where: { id: stub.id },
           data: { definition: resolvedDefinition as unknown as object },
-          select: { id: true, name: true },
+          select: { id: true, name: true, isActive: true },
         });
-        results.push(finalWf);
+        results.push({ ...finalWf, definition: resolvedDefinition });
       }
 
       return results;
     });
 
-    // Schedules live outside the DB — do the upsert per workflow after the
-    // transaction so a Temporal hiccup doesn't roll back the workflow rows.
+    // Schedules live outside the DB — upsert after commit so a Temporal hiccup
+    // doesn't roll back the workflow rows.
     await Promise.allSettled(
-      createdIds.map(async ({ id }) => {
-        const wf = await this.prisma.workflow.findUnique({ where: { id } });
-        if (!wf) return;
-        const def = wf.definition as Partial<WorkflowDefinition> | null;
-        if (def?.trigger?.mode.kind !== 'polling') return;
+      created.map(async ({ id, definition, isActive }) => {
+        if (definition.trigger.mode.kind !== 'polling') return;
         try {
           await this.temporal.upsertPollSchedule({
             workflowId: id,
-            intervalSec: def.trigger.mode.intervalSec,
-            active: wf.isActive && def.trigger.mode.active,
+            intervalSec: definition.trigger.mode.intervalSec,
+            active: isActive && definition.trigger.mode.active,
           });
         } catch (err) {
           this.logger.warn(
@@ -171,7 +140,10 @@ export class TemplatesService implements OnModuleInit {
       }),
     );
 
-    return { templateId, workflows: createdIds };
+    return {
+      templateId,
+      workflows: created.map(({ id, name }) => ({ id, name })),
+    };
   }
 
   private assertBindingsCoverPlaceholders(
@@ -196,45 +168,49 @@ export class TemplatesService implements OnModuleInit {
       if (binding.mode === 'new') credentialIds.add(binding.credentialId);
       else existingConnectionIds.add(binding.connectionId);
     }
-    if (credentialIds.size > 0) {
-      const found = await this.prisma.platformCredential.findMany({
-        where: { id: { in: [...credentialIds] } },
-        select: { id: true },
-      });
-      const foundIds = new Set(found.map((c) => c.id));
-      const missing = [...credentialIds].filter((id) => !foundIds.has(id));
-      if (missing.length > 0) {
-        throw new BadRequestException(
-          `Unknown credentialId(s): ${missing.join(', ')}`,
-        );
-      }
+
+    const [credRows, connRows] = await Promise.all([
+      credentialIds.size > 0
+        ? this.prisma.platformCredential.findMany({
+            where: { id: { in: [...credentialIds] } },
+            select: { id: true },
+          })
+        : Promise.resolve([]),
+      existingConnectionIds.size > 0
+        ? this.prisma.workflowConnection.findMany({
+            where: { id: { in: [...existingConnectionIds] } },
+            select: { id: true },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const missingCreds = diff(credentialIds, credRows);
+    if (missingCreds.length > 0) {
+      throw new BadRequestException(
+        `Unknown credentialId(s): ${missingCreds.join(', ')}`,
+      );
     }
-    if (existingConnectionIds.size > 0) {
-      const found = await this.prisma.workflowConnection.findMany({
-        where: { id: { in: [...existingConnectionIds] } },
-        select: { id: true },
-      });
-      const foundIds = new Set(found.map((c) => c.id));
-      const missing = [...existingConnectionIds].filter((id) => !foundIds.has(id));
-      if (missing.length > 0) {
-        throw new BadRequestException(
-          `Unknown connectionId(s): ${missing.join(', ')}`,
-        );
-      }
+    const missingConns = diff(existingConnectionIds, connRows);
+    if (missingConns.length > 0) {
+      throw new BadRequestException(
+        `Unknown connectionId(s): ${missingConns.join(', ')}`,
+      );
     }
   }
 }
 
-function assertSemanticValid(definition: WorkflowDefinition): void {
-  try {
-    assertValidWorkflowDefinition(definition);
-  } catch (err) {
-    if (err instanceof WorkflowValidationError) {
-      throw new BadRequestException({
-        message: err.message,
-        issues: err.issues,
-      });
-    }
-    throw err;
-  }
+function toSummary(t: LoadedTemplate): TemplateSummary {
+  return {
+    id: t.file.id,
+    name: t.file.name,
+    description: t.file.description,
+    category: t.file.category,
+    workflowCount: t.file.workflows.length,
+    placeholders: t.placeholders,
+  };
+}
+
+function diff(want: Set<string>, found: { id: string }[]): string[] {
+  const foundIds = new Set(found.map((c) => c.id));
+  return [...want].filter((id) => !foundIds.has(id));
 }

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ApiError } from '../../api/client.js';
 import {
@@ -12,16 +12,6 @@ import type {
   TemplateSummary,
 } from '../../api/types.js';
 
-/**
- * "Create from template" flow. Two steps: pick a template, then bind each
- * placeholder the template references (usually `<github>`) to either an
- * existing credential-backed connection or a new one.
- *
- * Connections are per-workflow in the DB, so a bundle template with N
- * workflows will create N connection rows — all pointing at the single
- * credential the user picked. The alias and credential stay consistent
- * across the bundle.
- */
 export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
   const { data: templates = [], isLoading } = useTemplates();
   const { data: credentials = [] } = useCredentials();
@@ -32,15 +22,14 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
   const [bindings, setBindings] = useState<Record<string, TemplateBinding>>({});
   const [error, setError] = useState<string | null>(null);
 
-  const canCreate = useMemo(() => {
-    if (!selected) return false;
-    return selected.placeholders.every((p) => {
+  const canCreate =
+    !!selected &&
+    selected.placeholders.every((p) => {
       const b = bindings[p];
       if (!b) return false;
       if (b.mode === 'existing') return Boolean(b.connectionId);
       return Boolean(b.alias && b.credentialId);
     });
-  }, [selected, bindings]);
 
   const handlePick = (t: TemplateSummary) => {
     setSelected(t);
