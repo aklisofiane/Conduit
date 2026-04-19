@@ -46,6 +46,12 @@ npm --workspace @conduit/web    dev    # :5173
 ## Things not obvious from the docs
 
 - **Workflow sandbox.** `apps/worker/src/workflows/agent-workflow.ts` runs in Temporal's V8 sandbox — no `node:*`, no Prisma, no Redis, no provider imports. All I/O belongs in `apps/worker/src/activities/`.
-- **Prefer `@conduit/shared` subpath exports** (`/agent`, `/trigger`, `/mcp`, `/workflow`, `/runtime`, `/temporal`, `/workspace`, `/skill`, `/platform`) over the root barrel — the web bundle tree-shakes `node:crypto` out only when consumers import narrowly.
+- **`@conduit/shared` subpath exports.** Import from the narrow subpaths (`/agent`, `/trigger`, `/mcp`, `/workflow`, `/runtime`, `/temporal`, `/workspace`, `/skill`, `/platform`) rather than the root barrel — the web bundle tree-shakes `node:crypto` out only when consumers import narrowly.
 - **Single root `.env`.** API/worker read `../../.env`; web uses `VITE_*`; `packages/database/.env` is a copy for the Prisma CLI (root npm scripts forward via `dotenv-cli`).
 - **Provider selection.** `CONDUIT_PROVIDER=claude|codex|stub`. Tests use `stub` — it replays scripted events but exercises real tool execution, real workspaces, real `.conduit/` writes. No real LLM calls anywhere in the suite.
+
+## Coding conventions
+
+- **Match the existing directory layout.** This repo splits code into nested subdirectories by concern (e.g. `activities/`, `workflows/`, `providers/`, `shared/*` subpaths) — don't flatten. When adding new code, find the sibling module that does the closest thing and follow its shape. New features usually mean a new subdirectory, not a new top-level file.
+- **Extract to `@conduit/shared` when logic is reused across apps.** If the same helper ends up in two of `apps/api`, `apps/worker`, `apps/web`, move it to the appropriate `packages/shared/src/*` subpath instead of duplicating or cross-importing between apps. Place it in the subpath that matches the concern so consumers can use the narrow imports above.
+- **Watch file size as a split signal.** ~500 lines is a soft ceiling — past that, consider splitting by concern. Not a hard rule: if a file genuinely needs to be big (a cohesive state machine, a generated schema, a single algorithm), leave it. The point is to notice the smell, not to chase a line count.
