@@ -79,9 +79,24 @@ function CanvasInner() {
       setFlowEdges([]);
       return;
     }
-    setFlowNodes((prev) => buildFlowNodes(draft, selectedNodeId, prev));
+    setFlowNodes((prev) => buildFlowNodes(draft, prev));
     setFlowEdges((prev) => buildFlowEdges(draft, prev));
-  }, [draft, selectedNodeId]);
+  }, [draft]);
+
+  useEffect(() => {
+    setFlowNodes((prev) => {
+      const selectedFlowId =
+        selectedNodeId === 'trigger' ? TRIGGER_NODE_ID : selectedNodeId;
+      let changed = false;
+      const next = prev.map((n) => {
+        const selected = n.id === selectedFlowId;
+        if (n.selected === selected) return n;
+        changed = true;
+        return { ...n, selected };
+      });
+      return changed ? next : prev;
+    });
+  }, [selectedNodeId]);
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
@@ -161,10 +176,10 @@ function CanvasInner() {
   );
 
   const handleSelectTrigger = useCallback(() => {
-    const pos = flowNodes.find((n) => n.id === TRIGGER_NODE_ID)?.position;
-    if (pos) rf.setCenter(pos.x + 150, pos.y + 20, { zoom: 1, duration: 400 });
+    const pos = draft?.ui.nodePositions[TRIGGER_NODE_ID] ?? { x: 80, y: 120 };
+    rf.setCenter(pos.x + 150, pos.y + 20, { zoom: 1, duration: 400 });
     setSelected('trigger');
-  }, [flowNodes, rf, setSelected]);
+  }, [draft, rf, setSelected]);
 
   const handleDragOver = useCallback((event: ReactDragEvent<HTMLDivElement>) => {
     if (event.dataTransfer.types.includes(PALETTE_DRAG_MIME)) {
@@ -342,14 +357,7 @@ function flowEdgesToDomain(edges: FlowEdge[], def: WorkflowDefinition): Edge[] {
   return result;
 }
 
-// Rebuild flow nodes from the domain model, carrying over React Flow's
-// internal `measured` / `width` / `height` (and the live dragging position)
-// from the previous array so we don't force a re-measure on every update.
-function buildFlowNodes(
-  draft: WorkflowDefinition,
-  selectedNodeId: string | 'trigger' | undefined,
-  prev: FlowNode[],
-): FlowNode[] {
+function buildFlowNodes(draft: WorkflowDefinition, prev: FlowNode[]): FlowNode[] {
   const prevById = new Map(prev.map((n) => [n.id, n]));
   const triggerPrev = prevById.get(TRIGGER_NODE_ID);
   // Explicit `nodePositions` wins so drop-handlers can reposition nodes;
@@ -364,7 +372,6 @@ function buildFlowNodes(
     type: 'trigger',
     position: triggerPosition,
     data: { trigger: draft.trigger, filterCount: draft.trigger.filters.length },
-    selected: selectedNodeId === 'trigger',
   };
   const agents: FlowNode[] = draft.nodes.map((agent, i) => {
     const p = prevById.get(agent.id);
@@ -378,7 +385,6 @@ function buildFlowNodes(
       type: 'agent',
       position,
       data: { agent },
-      selected: selectedNodeId === agent.id,
     };
   });
   return [triggerNode, ...agents];
@@ -386,6 +392,7 @@ function buildFlowNodes(
 
 function buildFlowEdges(draft: WorkflowDefinition, prev: FlowEdge[]): FlowEdge[] {
   const prevById = new Map(prev.map((e) => [e.id, e]));
+  const nodeByName = new Map(draft.nodes.map((n) => [n.name, n]));
   const edges: FlowEdge[] = [];
   const withIncoming = new Set(draft.edges.map((e) => e.to));
   for (const n of draft.nodes) {
@@ -394,8 +401,8 @@ function buildFlowEdges(draft: WorkflowDefinition, prev: FlowEdge[]): FlowEdge[]
     edges.push({ ...(prevById.get(id) ?? {}), id, source: TRIGGER_NODE_ID, target: n.id });
   }
   for (const e of draft.edges) {
-    const from = draft.nodes.find((n) => n.name === e.from);
-    const to = draft.nodes.find((n) => n.name === e.to);
+    const from = nodeByName.get(e.from);
+    const to = nodeByName.get(e.to);
     if (!from || !to) continue;
     const id = `${from.id}-${to.id}`;
     edges.push({ ...(prevById.get(id) ?? {}), id, source: from.id, target: to.id });
