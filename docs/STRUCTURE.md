@@ -44,6 +44,10 @@ src/
   activities/
     run-agent-node.ts                  invokes provider, streams events via heartbeat + Redis
     load-graph.ts, cleanup-run.ts
+    merge-worktree.ts                  clean-merge parallel branched worktree back into upstream
+                                       (throws MergeConflictError on conflict — aborts the run)
+    copy-conduit-files.ts              copies .conduit/<Node>.md from each parallel sibling into
+                                       the merged upstream workspace (gitignored, so not in merge)
   runtime/                             activity-side helpers (Prisma, Redis event bus, log writer,
                                        connection/credential lookup)
 ```
@@ -58,7 +62,9 @@ src/
   pages/                               HomePage, CanvasPage, RunDetailPage, CredentialsPage, ConnectionsPage
   components/
     canvas/                            TriggerNode, AgentNode, NodePalette, AgentConfigPanel, McpServerPicker
-    run/RunTimeline.tsx                live log rendering
+    run/                               RunTimeline (live trace), NodeSummary (.conduit/ body),
+                                       ChangedFiles (workspace diff), NodeError (failure details) —
+                                       tabs on the run detail page
     layout/, ui/                       shell + shadcn primitives
   api/                                 HTTP client, TanStack Query hooks, response types
   hooks/use-run-updates.ts             Socket.IO → TanStack cache bridge
@@ -95,16 +101,20 @@ Provider abstraction + workspace + MCP + skills. **Core of the execution path.**
 ```
 src/
   provider/
-    types.ts                           AgentProvider interface
+    types.ts                           AgentProvider / AgentSession interfaces (multi-turn)
     registry.ts                        selected by CONDUIT_PROVIDER env
-    claude-provider.ts                 wraps @anthropic-ai/claude-agent-sdk
-    codex-provider.ts                  wraps @openai/codex-sdk (dynamic-loaded, same pattern as Claude)
+    claude-provider.ts                 wraps @anthropic-ai/claude-agent-sdk (streaming-input query)
+    codex-provider.ts                  wraps @openai/codex-sdk (persistent Thread, dynamic-loaded)
     stub-provider.ts                   scripted events for tests (real tools, fake LLM)
+    async-queue.ts                     push-pull queue that feeds streaming-input SDKs one
+                                       user message per turn while the session stays open
     constraints.ts
   workspace/
-    manager.ts                         top-level orchestration
+    manager.ts                         top-level orchestration (seed / branch / resolve)
     git.ts, paths.ts                   worktree seeding, path derivation
-    conduit-folder.ts                  .conduit/<NodeName>.md reads/writes
+    conduit-folder.ts                  .conduit/<NodeName>.md reads/writes + cross-worktree copy
+    merge.ts                           mergeBranchedWorktree + MergeConflictError (clean-merge path)
+    types.ts                           workspace spec / resolved-workspace types
   mcp/
     resolve.ts                         decrypt credentials + {{credential}} substitution
     introspect.ts                      live `tools/list` via @modelcontextprotocol/sdk (stdio/sse/streamable-http)

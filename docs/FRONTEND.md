@@ -75,9 +75,9 @@ Dedicated observation page, independent of the canvas. Layout:
 - **Left rail**: list of nodes in execution order, each with a status dot, name, and elapsed time. The selected node highlights.
 - **Main area** (tabs for the selected node):
   - **Timeline** — live stream of `ExecutionLog` entries (text chunks, tool calls with expandable input/output, token usage). Auto-scrolls while running.
-  - **Summary** — `.conduit/<NodeName>.md` rendered as markdown (the agent's summary for downstream agents).
+  - **Summary** — `.conduit/<NodeName>.md` as raw monospace text. Sourced from `NodeRun.conduitSummary` (snapshotted before workspace cleanup, so it survives after the run ends). Markdown rendering may come later.
   - **Changed files** — list with click-to-diff.
-  - **Error** — stack + context if the node failed.
+  - **Error** — stack + context if the node failed. The page auto-switches to this tab when the selected node is `FAILED`, so the user doesn't hunt for it.
 
 No canvas, no graph rendering here. Just logs and inspection.
 

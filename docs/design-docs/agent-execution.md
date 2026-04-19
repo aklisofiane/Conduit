@@ -154,15 +154,20 @@ This keeps parallel execution fast (agents work concurrently) while making merge
 
 ## Merge-back agent
 
-`mergeWorktreeActivity` is not a raw `git merge` — it's a lightweight agent session. A plain `git merge` would fail on conflicts and break the flow. Instead:
+### What ships in Phase 3
 
-1. Spin up a short-lived agent session with the same provider as the node being merged.
-2. Hardcoded system prompt (not user-customizable in v1): "Merge branch X into Y. If there are conflicts, read the conflicting files, understand the intent of both changes, and resolve them sensibly. Commit the result."
-3. The agent has workspace tools only (file read/write/edit, shell, glob, grep). No MCP servers.
-4. On clean merge: the agent runs `git merge`, confirms success, done. Fast — one turn.
-5. On conflict: the agent reads conflict markers, resolves them, commits. May take a few turns.
+`mergeWorktreeActivity` does a raw `git merge --no-edit --no-ff` in the upstream worktree, targeting the parallel sibling's HEAD:
 
-Cost: one extra LLM call per parallel agent. In practice, most merges are clean (parallel agents typically touch different files), so this is usually a single fast turn. Conflicts are the exception, and when they happen, an LLM is exactly what you want resolving them.
+1. Any uncommitted changes in the sibling's worktree are first staged and folded into a single `Conduit: <Node> changes` commit (`.conduit/` is explicitly unstaged — it's gitignored by design and copied via `copyConduitFilesActivity` instead).
+2. If the sibling HEAD equals the target HEAD, the merge is skipped (nothing to do).
+3. On clean merge: a merge commit lands in the upstream and the activity returns.
+4. On conflict: `git merge --abort` runs, and the activity throws `MergeConflictError` carrying the conflicted file list. `MergeConflictError` is in the workflow's `nonRetryableErrorTypes` so the run fails cleanly instead of spinning on retries.
+
+No LLM is involved. In practice parallel agents typically touch different files, so most merges are clean; the conflict path is the exception and aborts the run today.
+
+### Deferred: conflict-resolution agent session
+
+The original design called for `mergeWorktreeActivity` to be a lightweight agent session — short-lived, workspace-tools only, hardcoded system prompt ("merge branch X into Y, resolve conflicts sensibly, commit") — so conflicts could be resolved inline instead of aborting. That session is not implemented yet; `MergeConflictError` is shaped (it carries `conflicts: string[]` and the source ref) so a future handler can pick it up and drive the resolution. Tracked under "later" in [PLANS.md](../PLANS.md).
 
 ## Streaming & live updates
 
