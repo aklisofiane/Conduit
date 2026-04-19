@@ -6,13 +6,22 @@ React 19 + Vite 8 + `@xyflow/react` + TanStack Query + Zustand + Tailwind v4 + s
 
 | Screen | Purpose |
 |---|---|
-| `/` | Workflow list (name, last run, status, active toggle) + "new workflow" entry point |
+| `/` | Workflow list (name, last run, status, active toggle) + "new workflow" + "from template" entry points |
 | `/workflows/:id` | Edit — canvas + config side panel (design only, no runtime data) |
 | `/workflows/:id/connections` | Manage the workflow's `WorkflowConnection`s — alias → credential + owner/repo + optional webhook signing secret |
 | `/workflows/:id/runs` | Run history list (status, trigger, duration, started at) |
 | `/runs/:runId` | Run detail — dedicated observation page with live logs (not on the canvas) |
 | `/credentials` | Manage `PlatformCredential`s (global — reused across workflows via connections) |
 | `/settings` | User / org settings (minimal v1) |
+
+## Create from template
+
+The workflow list's header row has a **"From template"** button next to **"New workflow"**. Clicking it opens `TemplatePickerDialog` (`apps/web/src/components/templates/TemplatePickerDialog.tsx`), a two-step modal:
+
+1. **Pick** — grid of template cards (name, category, workflow count, description) sourced from `useTemplates()` → `GET /api/templates`.
+2. **Bind** — one row per unique `<alias>` placeholder in the picked template. Each row toggles between **New** (alias + credential picker + optional owner/repo) and **Existing** (paste an existing `WorkflowConnection` id). Submit calls `useCreateFromTemplate()` → `POST /api/workflows/from-template/:id` and navigates to the first created workflow.
+
+Created workflows are paused — the user reviews the generated canvas before activating. See [design-docs/templates.md](./design-docs/templates.md) for the full flow.
 
 ## Canvas
 
