@@ -55,9 +55,14 @@ src/
                                        new match, upsert snapshot
   runtime/                             activity-side helpers (Prisma, Redis event bus, log writer,
                                        connection/credential lookup, plus the GitHub Projects v2
-                                       GraphQL client `github-projects.ts` and the standalone
+                                       GraphQL client `github-projects.ts`, the standalone
                                        `temporal-client.ts` singleton used by pollBoardActivity to
-                                       start agentWorkflows from inside an activity)
+                                       start agentWorkflows from inside an activity, the
+                                       `connection-context.ts` hydrator that builds the slim
+                                       `ConnectionContext` the workspace manager needs — respects
+                                       `CONDUIT_TEST_REMOTE_BASE` for E2E local bare repos — and
+                                       `ticket-branch-store.ts`, the Prisma-backed `TicketBranchStore`
+                                       adapter that owns slug derivation on first upsert)
 ```
 
 If it touches I/O, it belongs under `activities/` or `runtime/`, never `workflows/`.
@@ -93,14 +98,19 @@ src/
   trigger/    TriggerEvent + TriggerConfig (incl. `BoardRef` for Projects v2 polling),
               filter/match logic, `poll.ts` (PollWorkflowInput + PollCycleResult)
   mcp/        MCP server config + tool schemas
-  workflow/   Workflow.definition JSON schema (nodes, edges, ui)
+  workflow/   Workflow.definition JSON schema (nodes, edges, ui) + `identity.ts`
+              (isTicketBranchWorkflow / ticketLockFor) + `validate.ts`
+              (save-time `validateWorkflowDefinition` — ticket-branch requires
+              an issue-carrying trigger; wired into the API's create/update
+              as a 400)
   workspace/  workspace kind schemas (local, repo-clone, inherit, ticket-branch)
   skill/      skill manifest types
   platform/   Platform enum + per-platform connection shapes
   runtime/    AgentEvent → ExecutionLogKind mapping, Redis channel name
   temporal/   task queue name + workflow-type constants (AGENT_WORKFLOW_TYPE,
               POLL_WORKFLOW_TYPE) + deterministic id helpers (`pollScheduleId`,
-              `pollWorkflowId`)
+              `pollWorkflowId`, `agentWorkflowId(runId, ticketLock?)` — the
+              ticket-branch dedup id `run-<wfId>-<ticketKey>` flows through here)
   crypto/     AES-256-GCM helpers                              backend-only subpath
   webhook/    HMAC signature verify + GitHub event normalizer  backend-only subpath
               (handles issues.opened / pull_request.opened / issue_comment.created /
@@ -125,11 +135,19 @@ src/
                                        user message per turn while the session stays open
     constraints.ts
   workspace/
+    index.ts                           barrel — every workspace export the worker needs
     manager.ts                         top-level orchestration (seed / branch / resolve)
     git.ts, paths.ts                   worktree seeding, path derivation
     conduit-folder.ts                  .conduit/<NodeName>.md reads/writes + cross-worktree copy
     merge.ts                           mergeBranchedWorktree + MergeConflictError (clean-merge path)
-    types.ts                           workspace spec / resolved-workspace types
+    ticket-branch.ts                   resolveTicketBranchWorkspace — check-then-create
+                                       conduit/<ticket-id>-<slug> worktrees off the base clone
+    slug.ts                            deriveSlug + formatBranchName — branch naming primitives
+    lock.ts                            withPathLock — in-process base-clone mutex (one worker only)
+    push-auth.ts                       installPushCredentials — per-run git credential helper
+                                       script wired via credential.helper ! (no token in .git/config)
+    types.ts                           workspace spec / resolved-workspace types + ConnectionContext,
+                                       TicketContext, TicketBranchStore adapter interface
   mcp/
     resolve.ts                         decrypt credentials + {{credential}} substitution
     introspect.ts                      live `tools/list` via @modelcontextprotocol/sdk (stdio/sse/streamable-http)
@@ -157,15 +175,20 @@ e2e/
   phase2-webhook-run.test.ts           Phase 2 — signed GitHub delivery → run → WS tool_call
   phase3-parallel-run.test.ts          Phase 3 — parallel fan-out + merge-back + .conduit/ copy
   phase4-polling-run.test.ts           Phase 4 — polling trigger, set-diff dedup, re-entry
+  phase5-board-loop.test.ts            Phase 5 — ticket-branch workspaces + Dev→AIReview→Dev cycle;
+                                       drives shell via StubProvider against a local bare repo
 helpers/temporal.ts                    TestWorkflowEnvironment + MockActivityEnvironment wrappers
 fixtures/
-  workflows/                           seed JSON per topology (phase1 / phase2 / phase3 / phase4)
+  workflows/                           seed JSON per topology (phase1 / phase2 / phase3 / phase4 /
+                                       phase5-board-loop — Worker + Critic bundle)
   mcp-stub/                            in-repo stdio MCP server for tests
   events/github/                       GitHub webhook payload fixtures — see README in that folder
                                        (includes projects_v2_item.status_changed.json)
   repos/                               reserved
 smoke/
   phase4.smoke.md                      Playwright MCP prose script for the trigger config panel
+  phase5.smoke.md                      Playwright MCP prose script for the run detail ticket-branch
+                                       header — validates the resolved `conduit/*` branch surfaces
 ```
 
 Per-package unit tests sit next to source (`*.test.ts`); integration tests live under `<package>/test/integration/`; API contract tests under `apps/api/test/contract/`. See [VALIDATION.md](./VALIDATION.md).

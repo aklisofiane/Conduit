@@ -109,9 +109,9 @@ All routes prefixed `/api`. Non-webhook routes require `X-API-Key` header (see [
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/workflows` | List workflows (name, status, last run) |
-| `POST` | `/workflows` | Create workflow |
+| `POST` | `/workflows` | Create workflow (400 on `validateWorkflowDefinition` issues — e.g. `ticket-branch` without an issue-carrying trigger) |
 | `GET` | `/workflows/:id` | Get workflow with full definition |
-| `PUT` | `/workflows/:id` | Update workflow (definition, name, active toggle) |
+| `PUT` | `/workflows/:id` | Update workflow (definition, name, active toggle — same save-time validation as create) |
 | `DELETE` | `/workflows/:id` | Delete workflow + cascade runs |
 | `POST` | `/workflows/:id/run` | Manual run — starts a run with optional issue/PR reference. Dev/debug action, not a trigger mode. |
 

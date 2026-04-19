@@ -88,7 +88,7 @@ Part of Phase 1 deliverables alongside `ClaudeProvider`.
 - `TestWorkflowEnvironment.createTimeSkipping()` for workflow-level tests — skips sleeps, schedule intervals, retry backoffs.
 - `MockActivityEnvironment` for activity-level tests — isolates activity logic from workflow orchestration.
 - Real `Worker` + real Temporal server (via testcontainers or local compose) for full E2E — slower but catches wiring bugs.
-- Workflow-ID uniqueness (Phase 5 `ticket-branch`): explicit test for `WorkflowIdConflictPolicy = FAIL` path — start twice concurrently, assert second start rejected, assert first completes cleanly.
+- Workflow-ID uniqueness (Phase 5 `ticket-branch`): explicit test for `WorkflowIdConflictPolicy = FAIL` path — start twice concurrently, assert second start rejected, assert first completes cleanly. Board-loop iteration is covered end-to-end by `test/e2e/phase5-board-loop.test.ts`, which drives Worker → Critic → Worker against a local bare repo via `CONDUIT_TEST_REMOTE_BASE` and asserts iteration N+1 sees iteration N's commits.
 - Polling schedules (Phase 4): drive ticks deterministically via `ScheduleHandle.trigger()` rather than waiting on wall-clock intervals. Schedule-id lookups use `pollScheduleId(workflowId)` from `@conduit/shared/temporal`.
 
 ## What we don't test
