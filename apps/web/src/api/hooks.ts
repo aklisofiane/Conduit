@@ -3,10 +3,13 @@ import type { DiscoveredTool, McpTransport, WorkflowDefinition } from '@conduit/
 import { api } from './client.js';
 import type {
   ConnectionRow,
+  CreatedFromTemplate,
   CredentialRow,
   DiscoveredSkill,
   ExecutionLogRow,
   RunDetail,
+  TemplateBinding,
+  TemplateSummary,
   WorkflowRow,
 } from './types.js';
 
@@ -221,6 +224,27 @@ export function useSkills() {
   return useQuery({
     queryKey: ['skills'],
     queryFn: () => api.get<DiscoveredSkill[]>('/skills'),
+  });
+}
+
+export function useTemplates() {
+  return useQuery({
+    queryKey: ['templates'],
+    queryFn: () => api.get<TemplateSummary[]>('/templates'),
+  });
+}
+
+export function useCreateFromTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: {
+      templateId: string;
+      bindings: Record<string, TemplateBinding>;
+    }) =>
+      api.post<CreatedFromTemplate>(`/workflows/from-template/${args.templateId}`, {
+        bindings: args.bindings,
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: WORKFLOWS }),
   });
 }
 

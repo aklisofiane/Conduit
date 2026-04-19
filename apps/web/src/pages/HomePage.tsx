@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { TemplatePickerDialog } from '../components/templates/TemplatePickerDialog.js';
 import { useCreateWorkflow, useWorkflows } from '../api/hooks.js';
 import type { WorkflowRow } from '../api/types.js';
 import { duration, relativeFromNow } from '../lib/time.js';
@@ -15,6 +17,7 @@ export function HomePage() {
   const { data: workflows = [], isLoading } = useWorkflows();
   const navigate = useNavigate();
   const createWorkflow = useCreateWorkflow();
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
 
   const activeCount = workflows.filter((w) => w.isActive).length;
   const runningCount = workflows.filter((w) => w.runs[0]?.status === 'RUNNING').length;
@@ -62,12 +65,17 @@ export function HomePage() {
             Your workflows
             <span className="text-[var(--color-text-4)]">{workflows.length}</span>
           </h2>
-          <button className="btn primary" onClick={handleCreate} disabled={createWorkflow.isPending}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-            New workflow
-          </button>
+          <div className="flex items-center gap-2">
+            <button className="btn" onClick={() => setShowTemplatePicker(true)}>
+              From template
+            </button>
+            <button className="btn primary" onClick={handleCreate} disabled={createWorkflow.isPending}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              New workflow
+            </button>
+          </div>
         </div>
 
         <div className="overflow-hidden rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-1)]">
@@ -80,6 +88,10 @@ export function HomePage() {
           ))}
         </div>
       </section>
+
+      {showTemplatePicker && (
+        <TemplatePickerDialog onClose={() => setShowTemplatePicker(false)} />
+      )}
     </div>
   );
 }

@@ -101,19 +101,19 @@ Iterative Worker↔Critic workflows that persist state across runs. See [branch-
 
 **Exit criteria**: user builds a Worker workflow (triggered on `status = Dev`) and a Critic workflow (triggered on `status = AIReview`), runs them against a real issue, sees iteration N+1 build on iteration N's commits. Covered by `test/e2e/phase5-board-loop.test.ts`.
 
-## Phase 6 — Workflow templates
+## Phase 6 — Workflow templates ✅
 
 Ship starter templates so users don't face an empty canvas.
 
-- [ ] `/templates/` directory with JSON template files.
-- [ ] `GET /api/templates` endpoint: reads `/templates/*.json`, returns list.
-- [ ] Template schema supports **one or more workflows per file** (multi-workflow bundles) — see [templates.md](./design-docs/templates.md).
-- [ ] `POST /api/workflows/from-template/:templateId`: creates all workflows in the template atomically (single transaction), returns the list of created IDs.
-- [ ] UI: "Create from template" flow on workflow creation — picker with name, description, category, workflow count.
-- [ ] Connection binding UI: prompts once per unique placeholder across all workflows in the bundle; resolved placeholders are applied to each workflow on save.
-- [ ] Ship v1 templates: `analyze`, `develop`, `pr-review` (single-workflow each), `board-loop` (Worker + Critic bundle, for the pattern from Phase 5).
+- [x] `/templates/` directory with JSON template files.
+- [x] `GET /api/templates` endpoint: reads `/templates/*.json`, validates at boot, returns the catalog (id, name, description, category, workflow count, placeholders).
+- [x] Template schema supports **one or more workflows per file** (multi-workflow bundles) — see [templates.md](./design-docs/templates.md). Lives in `@conduit/shared/template`.
+- [x] `POST /api/workflows/from-template/:templateId`: creates all workflows in the bundle atomically via a single Prisma `$transaction` (creates workflow rows + per-workflow `WorkflowConnection` rows for each `new` binding), substitutes `<alias>` placeholders for real connection cuids, runs `validateWorkflowDefinition` per workflow, upserts Temporal poll schedules after commit. Returns the list of created IDs.
+- [x] UI: "From template" button on the workflow list opens a picker dialog with name, description, category, and workflow count per template.
+- [x] Connection binding UI: one row per unique `<alias>` placeholder across the bundle; each binding is either an existing `WorkflowConnection` id or a new one (alias + credential + optional owner/repo).
+- [x] v1 templates shipped: `analyze`, `develop`, `pr-review` (single-workflow each), `board-loop` (Worker + Critic bundle, for the pattern from Phase 5).
 
-**Exit criteria**: new user clones the repo, starts Conduit, picks the `analyze` template, binds their GitHub connection, runs it on a real issue.
+**Exit criteria**: new user clones the repo, starts Conduit, picks the `analyze` template, binds their GitHub connection, runs it on a real issue. Covered by `test/e2e/phase6-template-run.test.ts` (bundle creation, placeholder resolution, schedule upsert, missing-binding rejection). Playwright smoke at `test/smoke/phase6.smoke.md`.
 
 ## Phase 7 — More presets, polish, ship
 

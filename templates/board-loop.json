@@ -1,0 +1,94 @@
+{
+  "id": "board-loop",
+  "name": "Board Loop (Worker + Critic)",
+  "description": "Iterative Worker ↔ Critic pattern. Worker commits on status = \"Dev\" and moves to \"AIReview\"; Critic reviews on \"AIReview\" and either approves or moves back to \"Dev\" to re-trigger the Worker.",
+  "category": "board-loop",
+  "workflows": [
+    {
+      "name": "Worker",
+      "description": "Polling on status=Dev. Commits and pushes to conduit/<ticket>; opens a draft PR on first push; moves ticket to AIReview.",
+      "definition": {
+        "trigger": {
+          "platform": "github",
+          "connectionId": "<github>",
+          "mode": { "kind": "polling", "intervalSec": 60, "active": true },
+          "filters": [{ "field": "status", "op": "eq", "value": "Dev" }],
+          "board": { "ownerType": "org", "owner": "acme", "number": 1 }
+        },
+        "nodes": [
+          {
+            "id": "agent-worker",
+            "name": "Worker",
+            "provider": "claude",
+            "model": "claude-opus-4-6",
+            "instructions": "You are the Worker agent in a board-loop. The ticket entered status=Dev. Your workspace is a persistent conduit/<ticket> branch — iteration N+1 will see iteration N's commits.\n\n1. Read upstream review feedback from PR comments / ticket comments (via the GitHub MCP server). On first run these will be empty; on later iterations they contain what the Critic said.\n2. Implement changes. Commit with clear messages.\n3. `git push`. If no PR exists for this branch yet, open a draft PR referencing the ticket.\n4. Move the ticket to the \"AIReview\" column on the board.",
+            "mcpServers": [{ "serverId": "github-mcp" }],
+            "skills": [],
+            "workspace": { "kind": "ticket-branch", "connectionId": "<github>" }
+          }
+        ],
+        "edges": [],
+        "mcpServers": [
+          {
+            "id": "github-mcp",
+            "name": "GitHub",
+            "transport": {
+              "kind": "stdio",
+              "command": "npx",
+              "args": ["-y", "@modelcontextprotocol/server-github"],
+              "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "{{credential}}" }
+            },
+            "connectionId": "<github>"
+          }
+        ],
+        "ui": {
+          "nodePositions": { "Worker": { "x": 240, "y": 200 } },
+          "viewport": { "x": 0, "y": 0, "zoom": 1 }
+        }
+      }
+    },
+    {
+      "name": "Critic",
+      "description": "Polling on status=AIReview. Reads the branch and the PR; either approves or moves back to Dev with review feedback.",
+      "definition": {
+        "trigger": {
+          "platform": "github",
+          "connectionId": "<github>",
+          "mode": { "kind": "polling", "intervalSec": 60, "active": true },
+          "filters": [{ "field": "status", "op": "eq", "value": "AIReview" }],
+          "board": { "ownerType": "org", "owner": "acme", "number": 1 }
+        },
+        "nodes": [
+          {
+            "id": "agent-critic",
+            "name": "Critic",
+            "provider": "claude",
+            "model": "claude-opus-4-6",
+            "instructions": "You are the Critic agent in a board-loop. The ticket entered status=AIReview. Your workspace is the same persistent conduit/<ticket> branch the Worker just pushed to.\n\n1. Read the PR diff and the Worker's most recent commits.\n2. Decide: approve or request changes.\n3. If approving: leave an approving PR review and move the ticket to \"ReadyToMerge\".\n4. If requesting changes: leave specific, actionable inline comments on the PR, then move the ticket back to \"Dev\" — this re-triggers the Worker, which will read your comments on its next iteration.\n\nBe specific. Vague feedback produces vague fixes.",
+            "mcpServers": [{ "serverId": "github-mcp" }],
+            "skills": [],
+            "workspace": { "kind": "ticket-branch", "connectionId": "<github>" }
+          }
+        ],
+        "edges": [],
+        "mcpServers": [
+          {
+            "id": "github-mcp",
+            "name": "GitHub",
+            "transport": {
+              "kind": "stdio",
+              "command": "npx",
+              "args": ["-y", "@modelcontextprotocol/server-github"],
+              "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "{{credential}}" }
+            },
+            "connectionId": "<github>"
+          }
+        ],
+        "ui": {
+          "nodePositions": { "Critic": { "x": 240, "y": 200 } },
+          "viewport": { "x": 0, "y": 0, "zoom": 1 }
+        }
+      }
+    }
+  ]
+}

@@ -8,6 +8,7 @@ Where things live. Read [ARCHITECTURE.md](./ARCHITECTURE.md) for *why* first; th
 apps/        runnable services (api, web, worker)
 packages/    libraries (shared, database, agent)
 docs/        spec — INDEX.md for read order
+templates/   bundled workflow templates (JSON) — see docs/design-docs/templates.md
 test/        cross-app test infra (e2e harness, fixtures, helpers)
 ```
 
@@ -30,6 +31,11 @@ src/
                                        Reads the raw body captured in main.ts express.json verify hook.
     mcp/                               POST /mcp/introspect — live tools/list
     skills/                            GET /skills
+    templates/                         template catalog: loads /templates/*.json at boot,
+                                       GET /templates + POST /workflows/from-template/:id
+                                       (atomic $transaction creates all workflows in a bundle
+                                       + per-workflow connections for `new` bindings; polling
+                                       schedules upserted after commit)
     health/                            liveness
 ```
 
@@ -80,6 +86,9 @@ src/
     run/                               RunTimeline (live trace), NodeSummary (.conduit/ body),
                                        ChangedFiles (workspace diff), NodeError (failure details) —
                                        tabs on the run detail page
+    templates/                         TemplatePickerDialog — "From template" flow on the
+                                       workflow list (template grid → per-placeholder
+                                       connection binding → POST /workflows/from-template/:id)
     layout/, ui/                       shell + shadcn primitives
   api/                                 HTTP client, TanStack Query hooks, response types
   hooks/use-run-updates.ts             Socket.IO → TanStack cache bridge
@@ -103,6 +112,9 @@ src/
               (save-time `validateWorkflowDefinition` — ticket-branch requires
               an issue-carrying trigger; wired into the API's create/update
               as a 400)
+  template/   Template file schema (bundle of one or more workflow definitions)
+              + `<alias>` placeholder detection + `resolveTemplate` (substitutes
+              placeholders with real WorkflowConnection cuids for instantiation)
   workspace/  workspace kind schemas (local, repo-clone, inherit, ticket-branch)
   skill/      skill manifest types
   platform/   Platform enum + per-platform connection shapes
@@ -177,6 +189,9 @@ e2e/
   phase4-polling-run.test.ts           Phase 4 — polling trigger, set-diff dedup, re-entry
   phase5-board-loop.test.ts            Phase 5 — ticket-branch workspaces + Dev→AIReview→Dev cycle;
                                        drives shell via StubProvider against a local bare repo
+  phase6-template-run.test.ts          Phase 6 — GET /templates catalog + POST /workflows/from-template/:id
+                                       bundle creation, placeholder resolution, polling schedule upsert,
+                                       missing-binding 400
 helpers/temporal.ts                    TestWorkflowEnvironment + MockActivityEnvironment wrappers
 fixtures/
   workflows/                           seed JSON per topology (phase1 / phase2 / phase3 / phase4 /
@@ -189,6 +204,8 @@ smoke/
   phase4.smoke.md                      Playwright MCP prose script for the trigger config panel
   phase5.smoke.md                      Playwright MCP prose script for the run detail ticket-branch
                                        header — validates the resolved `conduit/*` branch surfaces
+  phase6.smoke.md                      Playwright MCP prose script for the "From template"
+                                       picker + bundle-creation flow
 ```
 
 Per-package unit tests sit next to source (`*.test.ts`); integration tests live under `<package>/test/integration/`; API contract tests under `apps/api/test/contract/`. See [VALIDATION.md](./VALIDATION.md).

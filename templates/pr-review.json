@@ -1,0 +1,50 @@
+{
+  "id": "pr-review",
+  "name": "PR Review",
+  "description": "Review a newly opened pull request. Posts inline comments and a summary review.",
+  "category": "review",
+  "workflows": [
+    {
+      "name": "PR Review",
+      "description": "Reads the PR diff, posts inline comments where appropriate, leaves a summary review.",
+      "definition": {
+        "trigger": {
+          "platform": "github",
+          "connectionId": "<github>",
+          "mode": { "kind": "webhook", "event": "pull_request.opened", "active": true },
+          "filters": []
+        },
+        "nodes": [
+          {
+            "id": "agent-pr-review",
+            "name": "Review",
+            "provider": "claude",
+            "model": "claude-opus-4-6",
+            "instructions": "You are the PR Review agent. A PR has just been opened. Read the PR metadata from the trigger context, check out the PR branch in your workspace, and review the diff against the base branch. Focus on: correctness, obvious bugs, missing tests, and adherence to local conventions (read CLAUDE.md or CONTRIBUTING.md if present). Post inline comments on specific lines where useful, and leave a summary review at the end. Do not approve destructive changes.",
+            "mcpServers": [{ "serverId": "github-mcp" }],
+            "skills": [],
+            "workspace": { "kind": "repo-clone", "connectionId": "<github>" }
+          }
+        ],
+        "edges": [],
+        "mcpServers": [
+          {
+            "id": "github-mcp",
+            "name": "GitHub",
+            "transport": {
+              "kind": "stdio",
+              "command": "npx",
+              "args": ["-y", "@modelcontextprotocol/server-github"],
+              "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "{{credential}}" }
+            },
+            "connectionId": "<github>"
+          }
+        ],
+        "ui": {
+          "nodePositions": { "Review": { "x": 240, "y": 200 } },
+          "viewport": { "x": 0, "y": 0, "zoom": 1 }
+        }
+      }
+    }
+  ]
+}

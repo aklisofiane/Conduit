@@ -1,0 +1,50 @@
+{
+  "id": "analyze",
+  "name": "Analyze",
+  "description": "Review a new issue's intent and propose an implementation approach. Triggered on GitHub issues.opened.",
+  "category": "triage",
+  "workflows": [
+    {
+      "name": "Analyze",
+      "description": "Reads a freshly opened issue, inspects the source code, posts a comment with a proposed approach.",
+      "definition": {
+        "trigger": {
+          "platform": "github",
+          "connectionId": "<github>",
+          "mode": { "kind": "webhook", "event": "issues.opened", "active": true },
+          "filters": []
+        },
+        "nodes": [
+          {
+            "id": "agent-analyze",
+            "name": "Analyze",
+            "provider": "claude",
+            "model": "claude-opus-4-6",
+            "instructions": "You are the Analyze agent. A new issue has just been opened. Read the issue body from the trigger context. Clone the repo via your workspace, skim the relevant files, and post a GitHub comment with a short implementation approach (1–2 paragraphs + bullet list of files to touch). If the issue is unclear, ask a question as the comment instead of proposing an approach.",
+            "mcpServers": [{ "serverId": "github-mcp" }],
+            "skills": [],
+            "workspace": { "kind": "repo-clone", "connectionId": "<github>" }
+          }
+        ],
+        "edges": [],
+        "mcpServers": [
+          {
+            "id": "github-mcp",
+            "name": "GitHub",
+            "transport": {
+              "kind": "stdio",
+              "command": "npx",
+              "args": ["-y", "@modelcontextprotocol/server-github"],
+              "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "{{credential}}" }
+            },
+            "connectionId": "<github>"
+          }
+        ],
+        "ui": {
+          "nodePositions": { "Analyze": { "x": 240, "y": 200 } },
+          "viewport": { "x": 0, "y": 0, "zoom": 1 }
+        }
+      }
+    }
+  ]
+}

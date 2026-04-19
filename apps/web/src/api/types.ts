@@ -104,6 +104,32 @@ export interface ConnectionRow {
   webhookSecretSuffix: string | null;
 }
 
+export interface TemplateSummary {
+  id: string;
+  name: string;
+  description: string;
+  category: 'triage' | 'develop' | 'review' | 'board-loop';
+  workflowCount: number;
+  /** Connection aliases the template references — one binding per entry. */
+  placeholders: string[];
+}
+
+export type TemplateBinding =
+  | { mode: 'existing'; connectionId: string }
+  | {
+      mode: 'new';
+      alias: string;
+      credentialId: string;
+      owner?: string;
+      repo?: string;
+      webhookSecret?: string;
+    };
+
+export interface CreatedFromTemplate {
+  templateId: string;
+  workflows: { id: string; name: string }[];
+}
+
 export interface DiscoveredSkill {
   id: string;
   name: string;

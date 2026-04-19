@@ -1,0 +1,104 @@
+{
+  "id": "develop",
+  "name": "Develop",
+  "description": "Multi-agent development pipeline: Dev + Tests + Docs fan out in parallel, QA merges and opens a draft PR. Triggered on status = \"Dev\".",
+  "category": "develop",
+  "workflows": [
+    {
+      "name": "Develop",
+      "description": "Polling on status=Dev. Dev + Tests + Docs work in parallel branched worktrees; QA consumes the merged workspace and opens a draft PR.",
+      "definition": {
+        "trigger": {
+          "platform": "github",
+          "connectionId": "<github>",
+          "mode": { "kind": "polling", "intervalSec": 60, "active": true },
+          "filters": [{ "field": "status", "op": "eq", "value": "Dev" }],
+          "board": { "ownerType": "org", "owner": "acme", "number": 1 }
+        },
+        "nodes": [
+          {
+            "id": "agent-seed",
+            "name": "Seed",
+            "provider": "claude",
+            "model": "claude-opus-4-6",
+            "instructions": "You are the Seed agent. Read the ticket from the trigger context and clone the repo. Skim the relevant code and note down the files downstream agents should touch. Your final summary is the plan Dev / Tests / Docs will read — list the files, the intended change per file, and anything downstream agents need to know.",
+            "mcpServers": [{ "serverId": "github-mcp" }],
+            "skills": [],
+            "workspace": { "kind": "repo-clone", "connectionId": "<github>" }
+          },
+          {
+            "id": "agent-dev",
+            "name": "Dev",
+            "provider": "claude",
+            "model": "claude-opus-4-6",
+            "instructions": "You are the Dev agent. Read .conduit/Seed.md for the plan, then implement the code changes in your workspace. Commit the code changes on your branch. Do not touch test files or docs — those are separate agents.",
+            "mcpServers": [],
+            "skills": [],
+            "workspace": { "kind": "inherit", "fromNode": "Seed" }
+          },
+          {
+            "id": "agent-tests",
+            "name": "Tests",
+            "provider": "claude",
+            "model": "claude-opus-4-6",
+            "instructions": "You are the Tests agent. Read .conduit/Seed.md for the plan. Add or update tests that cover the intended change. Do not modify the production code.",
+            "mcpServers": [],
+            "skills": [],
+            "workspace": { "kind": "inherit", "fromNode": "Seed" }
+          },
+          {
+            "id": "agent-docs",
+            "name": "Docs",
+            "provider": "claude",
+            "model": "claude-opus-4-6",
+            "instructions": "You are the Docs agent. Read .conduit/Seed.md for the plan and update user-facing documentation (README, docs/ folder) to reflect the change. Do not modify code or tests.",
+            "mcpServers": [],
+            "skills": [],
+            "workspace": { "kind": "inherit", "fromNode": "Seed" }
+          },
+          {
+            "id": "agent-qa",
+            "name": "QA",
+            "provider": "claude",
+            "model": "claude-opus-4-6",
+            "instructions": "You are the QA agent. Your workspace already contains the merged output of Dev, Tests, and Docs. Read each agent's .conduit/*.md summary, sanity-check the combined diff, run tests if you can, and then open a draft PR referencing the ticket. Move the ticket to the \"Review\" column on the board.",
+            "mcpServers": [{ "serverId": "github-mcp" }],
+            "skills": [],
+            "workspace": { "kind": "inherit", "fromNode": "Seed" }
+          }
+        ],
+        "edges": [
+          { "from": "Seed", "to": "Dev" },
+          { "from": "Seed", "to": "Tests" },
+          { "from": "Seed", "to": "Docs" },
+          { "from": "Dev", "to": "QA" },
+          { "from": "Tests", "to": "QA" },
+          { "from": "Docs", "to": "QA" }
+        ],
+        "mcpServers": [
+          {
+            "id": "github-mcp",
+            "name": "GitHub",
+            "transport": {
+              "kind": "stdio",
+              "command": "npx",
+              "args": ["-y", "@modelcontextprotocol/server-github"],
+              "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "{{credential}}" }
+            },
+            "connectionId": "<github>"
+          }
+        ],
+        "ui": {
+          "nodePositions": {
+            "Seed": { "x": 240, "y": 60 },
+            "Dev": { "x": 80, "y": 240 },
+            "Tests": { "x": 240, "y": 240 },
+            "Docs": { "x": 400, "y": 240 },
+            "QA": { "x": 240, "y": 420 }
+          },
+          "viewport": { "x": 0, "y": 0, "zoom": 1 }
+        }
+      }
+    }
+  ]
+}
