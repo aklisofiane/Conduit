@@ -12,7 +12,8 @@
     "declarationMap": false,
     "baseUrl": ".",
     "paths": {
-      "@conduit/shared/crypto": ["../../packages/shared/src/crypto/index.ts"]
+      "@conduit/shared/crypto": ["../../packages/shared/src/crypto/index.ts"],
+      "@conduit/shared/webhook": ["../../packages/shared/src/webhook/index.ts"]
     }
   },
   "include": ["src"],

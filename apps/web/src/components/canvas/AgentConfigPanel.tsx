@@ -1,9 +1,11 @@
 import type { AgentConfig } from '@conduit/shared';
 import { useSkills } from '../../api/hooks.js';
 import { cn } from '../../lib/cn.js';
+import { McpServerPicker } from './McpServerPicker.js';
 
 interface AgentConfigPanelProps {
   agent: AgentConfig;
+  workflowId: string;
   onChange: (patch: Partial<AgentConfig>) => void;
   onSave: () => void;
   onDiscard: () => void;
@@ -18,6 +20,7 @@ interface AgentConfigPanelProps {
  */
 export function AgentConfigPanel({
   agent,
+  workflowId,
   onChange,
   onSave,
   onDiscard,
@@ -116,6 +119,14 @@ export function AgentConfigPanel({
               <option value="inherit">inherit</option>
               <option value="ticket-branch">ticket-branch (coming soon)</option>
             </select>
+          </Field>
+
+          <Field label="MCP servers" hint="tools from external services">
+            <McpServerPicker
+              agent={agent}
+              workflowId={workflowId}
+              onChange={onChange}
+            />
           </Field>
 
           <Field label="Skills" hint="from .claude/skills/">

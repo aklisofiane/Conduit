@@ -1,4 +1,5 @@
 export { ClaudeProvider } from './claude-provider';
+export { CodexProvider } from './codex-provider';
 export {
   StubProvider,
   queueStubScript,

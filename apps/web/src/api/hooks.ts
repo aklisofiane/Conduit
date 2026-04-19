@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { WorkflowDefinition } from '@conduit/shared';
+import type { DiscoveredTool, McpTransport, WorkflowDefinition } from '@conduit/shared';
 import { api } from './client.js';
 import type {
+  ConnectionRow,
   CredentialRow,
   DiscoveredSkill,
   ExecutionLogRow,
@@ -111,6 +112,108 @@ export function useCredentials() {
   return useQuery({
     queryKey: ['credentials'],
     queryFn: () => api.get<CredentialRow[]>('/credentials'),
+  });
+}
+
+export function useCreateCredential() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: {
+      platform: CredentialRow['platform'];
+      name: string;
+      secret: string;
+      metadata?: Record<string, unknown>;
+    }) =>
+      api.post<{ id: string; name: string; platform: CredentialRow['platform'] }>(
+        '/credentials',
+        body,
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['credentials'] }),
+  });
+}
+
+export function useUpdateCredential() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: {
+      id: string;
+      body: { name?: string; secret?: string; metadata?: Record<string, unknown> };
+    }) => api.put<{ id: string }>(`/credentials/${args.id}`, args.body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['credentials'] }),
+  });
+}
+
+export function useDeleteCredential() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete<void>(`/credentials/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['credentials'] }),
+  });
+}
+
+const connectionsKey = (workflowId: string) =>
+  ['workflow', workflowId, 'connections'] as const;
+
+export function useConnections(workflowId: string | undefined) {
+  return useQuery({
+    queryKey: workflowId ? connectionsKey(workflowId) : ['workflow', 'none', 'connections'],
+    queryFn: () => api.get<ConnectionRow[]>(`/workflows/${workflowId!}/connections`),
+    enabled: !!workflowId,
+  });
+}
+
+export function useCreateConnection(workflowId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: {
+      alias: string;
+      credentialId: string;
+      owner?: string;
+      repo?: string;
+      webhookSecret?: string;
+    }) =>
+      api.post<{ id: string; alias: string; credentialId: string }>(
+        `/workflows/${workflowId}/connections`,
+        body,
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: connectionsKey(workflowId) }),
+  });
+}
+
+export function useUpdateConnection(workflowId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: {
+      connectionId: string;
+      body: {
+        alias?: string;
+        credentialId?: string;
+        owner?: string;
+        repo?: string;
+        webhookSecret?: string;
+      };
+    }) =>
+      api.put<{ id: string }>(
+        `/workflows/${workflowId}/connections/${args.connectionId}`,
+        args.body,
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: connectionsKey(workflowId) }),
+  });
+}
+
+export function useDeleteConnection(workflowId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (connectionId: string) =>
+      api.delete<void>(`/workflows/${workflowId}/connections/${connectionId}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: connectionsKey(workflowId) }),
+  });
+}
+
+export function useIntrospectMcp() {
+  return useMutation({
+    mutationFn: (body: { transport: McpTransport }) =>
+      api.post<DiscoveredTool[]>('/mcp/introspect', body),
   });
 }
 

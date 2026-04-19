@@ -1,0 +1,11 @@
+{
+  "action": "opened",
+  "issue": {
+    "id": 1,
+    "node_id": "I_kw",
+    "number": 1,
+    "title": "Edge case — payload missing repository",
+    "html_url": "https://example.com/i/1",
+    "labels": []
+  }
+}

@@ -7,4 +7,8 @@ export * from './agent/index';
 export * from './workflow/index';
 export * from './runtime/index';
 export * from './temporal/index';
-export * from './crypto/index';
+// Modules that touch `node:crypto` (crypto, webhook) are intentionally
+// absent from the root barrel — Vite would otherwise drag them into the
+// web bundle. Backend consumers import from the narrow subpaths:
+//   import { encryptSecret } from '@conduit/shared/crypto';
+//   import { verifyGithubSignature } from '@conduit/shared/webhook';

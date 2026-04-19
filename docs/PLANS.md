@@ -44,22 +44,22 @@ Make every later phase's exit criterion autonomously verifiable. See [VALIDATION
 
 **Exit criteria**: `npm test` runs the full suite (unit + integration + API + E2E) against an ephemeral test stack using `StubProvider`, completes in under 5 minutes, and the Phase 1 golden path is covered by a passing E2E test. Claude can run `npm test` and read pass/fail output.
 
-## Phase 2 — GitHub trigger + MCP + repo workspace
+## Phase 2 — GitHub trigger + MCP + repo workspace ✅
 
 Make it useful for real dev work.
 
-- [ ] `@conduit/agent`: MCP config resolver (decrypt credentials, substitute `{{credential}}`, hand to SDK).
-- [ ] `POST /mcp/introspect` endpoint using `@modelcontextprotocol/sdk` for tool discovery at config time.
-- [ ] Codex provider (full implementation wrapping `@openai/codex-sdk`).
-- [ ] Webhook ingestion (`POST /api/hooks/:workflowId`) with HMAC verification.
-- [ ] `TriggerEvent` normalization for GitHub (issue opened, PR opened, PR comment).
-- [ ] GitHub MCP server preset (`@modelcontextprotocol/server-github`) with credential binding.
-- [ ] `WorkflowConnection` + `PlatformCredential` UI.
-- [ ] Workspace `repo-clone` kind — seeded from base clone, token stripped.
-- [ ] Custom MCP server config UI (stdio + SSE/HTTP transports).
-- [ ] Per-tool `allowedTools` filtering in the MCP server picker (uses cached `discoveredTools`).
+- [x] `@conduit/agent`: MCP config resolver (decrypt credentials, substitute `{{credential}}`, hand to SDK).
+- [x] `POST /mcp/introspect` endpoint using `@modelcontextprotocol/sdk` for tool discovery at config time.
+- [x] Codex provider (full implementation wrapping `@openai/codex-sdk`).
+- [x] Webhook ingestion (`POST /api/hooks/:workflowId`) with HMAC verification.
+- [x] `TriggerEvent` normalization for GitHub (issue opened, PR opened, PR comment).
+- [x] GitHub MCP server preset (`@modelcontextprotocol/server-github`) with credential binding.
+- [x] `WorkflowConnection` + `PlatformCredential` UI.
+- [x] Workspace `repo-clone` kind — seeded from base clone, token stripped.
+- [x] Custom MCP server config UI (stdio + SSE/HTTP transports).
+- [x] Per-tool `allowedTools` filtering in the MCP server picker (uses cached `discoveredTools`).
 
-**Exit criteria**: User connects a GitHub repo, creates a workflow with "on issue opened" trigger → agent with GitHub MCP server + repo workspace → agent reads the issue, inspects the code, posts a comment.
+**Exit criteria**: User connects a GitHub repo, creates a workflow with "on issue opened" trigger → agent with GitHub MCP server + repo workspace → agent reads the issue, inspects the code, posts a comment. Covered by `test/e2e/phase2-webhook-run.test.ts`.
 
 ## Phase 3 — Multi-agent, parallel, workspace inheritance
 

@@ -31,6 +31,8 @@ Per-package, real external deps, slower.
 
 `apps/api` endpoints against a real test stack (Postgres + Temporal test env). Covers workflow CRUD, credential CRUD, webhook ingestion (HMAC verification), MCP introspection, template instantiation.
 
+> **Status**: not yet wired up. `@nestjs/testing` + `supertest` aren't installed and `apps/api/test/contract/` doesn't exist. New endpoints in the meantime rely on unit coverage of the service layer plus the E2E harness to exercise the HTTP surface. Stand this layer up the first time an endpoint's logic is too entangled with Nest DI / guards / pipes to cover cleanly at either end. Likely candidate: webhook ingestion (HMAC signature guard is the whole point of the feature).
+
 ### 4. E2E tests (`vitest` harness)
 
 The lever that makes Claude able to validate exit criteria autonomously.

@@ -1,0 +1,19 @@
+{
+  "ref": "refs/heads/main",
+  "before": "000000deadbeef000000deadbeef000000deadbe",
+  "after": "abc123def4567890abc123def4567890abc123de",
+  "repository": {
+    "name": "shop",
+    "full_name": "acme/shop",
+    "owner": { "login": "acme" }
+  },
+  "pusher": { "name": "bob", "email": "bob@example.com" },
+  "sender": { "login": "bob" },
+  "commits": [
+    {
+      "id": "abc123def4567890abc123def4567890abc123de",
+      "message": "Fix checkout crash on empty cart",
+      "author": { "name": "Bob", "email": "bob@example.com" }
+    }
+  ]
+}

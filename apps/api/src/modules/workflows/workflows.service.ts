@@ -82,16 +82,26 @@ export class WorkflowsService {
   async manualRun(id: string, dto: ManualRunDto) {
     const wf = await this.get(id);
     const triggerEvent = buildManualTriggerEvent(wf.definition, dto);
+    return this.startRun(id, triggerEvent);
+  }
+
+  /**
+   * Shared by manual runs and inbound webhook deliveries. Creates the
+   * `WorkflowRun` row, starts the Temporal workflow, flips the row to
+   * `RUNNING` on success or `FAILED` on start failure. Callers handle
+   * trigger-matching / auth before invoking this.
+   */
+  async startRun(workflowId: string, triggerEvent: TriggerEvent) {
     const run = await this.prisma.workflowRun.create({
       data: {
-        workflowId: id,
+        workflowId,
         status: 'PENDING',
         trigger: triggerEvent as unknown as object,
       },
     });
     try {
       const { temporalWorkflowId, temporalRunId } = await this.temporal.startAgentWorkflow({
-        workflowId: id,
+        workflowId,
         runId: run.id,
         triggerEvent,
       });

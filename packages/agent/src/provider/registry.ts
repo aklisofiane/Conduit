@@ -1,5 +1,6 @@
 import type { AgentProviderId } from '@conduit/shared';
 import { ClaudeProvider } from './claude-provider';
+import { CodexProvider } from './codex-provider';
 import { StubProvider } from './stub-provider';
 import type { AgentProvider } from './types';
 
@@ -11,7 +12,7 @@ import type { AgentProvider } from './types';
  */
 export function resolveProvider(
   id: AgentProviderId,
-  opts: { anthropicApiKey?: string } = {},
+  opts: { anthropicApiKey?: string; openaiApiKey?: string } = {},
 ): AgentProvider {
   if (process.env.CONDUIT_PROVIDER === 'stub') {
     return new StubProvider(id);
@@ -20,7 +21,7 @@ export function resolveProvider(
     case 'claude':
       return new ClaudeProvider({ apiKey: opts.anthropicApiKey });
     case 'codex':
-      throw new Error('Codex provider is not yet implemented — see docs/PLANS.md');
+      return new CodexProvider({ apiKey: opts.openaiApiKey });
     default: {
       const _exhaustive: never = id;
       throw new Error(`Unknown provider: ${String(_exhaustive)}`);

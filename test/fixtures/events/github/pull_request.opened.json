@@ -1,0 +1,48 @@
+{
+  "action": "opened",
+  "number": 7,
+  "pull_request": {
+    "id": 991234,
+    "node_id": "PR_kwDOxxxx",
+    "number": 7,
+    "state": "open",
+    "locked": false,
+    "title": "Fix checkout crash on empty cart",
+    "body": "Closes #42. Guard against empty cart in the checkout controller.",
+    "html_url": "https://github.com/acme/shop/pull/7",
+    "url": "https://api.github.com/repos/acme/shop/pulls/7",
+    "draft": false,
+    "user": {
+      "login": "bob",
+      "id": 222,
+      "type": "User"
+    },
+    "head": {
+      "ref": "fix/checkout-empty-cart",
+      "sha": "abc123def4567890abc123def4567890abc123de",
+      "repo": { "name": "shop", "owner": { "login": "acme" } }
+    },
+    "base": {
+      "ref": "main",
+      "sha": "000000deadbeef000000deadbeef000000deadbe",
+      "repo": { "name": "shop", "owner": { "login": "acme" } }
+    },
+    "labels": [],
+    "assignee": null,
+    "created_at": "2026-04-19T11:30:00Z",
+    "updated_at": "2026-04-19T11:30:00Z"
+  },
+  "repository": {
+    "id": 98765432,
+    "name": "shop",
+    "full_name": "acme/shop",
+    "owner": {
+      "login": "acme",
+      "type": "Organization"
+    }
+  },
+  "sender": {
+    "login": "bob",
+    "id": 222
+  }
+}

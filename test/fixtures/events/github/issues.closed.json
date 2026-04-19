@@ -1,0 +1,18 @@
+{
+  "action": "closed",
+  "issue": {
+    "id": 2134567890,
+    "node_id": "I_kwDOAbCdEf1234567",
+    "number": 42,
+    "title": "Checkout crashes when cart is empty",
+    "state": "closed",
+    "html_url": "https://github.com/acme/shop/issues/42",
+    "labels": [{ "id": 1, "name": "bug" }],
+    "closed_at": "2026-04-19T12:00:00Z"
+  },
+  "repository": {
+    "name": "shop",
+    "owner": { "login": "acme" }
+  },
+  "sender": { "login": "bob" }
+}

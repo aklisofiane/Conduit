@@ -1,0 +1,52 @@
+{
+  "action": "opened",
+  "issue": {
+    "id": 2134567890,
+    "node_id": "I_kwDOAbCdEf1234567",
+    "number": 42,
+    "title": "Checkout crashes when cart is empty",
+    "state": "open",
+    "locked": false,
+    "html_url": "https://github.com/acme/shop/issues/42",
+    "url": "https://api.github.com/repos/acme/shop/issues/42",
+    "body": "Steps to reproduce:\n1. Sign in\n2. Clear cart\n3. Click checkout\n\nExpected: redirect. Actual: 500.",
+    "user": {
+      "login": "alice",
+      "id": 111,
+      "type": "User"
+    },
+    "labels": [
+      { "id": 1, "name": "bug", "color": "d73a4a" },
+      { "id": 2, "name": "priority:high", "color": "b60205" }
+    ],
+    "assignee": {
+      "login": "bob",
+      "id": 222
+    },
+    "assignees": [{ "login": "bob", "id": 222 }],
+    "milestone": null,
+    "comments": 0,
+    "created_at": "2026-04-19T10:00:00Z",
+    "updated_at": "2026-04-19T10:00:00Z",
+    "closed_at": null
+  },
+  "repository": {
+    "id": 98765432,
+    "node_id": "R_kgDOxxxx",
+    "name": "shop",
+    "full_name": "acme/shop",
+    "private": false,
+    "owner": {
+      "login": "acme",
+      "id": 555,
+      "type": "Organization"
+    },
+    "html_url": "https://github.com/acme/shop",
+    "default_branch": "main"
+  },
+  "sender": {
+    "login": "alice",
+    "id": 111,
+    "type": "User"
+  }
+}

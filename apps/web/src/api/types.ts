@@ -80,6 +80,22 @@ export interface CredentialRow {
   suffix: string;
 }
 
+export interface ConnectionRow {
+  id: string;
+  workflowId: string;
+  alias: string;
+  credentialId: string;
+  credential: {
+    id: string;
+    name: string;
+    platform: 'GITHUB' | 'GITLAB' | 'JIRA' | 'SLACK' | 'DISCORD';
+  };
+  owner: string | null;
+  repo: string | null;
+  hasWebhookSecret: boolean;
+  webhookSecretSuffix: string | null;
+}
+
 export interface DiscoveredSkill {
   id: string;
   name: string;

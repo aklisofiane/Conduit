@@ -1,0 +1,32 @@
+{
+  "action": "created",
+  "issue": {
+    "id": 991234,
+    "node_id": "PR_kwDOxxxx",
+    "number": 7,
+    "state": "open",
+    "title": "Fix checkout crash on empty cart",
+    "html_url": "https://github.com/acme/shop/pull/7",
+    "pull_request": {
+      "url": "https://api.github.com/repos/acme/shop/pulls/7",
+      "html_url": "https://github.com/acme/shop/pull/7",
+      "diff_url": "https://github.com/acme/shop/pull/7.diff"
+    },
+    "labels": [],
+    "user": { "login": "bob", "id": 222 }
+  },
+  "comment": {
+    "id": 55667788,
+    "node_id": "IC_kwDO",
+    "user": { "login": "carol", "id": 333 },
+    "body": "Looks good — one suggestion inline.",
+    "created_at": "2026-04-19T12:15:00Z",
+    "html_url": "https://github.com/acme/shop/pull/7#issuecomment-55667788"
+  },
+  "repository": {
+    "name": "shop",
+    "full_name": "acme/shop",
+    "owner": { "login": "acme", "type": "Organization" }
+  },
+  "sender": { "login": "carol", "id": 333 }
+}

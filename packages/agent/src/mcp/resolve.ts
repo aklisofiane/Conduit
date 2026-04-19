@@ -5,6 +5,7 @@ import type {
   ResolvedMcpServer,
   WorkflowMcpServer,
 } from '@conduit/shared';
+import { CREDENTIAL_PLACEHOLDER_VALUE } from '@conduit/shared';
 import { ValidationError } from '../errors/index';
 
 /**
@@ -13,8 +14,13 @@ import { ValidationError } from '../errors/index';
  */
 export type CredentialLookup = (connectionId: string) => Promise<string | undefined>;
 
-/** Placeholder substituted in env/headers at resolution time. */
-export const CREDENTIAL_PLACEHOLDER = '{{credential}}';
+/**
+ * Placeholder substituted in env/headers at resolution time.
+ *
+ * @deprecated import `CREDENTIAL_PLACEHOLDER_VALUE` from `@conduit/shared`.
+ *             Kept as a re-export so existing callers don't break.
+ */
+export const CREDENTIAL_PLACEHOLDER = CREDENTIAL_PLACEHOLDER_VALUE;
 
 /**
  * Resolves the MCP servers attached to an agent node into fully-substituted

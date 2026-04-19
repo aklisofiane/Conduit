@@ -1,20 +1,26 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import type { DiscoveredTool, McpTransport } from '@conduit/shared';
+import { introspectMcpServer, McpIntrospectionError } from '@conduit/agent';
 
 /**
- * MCP introspection. Full implementation (stdio/SSE/HTTP client via
- * `@modelcontextprotocol/sdk`) lands in Phase 2 — see docs/PLANS.md. Phase
- * 1 ships the endpoint shape so the UI can wire it up and returns an empty
- * tool list with a warning-level log message.
+ * MCP introspection. Connects to the server with the provided transport,
+ * calls `tools/list`, returns the discovered tools. Used at config time so
+ * the UI can render an `allowedTools` picker. Errors surfaced as 400 so the
+ * user who just typed a bad command / URL / credential sees it inline.
  */
 @Injectable()
 export class McpService {
   private readonly logger = new Logger(McpService.name);
 
   async introspect(transport: McpTransport): Promise<DiscoveredTool[]> {
-    this.logger.warn(
-      `MCP introspection is a Phase 2 deliverable — returning empty tool list for transport.kind=${transport.kind}`,
-    );
-    return [];
+    try {
+      return await introspectMcpServer(transport);
+    } catch (e: unknown) {
+      if (e instanceof McpIntrospectionError) {
+        this.logger.warn(`MCP introspection failed (${transport.kind}): ${e.message}`);
+        throw new BadRequestException({ message: e.message, transportKind: transport.kind });
+      }
+      throw e;
+    }
   }
 }

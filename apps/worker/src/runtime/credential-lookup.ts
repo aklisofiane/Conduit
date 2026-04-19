@@ -1,5 +1,5 @@
 import type { CredentialLookup } from '@conduit/agent';
-import { decryptSecret, loadEncryptionKey } from '@conduit/shared';
+import { decryptSecret, loadEncryptionKey } from '@conduit/shared/crypto';
 import { prisma } from './prisma';
 
 /**

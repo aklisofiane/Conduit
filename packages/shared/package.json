@@ -46,6 +46,14 @@
     "./temporal": {
       "types": "./dist/temporal/index.d.ts",
       "default": "./dist/temporal/index.js"
+    },
+    "./crypto": {
+      "types": "./dist/crypto/index.d.ts",
+      "default": "./dist/crypto/index.js"
+    },
+    "./webhook": {
+      "types": "./dist/webhook/index.d.ts",
+      "default": "./dist/webhook/index.js"
     }
   },
   "files": [

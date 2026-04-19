@@ -50,6 +50,11 @@ model WorkflowConnection {
   // Platform-specific bindings (nullable — e.g. Slack connection has no repo).
   owner        String?
   repo         String?
+  // Webhook signing secret for verifying inbound deliveries against this
+  // connection. Encrypted at rest (same AES-256-GCM format as
+  // PlatformCredential.secret). Nullable — polling-only workflows don't
+  // need one. See docs/SECURITY.md ("Webhook authentication").
+  webhookSecret String?
 
   workflow   Workflow           @relation(fields: [workflowId], references: [id], onDelete: Cascade)
   credential PlatformCredential @relation(fields: [credentialId], references: [id])

@@ -215,6 +215,9 @@ function CanvasInner() {
             </span>
           </div>
           <div className="flex-1" />
+          <button className="btn" onClick={() => navigate(`/workflows/${id}/connections`)}>
+            Connections
+          </button>
           <button className="btn" onClick={handleSave} disabled={!dirty || updateWorkflow.isPending}>
             {updateWorkflow.isPending ? 'Saving…' : dirty ? 'Save' : 'Saved'}
           </button>
@@ -255,6 +258,7 @@ function CanvasInner() {
       {selectedAgent && (
         <AgentConfigPanel
           agent={selectedAgent}
+          workflowId={id}
           onChange={(patch) => updateAgent(selectedAgent.id, patch)}
           onSave={handleSave}
           onDiscard={() => wf && reset(wf.definition)}

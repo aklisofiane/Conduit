@@ -3,7 +3,7 @@ import {
   encryptSecret,
   loadEncryptionKey,
   redactedSuffix,
-} from '@conduit/shared';
+} from '@conduit/shared/crypto';
 
 /**
  * API-side credential crypto. The shared `@conduit/shared/crypto` module
