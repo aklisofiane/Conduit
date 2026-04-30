@@ -1,9 +1,3 @@
-/**
- * Monoline SVG icon set + provider glyphs. Mirrors the Conduit design's
- * `Icon` component from `workflow.jsx` so the same names map to the same
- * shapes everywhere (topbar, palette, nodes, inspector).
- */
-
 import type { ProviderId } from '../../styles/theme.js';
 
 export type IconName =

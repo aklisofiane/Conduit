@@ -36,7 +36,6 @@ import {
 import { useWorkflowEditor } from '../state/workflow-editor.js';
 import { useTopbarSlots } from '../state/topbar-slots.js';
 import { relativeFromNow } from '../lib/time.js';
-import { tokens } from '../styles/theme.js';
 
 const NODE_TYPES = { agent: AgentNode, trigger: TriggerNode } as const;
 const TRIGGER_NODE_ID = '__trigger__';
@@ -281,26 +280,11 @@ function CanvasInner() {
           onDragOver={handleDragOver}
           onDrop={handleDrop}
         >
-          {/* Canvas chrome — top-left version pills */}
           <div className="pointer-events-none absolute left-[14px] top-3 z-[2] flex gap-[6px]">
-            <span
-              className="pointer-events-auto rounded-[var(--radius-sm)] border px-2 py-[3px] font-mono text-[11px]"
-              style={{
-                background: tokens.color.bgPanel,
-                borderColor: tokens.color.divider,
-                color: tokens.color.text2,
-              }}
-            >
+            <span className="pointer-events-auto rounded-[var(--radius-sm)] border border-[var(--color-divider)] bg-[var(--color-bg-panel)] px-2 py-[3px] font-mono text-[11px] text-[var(--color-text-2)]">
               {wf?.name ?? 'workflow'}
             </span>
-            <span
-              className="pointer-events-auto rounded-[var(--radius-sm)] border px-2 py-[3px] font-mono text-[11px]"
-              style={{
-                background: tokens.color.bgPanel,
-                borderColor: tokens.color.divider,
-                color: tokens.color.textMuted,
-              }}
-            >
+            <span className="pointer-events-auto rounded-[var(--radius-sm)] border border-[var(--color-divider)] bg-[var(--color-bg-panel)] px-2 py-[3px] font-mono text-[11px] text-[var(--color-text-muted)]">
               {lastRunLabel}
             </span>
           </div>

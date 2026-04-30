@@ -16,11 +16,6 @@ interface AgentConfigPanelProps {
   dirty: boolean;
 }
 
-/**
- * Matches the mockup's right-hand side panel: name, provider+model, instructions,
- * MCP picker, skill picker, workspace picker. Validation deferred to save time
- * (Zod schema at API boundary).
- */
 export function AgentConfigPanel({
   agent,
   workflowId,
@@ -36,6 +31,7 @@ export function AgentConfigPanel({
     (s) => s.provider === 'both' || s.provider === agent.provider,
   );
   const ps = providerStyle(agent.provider);
+  const selectedSkillIds = new Set(agent.skills.map((s) => s.skillId));
 
   return (
     <aside className="flex w-[320px] shrink-0 flex-col border-l border-[var(--color-divider)] bg-[var(--color-bg-panel)]">
@@ -46,7 +42,7 @@ export function AgentConfigPanel({
               className="h-[6px] w-[6px] rounded-full"
               style={{ background: ps.mark }}
             />
-            Agent · {agent.provider === 'claude' ? 'Claude' : 'Codex'}
+            Agent · {ps.label}
           </div>
           <h3 className="mt-2 truncate font-sans text-[15px] font-semibold text-[var(--color-text)]">
             <span>{agent.name}</span>
@@ -149,7 +145,7 @@ export function AgentConfigPanel({
             ) : (
               <div className="grid grid-cols-1 gap-1.5">
                 {providerSkills.map((skill) => {
-                  const selected = agent.skills.some((s) => s.skillId === skill.id);
+                  const selected = selectedSkillIds.has(skill.id);
                   return (
                     <button
                       key={skill.id}

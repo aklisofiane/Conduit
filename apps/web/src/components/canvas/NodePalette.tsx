@@ -14,16 +14,6 @@ interface NodePaletteProps {
   onSelectTrigger: () => void;
 }
 
-/**
- * Left rail palette — cards are both click-to-add and drag-to-place onto the
- * canvas (see `handleDrop` in CanvasPage). Triggers remain a singleton per
- * workflow; the trigger card repositions (or re-reveals) the existing one.
- *
- * Visual system: each palette card previews its on-canvas styling.
- *   · Trigger → slate avatar + tinted slate background.
- *   · Claude  → terracotta accent stripe + warm-cream card.
- *   · Codex   → mint-green accent stripe + mint card, mono name.
- */
 export function NodePalette({ onAddAgent, onSelectTrigger }: NodePaletteProps) {
   return (
     <aside
@@ -123,7 +113,6 @@ function AgentPaletteCard({
 }) {
   const ps = providerStyle(provider);
   const payload: PaletteDragPayload = { kind: 'agent', provider };
-  const isCodex = provider === 'codex';
   return (
     <button
       type="button"
@@ -150,7 +139,7 @@ function AgentPaletteCard({
       <span className="min-w-0">
         <span
           className="block text-[12px] font-semibold text-[var(--color-text)]"
-          style={{ fontFamily: isCodex ? tokens.font.mono : tokens.font.sans }}
+          style={{ fontFamily: ps.font }}
         >
           {name}
         </span>

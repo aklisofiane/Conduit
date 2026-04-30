@@ -1,7 +1,6 @@
 import type { BoardRef, TriggerConfig, TriggerFilter } from '@conduit/shared';
 import { useConnections } from '../../api/hooks.js';
 import { cn } from '../../lib/cn.js';
-import { tokens } from '../../styles/theme.js';
 import { Icon } from './Icon.js';
 
 interface TriggerConfigPanelProps {
@@ -15,13 +14,6 @@ interface TriggerConfigPanelProps {
   dirty: boolean;
 }
 
-/**
- * Sibling of `AgentConfigPanel` — edits the single `TriggerConfig` on the
- * workflow. One form for both trigger modes, gated by the mode toggle.
- * Validation lives in the shared Zod schema; this panel just keeps the
- * shape coherent while the user clicks around (swapping mode resets the
- * mode-specific fields).
- */
 export function TriggerConfigPanel({
   trigger,
   workflowId,
@@ -70,7 +62,6 @@ export function TriggerConfigPanel({
                 'h-[6px] w-[6px] rounded-full',
                 trigger.mode.active ? 'bg-[var(--color-success)]' : 'bg-[var(--color-text-muted)]',
               )}
-              style={trigger.mode.active ? { background: tokens.color.success } : undefined}
             />
             Trigger · {trigger.platform}
           </div>

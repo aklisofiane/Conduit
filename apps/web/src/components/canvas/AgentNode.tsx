@@ -12,18 +12,10 @@ export interface AgentNodeData extends Record<string, unknown> {
   agent: AgentConfig;
 }
 
-/**
- * On-canvas agent block. Four bands: header (avatar + name + provider tag),
- * prompt sheet (white inner card with system prompt), pill row (model +
- * workspace), footer (MCP servers · summary). Provider tokens drive every
- * tinted surface (Claude → terracotta-warm, Codex → mint-green).
- */
 export function AgentNode({ data, selected }: NodeProps) {
   const { agent } = data as AgentNodeData;
   const provider = agent.provider;
   const ps = providerStyle(provider);
-  const isCodex = provider === 'codex';
-  const headerFont = isCodex ? tokens.font.mono : tokens.font.sans;
 
   return (
     <div
@@ -52,7 +44,7 @@ export function AgentNode({ data, selected }: NodeProps) {
         </span>
         <span
           className="min-w-0 flex-1 truncate text-[13px] font-semibold leading-none"
-          style={{ fontFamily: headerFont }}
+          style={{ fontFamily: ps.font }}
         >
           {agent.name}
         </span>
@@ -67,7 +59,7 @@ export function AgentNode({ data, selected }: NodeProps) {
             background: ps.prompt,
             border: `1px solid ${ps.promptBorder}`,
             color: tokens.color.text2,
-            fontFamily: isCodex ? tokens.font.mono : tokens.font.sans,
+            fontFamily: ps.font,
           }}
         >
           {agent.instructions ? (

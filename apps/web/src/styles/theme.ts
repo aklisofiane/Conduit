@@ -1,16 +1,3 @@
-/**
- * Typed mirror of the CSS custom properties declared in `tokens.css`.
- *
- * Use this from places that can't write CSS classes — inline `style={...}`,
- * SVG `stroke` / `fill` attrs, or react-flow props that take literal strings.
- * For everything else (most of the UI), prefer Tailwind utilities or the
- * primitive classes in `globals.css`.
- *
- * Each leaf is a `var(--name)` reference, so the runtime resolution still
- * comes from `tokens.css` — swap the CSS file and the whole TS surface
- * follows automatically.
- */
-
 import type { AgentConfig } from '@conduit/shared';
 
 const v = (name: string) => `var(${name})`;
@@ -55,6 +42,8 @@ export const tokens = {
       border: v('--color-claude-border'),
       tagBg: v('--color-claude-tag-bg'),
       tagText: v('--color-claude-tag-text'),
+      font: v('--font-sans'),
+      label: 'Claude',
     },
     codex: {
       mark: v('--color-codex-mark'),
@@ -65,12 +54,14 @@ export const tokens = {
       border: v('--color-codex-border'),
       tagBg: v('--color-codex-tag-bg'),
       tagText: v('--color-codex-tag-text'),
+      font: v('--font-mono'),
+      label: 'Codex',
     },
   },
   radius: {
     sm: v('--radius-sm'),
     md: v('--radius'),
-    lg: v('--radius-md'),
+    lg: v('--radius-lg'),
   },
   shadow: {
     node: v('--shadow-node'),
@@ -90,10 +81,6 @@ export function providerStyle(provider: ProviderId): ProviderStyle {
   return tokens.provider[provider];
 }
 
-/**
- * Node geometry shared between the renderer and any code that needs to know
- * a node's logical size (e.g. layout heuristics, drop-position rounding).
- */
 export const nodeSize = {
   agent: { width: 230, minHeight: 168 },
   trigger: { width: 140, minHeight: 56 },

@@ -2,14 +2,6 @@ import { useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { create } from 'zustand';
 
-/**
- * Slot store for the global TopChrome — pages mount their workflow-scoped
- * UI (tabs in the centre, actions on the right) into the chrome without
- * coupling routing to the layout.
- *
- * Use the `useTopbarSlots` hook below from inside a page; slots clear on
- * unmount automatically.
- */
 interface TopbarSlotsState {
   centerSlot: ReactNode | null;
   actionsSlot: ReactNode | null;
@@ -17,11 +9,15 @@ interface TopbarSlotsState {
   setActionsSlot: (node: ReactNode | null) => void;
 }
 
-export const useTopbarSlotsStore = create<TopbarSlotsState>((set) => ({
+export const useTopbarSlotsStore = create<TopbarSlotsState>((set, get) => ({
   centerSlot: null,
   actionsSlot: null,
-  setCenterSlot: (node) => set({ centerSlot: node }),
-  setActionsSlot: (node) => set({ actionsSlot: node }),
+  setCenterSlot: (node) => {
+    if (get().centerSlot !== node) set({ centerSlot: node });
+  },
+  setActionsSlot: (node) => {
+    if (get().actionsSlot !== node) set({ actionsSlot: node });
+  },
 }));
 
 export function useTopbarSlots(slots: { center?: ReactNode; actions?: ReactNode }) {
@@ -29,12 +25,19 @@ export function useTopbarSlots(slots: { center?: ReactNode; actions?: ReactNode 
   const setActions = useTopbarSlotsStore((s) => s.setActionsSlot);
   const center = slots.center ?? null;
   const actions = slots.actions ?? null;
+
   useEffect(() => {
     setCenter(center);
+  }, [center, setCenter]);
+  useEffect(() => {
     setActions(actions);
-    return () => {
+  }, [actions, setActions]);
+
+  useEffect(
+    () => () => {
       setCenter(null);
       setActions(null);
-    };
-  }, [center, actions, setCenter, setActions]);
+    },
+    [setCenter, setActions],
+  );
 }

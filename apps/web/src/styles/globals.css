@@ -2,49 +2,7 @@
 @import '@xyflow/react/dist/style.css';
 @import './tokens.css';
 
-/*
- * Re-export the tokens declared in `tokens.css` to Tailwind v4 so utilities
- * like `bg-bg`, `text-text-2`, `border-divider`, `font-mono` resolve.
- * `@theme inline` tells Tailwind to use the var() reference verbatim in the
- * generated utility CSS rather than copying a value — the source of truth
- * stays in `tokens.css`.
- */
 @theme inline {
-  --color-bg: var(--color-bg);
-  --color-bg-panel: var(--color-bg-panel);
-  --color-bg-canvas: var(--color-bg-canvas);
-
-  --color-text: var(--color-text);
-  --color-text-2: var(--color-text-2);
-  --color-text-muted: var(--color-text-muted);
-
-  --color-divider: var(--color-divider);
-  --color-edge: var(--color-edge);
-
-  --color-success: var(--color-success);
-  --color-running: var(--color-running);
-  --color-warn: var(--color-warn);
-  --color-error: var(--color-error);
-
-  --color-accent: var(--color-accent);
-  --color-accent-soft: var(--color-accent-soft);
-
-  --color-primary: var(--color-primary);
-  --color-primary-text: var(--color-primary-text);
-
-  --color-pill-bg: var(--color-pill-bg);
-  --color-pill-border: var(--color-pill-border);
-  --color-footer-bg: var(--color-footer-bg);
-
-  --color-trigger: var(--color-trigger);
-  --color-trigger-bg: var(--color-trigger-bg);
-  --color-trigger-border: var(--color-trigger-border);
-
-  --color-claude: var(--color-claude);
-  --color-claude-bg: var(--color-claude-bg);
-  --color-codex: var(--color-codex);
-  --color-codex-bg: var(--color-codex-bg);
-
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
   --font-serif: var(--font-serif);

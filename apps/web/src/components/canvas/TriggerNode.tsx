@@ -8,12 +8,6 @@ export interface TriggerNodeData extends Record<string, unknown> {
   filterCount: number;
 }
 
-/**
- * Compact slate card. Header has a "TRIGGER" mono label and a small
- * platform tag on the right (the design's chrome was label-only, but the
- * real schema carries platform/mode that's worth surfacing). Body is the
- * mode-aware label: webhook event, polling interval, etc.
- */
 export function TriggerNode({ data, selected }: NodeProps) {
   const { trigger, filterCount } = data as TriggerNodeData;
   return (

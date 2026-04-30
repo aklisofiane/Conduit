@@ -9,11 +9,6 @@ interface WorkflowActionsProps {
   onTestRun: () => void;
 }
 
-/**
- * Right-side topbar slot for the canvas page: status pill, Save (ghost),
- * Test run (primary indigo). Mirrors the design's right cluster in
- * `Conduit.html`. Wired from `CanvasPage` via `useTopbarSlots`.
- */
 export function WorkflowActions({
   isActive,
   dirty,

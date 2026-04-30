@@ -1,16 +1,8 @@
 import { NavLink } from 'react-router-dom';
+import { cn } from '../../lib/cn.js';
 import { Icon } from '../canvas/Icon.js';
 import { useTopbarSlotsStore } from '../../state/topbar-slots.js';
 
-/**
- * Global app chrome — three-column grid:
- *   left   · brand + Home + Settings nav-icons
- *   center · slot (e.g. workflow Build/Runs/History tabs)
- *   right  · slot (e.g. Save/Test run) — falls back to the services pill
- *
- * Pages populate the center/right slots via `useTopbarSlots(...)` so the
- * chrome stays presentational and routing stays decoupled from layout.
- */
 export function TopChrome() {
   const centerSlot = useTopbarSlotsStore((s) => s.centerSlot);
   const actionsSlot = useTopbarSlotsStore((s) => s.actionsSlot);
@@ -21,7 +13,6 @@ export function TopChrome() {
         className="grid h-12 items-center gap-4 px-4"
         style={{ gridTemplateColumns: '1fr auto 1fr' }}
       >
-        {/* Left — brand + nav */}
         <div className="flex items-center gap-1 text-[var(--color-text)]">
           <NavLink
             to="/"
@@ -38,10 +29,8 @@ export function TopChrome() {
           <NavIconLink to="/credentials" label="Settings" icon="settings" />
         </div>
 
-        {/* Center — page-supplied tabs */}
         <div className="flex items-center justify-center">{centerSlot}</div>
 
-        {/* Right — page-supplied actions, with global status fallback */}
         <div className="flex items-center justify-end">
           {actionsSlot ?? (
             <div className="pill">
@@ -74,12 +63,12 @@ function NavIconLink({
       title={label}
       aria-label={label}
       className={({ isActive }) =>
-        [
+        cn(
           'inline-flex h-7 w-7 items-center justify-center rounded-[var(--radius)] transition-colors',
           isActive
             ? 'bg-[var(--color-pill-bg)] text-[var(--color-text)]'
             : 'text-[var(--color-text-2)] hover:bg-[var(--color-pill-bg)] hover:text-[var(--color-text)]',
-        ].join(' ')
+        )
       }
     >
       <Icon name={icon} size={15} color="currentColor" />
