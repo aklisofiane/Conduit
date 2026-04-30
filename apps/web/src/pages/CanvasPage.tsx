@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState, type DragEvent as ReactDragEvent } from 'react';
+import { useCallback, useEffect, useMemo, useState, type DragEvent as ReactDragEvent } from 'react';
 import {
   Background,
+  BackgroundVariant,
   Controls,
   ReactFlow,
   ReactFlowProvider,
@@ -25,13 +26,17 @@ import {
 } from '../components/canvas/NodePalette.js';
 import { TriggerConfigPanel } from '../components/canvas/TriggerConfigPanel.js';
 import { TriggerNode } from '../components/canvas/TriggerNode.js';
+import { WorkflowTabs, type WorkflowTabId } from '../components/layout/WorkflowTabs.js';
+import { WorkflowActions } from '../components/layout/WorkflowActions.js';
 import {
   useManualRun,
   useUpdateWorkflow,
   useWorkflow,
 } from '../api/hooks.js';
 import { useWorkflowEditor } from '../state/workflow-editor.js';
+import { useTopbarSlots } from '../state/topbar-slots.js';
 import { relativeFromNow } from '../lib/time.js';
+import { tokens } from '../styles/theme.js';
 
 const NODE_TYPES = { agent: AgentNode, trigger: TriggerNode } as const;
 const TRIGGER_NODE_ID = '__trigger__';
@@ -51,6 +56,7 @@ function CanvasInner() {
   const updateWorkflow = useUpdateWorkflow(id ?? '');
   const manualRun = useManualRun();
   const rf = useReactFlow();
+  const [activeTab, setActiveTab] = useState<WorkflowTabId>('build');
 
   const draft = useWorkflowEditor((s) => s.draft);
   const selectedNodeId = useWorkflowEditor((s) => s.selectedNodeId);
@@ -215,78 +221,89 @@ function CanvasInner() {
     [draft, rf, handleAddAgent, setDraft, setSelected],
   );
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     if (!draft || !id) return;
     await updateWorkflow.mutateAsync({ definition: draft });
-  };
+  }, [draft, id, updateWorkflow]);
 
-  const handleRun = async () => {
+  const handleRun = useCallback(async () => {
     if (!id) return;
     const run = await manualRun.mutateAsync({ workflowId: id, body: {} });
     navigate(`/runs/${run.id}`);
-  };
+  }, [id, manualRun, navigate]);
+
+  const tabsSlot = useMemo(
+    () => <WorkflowTabs active={activeTab} onChange={setActiveTab} />,
+    [activeTab],
+  );
+  const actionsSlot = useMemo(
+    () => (
+      <WorkflowActions
+        isActive={Boolean(wf?.isActive)}
+        dirty={dirty}
+        saving={updateWorkflow.isPending}
+        running={manualRun.isPending}
+        onSave={handleSave}
+        onTestRun={handleRun}
+      />
+    ),
+    [
+      wf?.isActive,
+      dirty,
+      updateWorkflow.isPending,
+      manualRun.isPending,
+      handleSave,
+      handleRun,
+    ],
+  );
+  useTopbarSlots({ center: tabsSlot, actions: actionsSlot });
 
   if (!id) return null;
   if (isLoading || !draft) {
     return (
-      <div className="flex flex-1 items-center justify-center font-mono text-[12px] text-[var(--color-text-3)]">
+      <div className="flex flex-1 items-center justify-center font-mono text-[12px] text-[var(--color-text-muted)]">
         Loading workflow…
       </div>
     );
   }
 
   const selectedAgent = draft.nodes.find((n) => n.id === selectedNodeId);
+  const lastRunLabel = wf?.updatedAt
+    ? `saved · ${relativeFromNow(wf.updatedAt)}`
+    : 'unsaved';
 
   return (
     <div className="flex flex-1 min-h-0">
       <NodePalette onAddAgent={handleAddAgent} onSelectTrigger={handleSelectTrigger} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex h-12 items-center gap-3 border-b border-[var(--color-line)] bg-[var(--color-bg-1)] px-4">
-          <button
-            className="btn"
-            onClick={() => navigate('/')}
-            aria-label="Back to workflows"
-          >
-            ← workflows
-          </button>
-          <div className="flex items-center gap-2 rounded-md border border-[var(--color-line)] bg-[var(--color-bg-2)] px-2 py-1">
-            <span
-              className="h-2 w-2 rounded-full"
-              style={{
-                background: wf?.isActive ? 'var(--color-success)' : 'var(--color-text-4)',
-                boxShadow: wf?.isActive ? '0 0 6px var(--color-success)' : undefined,
-              }}
-            />
-            <span className="font-mono text-[12px] font-semibold">{wf?.name}</span>
-            <span className="ml-1 font-mono text-[10.5px] text-[var(--color-text-3)]">
-              {wf?.updatedAt ? `saved · ${relativeFromNow(wf.updatedAt)}` : 'unsaved'}
-            </span>
-          </div>
-          <div className="flex-1" />
-          <button className="btn" onClick={() => navigate(`/workflows/${id}/connections`)}>
-            Connections
-          </button>
-          <button className="btn" onClick={handleSave} disabled={!dirty || updateWorkflow.isPending}>
-            {updateWorkflow.isPending ? 'Saving…' : dirty ? 'Save' : 'Saved'}
-          </button>
-          <button
-            className="btn primary"
-            onClick={handleRun}
-            disabled={manualRun.isPending || dirty}
-            title={dirty ? 'Save changes before running' : 'Start a manual run'}
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <path d="M5 3l14 9-14 9V3z" />
-            </svg>
-            Test run
-          </button>
-        </div>
-
         <div
           className="relative flex-1"
           onDragOver={handleDragOver}
           onDrop={handleDrop}
         >
+          {/* Canvas chrome — top-left version pills */}
+          <div className="pointer-events-none absolute left-[14px] top-3 z-[2] flex gap-[6px]">
+            <span
+              className="pointer-events-auto rounded-[var(--radius-sm)] border px-2 py-[3px] font-mono text-[11px]"
+              style={{
+                background: tokens.color.bgPanel,
+                borderColor: tokens.color.divider,
+                color: tokens.color.text2,
+              }}
+            >
+              {wf?.name ?? 'workflow'}
+            </span>
+            <span
+              className="pointer-events-auto rounded-[var(--radius-sm)] border px-2 py-[3px] font-mono text-[11px]"
+              style={{
+                background: tokens.color.bgPanel,
+                borderColor: tokens.color.divider,
+                color: tokens.color.textMuted,
+              }}
+            >
+              {lastRunLabel}
+            </span>
+          </div>
           <ReactFlow
             nodes={flowNodes}
             edges={flowEdges}
@@ -301,8 +318,12 @@ function CanvasInner() {
             defaultViewport={draft.ui.viewport}
             fitView
           >
-            <Background color="#2e2e36" gap={24} />
-            <Controls showInteractive={false} />
+            <Background
+              variant={BackgroundVariant.Lines}
+              color="var(--canvas-grid-color)"
+              gap={32}
+            />
+            <Controls showInteractive={false} position="bottom-right" />
           </ReactFlow>
         </div>
       </div>
@@ -314,6 +335,7 @@ function CanvasInner() {
           onChange={(patch) => updateAgent(selectedAgent.id, patch)}
           onSave={handleSave}
           onDiscard={() => wf && reset(wf.definition)}
+          onClose={() => setSelected(undefined)}
           saving={updateWorkflow.isPending}
           dirty={dirty}
         />
@@ -326,6 +348,7 @@ function CanvasInner() {
           onChange={(patch) => updateTrigger(patch)}
           onSave={handleSave}
           onDiscard={() => wf && reset(wf.definition)}
+          onClose={() => setSelected(undefined)}
           saving={updateWorkflow.isPending}
           dirty={dirty}
         />

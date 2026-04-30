@@ -1,6 +1,8 @@
 import type { BoardRef, TriggerConfig, TriggerFilter } from '@conduit/shared';
 import { useConnections } from '../../api/hooks.js';
 import { cn } from '../../lib/cn.js';
+import { tokens } from '../../styles/theme.js';
+import { Icon } from './Icon.js';
 
 interface TriggerConfigPanelProps {
   trigger: TriggerConfig;
@@ -8,6 +10,7 @@ interface TriggerConfigPanelProps {
   onChange: (patch: Partial<TriggerConfig>) => void;
   onSave: () => void;
   onDiscard: () => void;
+  onClose: () => void;
   saving: boolean;
   dirty: boolean;
 }
@@ -25,6 +28,7 @@ export function TriggerConfigPanel({
   onChange,
   onSave,
   onDiscard,
+  onClose,
   saving,
   dirty,
 }: TriggerConfigPanelProps) {
@@ -57,24 +61,32 @@ export function TriggerConfigPanel({
   };
 
   return (
-    <aside className="flex w-[380px] shrink-0 flex-col border-l border-[var(--color-line)] bg-[var(--color-bg-1)]">
-      <div className="border-b border-[var(--color-line)] px-5 py-4">
-        <div className="flex items-center gap-2 font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-3)]">
-          <span
-            className={cn(
-              'h-1.5 w-1.5 rounded-full',
-              trigger.mode.active ? 'bg-[var(--color-success)]' : 'bg-[var(--color-text-4)]',
-            )}
-            style={
-              trigger.mode.active ? { boxShadow: '0 0 6px var(--color-success)' } : undefined
-            }
-          />
-          Trigger · {trigger.platform}
+    <aside className="flex w-[320px] shrink-0 flex-col border-l border-[var(--color-divider)] bg-[var(--color-bg-panel)]">
+      <div className="flex items-start justify-between border-b border-[var(--color-divider)] px-5 py-4">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 font-mono text-[10px] font-medium uppercase tracking-[0.06em] text-[var(--color-text-muted)]">
+            <span
+              className={cn(
+                'h-[6px] w-[6px] rounded-full',
+                trigger.mode.active ? 'bg-[var(--color-success)]' : 'bg-[var(--color-text-muted)]',
+              )}
+              style={trigger.mode.active ? { background: tokens.color.success } : undefined}
+            />
+            Trigger · {trigger.platform}
+          </div>
+          <h3 className="mt-2 truncate font-sans text-[15px] font-semibold text-[var(--color-text)]">
+            <span>{trigger.mode.kind}</span>
+            <span className="text-[var(--color-text-muted)]"> · config</span>
+          </h3>
         </div>
-        <h3 className="mt-2 font-mono text-[15px] font-semibold">
-          <span>{trigger.mode.kind}</span>
-          <span className="text-[var(--color-text-4)]"> · config</span>
-        </h3>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close inspector"
+          className="ml-2 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-[var(--radius-sm)] text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-pill-bg)] hover:text-[var(--color-text)]"
+        >
+          <Icon name="close" size={14} color="currentColor" />
+        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 py-4">
@@ -99,7 +111,7 @@ export function TriggerConfigPanel({
 
           <Field label="Connection" hint="credential used by this trigger">
             {platformConnections.length === 0 ? (
-              <div className="font-mono text-[11px] text-[var(--color-text-4)]">
+              <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
                 No {trigger.platform} connections yet. Add one on the Connections page.
               </div>
             ) : (
@@ -241,7 +253,7 @@ export function TriggerConfigPanel({
         </div>
       </div>
 
-      <div className="flex gap-2 border-t border-[var(--color-line)] bg-[var(--color-bg-1)] px-5 py-4">
+      <div className="flex gap-2 border-t border-[var(--color-divider)] bg-[var(--color-bg-panel)] px-5 py-4">
         <button className="btn flex-1" onClick={onDiscard} disabled={!dirty}>
           Discard
         </button>
@@ -271,14 +283,14 @@ function FilterEditor({
   return (
     <div className="space-y-2">
       {filters.length === 0 && (
-        <div className="font-mono text-[11px] text-[var(--color-text-4)]">
+        <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
           No filters — every matching event fires the workflow.
         </div>
       )}
       {filters.map((f, i) => (
         <div
           key={i}
-          className="grid grid-cols-[1fr_78px_1fr_28px] gap-1.5 rounded-md border border-[var(--color-line)] bg-[var(--color-bg-2)] p-1.5"
+          className="grid grid-cols-[1fr_78px_1fr_28px] gap-1.5 rounded-[var(--radius)] border border-[var(--color-divider)] bg-[var(--color-pill-bg)] p-1.5"
         >
           <input
             className="field-input"
@@ -364,14 +376,14 @@ function ModeButton({
     <button
       onClick={onClick}
       className={cn(
-        'rounded-md border p-2 text-left transition-colors',
+        'rounded-[var(--radius)] border p-2 text-left transition-colors',
         active
-          ? 'border-[var(--color-line-2)] bg-[var(--color-bg-2)]'
-          : 'border-[var(--color-line)] bg-[var(--color-bg-1)] hover:border-[var(--color-line-2)]',
+          ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-text)]'
+          : 'border-[var(--color-divider)] bg-[var(--color-bg)] hover:border-[var(--color-text-muted)]',
       )}
     >
-      <div className="font-mono text-[12px] font-medium">{label}</div>
-      <div className="mt-0.5 font-mono text-[10.5px] text-[var(--color-text-3)]">{hint}</div>
+      <div className="font-sans text-[12px] font-medium">{label}</div>
+      <div className="mt-0.5 font-mono text-[10.5px] text-[var(--color-text-muted)]">{hint}</div>
     </button>
   );
 }

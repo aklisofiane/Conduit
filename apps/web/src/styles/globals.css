@@ -1,39 +1,53 @@
 @import 'tailwindcss';
 @import '@xyflow/react/dist/style.css';
+@import './tokens.css';
 
-/* Design tokens mirror conduit-mockup_5.html — Zinc base palette, New York shadcn variant. */
-@theme {
-  --color-bg: #09090b;
-  --color-bg-1: #0f0f11;
-  --color-bg-2: #18181b;
-  --color-bg-3: #1f1f23;
-  --color-line: #24242a;
-  --color-line-2: #2e2e36;
-  --color-text: #f4f4f5;
-  --color-text-2: #a1a1aa;
-  --color-text-3: #71717a;
-  --color-text-4: #52525b;
+/*
+ * Re-export the tokens declared in `tokens.css` to Tailwind v4 so utilities
+ * like `bg-bg`, `text-text-2`, `border-divider`, `font-mono` resolve.
+ * `@theme inline` tells Tailwind to use the var() reference verbatim in the
+ * generated utility CSS rather than copying a value — the source of truth
+ * stays in `tokens.css`.
+ */
+@theme inline {
+  --color-bg: var(--color-bg);
+  --color-bg-panel: var(--color-bg-panel);
+  --color-bg-canvas: var(--color-bg-canvas);
 
-  --color-claude: #f5a623;
-  --color-claude-bg: rgba(245, 166, 35, 0.08);
-  --color-claude-border: rgba(245, 166, 35, 0.3);
-  --color-codex: #14b8a6;
-  --color-codex-bg: rgba(20, 184, 166, 0.08);
-  --color-codex-border: rgba(20, 184, 166, 0.3);
+  --color-text: var(--color-text);
+  --color-text-2: var(--color-text-2);
+  --color-text-muted: var(--color-text-muted);
 
-  --color-success: #22c55e;
-  --color-running: #3b82f6;
-  --color-pending: #71717a;
-  --color-error: #ef4444;
-  --color-warn: #f59e0b;
+  --color-divider: var(--color-divider);
+  --color-edge: var(--color-edge);
 
-  --font-sans: 'Inter', -apple-system, system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  --font-serif: 'Fraunces', Georgia, serif;
-}
+  --color-success: var(--color-success);
+  --color-running: var(--color-running);
+  --color-warn: var(--color-warn);
+  --color-error: var(--color-error);
 
-:root {
-  color-scheme: dark;
+  --color-accent: var(--color-accent);
+  --color-accent-soft: var(--color-accent-soft);
+
+  --color-primary: var(--color-primary);
+  --color-primary-text: var(--color-primary-text);
+
+  --color-pill-bg: var(--color-pill-bg);
+  --color-pill-border: var(--color-pill-border);
+  --color-footer-bg: var(--color-footer-bg);
+
+  --color-trigger: var(--color-trigger);
+  --color-trigger-bg: var(--color-trigger-bg);
+  --color-trigger-border: var(--color-trigger-border);
+
+  --color-claude: var(--color-claude);
+  --color-claude-bg: var(--color-claude-bg);
+  --color-codex: var(--color-codex);
+  --color-codex-bg: var(--color-codex-bg);
+
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-serif: var(--font-serif);
 }
 
 html,
@@ -64,49 +78,75 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--color-line-2);
+  background: var(--color-divider);
   border-radius: 999px;
   border: 2px solid var(--color-bg);
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-text-2);
+  background: var(--color-text-muted);
 }
 
 .mono {
   font-family: var(--font-mono);
 }
 
-/* ----- React Flow overrides to match the mockup canvas ----- */
+/* ---------- React Flow overrides ---------- */
 .react-flow {
-  background: var(--color-bg);
+  background: var(--color-bg-canvas);
 }
 .react-flow__edge-path {
-  stroke: #3f3f46;
+  stroke: var(--color-edge);
   stroke-width: 1.5;
 }
 .react-flow__edge.selected .react-flow__edge-path,
 .react-flow__edge:hover .react-flow__edge-path {
-  stroke: var(--color-claude);
+  stroke: var(--color-accent);
 }
 .react-flow__handle {
-  background: var(--color-line-2);
-  border-color: var(--color-bg);
+  background: var(--color-divider);
+  border-color: var(--color-bg-panel);
 }
 .react-flow__attribution {
   display: none;
 }
+.react-flow__controls {
+  border-radius: var(--radius);
+  background: var(--color-bg-panel);
+  border: 1px solid var(--color-divider);
+  box-shadow: var(--shadow-node);
+  overflow: hidden;
+}
+.react-flow__controls-button {
+  background: var(--color-bg-panel);
+  border-bottom: 1px solid var(--color-divider);
+  color: var(--color-text-2);
+  width: 26px;
+  height: 26px;
+}
+.react-flow__controls-button:last-child {
+  border-bottom: none;
+}
+.react-flow__controls-button:hover {
+  background: var(--color-pill-bg);
+  color: var(--color-text);
+}
+.react-flow__controls-button svg {
+  fill: currentColor;
+  max-width: 12px;
+  max-height: 12px;
+}
 
-/* ----- Reusable component primitives tuned to the mockup's look ----- */
+/* ---------- Reusable component primitives ---------- */
 .btn {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 11.5px;
   font-weight: 500;
   height: 28px;
   padding: 0 12px;
-  border-radius: 6px;
-  border: 1px solid var(--color-line);
-  color: var(--color-text-2);
-  background: transparent;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-divider);
+  color: var(--color-text);
+  background: var(--color-bg);
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -114,27 +154,33 @@ body {
   transition:
     background-color 150ms ease,
     color 150ms ease,
-    border-color 150ms ease;
+    border-color 150ms ease,
+    box-shadow 150ms ease;
 }
 .btn:hover {
-  color: var(--color-text);
-  background: var(--color-bg-3);
-  border-color: var(--color-line-2);
+  background: var(--color-pill-bg);
+  border-color: var(--color-text-muted);
+}
+.btn:focus-visible {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-focus);
 }
 .btn.primary {
-  background: var(--color-text);
-  color: var(--color-bg-2);
-  border-color: var(--color-text);
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+  border-color: var(--color-primary-border);
 }
 .btn.primary:hover {
-  background: #ffffff;
+  background: var(--color-primary-border);
+  border-color: var(--color-primary-border);
 }
 .btn.danger {
   color: var(--color-error);
-  border-color: rgba(239, 68, 68, 0.3);
+  border-color: color-mix(in oklch, var(--color-error) 30%, transparent);
 }
 .btn:disabled {
-  opacity: 0.4;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
@@ -146,76 +192,92 @@ body {
   font-family: var(--font-mono);
   font-size: 10.5px;
   color: var(--color-text-2);
-  background: var(--color-bg-2);
-  border: 1px solid var(--color-line);
+  background: var(--color-pill-bg);
+  border: 1px solid var(--color-pill-border);
   border-radius: 999px;
 }
 .chip .dot {
   width: 5px;
   height: 5px;
   border-radius: 999px;
-  background: var(--color-text-3);
+  background: var(--color-text-muted);
 }
 .chip.claude {
-  color: var(--color-claude);
-  background: var(--color-claude-bg);
+  color: var(--color-claude-tag-text);
+  background: var(--color-claude-tag-bg);
   border-color: var(--color-claude-border);
 }
 .chip.claude .dot {
-  background: var(--color-claude);
+  background: var(--color-claude-mark);
 }
 .chip.codex {
-  color: var(--color-codex);
-  background: var(--color-codex-bg);
+  color: var(--color-codex-tag-text);
+  background: var(--color-codex-tag-bg);
   border-color: var(--color-codex-border);
 }
 .chip.codex .dot {
-  background: var(--color-codex);
+  background: var(--color-codex-mark);
 }
 
 .field-label {
   font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--color-text-2);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
   margin-bottom: 6px;
   display: flex;
   align-items: center;
   gap: 8px;
+  font-weight: 500;
 }
 .field-label .hint {
-  color: var(--color-text-4);
+  color: var(--color-text-muted);
   font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .field-input {
   width: 100%;
   height: 30px;
-  background: var(--color-bg-2);
-  border: 1px solid var(--color-line);
-  border-radius: 6px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius);
   padding: 0 10px;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 12px;
   color: var(--color-text);
   outline: none;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
 }
-.field-input:focus {
-  border-color: var(--color-text-2);
+.field-input:focus,
+.field-input:focus-visible {
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-focus);
 }
 textarea.field-input {
   height: auto;
   padding: 8px 10px;
   resize: vertical;
+  font-family: var(--font-sans);
+}
+select.field-input {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  cursor: pointer;
 }
 
 .kbd {
   font-family: var(--font-mono);
   font-size: 10px;
-  color: var(--color-text-3);
-  background: var(--color-bg-3);
+  color: var(--color-text-muted);
+  background: var(--color-pill-bg);
   padding: 1px 5px;
-  border-radius: 3px;
-  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-divider);
 }
 
 .pill {
@@ -226,8 +288,8 @@ textarea.field-input {
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--color-text-2);
-  background: var(--color-bg-2);
-  border: 1px solid var(--color-line);
+  background: var(--color-bg-panel);
+  border: 1px solid var(--color-divider);
   border-radius: 999px;
 }
 .pill .dot {
@@ -235,11 +297,9 @@ textarea.field-input {
   height: 6px;
   border-radius: 999px;
   background: var(--color-success);
-  box-shadow: 0 0 6px var(--color-success);
 }
 .pill.error .dot {
   background: var(--color-error);
-  box-shadow: 0 0 6px var(--color-error);
 }
 
 .status-dot {
@@ -260,10 +320,10 @@ textarea.field-input {
   background: var(--color-error);
 }
 .status-dot.pending {
-  background: var(--color-text-4);
+  background: var(--color-text-muted);
 }
 .status-dot.paused {
-  background: var(--color-text-4);
+  background: var(--color-text-muted);
   opacity: 0.5;
 }
 
@@ -277,27 +337,25 @@ textarea.field-input {
   }
 }
 
-/* Provider glyphs (the "C" / "X" tiles) */
+/* Provider glyph tile (the "C" / "X" badges used outside the canvas) */
 .prov-glyph {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 18px;
   height: 18px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 700;
 }
 .prov-glyph.claude {
-  background: var(--color-claude-bg);
-  color: var(--color-claude);
-  border: 1px solid var(--color-claude-border);
+  background: var(--color-claude-mark);
+  color: #ffffff;
 }
 .prov-glyph.codex {
-  background: var(--color-codex-bg);
-  color: var(--color-codex);
-  border: 1px solid var(--color-codex-border);
+  background: var(--color-codex-mark);
+  color: #ffffff;
 }
 
 .cursor {

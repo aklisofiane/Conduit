@@ -1,0 +1,121 @@
+/*
+ * Design tokens — single source of truth for the workflow editor's visual system.
+ *
+ * Layering:
+ *   tokens.css      → CSS custom properties (this file). Theme values live here.
+ *   theme.ts        → typed mirror of these tokens for inline `style` / SVG attrs.
+ *   globals.css     → maps the tokens onto Tailwind via `@theme {}` and styles
+ *                     reusable primitive classes (.btn, .chip, .field-input, …).
+ *
+ * This is the "Crisp Editor" light theme from the Conduit design handoff:
+ * warm off-white panels, near-neutral blueprint canvas, indigo accent,
+ * provider-tinted nodes (Claude → terracotta-warm, Codex → mint-green).
+ *
+ * To add a dark variant later: append a `[data-theme="dark"] { ... }` block
+ * below with the same token names. Nothing else in the codebase needs to know.
+ */
+
+:root {
+  color-scheme: light;
+
+  /* ---------- Typography ---------- */
+  --font-sans: 'Inter', -apple-system, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-serif: 'Fraunces', Georgia, serif;
+
+  /* ---------- Surfaces ---------- */
+  --color-bg: #fcfbf8;
+  --color-bg-panel: #fcfbf8;
+  --color-bg-canvas: #fbfaf6;
+
+  /* ---------- Text ---------- */
+  --color-text: #0b1020;
+  --color-text-2: #3b475c;
+  --color-text-muted: #8a93a6;
+
+  /* ---------- Borders / strokes ---------- */
+  --color-divider: #e8e5dd;
+  --color-edge: #a8afbe;
+
+  /* ---------- State ---------- */
+  --color-success: oklch(0.62 0.13 145);
+  --color-running: oklch(0.62 0.18 250);
+  --color-warn: oklch(0.75 0.14 70);
+  --color-error: oklch(0.58 0.2 25);
+
+  /* ---------- Accent (indigo) ---------- */
+  --color-accent: oklch(0.55 0.18 250);
+  --color-accent-soft: oklch(0.92 0.05 250 / 0.6);
+
+  /* ---------- Primary button ---------- */
+  --color-primary: oklch(0.55 0.18 250);
+  --color-primary-text: #ffffff;
+  --color-primary-border: oklch(0.5 0.18 250);
+
+  /* ---------- Pills / footers ---------- */
+  --color-pill-bg: #f5f2ec;
+  --color-pill-border: #e8e5dd;
+  --color-footer-bg: #fbfaf6;
+
+  /* ---------- Trigger (slate) ---------- */
+  --color-trigger: oklch(0.45 0.05 260);
+  --color-trigger-bg: oklch(0.96 0.012 260);
+  --color-trigger-border: oklch(0.88 0.02 260);
+
+  /* ---------- Provider · Claude (warm terracotta) ---------- */
+  --color-claude-mark: oklch(0.62 0.13 50);
+  --color-claude-card: oklch(0.975 0.018 60);
+  --color-claude-prompt: #ffffff;
+  --color-claude-prompt-border: oklch(0.92 0.03 60);
+  --color-claude-footer: oklch(0.96 0.025 60);
+  --color-claude-border: oklch(0.88 0.05 60);
+  --color-claude-tag-bg: oklch(0.94 0.06 60);
+  --color-claude-tag-text: oklch(0.45 0.12 50);
+
+  /* ---------- Provider · Codex (mint green) ---------- */
+  --color-codex-mark: oklch(0.42 0.1 155);
+  --color-codex-card: oklch(0.975 0.018 155);
+  --color-codex-prompt: #ffffff;
+  --color-codex-prompt-border: oklch(0.92 0.025 155);
+  --color-codex-footer: oklch(0.96 0.025 155);
+  --color-codex-border: oklch(0.88 0.04 155);
+  --color-codex-tag-bg: oklch(0.94 0.06 155);
+  --color-codex-tag-text: oklch(0.4 0.12 155);
+
+  /* Backwards-compat aliases — `.chip.claude`, `.prov-glyph.codex`, etc.
+     across non-canvas surfaces (RunTimeline, NodeSummary, TemplatePicker)
+     consume these names. They resolve to the new mark colors. */
+  --color-claude: var(--color-claude-mark);
+  --color-claude-bg: var(--color-claude-card);
+  --color-claude-border-soft: var(--color-claude-border);
+  --color-codex: var(--color-codex-mark);
+  --color-codex-bg: var(--color-codex-card);
+  --color-codex-border-soft: var(--color-codex-border);
+
+  /* Backwards-compat — non-canvas pages (Home, Credentials, Connections,
+     Runs, TemplatePicker) still reference the old zinc-era token names.
+     Map them onto the new semantic tokens so those views render cleanly
+     in the light theme without per-file edits. Drop these once all
+     consumers migrate to the semantic names. */
+  --color-bg-1: var(--color-bg-panel);
+  --color-bg-2: var(--color-pill-bg);
+  --color-bg-3: var(--color-pill-bg);
+  --color-line: var(--color-divider);
+  --color-line-2: var(--color-divider);
+  --color-text-3: var(--color-text-muted);
+  --color-text-4: var(--color-text-muted);
+
+  /* ---------- Radius ---------- */
+  --radius-sm: 4px;
+  --radius: 6px;
+  --radius-md: 7px;
+  --radius-lg: 8px;
+
+  /* ---------- Shadows ---------- */
+  --shadow-node: 0 1px 0 rgba(11, 16, 32, 0.02);
+  --shadow-focus: 0 0 0 3px var(--color-accent-soft);
+
+  /* ---------- Canvas grid ---------- */
+  --canvas-grid-color: rgba(0, 0, 0, 0.04);
+  --canvas-grid-size: 32px;
+}

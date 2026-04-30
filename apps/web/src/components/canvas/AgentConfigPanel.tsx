@@ -1,6 +1,8 @@
 import type { AgentConfig } from '@conduit/shared';
 import { useSkills } from '../../api/hooks.js';
 import { cn } from '../../lib/cn.js';
+import { providerStyle } from '../../styles/theme.js';
+import { Icon } from './Icon.js';
 import { McpServerPicker } from './McpServerPicker.js';
 
 interface AgentConfigPanelProps {
@@ -9,6 +11,7 @@ interface AgentConfigPanelProps {
   onChange: (patch: Partial<AgentConfig>) => void;
   onSave: () => void;
   onDiscard: () => void;
+  onClose: () => void;
   saving: boolean;
   dirty: boolean;
 }
@@ -24,6 +27,7 @@ export function AgentConfigPanel({
   onChange,
   onSave,
   onDiscard,
+  onClose,
   saving,
   dirty,
 }: AgentConfigPanelProps) {
@@ -31,24 +35,32 @@ export function AgentConfigPanel({
   const providerSkills = skills.filter(
     (s) => s.provider === 'both' || s.provider === agent.provider,
   );
+  const ps = providerStyle(agent.provider);
 
   return (
-    <aside className="flex w-[380px] shrink-0 flex-col border-l border-[var(--color-line)] bg-[var(--color-bg-1)]">
-      <div className="border-b border-[var(--color-line)] px-5 py-4">
-        <div className="flex items-center gap-2 font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-3)]">
-          <span
-            className="h-1.5 w-1.5 rounded-full"
-            style={{
-              background: agent.provider === 'claude' ? 'var(--color-claude)' : 'var(--color-codex)',
-              boxShadow: `0 0 6px ${agent.provider === 'claude' ? 'var(--color-claude)' : 'var(--color-codex)'}`,
-            }}
-          />
-          Agent · {agent.provider === 'claude' ? 'Claude' : 'Codex'}
+    <aside className="flex w-[320px] shrink-0 flex-col border-l border-[var(--color-divider)] bg-[var(--color-bg-panel)]">
+      <div className="flex items-start justify-between border-b border-[var(--color-divider)] px-5 py-4">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 font-mono text-[10px] font-medium uppercase tracking-[0.06em] text-[var(--color-text-muted)]">
+            <span
+              className="h-[6px] w-[6px] rounded-full"
+              style={{ background: ps.mark }}
+            />
+            Agent · {agent.provider === 'claude' ? 'Claude' : 'Codex'}
+          </div>
+          <h3 className="mt-2 truncate font-sans text-[15px] font-semibold text-[var(--color-text)]">
+            <span>{agent.name}</span>
+            <span className="text-[var(--color-text-muted)]"> · config</span>
+          </h3>
         </div>
-        <h3 className="mt-2 font-mono text-[15px] font-semibold">
-          <span>{agent.name}</span>
-          <span className="text-[var(--color-text-4)]"> · config</span>
-        </h3>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close inspector"
+          className="ml-2 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-[var(--radius-sm)] text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-pill-bg)] hover:text-[var(--color-text)]"
+        >
+          <Icon name="close" size={14} color="currentColor" />
+        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 py-4">
@@ -131,7 +143,7 @@ export function AgentConfigPanel({
 
           <Field label="Skills" hint="from .claude/skills/">
             {providerSkills.length === 0 ? (
-              <div className="font-mono text-[11px] text-[var(--color-text-4)]">
+              <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
                 No skills discovered. Add SKILL.md files under .claude/skills/ on the worker or in a connected repo.
               </div>
             ) : (
@@ -149,28 +161,18 @@ export function AgentConfigPanel({
                         })
                       }
                       className={cn(
-                        'rounded-md border p-2 text-left transition-colors',
+                        'rounded-[var(--radius)] border p-2 text-left transition-colors',
                         selected
-                          ? agent.provider === 'claude'
-                            ? 'border-[var(--color-claude-border)] bg-[var(--color-claude-bg)]'
-                            : 'border-[var(--color-codex-border)] bg-[var(--color-codex-bg)]'
-                          : 'border-[var(--color-line)] bg-[var(--color-bg-2)] hover:border-[var(--color-line-2)]',
+                          ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)]'
+                          : 'border-[var(--color-divider)] bg-[var(--color-bg)] hover:border-[var(--color-text-muted)]',
                       )}
                     >
-                      <div className="flex items-center gap-2 font-mono text-[12px] font-medium">
-                        <span
-                          className={
-                            agent.provider === 'claude'
-                              ? 'text-[var(--color-claude)]'
-                              : 'text-[var(--color-codex)]'
-                          }
-                        >
-                          ✶
-                        </span>
+                      <div className="flex items-center gap-2 font-sans text-[12px] font-medium text-[var(--color-text)]">
+                        <span style={{ color: ps.mark }}>✶</span>
                         {skill.name}
                       </div>
                       {skill.description && (
-                        <div className="mt-1 font-mono text-[10.5px] text-[var(--color-text-3)]">
+                        <div className="mt-1 font-mono text-[10.5px] text-[var(--color-text-muted)]">
                           {skill.description}
                         </div>
                       )}
@@ -183,7 +185,7 @@ export function AgentConfigPanel({
         </div>
       </div>
 
-      <div className="flex gap-2 border-t border-[var(--color-line)] bg-[var(--color-bg-1)] px-5 py-4">
+      <div className="flex gap-2 border-t border-[var(--color-divider)] bg-[var(--color-bg-panel)] px-5 py-4">
         <button className="btn flex-1" onClick={onDiscard} disabled={!dirty}>
           Discard
         </button>
