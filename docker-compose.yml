@@ -7,10 +7,13 @@ services:
       POSTGRES_USER: conduit
       POSTGRES_PASSWORD: conduit
       POSTGRES_DB: conduit
+      # Postgres 18 manages major-version subdirs under the mount itself, so
+      # mount the named volume at /var/lib/postgresql and point PGDATA at a subdir.
+      PGDATA: /var/lib/postgresql/data/pg
     ports:
       - '5434:5432'
     volumes:
-      - conduit_pg_data:/var/lib/postgresql/data
+      - conduit_pg_data:/var/lib/postgresql
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U conduit -d conduit']
       interval: 5s
@@ -25,8 +28,9 @@ services:
       POSTGRES_USER: temporal
       POSTGRES_PASSWORD: temporal
       POSTGRES_DB: temporal
+      PGDATA: /var/lib/postgresql/data/pg
     volumes:
-      - temporal_pg_data:/var/lib/postgresql/data
+      - temporal_pg_data:/var/lib/postgresql
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U temporal -d temporal']
       interval: 5s
