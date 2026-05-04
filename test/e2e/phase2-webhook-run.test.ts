@@ -84,7 +84,10 @@ describe('Phase 2 — webhook triggers a run and streams MCP tool calls', () => 
     //    drop the delivery.
     const patched: WorkflowDefinition = {
       ...created.definition,
-      trigger: { ...created.definition.trigger, connectionId: connection.id },
+      triggers: created.definition.triggers.map((t) => ({
+        ...t,
+        connectionId: connection.id,
+      })),
     };
     await harness.http.put(`/workflows/${created.id}`, {
       definition: patched,

@@ -41,7 +41,8 @@ export function validateWorkflowDefinition(definition: WorkflowDefinition): Work
   const issues: WorkflowValidationIssue[] = [];
 
   if (isTicketBranchWorkflow(definition)) {
-    const trigger = definition.trigger;
+    const trigger = definition.triggers[0];
+    if (!trigger) return issues;
     const ticketBranchNodes = definition.nodes
       .filter((n) => n.workspace.kind === 'ticket-branch')
       .map((n) => n.name);

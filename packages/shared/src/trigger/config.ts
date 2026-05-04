@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { nodeNameSchema } from '../agent/node-name';
 import { triggerSourceSchema } from '../platform/index';
 import { triggerFilterSchema } from './filter';
 import { triggerModeSchema } from './mode';
@@ -21,8 +22,14 @@ export const boardRefSchema = z.object({
 });
 export type BoardRef = z.infer<typeof boardRefSchema>;
 
-/** Persisted trigger shape on `WorkflowDefinition.trigger`. */
+/**
+ * Persisted trigger shape on `WorkflowDefinition.triggers[]`. Triggers are
+ * graph nodes — `id` is the React Flow node id, `name` lives in the same
+ * namespace as agent names so `Edge.from` can reference either.
+ */
 export const triggerConfigSchema = z.object({
+  id: z.string().min(1),
+  name: nodeNameSchema,
   platform: triggerSourceSchema,
   connectionId: z.string().min(1),
   mode: triggerModeSchema,

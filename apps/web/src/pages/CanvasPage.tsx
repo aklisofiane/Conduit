@@ -26,6 +26,10 @@ import {
 } from '../components/canvas/NodePalette.js';
 import { TriggerConfigPanel } from '../components/canvas/TriggerConfigPanel.js';
 import { TriggerNode } from '../components/canvas/TriggerNode.js';
+import {
+  WorkflowEdge,
+  type WorkflowEdgeData,
+} from '../components/canvas/WorkflowEdge.js';
 import { WorkflowTabs, type WorkflowTabId } from '../components/layout/WorkflowTabs.js';
 import { WorkflowActions } from '../components/layout/WorkflowActions.js';
 import { WorkflowRunsList } from '../components/run/WorkflowRunsList.js';
@@ -35,7 +39,8 @@ import { useTopbarSlots } from '../state/topbar-slots.js';
 import { relativeFromNow } from '../lib/time.js';
 
 const NODE_TYPES = { agent: AgentNode, trigger: TriggerNode } as const;
-const TRIGGER_NODE_ID = '__trigger__';
+const EDGE_TYPES = { workflow: WorkflowEdge } as const;
+const WORKFLOW_EDGE_TYPE = 'workflow';
 
 export function CanvasPage() {
   return (
@@ -85,11 +90,9 @@ function CanvasInner() {
 
   useEffect(() => {
     setFlowNodes((prev) => {
-      const selectedFlowId =
-        selectedNodeId === 'trigger' ? TRIGGER_NODE_ID : selectedNodeId;
       let changed = false;
       const next = prev.map((n) => {
-        const selected = n.id === selectedFlowId;
+        const selected = n.id === selectedNodeId;
         if (n.selected === selected) return n;
         changed = true;
         return { ...n, selected };
@@ -108,8 +111,7 @@ function CanvasInner() {
         if (dragEnded && draft) {
           const ui = { ...draft.ui, nodePositions: { ...draft.ui.nodePositions } };
           for (const n of next) {
-            const key =
-              n.id === TRIGGER_NODE_ID ? TRIGGER_NODE_ID : nameForId(draft, n.id) ?? n.id;
+            const key = nameForFlowId(draft, n.id) ?? n.id;
             ui.nodePositions[key] = { x: n.position.x, y: n.position.y };
           }
           setDraft({ ...draft, ui });
@@ -136,7 +138,10 @@ function CanvasInner() {
   const onConnect = useCallback(
     (conn: Connection) => {
       setFlowEdges((current) => {
-        const next = addEdge(conn, current);
+        const next = addEdge(
+          { ...conn, type: WORKFLOW_EDGE_TYPE },
+          current,
+        );
         if (draft) setDraft({ ...draft, edges: flowEdgesToDomain(next, draft) });
         return next;
       });
@@ -144,10 +149,35 @@ function CanvasInner() {
     [draft, setDraft],
   );
 
+  const handleDeleteEdge = useCallback(
+    (edgeId: string) => {
+      // Routed through onEdgesChange so the persistence path stays the same
+      // as Backspace — the React Flow change descriptor is identical.
+      onEdgesChange([{ id: edgeId, type: 'remove' }]);
+    },
+    [onEdgesChange],
+  );
+
+  // Inject the delete callback into every rendered edge so the custom edge
+  // component can show a × button without owning its own draft mutation.
+  useEffect(() => {
+    setFlowEdges((current) => {
+      let changed = false;
+      const next = current.map((e) => {
+        if ((e.data as WorkflowEdgeData | undefined)?.onDelete === handleDeleteEdge) {
+          return e;
+        }
+        changed = true;
+        return { ...e, type: WORKFLOW_EDGE_TYPE, data: { ...(e.data ?? {}), onDelete: handleDeleteEdge } };
+      });
+      return changed ? next : current;
+    });
+  }, [handleDeleteEdge]);
+
   const handleAddAgent = useCallback(
     (provider: 'claude' | 'codex', position?: { x: number; y: number }) => {
       if (!draft) return;
-      const name = uniqueAgentName(draft, provider === 'claude' ? 'Agent' : 'Codex');
+      const name = uniqueNodeName(draft, provider === 'claude' ? 'Agent' : 'Codex');
       const agentId = `agent_${Math.random().toString(36).slice(2, 10)}`;
       const drop =
         position ??
@@ -176,9 +206,12 @@ function CanvasInner() {
   );
 
   const handleSelectTrigger = useCallback(() => {
-    const pos = draft?.ui.nodePositions[TRIGGER_NODE_ID] ?? { x: 80, y: 120 };
+    if (!draft) return;
+    const trigger = draft.triggers[0];
+    if (!trigger) return;
+    const pos = draft.ui.nodePositions[trigger.name] ?? { x: 80, y: 120 };
     rf.setCenter(pos.x + 150, pos.y + 20, { zoom: 1, duration: 400 });
-    setSelected('trigger');
+    setSelected(trigger.id);
   }, [draft, rf, setSelected]);
 
   const handleDragOver = useCallback((event: ReactDragEvent<HTMLDivElement>) => {
@@ -204,12 +237,17 @@ function CanvasInner() {
       if (payload.kind === 'agent') {
         handleAddAgent(payload.provider, point);
       } else {
+        // Multi-trigger UX is gated by the schema cap (=== 1) for now —
+        // dropping the trigger card just repositions the existing trigger
+        // and focuses its inspector.
+        const trigger = draft.triggers[0];
+        if (!trigger) return;
         const ui = {
           ...draft.ui,
-          nodePositions: { ...draft.ui.nodePositions, [TRIGGER_NODE_ID]: point },
+          nodePositions: { ...draft.ui.nodePositions, [trigger.name]: point },
         };
         setDraft({ ...draft, ui });
-        setSelected('trigger');
+        setSelected(trigger.id);
       }
     },
     [draft, rf, handleAddAgent, setDraft, setSelected],
@@ -247,6 +285,7 @@ function CanvasInner() {
   }
 
   const selectedAgent = draft.nodes.find((n) => n.id === selectedNodeId);
+  const selectedTrigger = draft.triggers.find((t) => t.id === selectedNodeId);
   const lastRunLabel = wf?.updatedAt
     ? `saved · ${relativeFromNow(wf.updatedAt)}`
     : 'unsaved';
@@ -280,12 +319,12 @@ function CanvasInner() {
             nodes={flowNodes}
             edges={flowEdges}
             nodeTypes={NODE_TYPES}
+            edgeTypes={EDGE_TYPES}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
-            onNodeClick={(_, node) =>
-              setSelected(node.id === TRIGGER_NODE_ID ? 'trigger' : node.id)
-            }
+            onNodeClick={(_, node) => setSelected(node.id)}
+            onEdgeClick={(_, edge) => setSelected(edge.id)}
             onPaneClick={() => setSelected(undefined)}
             defaultViewport={draft.ui.viewport}
             fitView
@@ -313,12 +352,12 @@ function CanvasInner() {
         />
       )}
 
-      {selectedNodeId === 'trigger' && (
+      {selectedTrigger && (
         <TriggerConfigPanel
-          trigger={draft.trigger}
+          trigger={selectedTrigger}
           workflowId={id}
           isActive={Boolean(wf?.isActive)}
-          onChange={(patch) => updateTrigger(patch)}
+          onChange={(patch) => updateTrigger(selectedTrigger.id, patch)}
           onActiveChange={(next) => updateWorkflow.mutate({ isActive: next })}
           onSave={handleSave}
           onDiscard={() => wf && reset(wf.definition)}
@@ -331,45 +370,57 @@ function CanvasInner() {
   );
 }
 
-function nameForId(def: WorkflowDefinition, id: string): string | undefined {
-  return def.nodes.find((n) => n.id === id)?.name;
+function nameForFlowId(def: WorkflowDefinition, id: string): string | undefined {
+  return (
+    def.nodes.find((n) => n.id === id)?.name ??
+    def.triggers.find((t) => t.id === id)?.name
+  );
 }
 
-function uniqueAgentName(def: WorkflowDefinition, prefix: string): string {
-  const names = new Set(def.nodes.map((n) => n.name));
+function uniqueNodeName(def: WorkflowDefinition, prefix: string): string {
+  const names = new Set([
+    ...def.nodes.map((n) => n.name),
+    ...def.triggers.map((t) => t.name),
+  ]);
   let i = 1;
   while (names.has(`${prefix}${i}`)) i++;
   return `${prefix}${i}`;
 }
 
 function flowEdgesToDomain(edges: FlowEdge[], def: WorkflowDefinition): Edge[] {
-  const nameById = new Map(def.nodes.map((n) => [n.id, n.name]));
+  const nameById = new Map<string, string>();
+  for (const t of def.triggers) nameById.set(t.id, t.name);
+  for (const n of def.nodes) nameById.set(n.id, n.name);
   const result: Edge[] = [];
+  const agentIds = new Set(def.nodes.map((n) => n.id));
   for (const edge of edges) {
-    if (edge.source === TRIGGER_NODE_ID) continue;
     const from = nameById.get(edge.source);
     const to = nameById.get(edge.target);
-    if (from && to) result.push({ from, to });
+    // Edge.to must point at an agent — block trigger-as-target attempts
+    // (e.g. accidental drag onto a trigger handle, though triggers expose
+    // only a source handle, this is belt-and-braces for the schema).
+    if (!from || !to || !agentIds.has(edge.target)) continue;
+    result.push({ from, to });
   }
   return result;
 }
 
 function buildFlowNodes(draft: WorkflowDefinition, prev: FlowNode[]): FlowNode[] {
   const prevById = new Map(prev.map((n) => [n.id, n]));
-  const triggerPrev = prevById.get(TRIGGER_NODE_ID);
-  // Explicit `nodePositions` wins so drop-handlers can reposition nodes;
-  // `prev.position` is only the fallback for nodes that have never been
-  // saved (initial auto-layout before the first drag-end).
-  const triggerPosition =
-    draft.ui.nodePositions[TRIGGER_NODE_ID] ??
-    triggerPrev?.position ?? { x: 80, y: 120 };
-  const triggerNode: FlowNode = {
-    ...(triggerPrev ?? {}),
-    id: TRIGGER_NODE_ID,
-    type: 'trigger',
-    position: triggerPosition,
-    data: { trigger: draft.trigger, filterCount: draft.trigger.filters.length },
-  };
+  const triggerNodes: FlowNode[] = draft.triggers.map((trigger, i) => {
+    const p = prevById.get(trigger.id);
+    const position =
+      draft.ui.nodePositions[trigger.name] ??
+      draft.ui.nodePositions[trigger.id] ??
+      p?.position ?? { x: 80, y: 120 + i * 160 };
+    return {
+      ...(p ?? {}),
+      id: trigger.id,
+      type: 'trigger',
+      position,
+      data: { trigger, filterCount: trigger.filters.length },
+    };
+  });
   const agents: FlowNode[] = draft.nodes.map((agent, i) => {
     const p = prevById.get(agent.id);
     const position =
@@ -384,25 +435,28 @@ function buildFlowNodes(draft: WorkflowDefinition, prev: FlowNode[]): FlowNode[]
       data: { agent },
     };
   });
-  return [triggerNode, ...agents];
+  return [...triggerNodes, ...agents];
 }
 
 function buildFlowEdges(draft: WorkflowDefinition, prev: FlowEdge[]): FlowEdge[] {
   const prevById = new Map(prev.map((e) => [e.id, e]));
-  const nodeByName = new Map(draft.nodes.map((n) => [n.name, n]));
+  const idByName = new Map<string, string>();
+  for (const t of draft.triggers) idByName.set(t.name, t.id);
+  for (const n of draft.nodes) idByName.set(n.name, n.id);
+
   const edges: FlowEdge[] = [];
-  const withIncoming = new Set(draft.edges.map((e) => e.to));
-  for (const n of draft.nodes) {
-    if (withIncoming.has(n.name)) continue;
-    const id = `trigger-${n.id}`;
-    edges.push({ ...(prevById.get(id) ?? {}), id, source: TRIGGER_NODE_ID, target: n.id });
-  }
   for (const e of draft.edges) {
-    const from = nodeByName.get(e.from);
-    const to = nodeByName.get(e.to);
-    if (!from || !to) continue;
-    const id = `${from.id}-${to.id}`;
-    edges.push({ ...(prevById.get(id) ?? {}), id, source: from.id, target: to.id });
+    const sourceId = idByName.get(e.from);
+    const targetId = idByName.get(e.to);
+    if (!sourceId || !targetId) continue;
+    const id = `${sourceId}-${targetId}`;
+    edges.push({
+      ...(prevById.get(id) ?? {}),
+      id,
+      source: sourceId,
+      target: targetId,
+      type: WORKFLOW_EDGE_TYPE,
+    });
   }
   return edges;
 }

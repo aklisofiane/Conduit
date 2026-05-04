@@ -8,12 +8,16 @@
       "name": "PR Review",
       "description": "Reads the PR diff, posts inline comments where appropriate, leaves a summary review.",
       "definition": {
-        "trigger": {
-          "platform": "github",
-          "connectionId": "<github>",
-          "mode": { "kind": "webhook", "event": "pull_request.opened" },
-          "filters": []
-        },
+        "triggers": [
+          {
+            "id": "trigger-pr-review",
+            "name": "PRReviewTrigger",
+            "platform": "github",
+            "connectionId": "<github>",
+            "mode": { "kind": "webhook", "event": "pull_request.opened" },
+            "filters": []
+          }
+        ],
         "nodes": [
           {
             "id": "agent-pr-review",
@@ -26,7 +30,7 @@
             "workspace": { "kind": "repo-clone", "connectionId": "<github>" }
           }
         ],
-        "edges": [],
+        "edges": [{ "from": "PRReviewTrigger", "to": "Review" }],
         "mcpServers": [
           {
             "id": "github-mcp",
@@ -41,7 +45,10 @@
           }
         ],
         "ui": {
-          "nodePositions": { "Review": { "x": 240, "y": 200 } },
+          "nodePositions": {
+            "PRReviewTrigger": { "x": 80, "y": 120 },
+            "Review": { "x": 440, "y": 120 }
+          },
           "viewport": { "x": 0, "y": 0, "zoom": 1 }
         }
       }

@@ -2,12 +2,16 @@
   "name": "Phase 3 — parallel fix + doc with review",
   "description": "Triage clones the repo, Fix and Doc inherit in parallel branched worktrees, Review inherits the merged workspace. Exercises parallel execution, workspace branching, merge-back, and .conduit/ copy. Runs against StubProvider.",
   "definition": {
-    "trigger": {
-      "platform": "github",
-      "connectionId": "__placeholder__",
-      "mode": { "kind": "webhook", "event": "issues.opened" },
-      "filters": []
-    },
+    "triggers": [
+      {
+        "id": "trigger-phase3",
+        "name": "Phase3Trigger",
+        "platform": "github",
+        "connectionId": "__placeholder__",
+        "mode": { "kind": "webhook", "event": "issues.opened" },
+        "filters": []
+      }
+    ],
     "nodes": [
       {
         "id": "agent-triage",
@@ -51,6 +55,7 @@
       }
     ],
     "edges": [
+      { "from": "Phase3Trigger", "to": "Triage" },
       { "from": "Triage", "to": "Fix" },
       { "from": "Triage", "to": "Doc" },
       { "from": "Fix", "to": "Review" },
@@ -59,6 +64,7 @@
     "mcpServers": [],
     "ui": {
       "nodePositions": {
+        "Phase3Trigger": { "x": 60, "y": 80 },
         "Triage": { "x": 240, "y": 80 },
         "Fix": { "x": 120, "y": 240 },
         "Doc": { "x": 360, "y": 240 },

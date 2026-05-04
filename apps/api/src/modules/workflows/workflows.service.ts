@@ -35,10 +35,11 @@ export class WorkflowsService implements OnModuleInit {
 
   private async reconcilePollSchedules(): Promise<void> {
     const workflows = await this.prisma.workflow.findMany();
-    const polling = workflows.filter(
-      (wf) =>
-        (wf.definition as Partial<WorkflowDefinition> | null)?.trigger?.mode.kind === 'polling',
-    );
+    const polling = workflows.filter((wf) => {
+      const trigger = (wf.definition as Partial<WorkflowDefinition> | null)
+        ?.triggers?.[0];
+      return trigger?.mode.kind === 'polling';
+    });
     await Promise.allSettled(
       polling.map((wf) => this.syncPollSchedule(wf.id, wf.definition, wf.isActive)),
     );
@@ -131,7 +132,7 @@ export class WorkflowsService implements OnModuleInit {
     definition: unknown,
     isActive: boolean,
   ): Promise<void> {
-    const trigger = (definition as Partial<WorkflowDefinition> | null)?.trigger;
+    const trigger = (definition as Partial<WorkflowDefinition> | null)?.triggers?.[0];
     try {
       if (trigger?.mode.kind === 'polling') {
         await this.temporal.upsertPollSchedule({

@@ -8,13 +8,17 @@
       "name": "Worker",
       "description": "Polling on status=Dev. Commits and pushes to conduit/<ticket>; opens a draft PR on first push; moves ticket to AIReview.",
       "definition": {
-        "trigger": {
-          "platform": "github",
-          "connectionId": "<github>",
-          "mode": { "kind": "polling", "intervalSec": 60 },
-          "filters": [{ "field": "status", "op": "eq", "value": "Dev" }],
-          "board": { "ownerType": "org", "owner": "acme", "number": 1 }
-        },
+        "triggers": [
+          {
+            "id": "trigger-worker",
+            "name": "WorkerTrigger",
+            "platform": "github",
+            "connectionId": "<github>",
+            "mode": { "kind": "polling", "intervalSec": 60 },
+            "filters": [{ "field": "status", "op": "eq", "value": "Dev" }],
+            "board": { "ownerType": "org", "owner": "acme", "number": 1 }
+          }
+        ],
         "nodes": [
           {
             "id": "agent-worker",
@@ -27,7 +31,7 @@
             "workspace": { "kind": "ticket-branch", "connectionId": "<github>" }
           }
         ],
-        "edges": [],
+        "edges": [{ "from": "WorkerTrigger", "to": "Worker" }],
         "mcpServers": [
           {
             "id": "github-mcp",
@@ -42,7 +46,10 @@
           }
         ],
         "ui": {
-          "nodePositions": { "Worker": { "x": 240, "y": 200 } },
+          "nodePositions": {
+            "WorkerTrigger": { "x": 80, "y": 120 },
+            "Worker": { "x": 440, "y": 120 }
+          },
           "viewport": { "x": 0, "y": 0, "zoom": 1 }
         }
       }
@@ -51,13 +58,17 @@
       "name": "Critic",
       "description": "Polling on status=AIReview. Reads the branch and the PR; either approves or moves back to Dev with review feedback.",
       "definition": {
-        "trigger": {
-          "platform": "github",
-          "connectionId": "<github>",
-          "mode": { "kind": "polling", "intervalSec": 60 },
-          "filters": [{ "field": "status", "op": "eq", "value": "AIReview" }],
-          "board": { "ownerType": "org", "owner": "acme", "number": 1 }
-        },
+        "triggers": [
+          {
+            "id": "trigger-critic",
+            "name": "CriticTrigger",
+            "platform": "github",
+            "connectionId": "<github>",
+            "mode": { "kind": "polling", "intervalSec": 60 },
+            "filters": [{ "field": "status", "op": "eq", "value": "AIReview" }],
+            "board": { "ownerType": "org", "owner": "acme", "number": 1 }
+          }
+        ],
         "nodes": [
           {
             "id": "agent-critic",
@@ -70,7 +81,7 @@
             "workspace": { "kind": "ticket-branch", "connectionId": "<github>" }
           }
         ],
-        "edges": [],
+        "edges": [{ "from": "CriticTrigger", "to": "Critic" }],
         "mcpServers": [
           {
             "id": "github-mcp",
@@ -85,7 +96,10 @@
           }
         ],
         "ui": {
-          "nodePositions": { "Critic": { "x": 240, "y": 200 } },
+          "nodePositions": {
+            "CriticTrigger": { "x": 80, "y": 120 },
+            "Critic": { "x": 440, "y": 120 }
+          },
           "viewport": { "x": 0, "y": 0, "zoom": 1 }
         }
       }

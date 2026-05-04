@@ -13,13 +13,13 @@ import type {
  * `WorkflowDefinition.ui`.
  */
 export interface WorkflowEditorState {
-  selectedNodeId: string | 'trigger' | undefined;
+  selectedNodeId: string | undefined;
   dirty: boolean;
   draft: WorkflowDefinition | undefined;
-  setSelected: (id: string | 'trigger' | undefined) => void;
+  setSelected: (id: string | undefined) => void;
   setDraft: (draft: WorkflowDefinition) => void;
   updateAgent: (id: string, patch: Partial<AgentConfig>) => void;
-  updateTrigger: (patch: Partial<TriggerConfig>) => void;
+  updateTrigger: (id: string, patch: Partial<TriggerConfig>) => void;
   addMcpServer: (server: WorkflowMcpServer) => void;
   updateMcpServer: (id: string, patch: Partial<WorkflowMcpServer>) => void;
   removeMcpServer: (id: string) => void;
@@ -39,13 +39,13 @@ export const useWorkflowEditor = create<WorkflowEditorState>((set) => ({
       const nodes = state.draft.nodes.map((n) => (n.id === id ? { ...n, ...patch } : n));
       return { draft: { ...state.draft, nodes }, dirty: true };
     }),
-  updateTrigger: (patch) =>
+  updateTrigger: (id, patch) =>
     set((state) => {
       if (!state.draft) return {};
-      return {
-        draft: { ...state.draft, trigger: { ...state.draft.trigger, ...patch } },
-        dirty: true,
-      };
+      const triggers = state.draft.triggers.map((t) =>
+        t.id === id ? { ...t, ...patch } : t,
+      );
+      return { draft: { ...state.draft, triggers }, dirty: true };
     }),
   addMcpServer: (server) =>
     set((state) => {

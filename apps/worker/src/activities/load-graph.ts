@@ -1,10 +1,16 @@
-import type { AgentConfig, Edge, WorkflowDefinition } from '@conduit/shared';
+import type {
+  AgentConfig,
+  Edge,
+  TriggerConfig,
+  WorkflowDefinition,
+} from '@conduit/shared';
 import { workflowDefinitionSchema } from '@conduit/shared';
 import { prisma } from '../runtime/prisma';
 
 export interface LoadedGraph {
   workflowId: string;
   workflowName: string;
+  triggers: TriggerConfig[];
   nodes: AgentConfig[];
   edges: Edge[];
   mcpServers: WorkflowDefinition['mcpServers'];
@@ -22,6 +28,7 @@ export async function loadGraphActivity(workflowId: string): Promise<LoadedGraph
   return {
     workflowId: wf.id,
     workflowName: wf.name,
+    triggers: parsed.triggers,
     nodes: parsed.nodes,
     edges: parsed.edges,
     mcpServers: parsed.mcpServers,

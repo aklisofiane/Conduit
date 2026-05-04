@@ -19,6 +19,8 @@ const BASE_EVENT: TriggerEvent = {
 };
 
 const BASE_TRIGGER: TriggerConfig = {
+  id: 'trigger-1',
+  name: 'Trigger1',
   platform: 'github',
   connectionId: 'conn_1',
   mode: { kind: 'webhook', event: 'issues.opened' },
@@ -88,6 +90,8 @@ describe('matchesTrigger', () => {
       },
     };
     const trigger: TriggerConfig = {
+      id: 'trigger-1',
+      name: 'Trigger1',
       platform: 'github',
       connectionId: 'conn_1',
       mode: { kind: 'webhook', event: 'board.column.changed' },
@@ -107,6 +111,8 @@ describe('matchesTrigger', () => {
       issue: { id: 'I_1', key: '42', title: 't', url: 'https://x' },
     };
     const trigger: TriggerConfig = {
+      id: 'trigger-1',
+      name: 'Trigger1',
       platform: 'github',
       connectionId: 'conn_1',
       mode: { kind: 'polling', intervalSec: 60 },

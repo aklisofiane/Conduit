@@ -139,7 +139,10 @@ describe('Phase 4 — polling trigger fires runs on board set-diff', () => {
     // short-circuit its early `!wf.isActive` check.
     const patched: WorkflowDefinition = {
       ...created.definition,
-      trigger: { ...created.definition.trigger, connectionId: conn.id },
+      triggers: created.definition.triggers.map((t) => ({
+        ...t,
+        connectionId: conn.id,
+      })),
     };
     await harness.http.put(`/workflows/${created.id}`, {
       definition: patched,

@@ -8,13 +8,17 @@
       "name": "Develop",
       "description": "Polling on status=Dev. Dev + Tests + Docs work in parallel branched worktrees; QA consumes the merged workspace and opens a draft PR.",
       "definition": {
-        "trigger": {
-          "platform": "github",
-          "connectionId": "<github>",
-          "mode": { "kind": "polling", "intervalSec": 60 },
-          "filters": [{ "field": "status", "op": "eq", "value": "Dev" }],
-          "board": { "ownerType": "org", "owner": "acme", "number": 1 }
-        },
+        "triggers": [
+          {
+            "id": "trigger-develop",
+            "name": "DevelopTrigger",
+            "platform": "github",
+            "connectionId": "<github>",
+            "mode": { "kind": "polling", "intervalSec": 60 },
+            "filters": [{ "field": "status", "op": "eq", "value": "Dev" }],
+            "board": { "ownerType": "org", "owner": "acme", "number": 1 }
+          }
+        ],
         "nodes": [
           {
             "id": "agent-seed",
@@ -68,6 +72,7 @@
           }
         ],
         "edges": [
+          { "from": "DevelopTrigger", "to": "Seed" },
           { "from": "Seed", "to": "Dev" },
           { "from": "Seed", "to": "Tests" },
           { "from": "Seed", "to": "Docs" },
@@ -90,6 +95,7 @@
         ],
         "ui": {
           "nodePositions": {
+            "DevelopTrigger": { "x": 60, "y": 60 },
             "Seed": { "x": 240, "y": 60 },
             "Dev": { "x": 80, "y": 240 },
             "Tests": { "x": 240, "y": 240 },

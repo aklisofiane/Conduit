@@ -130,8 +130,9 @@ describe('Phase 6 — create workflows from template', () => {
       const wf = await harness.http.get<WorkflowRow>(`/workflows/${id}`);
       const def = wf.definition;
 
-      expect(def.trigger.connectionId).toMatch(/^[a-z0-9]+$/);
-      expect(def.trigger.connectionId).not.toMatch(/^</);
+      const trigger = def.triggers[0]!;
+      expect(trigger.connectionId).toMatch(/^[a-z0-9]+$/);
+      expect(trigger.connectionId).not.toMatch(/^</);
 
       for (const server of def.mcpServers) {
         expect(server.connectionId).not.toMatch(/^</);
@@ -148,7 +149,7 @@ describe('Phase 6 — create workflows from template', () => {
       );
       expect(conns.map((c) => c.alias)).toContain('github-main');
       // The connection id on the trigger must be one of the workflow's connections.
-      expect(conns.map((c) => c.id)).toContain(def.trigger.connectionId);
+      expect(conns.map((c) => c.id)).toContain(trigger.connectionId);
     }
 
     // Polling schedules are registered — both templates trigger on polling,
@@ -197,7 +198,7 @@ describe('Phase 6 — create workflows from template', () => {
     );
     expect(result.workflows).toHaveLength(1);
     const wf = await harness.http.get<WorkflowRow>(`/workflows/${result.workflows[0]!.id}`);
-    expect(wf.definition.trigger.mode.kind).toBe('webhook');
+    expect(wf.definition.triggers[0]!.mode.kind).toBe('webhook');
     // Webhook triggers don't get a schedule — verify we didn't accidentally
     // create one.
     const handle = scheduleClient.getHandle(pollScheduleId(wf.id));

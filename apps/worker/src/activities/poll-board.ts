@@ -47,7 +47,10 @@ export async function pollBoardActivity(
   }
 
   const definition = workflowDefinitionSchema.parse(wf.definition);
-  const { trigger } = definition;
+  const trigger = definition.triggers[0];
+  if (!trigger) {
+    return emptyResult(workflowId, 'not-polling');
+  }
   if (trigger.mode.kind !== 'polling') {
     return emptyResult(workflowId, 'not-polling');
   }

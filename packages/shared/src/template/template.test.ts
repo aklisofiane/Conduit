@@ -17,12 +17,16 @@ const TEMPLATE: TemplateFile = {
     {
       name: 'A',
       definition: {
-        trigger: {
-          platform: 'github',
-          connectionId: '<github>',
-          mode: { kind: 'webhook', event: 'issues.opened' },
-          filters: [],
-        },
+        triggers: [
+          {
+            id: 'trigger-1',
+            name: 'Trigger1',
+            platform: 'github',
+            connectionId: '<github>',
+            mode: { kind: 'webhook', event: 'issues.opened' },
+            filters: [],
+          },
+        ],
         nodes: [
           {
             id: 'agent-a',
@@ -72,12 +76,12 @@ describe('template placeholders', () => {
 describe('resolveTemplate', () => {
   it('substitutes placeholders with real connection ids without mutating input', () => {
     const resolved = resolveTemplate(TEMPLATE, { github: 'conn_123' })[0]!;
-    expect(resolved.definition.trigger.connectionId).toBe('conn_123');
+    expect(resolved.definition.triggers[0]!.connectionId).toBe('conn_123');
     expect(resolved.definition.mcpServers[0]!.connectionId).toBe('conn_123');
     const ws = resolved.definition.nodes[0]!.workspace;
     expect(ws.kind === 'repo-clone' && ws.connectionId).toBe('conn_123');
     // Input untouched.
-    expect(TEMPLATE.workflows[0]!.definition.trigger.connectionId).toBe('<github>');
+    expect(TEMPLATE.workflows[0]!.definition.triggers[0]!.connectionId).toBe('<github>');
   });
 
   it('throws when a placeholder has no binding', () => {

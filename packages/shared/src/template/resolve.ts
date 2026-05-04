@@ -53,12 +53,14 @@ interface ConnectionSlot {
 function* enumerateConnectionSlots(
   def: WorkflowDefinition,
 ): Generator<ConnectionSlot> {
-  yield {
-    value: def.trigger.connectionId,
-    set: (v) => {
-      def.trigger.connectionId = v;
-    },
-  };
+  for (const trigger of def.triggers) {
+    yield {
+      value: trigger.connectionId,
+      set: (v) => {
+        trigger.connectionId = v;
+      },
+    };
+  }
   for (const server of def.mcpServers) {
     yield {
       value: server.connectionId,

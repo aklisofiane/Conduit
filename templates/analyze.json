@@ -8,12 +8,16 @@
       "name": "Analyze",
       "description": "Reads a freshly opened issue, inspects the source code, posts a comment with a proposed approach.",
       "definition": {
-        "trigger": {
-          "platform": "github",
-          "connectionId": "<github>",
-          "mode": { "kind": "webhook", "event": "issues.opened" },
-          "filters": []
-        },
+        "triggers": [
+          {
+            "id": "trigger-analyze",
+            "name": "AnalyzeTrigger",
+            "platform": "github",
+            "connectionId": "<github>",
+            "mode": { "kind": "webhook", "event": "issues.opened" },
+            "filters": []
+          }
+        ],
         "nodes": [
           {
             "id": "agent-analyze",
@@ -26,7 +30,7 @@
             "workspace": { "kind": "repo-clone", "connectionId": "<github>" }
           }
         ],
-        "edges": [],
+        "edges": [{ "from": "AnalyzeTrigger", "to": "Analyze" }],
         "mcpServers": [
           {
             "id": "github-mcp",
@@ -41,7 +45,10 @@
           }
         ],
         "ui": {
-          "nodePositions": { "Analyze": { "x": 240, "y": 200 } },
+          "nodePositions": {
+            "AnalyzeTrigger": { "x": 80, "y": 120 },
+            "Analyze": { "x": 440, "y": 120 }
+          },
           "viewport": { "x": 0, "y": 0, "zoom": 1 }
         }
       }

@@ -261,7 +261,7 @@ describe('Phase 3 — parallel fan-out, merge-back, .conduit/ propagation', () =
 function rewireConnectionIds(def: WorkflowDefinition, connectionId: string): WorkflowDefinition {
   return {
     ...def,
-    trigger: { ...def.trigger, connectionId },
+    triggers: def.triggers.map((t) => ({ ...t, connectionId })),
     nodes: def.nodes.map((n) =>
       n.workspace.kind === 'repo-clone' || n.workspace.kind === 'ticket-branch'
         ? { ...n, workspace: { ...n.workspace, connectionId } }

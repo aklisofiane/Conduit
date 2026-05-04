@@ -125,11 +125,12 @@ export class TemplatesService implements OnModuleInit {
     // doesn't roll back the workflow rows.
     await Promise.allSettled(
       created.map(async ({ id, definition, isActive }) => {
-        if (definition.trigger.mode.kind !== 'polling') return;
+        const trigger = definition.triggers[0];
+        if (!trigger || trigger.mode.kind !== 'polling') return;
         try {
           await this.temporal.upsertPollSchedule({
             workflowId: id,
-            intervalSec: definition.trigger.mode.intervalSec,
+            intervalSec: trigger.mode.intervalSec,
             active: isActive,
           });
         } catch (err) {

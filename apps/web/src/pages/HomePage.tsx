@@ -116,10 +116,10 @@ function WorkflowRowItem({ wf }: { wf: WorkflowRow }) {
         </div>
       </div>
       <div className="truncate font-mono text-[11px] text-[var(--color-text-2)]">
-        {wf.definition?.trigger?.platform ? (
+        {wf.definition?.triggers?.[0]?.platform ? (
           <>
             <b className="text-[var(--color-text)]">
-              {wf.definition.trigger.platform.toUpperCase()}
+              {wf.definition.triggers[0].platform.toUpperCase()}
             </b>{' '}
             · {triggerSummary(wf.definition)}
           </>
@@ -178,7 +178,8 @@ function EmptyRow({ text }: { text: string }) {
 }
 
 function triggerSummary(def: WorkflowRow['definition']): string {
-  const trigger = def.trigger;
+  const trigger = def.triggers[0];
+  if (!trigger) return 'no trigger';
   if (trigger.mode.kind === 'webhook') return trigger.mode.event;
   return `polling · every ${trigger.mode.intervalSec}s`;
 }

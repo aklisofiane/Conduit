@@ -7,17 +7,21 @@ import type { WorkflowDefinition } from '@conduit/shared';
  */
 export function defaultDefinition(): WorkflowDefinition {
   return {
-    trigger: {
-      platform: 'github',
-      connectionId: '',
-      mode: { kind: 'webhook', event: 'issues.opened' },
-      filters: [],
-    },
+    triggers: [
+      {
+        id: 'trigger_default',
+        name: 'Trigger1',
+        platform: 'github',
+        connectionId: '',
+        mode: { kind: 'webhook', event: 'issues.opened' },
+        filters: [],
+      },
+    ],
     nodes: [],
     edges: [],
     mcpServers: [],
     ui: {
-      nodePositions: {},
+      nodePositions: { Trigger1: { x: 80, y: 120 } },
       viewport: { x: 0, y: 0, zoom: 1 },
     },
   };

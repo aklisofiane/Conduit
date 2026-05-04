@@ -2,12 +2,16 @@
   "name": "Phase 2 webhook — issue triage",
   "description": "Single-agent workflow wired to the GitHub issues.opened webhook, used by the Phase 2 exit-criterion E2E test. Runs against StubProvider.",
   "definition": {
-    "trigger": {
-      "platform": "github",
-      "connectionId": "__placeholder__",
-      "mode": { "kind": "webhook", "event": "issues.opened" },
-      "filters": []
-    },
+    "triggers": [
+      {
+        "id": "trigger-phase2",
+        "name": "Phase2Trigger",
+        "platform": "github",
+        "connectionId": "__placeholder__",
+        "mode": { "kind": "webhook", "event": "issues.opened" },
+        "filters": []
+      }
+    ],
     "nodes": [
       {
         "id": "agent-triage",
@@ -20,7 +24,7 @@
         "workspace": { "kind": "fresh-tmpdir" }
       }
     ],
-    "edges": [],
+    "edges": [{ "from": "Phase2Trigger", "to": "Triage" }],
     "mcpServers": [
       {
         "id": "github-mcp",
@@ -34,7 +38,10 @@
       }
     ],
     "ui": {
-      "nodePositions": { "Triage": { "x": 240, "y": 160 } },
+      "nodePositions": {
+        "Phase2Trigger": { "x": 80, "y": 120 },
+        "Triage": { "x": 440, "y": 120 }
+      },
       "viewport": { "x": 0, "y": 0, "zoom": 1 }
     }
   }

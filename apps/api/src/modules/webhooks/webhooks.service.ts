@@ -41,7 +41,7 @@ export class WebhooksService {
     if (!workflow) throw new NotFoundException(`Workflow ${workflowId} not found`);
 
     const definition = workflow.definition as WorkflowDefinition | null;
-    const trigger = definition?.trigger;
+    const trigger = definition?.triggers?.[0];
     if (!trigger || trigger.platform !== 'github') {
       throw new UnauthorizedException(
         `Workflow ${workflowId} is not configured for GitHub webhooks`,
