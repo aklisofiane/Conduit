@@ -44,6 +44,21 @@ export function RunDetailPage() {
   const { data: logs = [] } = useRunLogs(runId, selectedNode);
   const orderedEvents = useOrderedEvents(logs);
 
+  const tokens = useMemo(
+    () =>
+      (run?.nodes ?? []).reduce(
+        (acc, n) => {
+          const u = n.usage ?? {};
+          return {
+            input: acc.input + (u.inputTokens ?? 0),
+            output: acc.output + (u.outputTokens ?? 0),
+          };
+        },
+        { input: 0, output: 0 },
+      ),
+    [run?.nodes],
+  );
+
   const status = run?.status ?? 'PENDING';
   const streaming = status === 'RUNNING' || status === 'PENDING';
 
@@ -56,20 +71,6 @@ export function RunDetailPage() {
     );
   }
 
-  const tokens = useMemo(
-    () =>
-      run.nodes.reduce(
-        (acc, n) => {
-          const u = n.usage ?? {};
-          return {
-            input: acc.input + (u.inputTokens ?? 0),
-            output: acc.output + (u.outputTokens ?? 0),
-          };
-        },
-        { input: 0, output: 0 },
-      ),
-    [run.nodes],
-  );
   const branchName = ticketBranchName(run.nodes);
 
   return (
