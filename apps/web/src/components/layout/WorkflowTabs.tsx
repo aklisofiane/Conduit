@@ -1,6 +1,6 @@
 import { cn } from '../../lib/cn.js';
 
-export type WorkflowTabId = 'build' | 'runs' | 'history';
+export type WorkflowTabId = 'build' | 'runs';
 
 interface WorkflowTabsProps {
   active: WorkflowTabId;
@@ -14,9 +14,8 @@ interface TabDef {
 }
 
 const TABS: TabDef[] = [
-  { id: 'build', label: 'Build', enabled: true },
+  { id: 'build', label: 'Canvas', enabled: true },
   { id: 'runs', label: 'Runs', enabled: true },
-  { id: 'history', label: 'History', enabled: false },
 ];
 
 export function WorkflowTabs({ active, onChange }: WorkflowTabsProps) {
