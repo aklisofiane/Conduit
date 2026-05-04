@@ -186,21 +186,29 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
       abortController.signal,
     );
 
+    // Per-event heartbeats stall whenever a tool call blocks the SDK iterator
+    // (a slow Bash, a slow MCP tool). A timer at half the heartbeatTimeout
+    // (60s → 30s) keeps Temporal's liveness check happy regardless of tool
+    // duration, with one missed-heartbeat of slack.
+    let phase: 'main' | 'summary' = 'main';
+    const heartbeater = setInterval(() => {
+      ctx.heartbeat({ nodeName: node.name, usage, phase });
+    }, 30_000);
     try {
       // Turn 1 — main work. The agent reads upstream `.conduit/*.md` on its
       // own via file tools; only the trigger/workflow/run shell is injected.
       for await (const event of session.run(serializeAgentContext(agentCtx))) {
         await onAgentEvent(runId, node.name, event, usage);
-        ctx.heartbeat({ nodeName: node.name, usage, phase: 'main' });
       }
 
       // Turn 2 — final summary. Same session, so conversation state is
       // retained. The agent is expected to write `.conduit/<NodeName>.md`.
+      phase = 'summary';
       for await (const event of session.run(finalSummaryPrompt(node.name))) {
         await onAgentEvent(runId, node.name, event, usage);
-        ctx.heartbeat({ nodeName: node.name, usage, phase: 'summary' });
       }
     } finally {
+      clearInterval(heartbeater);
       await session.dispose();
     }
 
