@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { ExecutionLogRow } from '../../api/types.js';
+import type { AgentEvent, ExecutionLogRow } from '../../api/types.js';
 import { cn } from '../../lib/cn.js';
 import {
   prettyToolName,
@@ -12,36 +12,36 @@ interface RunTimelineProps {
   streaming: boolean;
 }
 
-interface ToolPair {
-  call: ExecutionLogRow;
-  result?: ExecutionLogRow;
+type ToolCallPayload = Extract<AgentEvent, { type: 'tool_call' }>;
+type ToolResultPayload = Extract<AgentEvent, { type: 'tool_result' }>;
+
+interface ToolItem {
+  id: string;
+  tsMs: number;
+  call: ToolCallPayload;
+  result?: ToolResultPayload;
+  summary: string;
+  status: ToolStatus;
 }
 
 type DisplayItem =
-  | { kind: 'text'; id: string; ts: string; nodeName: string; delta: string }
-  | { kind: 'system'; id: string; ts: string; nodeName: string; message: string }
-  | { kind: 'tool'; id: string; ts: string; pair: ToolPair }
-  | { kind: 'tool-group'; id: string; ts: string; toolName: string; pairs: ToolPair[] };
+  | { kind: 'text'; id: string; tsMs: number; nodeName: string; delta: string }
+  | { kind: 'system'; id: string; tsMs: number; nodeName: string; message: string }
+  | { kind: 'tool'; id: string; tsMs: number; tool: ToolItem }
+  | {
+      kind: 'tool-group';
+      id: string;
+      tsMs: number;
+      toolName: string;
+      tools: ToolItem[];
+      status: ToolStatus;
+      statusLabel: string;
+    };
 
 export function RunTimeline({ events, streaming }: RunTimelineProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const display = useMemo(() => buildDisplay(events), [events]);
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
-
-  // Drop expanded ids that no longer exist (e.g. a streaming pair that got
-  // grouped after another sibling arrived). Keeps the Set bounded.
-  useEffect(() => {
-    setExpanded((prev) => {
-      const valid = collectIds(display);
-      let changed = false;
-      const next = new Set<string>();
-      for (const id of prev) {
-        if (valid.has(id)) next.add(id);
-        else changed = true;
-      }
-      return changed ? next : prev;
-    });
-  }, [display]);
 
   useEffect(() => {
     if (!streaming) return;
@@ -56,7 +56,7 @@ export function RunTimeline({ events, streaming }: RunTimelineProps) {
     );
   }
 
-  const startTs = new Date(display[0]!.ts).getTime();
+  const startMs = display[0]!.tsMs;
   const toggle = (id: string) =>
     setExpanded((prev) => {
       const next = new Set(prev);
@@ -70,7 +70,7 @@ export function RunTimeline({ events, streaming }: RunTimelineProps) {
       <div className="space-y-2">
         {display.map((item, idx) => {
           const last = streaming && idx === display.length - 1;
-          const offset = offsetSeconds(item.ts, startTs);
+          const offset = secondsSince(item.tsMs, startMs);
           switch (item.kind) {
             case 'text':
               return <TextRow key={item.id} item={item} offset={offset} cursor={last} />;
@@ -78,21 +78,25 @@ export function RunTimeline({ events, streaming }: RunTimelineProps) {
               return <SystemRow key={item.id} item={item} offset={offset} />;
             case 'tool':
               return (
-                <ToolRow
+                <div
                   key={item.id}
-                  item={item}
-                  offset={offset}
-                  open={expanded.has(item.id)}
-                  onToggle={() => toggle(item.id)}
-                  cursor={last}
-                />
+                  className="overflow-hidden rounded-md border border-[var(--color-line)] bg-[var(--color-bg-1)]"
+                >
+                  <ExpandableTool
+                    tool={item.tool}
+                    offset={offset}
+                    open={expanded.has(item.id)}
+                    onToggle={() => toggle(item.id)}
+                    cursor={last}
+                  />
+                </div>
               );
             case 'tool-group':
               return (
                 <ToolGroupRow
                   key={item.id}
                   item={item}
-                  startTs={startTs}
+                  startMs={startMs}
                   groupOpen={expanded.has(item.id)}
                   expanded={expanded}
                   onToggle={toggle}
@@ -107,81 +111,62 @@ export function RunTimeline({ events, streaming }: RunTimelineProps) {
 }
 
 function buildDisplay(events: ExecutionLogRow[]): DisplayItem[] {
-  // Index every tool_result by its tool_use id once so out-of-order or
-  // delayed-result streams still pair correctly.
-  const resultsById = new Map<string, ExecutionLogRow>();
+  // Index tool_results by id up front so out-of-order frames still pair.
+  const resultsById = new Map<string, ToolResultPayload>();
   for (const ev of events) {
-    const p = ev.payload as { type?: string; id?: string } | null;
-    if (p?.type === 'tool_result' && typeof p.id === 'string') {
-      resultsById.set(p.id, ev);
-    }
+    const p = asAgent(ev);
+    if (p?.type === 'tool_result') resultsById.set(p.id, p);
   }
 
-  // First, build a flat list of items (text/system/tool), coalescing
-  // consecutive text deltas — same behavior as before, just over the new
-  // discriminated union.
   const flat: DisplayItem[] = [];
   for (const ev of events) {
-    const p = ev.payload as { type?: string } | null;
-    if (!p) continue;
-    if (p.type === 'usage' || ev.kind === 'USAGE') continue;
-    if (p.type === 'tool_result') continue; // attached to its call below
+    if (ev.kind === 'USAGE') continue;
+    const p = asAgent(ev);
+    if (p?.type === 'usage' || p?.type === 'tool_result' || p?.type === 'done') continue;
 
-    if (p.type === 'text') {
-      const delta = (ev.payload as { delta?: string }).delta ?? '';
+    const tsMs = new Date(ev.ts).getTime();
+
+    if (p?.type === 'text') {
       const prev = flat[flat.length - 1];
       if (prev?.kind === 'text' && prev.nodeName === ev.nodeName) {
-        flat[flat.length - 1] = { ...prev, delta: prev.delta + delta };
+        flat[flat.length - 1] = { ...prev, delta: prev.delta + p.delta };
       } else {
         flat.push({
           kind: 'text',
           id: ev.id,
-          ts: ev.ts,
+          tsMs,
           nodeName: ev.nodeName ?? '',
-          delta,
+          delta: p.delta,
         });
       }
       continue;
     }
 
-    if (p.type === 'tool_call') {
-      const callPayload = ev.payload as { id?: string };
-      const result = callPayload.id ? resultsById.get(callPayload.id) : undefined;
+    if (p?.type === 'tool_call') {
+      const result = resultsById.get(p.id);
+      const { summary, status } = summarizeToolCall(p, result);
       flat.push({
         kind: 'tool',
         id: ev.id,
-        ts: ev.ts,
-        pair: { call: ev, result },
+        tsMs,
+        tool: { id: ev.id, tsMs, call: p, result, summary, status },
       });
       continue;
     }
 
-    if (ev.kind === 'SYSTEM' || p.type === 'system') {
-      const msg =
-        (ev.payload as { message?: string }).message ??
-        JSON.stringify(ev.payload, null, 2);
-      flat.push({
-        kind: 'system',
-        id: ev.id,
-        ts: ev.ts,
-        nodeName: ev.nodeName ?? '',
-        message: msg,
-      });
-      continue;
-    }
-
-    // Unknown payload — render it raw via the system row so nothing is dropped.
+    const sys = ev.payload as { message?: unknown } | null;
+    const msg =
+      typeof sys?.message === 'string' ? sys.message : JSON.stringify(ev.payload, null, 2);
     flat.push({
       kind: 'system',
       id: ev.id,
-      ts: ev.ts,
+      tsMs,
       nodeName: ev.nodeName ?? '',
-      message: JSON.stringify(ev.payload, null, 2),
+      message: msg,
     });
   }
 
-  // Second pass: collapse runs of ≥ 2 consecutive `tool` items with the same
-  // tool name into a single `tool-group`. Anything non-tool breaks the run.
+  // Collapse runs of ≥ 2 consecutive same-tool items into a tool-group.
   const out: DisplayItem[] = [];
   let i = 0;
   while (i < flat.length) {
@@ -191,27 +176,25 @@ function buildDisplay(events: ExecutionLogRow[]): DisplayItem[] {
       i++;
       continue;
     }
-    const toolName = (item.pair.call.payload as { name?: string }).name ?? '';
+    const toolName = item.tool.call.name;
+    const tools: ToolItem[] = [item.tool];
     let j = i + 1;
     while (j < flat.length) {
       const next = flat[j];
-      if (
-        next?.kind === 'tool' &&
-        ((next.pair.call.payload as { name?: string }).name ?? '') === toolName
-      ) {
-        j++;
-      } else {
-        break;
-      }
+      if (next?.kind !== 'tool' || next.tool.call.name !== toolName) break;
+      tools.push(next.tool);
+      j++;
     }
-    if (j - i >= 2) {
-      const pairs = flat.slice(i, j).map((it) => (it as Extract<DisplayItem, { kind: 'tool' }>).pair);
+    if (tools.length >= 2) {
+      const status = aggregateStatus(tools);
       out.push({
         kind: 'tool-group',
         id: `${item.id}+grp`,
-        ts: item.ts,
+        tsMs: item.tsMs,
         toolName,
-        pairs,
+        tools,
+        status,
+        statusLabel: aggregateLabel(status, tools),
       });
     } else {
       out.push(item);
@@ -221,15 +204,39 @@ function buildDisplay(events: ExecutionLogRow[]): DisplayItem[] {
   return out;
 }
 
-function collectIds(items: DisplayItem[]): Set<string> {
-  const ids = new Set<string>();
-  for (const it of items) {
-    ids.add(it.id);
-    if (it.kind === 'tool-group') {
-      for (const pair of it.pairs) ids.add(pair.call.id);
-    }
+function asAgent(ev: ExecutionLogRow): AgentEvent | null {
+  const p = ev.payload as { type?: unknown } | null;
+  switch (p?.type) {
+    case 'text':
+    case 'tool_call':
+    case 'tool_result':
+    case 'usage':
+    case 'done':
+      return p as AgentEvent;
+    default:
+      return null;
   }
-  return ids;
+}
+
+function aggregateStatus(tools: ToolItem[]): ToolStatus {
+  let pending = false;
+  let errors = 0;
+  for (const t of tools) {
+    if (t.status === 'pending') pending = true;
+    else if (t.status === 'error') errors++;
+  }
+  if (pending) return 'pending';
+  if (errors > 0) return 'error';
+  return 'ok';
+}
+
+function aggregateLabel(status: ToolStatus, tools: ToolItem[]): string {
+  if (status === 'pending') return 'running';
+  if (status === 'error') {
+    const errs = tools.filter((t) => t.status === 'error').length;
+    return `${errs} error${errs === 1 ? '' : 's'}`;
+  }
+  return 'all ok';
 }
 
 function TextRow({
@@ -273,88 +280,86 @@ function SystemRow({
   );
 }
 
-function ToolRow({
-  item,
+function ExpandableTool({
+  tool,
   offset,
   open,
   onToggle,
   cursor,
+  nested = false,
 }: {
-  item: Extract<DisplayItem, { kind: 'tool' }>;
+  tool: ToolItem;
   offset: string;
   open: boolean;
   onToggle: () => void;
   cursor: boolean;
+  nested?: boolean;
 }) {
   return (
-    <div className="overflow-hidden rounded-md border border-[var(--color-line)] bg-[var(--color-bg-1)]">
+    <>
       <CollapsedToolHeader
+        tool={tool}
         offset={offset}
-        pair={item.pair}
         open={open}
         onToggle={onToggle}
         cursor={cursor}
+        nested={nested}
       />
-      {open && <ExpandedToolBody pair={item.pair} />}
-    </div>
+      {open && <ExpandedToolBody tool={tool} />}
+    </>
   );
 }
 
 function ToolGroupRow({
   item,
-  startTs,
+  startMs,
   groupOpen,
   expanded,
   onToggle,
   cursor,
 }: {
   item: Extract<DisplayItem, { kind: 'tool-group' }>;
-  startTs: number;
+  startMs: number;
   groupOpen: boolean;
   expanded: Set<string>;
   onToggle: (id: string) => void;
   cursor: boolean;
 }) {
-  const aggregateStatus = summarizeGroupStatus(item.pairs);
   return (
     <div className="overflow-hidden rounded-md border border-[var(--color-line)] bg-[var(--color-bg-1)]">
       <button
         type="button"
         onClick={() => onToggle(item.id)}
         aria-expanded={groupOpen}
-        aria-label={`${groupOpen ? 'Collapse' : 'Expand'} ${item.pairs.length} ${prettyToolName(item.toolName)} calls`}
+        aria-label={`${groupOpen ? 'Collapse' : 'Expand'} ${item.tools.length} ${prettyToolName(item.toolName)} calls`}
         className="group flex w-full cursor-pointer items-center gap-3 px-3 py-2 text-left font-mono text-[11px] text-[var(--color-text-3)] transition-colors hover:bg-[var(--color-bg-2)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-claude)] focus-visible:ring-inset"
       >
         <Chevron open={groupOpen} />
-        <span className="w-12 shrink-0 text-[var(--color-text-4)]">+{offsetSeconds(item.ts, startTs)}s</span>
+        <span className="w-12 shrink-0 text-[var(--color-text-4)]">
+          +{secondsSince(item.tsMs, startMs)}s
+        </span>
         <span className="shrink-0 text-[var(--color-claude)] group-hover:text-[var(--color-text)]">
           {prettyToolName(item.toolName)}
         </span>
-        <span className="shrink-0 text-[var(--color-text-4)]">× {item.pairs.length}</span>
+        <span className="shrink-0 text-[var(--color-text-4)]">× {item.tools.length}</span>
         <span className="flex-1" />
-        <StatusPill status={aggregateStatus} label={aggregateStatusLabel(aggregateStatus, item.pairs)} />
+        <StatusPill status={item.status} label={item.statusLabel} />
         {cursor && !groupOpen && <span className="cursor" />}
       </button>
       {groupOpen && (
         <div>
-          {item.pairs.map((pair, idx) => {
-            const id = pair.call.id;
-            const open = expanded.has(id);
-            return (
-              <div key={id} className="border-t border-[var(--color-line)]">
-                <CollapsedToolHeader
-                  offset={offsetSeconds(pair.call.ts, startTs)}
-                  pair={pair}
-                  open={open}
-                  onToggle={() => onToggle(id)}
-                  cursor={cursor && idx === item.pairs.length - 1}
-                  indented
-                  hideName
-                />
-                {open && <ExpandedToolBody pair={pair} />}
-              </div>
-            );
-          })}
+          {item.tools.map((tool, idx) => (
+            <div key={tool.id} className="border-t border-[var(--color-line)]">
+              <ExpandableTool
+                tool={tool}
+                offset={secondsSince(tool.tsMs, startMs)}
+                open={expanded.has(tool.id)}
+                onToggle={() => onToggle(tool.id)}
+                cursor={cursor && idx === item.tools.length - 1}
+                nested
+              />
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -362,28 +367,20 @@ function ToolGroupRow({
 }
 
 function CollapsedToolHeader({
+  tool,
   offset,
-  pair,
   open,
   onToggle,
   cursor,
-  indented = false,
-  hideName = false,
+  nested,
 }: {
+  tool: ToolItem;
   offset: string;
-  pair: ToolPair;
   open: boolean;
   onToggle: () => void;
   cursor: boolean;
-  indented?: boolean;
-  hideName?: boolean;
+  nested: boolean;
 }) {
-  const callPayload = pair.call.payload as { name?: string; input?: unknown };
-  const resultPayload = pair.result?.payload as { error?: string; output?: unknown } | undefined;
-  const { summary, status } = summarizeToolCall(
-    { name: callPayload.name, input: callPayload.input },
-    resultPayload ? { error: resultPayload.error, output: resultPayload.output } : undefined,
-  );
   return (
     <button
       type="button"
@@ -391,20 +388,20 @@ function CollapsedToolHeader({
       aria-expanded={open}
       className={cn(
         'group flex w-full cursor-pointer items-center gap-3 px-3 py-2 text-left font-mono text-[11.5px] transition-colors hover:bg-[var(--color-bg-2)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-claude)] focus-visible:ring-inset',
-        indented && 'pl-8',
+        nested && 'pl-8',
       )}
     >
       <Chevron open={open} />
       <span className="w-12 shrink-0 text-[var(--color-text-4)]">+{offset}s</span>
-      {!hideName && (
+      {!nested && (
         <span className="shrink-0 text-[var(--color-claude)]">
-          {prettyToolName(callPayload.name ?? '')}
+          {prettyToolName(tool.call.name)}
         </span>
       )}
       <span className="min-w-0 flex-1 truncate text-[var(--color-text-3)] group-hover:text-[var(--color-text)]">
-        {summary}
+        {tool.summary}
       </span>
-      <StatusPill status={status} />
+      <StatusPill status={tool.status} />
       {cursor && <span className="cursor" />}
     </button>
   );
@@ -424,9 +421,8 @@ function Chevron({ open }: { open: boolean }) {
   );
 }
 
-function ExpandedToolBody({ pair }: { pair: ToolPair }) {
-  const callPayload = pair.call.payload as { input?: unknown };
-  const resultPayload = pair.result?.payload as { error?: string; output?: unknown } | undefined;
+function ExpandedToolBody({ tool }: { tool: ToolItem }) {
+  const error = tool.result?.error;
   return (
     <div className="space-y-2 border-t border-[var(--color-line)] bg-[var(--color-bg)] px-3 py-2">
       <div>
@@ -434,22 +430,22 @@ function ExpandedToolBody({ pair }: { pair: ToolPair }) {
           input
         </div>
         <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap font-mono text-[11px] text-[var(--color-text-2)]">
-          {formatJson(callPayload.input)}
+          {formatJson(tool.call.input)}
         </pre>
       </div>
       <div>
         <div className="font-mono text-[10px] uppercase tracking-wider text-[var(--color-text-4)]">
-          {resultPayload?.error ? 'error' : 'result'}
+          {error ? 'error' : 'result'}
         </div>
         <pre
           className={cn(
             'mt-1 max-h-64 overflow-auto whitespace-pre-wrap font-mono text-[11px]',
-            resultPayload?.error ? 'text-[var(--color-error)]' : 'text-[var(--color-text-2)]',
+            error ? 'text-[var(--color-error)]' : 'text-[var(--color-text-2)]',
           )}
         >
-          {pair.result === undefined
+          {tool.result === undefined
             ? '(streaming…)'
-            : resultPayload?.error ?? formatJson(resultPayload?.output)}
+            : (error ?? formatJson(tool.result.output))}
         </pre>
       </div>
     </div>
@@ -478,35 +474,8 @@ function defaultStatusLabel(status: ToolStatus): string {
   return 'ok';
 }
 
-function summarizeGroupStatus(pairs: ToolPair[]): ToolStatus {
-  let pending = false;
-  let errors = 0;
-  for (const p of pairs) {
-    if (!p.result) {
-      pending = true;
-      continue;
-    }
-    if ((p.result.payload as { error?: string } | null)?.error) errors++;
-  }
-  if (pending) return 'pending';
-  if (errors > 0) return 'error';
-  return 'ok';
-}
-
-function aggregateStatusLabel(status: ToolStatus, pairs: ToolPair[]): string {
-  if (status === 'pending') return 'running';
-  if (status === 'error') {
-    const errs = pairs.filter(
-      (p) => (p.result?.payload as { error?: string } | null)?.error,
-    ).length;
-    return `${errs} error${errs === 1 ? '' : 's'}`;
-  }
-  return 'all ok';
-}
-
-function offsetSeconds(ts: string, startMs: number): string {
-  const diff = (new Date(ts).getTime() - startMs) / 1000;
-  return diff.toFixed(1);
+function secondsSince(tsMs: number, startMs: number): string {
+  return ((tsMs - startMs) / 1000).toFixed(1);
 }
 
 function formatJson(v: unknown): string {

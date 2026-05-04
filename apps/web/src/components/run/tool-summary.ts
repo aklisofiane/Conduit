@@ -1,9 +1,11 @@
-/**
- * One-line summary + ok/error status for a tool call/result pair, used by
- * the collapsed timeline rows. Intentionally non-exhaustive: a small switch
- * over the tools we see often, with a generic JSON-stringify fallback so
- * unknown tools still render something readable.
- */
+// Intentionally non-exhaustive: a small switch over the tools we see often,
+// with a generic JSON-stringify fallback so unknown tools still render
+// something readable.
+
+import type { AgentEvent } from '../../api/types.js';
+
+type ToolCallPayload = Extract<AgentEvent, { type: 'tool_call' }>;
+type ToolResultPayload = Extract<AgentEvent, { type: 'tool_result' }>;
 
 export type ToolStatus = 'ok' | 'error' | 'pending';
 
@@ -12,28 +14,14 @@ export interface ToolSummary {
   status: ToolStatus;
 }
 
-interface ToolCallPayload {
-  id?: string;
-  name?: string;
-  input?: unknown;
-}
-
-interface ToolResultPayload {
-  id?: string;
-  output?: unknown;
-  error?: string;
-}
-
-const STATUS_PENDING: ToolStatus = 'pending';
-
 export function summarizeToolCall(
   call: ToolCallPayload,
   result: ToolResultPayload | undefined,
 ): ToolSummary {
-  const name = call.name ?? '';
+  const name = call.name;
   const input = (call.input ?? {}) as Record<string, unknown>;
   const status: ToolStatus =
-    result === undefined ? STATUS_PENDING : result.error ? 'error' : 'ok';
+    result === undefined ? 'pending' : result.error ? 'error' : 'ok';
 
   switch (name) {
     case 'Read':
@@ -75,11 +63,8 @@ export function summarizeToolCall(
 }
 
 function summarizeUnknown(name: string, input: Record<string, unknown>): string {
-  // MCP tools follow `mcp__<server>__<tool>` — surface the tail and any
-  // obvious identifying fields. Plain JSON dump for everything else.
   if (name.startsWith('mcp__')) {
-    const ident = pickIdentifyingFields(input);
-    return ident ? ident : '(no args)';
+    return pickIdentifyingFields(input) || '(no args)';
   }
   let s: string;
   try {
@@ -120,8 +105,6 @@ function pickIdentifyingFields(input: Record<string, unknown>): string {
 }
 
 export function prettyToolName(name: string): string {
-  // Drop the `mcp__<server>__` prefix for MCP tools so the row reads as the
-  // remote tool name, which is what the user actually configured.
   const m = name.match(/^mcp__[^_]+__(.+)$/);
   return m ? m[1]! : name;
 }
@@ -130,7 +113,7 @@ function stringField(v: unknown): string {
   return typeof v === 'string' ? v : '';
 }
 
-export function truncate(s: string, n: number): string {
+function truncate(s: string, n: number): string {
   return s.length > n ? `${s.slice(0, n)}…` : s;
 }
 
