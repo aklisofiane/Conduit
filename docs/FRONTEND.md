@@ -45,6 +45,8 @@ Node positions are persisted to `Workflow.definition.ui.nodePositions` on drag-e
   - Input + output handles
   - **No runtime state on the canvas** — no status dots, no streaming text. Runtime observation lives on the dedicated run page.
 
+Visual tokens (palette, per-provider color/font/label, radii, the `providerStyle()` helper) live in [DESIGN.md](./DESIGN.md).
+
 ### Config side panel
 
 Opens on node click. Form driven by Zod schema from `@conduit/shared`.
@@ -89,7 +91,7 @@ Clickable → opens the run detail page.
 
 Dedicated observation page, independent of the canvas. Layout:
 
-- **Top bar**: run metadata (workflow name link, trigger summary, started at, duration, status badge, Cancel button for in-flight runs).
+- **Top bar**: run metadata (workflow name link, trigger summary, started at, duration, status badge, Cancel button for in-flight runs). The top bar itself is the global `TopChrome` shell — pages publish a `center` and `actions` ReactNode into it via `useTopbarSlots()` (`apps/web/src/state/topbar-slots.ts`). The store identity-checks before setting and uses split per-slot effects so an unchanged slot doesn't churn when the other one changes; memoize the published nodes on the producer side or you defeat both.
 - **Left rail**: list of nodes in execution order, each with a status dot, name, and elapsed time. The selected node highlights.
 - **Main area** (tabs for the selected node):
   - **Timeline** — live stream of `ExecutionLog` entries (text chunks, tool calls with expandable input/output, token usage). Auto-scrolls while running.
@@ -109,7 +111,8 @@ No canvas, no graph rendering here. Just logs and inspection.
 
 ## Design conventions
 
-- Tailwind v4, Zinc base palette, New York shadcn variant.
-- Dark mode first. Dense but not cramped.
-- Monospace for identifiers, instructions, JSON.
+- Tailwind v4, custom warm-paper light palette (no Zinc / no shadcn theme — see [DESIGN.md](./DESIGN.md) for the token layer).
+- oklch for status and accent colors; per-provider warm/cool families distinguish Claude (amber) from Codex (teal-green).
+- Light surfaces by default. Dense but not cramped.
+- Monospace for identifiers, instructions, JSON. Provider-display font is part of the provider token (Claude → sans, Codex → mono).
 - Motion: subtle — node status transitions use 150ms fades, no bouncy springs.

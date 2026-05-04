@@ -15,7 +15,8 @@ Agent-first workflow automation for dev teams. Board-driven orchestration, atomi
 9. [design-docs/templates.md](./design-docs/templates.md) — workflow templates shipped as starting points
 10. [data-model.md](./data-model.md) — Prisma schema spec
 11. [FRONTEND.md](./FRONTEND.md) — canvas (design), run history, run detail page
-12. [SECURITY.md](./SECURITY.md) — auth, credentials, sandboxing
-13. [RELIABILITY.md](./RELIABILITY.md) — retries, crash recovery, cancellation
-14. [VALIDATION.md](./VALIDATION.md) — testing strategy, E2E harness, `StubProvider`
-15. [PLANS.md](./PLANS.md) — phased rollout
+12. [DESIGN.md](./DESIGN.md) — design tokens, palette, provider styling, the @theme bridge
+13. [SECURITY.md](./SECURITY.md) — auth, credentials, sandboxing
+14. [RELIABILITY.md](./RELIABILITY.md) — retries, crash recovery, cancellation
+15. [VALIDATION.md](./VALIDATION.md) — testing strategy, E2E harness, `StubProvider`
+16. [PLANS.md](./PLANS.md) — phased rollout

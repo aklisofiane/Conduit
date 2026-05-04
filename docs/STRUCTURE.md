@@ -89,12 +89,19 @@ src/
     templates/                         TemplatePickerDialog — "From template" flow on the
                                        workflow list (template grid → per-placeholder
                                        connection binding → POST /workflows/from-template/:id)
-    layout/, ui/                       shell + shadcn primitives
+    layout/                            TopChrome (global topbar shell, reads slot store),
+                                       WorkflowActions, etc.
+    ui/                                shadcn primitives
   api/                                 HTTP client, TanStack Query hooks, response types
   hooks/use-run-updates.ts             Socket.IO → TanStack cache bridge
-  state/workflow-editor.ts             Zustand store for the canvas
+  state/
+    workflow-editor.ts                 Zustand store for the canvas
+    topbar-slots.ts                    Zustand store + `useTopbarSlots()` hook — pages publish
+                                       ReactNodes into the global topbar (see FRONTEND.md > Run detail)
   lib/                                 cn, status, time helpers
-  styles/
+  styles/                              tokens.css (CSS vars), globals.css (@theme font bridge +
+                                       component primitives), theme.ts (TS mirror + providerStyle).
+                                       See docs/DESIGN.md.
 ```
 
 ## packages/shared
