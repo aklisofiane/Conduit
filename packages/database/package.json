@@ -17,8 +17,10 @@
     "prisma"
   ],
   "scripts": {
+    "prebuild": "prisma generate",
     "build": "tsc --build",
     "dev": "tsc --build --watch --preserveWatchOutput",
+    "pretypecheck": "prisma generate",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
     "db:push": "prisma db push --skip-generate && prisma generate",
