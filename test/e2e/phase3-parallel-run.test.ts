@@ -55,7 +55,10 @@ describe('Phase 3 — parallel fan-out, merge-back, .conduit/ propagation', () =
     await harness?.stop();
   });
 
-  it('runs Triage → (Fix || Doc) → Review with merge-back and sibling summaries', async () => {
+  // Heaviest E2E (clone + branched worktrees + merge-back + .conduit/ copy).
+  // Locally finishes in ~4s; CI runners (2 vCPU, shared docker I/O) need more
+  // headroom than the global e2e cap of 120s.
+  it('runs Triage → (Fix || Doc) → Review with merge-back and sibling summaries', { timeout: 300_000 }, async () => {
     await harness.seedRepoClone('acme', 'shop', {
       'src/index.ts': 'export const version = "0.1.0";\n',
     });
@@ -201,7 +204,7 @@ describe('Phase 3 — parallel fan-out, merge-back, .conduit/ propagation', () =
 
     const collector = harness.collectRun(runId);
     try {
-      await collector.waitForDone('Review', 120_000);
+      await collector.waitForDone('Review', 240_000);
     } finally {
       collector.close();
     }
@@ -209,7 +212,7 @@ describe('Phase 3 — parallel fan-out, merge-back, .conduit/ propagation', () =
     const finalRun = await pollForStatus(
       () => harness.http.get<RunDetail>(`/runs/${runId}`),
       (r) => r.status === 'COMPLETED' || r.status === 'FAILED',
-      30_000,
+      45_000,
     );
     expect(finalRun.status).toBe('COMPLETED');
 
@@ -229,9 +232,11 @@ describe('Phase 3 — parallel fan-out, merge-back, .conduit/ propagation', () =
     expect(review.conduitSummary).toMatch(/Saw Fix and Doc summaries/);
 
     // Fix and Doc ran concurrently — one started before the other finished.
-    const fixRange = [new Date(fix.startedAt!).getTime(), new Date(fix.finishedAt!).getTime()];
-    const docRange = [new Date(doc.startedAt!).getTime(), new Date(doc.finishedAt!).getTime()];
-    const overlap = !(fixRange[1] < docRange[0] || docRange[1] < fixRange[0]);
+    const fixStart = new Date(fix.startedAt!).getTime();
+    const fixEnd = new Date(fix.finishedAt!).getTime();
+    const docStart = new Date(doc.startedAt!).getTime();
+    const docEnd = new Date(doc.finishedAt!).getTime();
+    const overlap = !(fixEnd < docStart || docEnd < fixStart);
     expect(overlap).toBe(true);
 
     // Fix and Doc got their own branched worktrees, distinct from Triage's.
