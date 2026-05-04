@@ -47,6 +47,7 @@ export class ClaudeProvider implements AgentProvider {
           model: req.model,
           systemPrompt: { type: 'preset', preset: 'claude_code', append: req.systemPrompt },
           cwd: req.workspacePath,
+          additionalDirectories: req.additionalDirectories,
           mcpServers,
           maxTurns: req.constraints.maxTurns,
           abortController: abortControllerFromSignal(signal),

@@ -14,6 +14,12 @@ export const agentRequestSchema = z.object({
   systemPrompt: z.string(),
   mcpServers: z.array(resolvedMcpServerSchema),
   workspacePath: z.string().min(1),
+  /**
+   * Extra absolute paths the agent is allowed to read/list outside its
+   * `workspacePath`. Provider-specific: Claude Code wires this to the SDK's
+   * `additionalDirectories` option; Codex/Stub ignore it.
+   */
+  additionalDirectories: z.array(z.string()).optional(),
   constraints: agentConstraintsSchema,
 });
 export type AgentRequest = z.infer<typeof agentRequestSchema>;

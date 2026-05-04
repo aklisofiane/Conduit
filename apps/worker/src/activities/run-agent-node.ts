@@ -13,6 +13,7 @@ import {
   readConduitSummary,
   resolveMcpServers,
   resolveProvider,
+  runDir,
   serializeAgentContext,
 } from '@conduit/agent';
 import type {
@@ -175,6 +176,11 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
         systemPrompt: node.instructions,
         mcpServers: resolvedMcp,
         workspacePath: workspace.path,
+        // Per-run scratch root — siblings + .credential-helpers/ live here.
+        // Without this, Claude Code blocks any tool call that touches the
+        // run dir (the workspace's parent), which contradicts the design
+        // assumption noted in push-auth.ts.
+        additionalDirectories: [runDir(runId)],
         constraints: node.constraints ?? {},
       },
       abortController.signal,
