@@ -30,7 +30,8 @@ export const CREDENTIAL_PLACEHOLDER = CREDENTIAL_PLACEHOLDER_VALUE;
  *      `WorkflowMcpServer` definition.
  *   2. If the definition has a `connectionId`, look up + decrypt the secret
  *      and substitute `{{credential}}` in `transport.env` / `transport.headers`.
- *   3. Carry `allowedTools` from the ref (SDK enforces it).
+ *   3. Carry `allowedTools` from the ref. The SDK has no built-in allow-list
+ *      knob, so `ClaudeProvider` enforces it via a `canUseTool` callback.
  */
 export async function resolveMcpServers(
   agent: Pick<AgentConfig, 'mcpServers'>,

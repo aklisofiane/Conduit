@@ -1,0 +1,99 @@
+import { afterEach, describe, expect, it } from 'vitest';
+import { ClaudeProvider, __setClaudeSdkLoaderForTests } from './claude-provider';
+
+type CanUseTool = (
+  name: string,
+  input: Record<string, unknown>,
+) => Promise<{ behavior: 'allow'; updatedInput: Record<string, unknown> } | { behavior: 'deny'; message: string }>;
+
+interface CapturedOptions {
+  canUseTool: CanUseTool;
+  mcpServers: Record<string, unknown>;
+}
+
+function installStub(): { capturedOptions: CapturedOptions | undefined } {
+  const out: { capturedOptions: CapturedOptions | undefined } = { capturedOptions: undefined };
+  const sdk = {
+    query(args: unknown) {
+      const a = args as { options: CapturedOptions };
+      out.capturedOptions = a.options;
+      async function* events() {
+        yield { type: 'result' };
+      }
+      return events();
+    },
+  };
+  __setClaudeSdkLoaderForTests(async () => sdk);
+  return out;
+}
+
+afterEach(() => __setClaudeSdkLoaderForTests(undefined));
+
+describe('ClaudeProvider', () => {
+  it('reports capabilities', () => {
+    const p = new ClaudeProvider();
+    const caps = p.getCapabilities();
+    expect(caps.models).toContain('claude-sonnet-4-6');
+    expect(caps.supportsMcp).toBe(true);
+  });
+
+  it('canUseTool gates MCP tools by per-server allowedTools', async () => {
+    const captured = installStub();
+    const p = new ClaudeProvider();
+    const session = p.startSession(
+      {
+        model: 'claude-sonnet-4-6',
+        systemPrompt: 'sys',
+        mcpServers: [
+          {
+            id: 'server1',
+            name: 'server1',
+            transport: { kind: 'stdio', command: 'noop' },
+            allowedTools: ['get_issue'],
+          },
+          {
+            id: 'server2',
+            name: 'server2',
+            transport: { kind: 'stdio', command: 'noop' },
+          },
+        ],
+        workspacePath: '/tmp/x',
+        constraints: {},
+      } as never,
+      new AbortController().signal,
+    );
+
+    // Drive the generator so query() runs and we capture options.
+    for await (const _ of session.run('hi')) void _;
+
+    const opts = captured.capturedOptions;
+    if (!opts) throw new Error('query() was not called');
+    expect(typeof opts.canUseTool).toBe('function');
+
+    // Built-in tools are always allowed — agent config has no built-in whitelist.
+    expect(await opts.canUseTool('Bash', { cmd: 'ls' })).toEqual({
+      behavior: 'allow',
+      updatedInput: { cmd: 'ls' },
+    });
+
+    // Whitelisted MCP tool from server1 is allowed.
+    expect(await opts.canUseTool('mcp__server1__get_issue', {})).toMatchObject({
+      behavior: 'allow',
+    });
+
+    // Non-whitelisted MCP tool from server1 is denied.
+    expect(await opts.canUseTool('mcp__server1__create_issue', {})).toMatchObject({
+      behavior: 'deny',
+    });
+
+    // server2 has no allowedTools filter — allow any tool from it.
+    expect(await opts.canUseTool('mcp__server2__anything', {})).toMatchObject({
+      behavior: 'allow',
+    });
+
+    // Unknown server id is denied.
+    expect(await opts.canUseTool('mcp__unknown__foo', {})).toMatchObject({
+      behavior: 'deny',
+    });
+  });
+});

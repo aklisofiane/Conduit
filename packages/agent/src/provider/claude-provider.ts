@@ -35,6 +35,7 @@ export class ClaudeProvider implements AgentProvider {
     const mcpServers = Object.fromEntries(
       req.mcpServers.map((s) => [s.id, sdkMcpConfig(s)]),
     );
+    const canUseTool = makeCanUseTool(buildMcpAllowMap(req.mcpServers));
     const input = new AsyncQueue<SdkUserMessage>();
     let iterator: AsyncIterator<unknown> | undefined;
 
@@ -49,6 +50,7 @@ export class ClaudeProvider implements AgentProvider {
           cwd: req.workspacePath,
           additionalDirectories: req.additionalDirectories,
           mcpServers,
+          canUseTool,
           maxTurns: req.constraints.maxTurns,
           abortController: abortControllerFromSignal(signal),
           includePartialMessages: true,
@@ -94,9 +96,14 @@ type ClaudeSdk = {
 };
 
 let _sdk: ClaudeSdk | undefined;
+let _loader: (() => Promise<ClaudeSdk>) | undefined;
 
 async function loadClaudeSdk(): Promise<ClaudeSdk> {
   if (_sdk) return _sdk;
+  if (_loader) {
+    _sdk = await _loader();
+    return _sdk;
+  }
   const mod: unknown = await import('@anthropic-ai/claude-agent-sdk').catch((err: unknown) => {
     throw new Error(
       `@anthropic-ai/claude-agent-sdk is not installed. Install it in the worker app. Original: ${String(err)}`,
@@ -104,6 +111,18 @@ async function loadClaudeSdk(): Promise<ClaudeSdk> {
   });
   _sdk = mod as ClaudeSdk;
   return _sdk;
+}
+
+/**
+ * Test-only: inject a custom SDK loader and reset the cached module. Mirrors
+ * the seam on `CodexProvider` so unit tests can stub `query()` without
+ * needing the real Claude Agent SDK installed.
+ */
+export function __setClaudeSdkLoaderForTests(
+  loader: (() => Promise<ClaudeSdk>) | undefined,
+): void {
+  _loader = loader;
+  _sdk = undefined;
 }
 
 /** Map our ResolvedMcpServer shape into the SDK's expected config shape. */
@@ -116,6 +135,66 @@ function sdkMcpConfig(server: AgentRequest['mcpServers'][number]): unknown {
     return { type: 'sse', url: t.url, headers: t.headers ?? {} };
   }
   return { type: 'http', url: t.url, headers: t.headers ?? {} };
+}
+
+/**
+ * MCP allow list keyed by server id. The SDK runs in a headless worker where
+ * `permissionMode: 'default'` would deny every tool call (no UI to prompt).
+ * `'all'` matches the picker's "no `allowedTools` filter" semantic
+ * (`McpServerPicker.tsx` — `allAllowed = allowedTools === undefined`).
+ */
+type McpAllowMap = Map<string, Set<string> | 'all'>;
+
+function buildMcpAllowMap(servers: AgentRequest['mcpServers']): McpAllowMap {
+  const map: McpAllowMap = new Map();
+  for (const s of servers) {
+    map.set(s.id, s.allowedTools ? new Set(s.allowedTools) : 'all');
+  }
+  return map;
+}
+
+type SdkPermissionResult =
+  | { behavior: 'allow'; updatedInput: Record<string, unknown> }
+  | { behavior: 'deny'; message: string };
+
+type SdkCanUseTool = (
+  toolName: string,
+  input: Record<string, unknown>,
+) => Promise<SdkPermissionResult>;
+
+/**
+ * Decides per tool call whether the SDK may execute it. Built-in tools (Bash,
+ * Read, Edit, …) are always allowed — `AgentConfig` doesn't expose a built-in
+ * tool whitelist today, so denying them would break every agent. MCP tools
+ * are gated by the agent's per-server `allowedTools` whitelist.
+ */
+function makeCanUseTool(allow: McpAllowMap): SdkCanUseTool {
+  return async (toolName, input) => {
+    if (!toolName.startsWith('mcp__')) {
+      return { behavior: 'allow', updatedInput: input };
+    }
+    const rest = toolName.slice('mcp__'.length);
+    const sep = rest.indexOf('__');
+    if (sep === -1) {
+      return { behavior: 'deny', message: `Malformed MCP tool name "${toolName}"` };
+    }
+    const serverId = rest.slice(0, sep);
+    const tool = rest.slice(sep + 2);
+    const entry = allow.get(serverId);
+    if (entry === undefined) {
+      return {
+        behavior: 'deny',
+        message: `MCP server "${serverId}" is not attached to this agent`,
+      };
+    }
+    if (entry === 'all' || entry.has(tool)) {
+      return { behavior: 'allow', updatedInput: input };
+    }
+    return {
+      behavior: 'deny',
+      message: `Tool "${tool}" from MCP server "${serverId}" is not in the agent's allow list`,
+    };
+  };
 }
 
 function abortControllerFromSignal(signal: AbortSignal): AbortController {
