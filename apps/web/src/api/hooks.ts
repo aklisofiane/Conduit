@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { DiscoveredTool, McpTransport, WorkflowDefinition } from '@conduit/shared';
+import type { ProjectBoardSummary } from '@conduit/shared/platform';
 import { api } from './client.js';
 import type {
   ConnectionRow,
@@ -238,24 +239,24 @@ export function useIntrospectMcp() {
   });
 }
 
-export interface BoardSummary {
-  number: number;
-  title: string;
-  url: string;
-  fields: Array<{ name: string; options: string[] }>;
-}
-
-export function useListProjectBoards(workflowId: string) {
-  return useMutation({
-    mutationFn: (body: {
-      connectionId: string;
-      ownerType: 'user' | 'org';
-      owner: string;
-    }) =>
-      api.post<BoardSummary[]>(
+export function useListProjectBoards(args: {
+  workflowId: string;
+  connectionId: string;
+  ownerType: 'user' | 'org';
+  owner: string;
+  enabled: boolean;
+}) {
+  const { workflowId, connectionId, ownerType, owner, enabled } = args;
+  return useQuery({
+    queryKey: ['workflow', workflowId, 'project-boards', connectionId, ownerType, owner] as const,
+    queryFn: () =>
+      api.post<ProjectBoardSummary[]>(
         `/workflows/${workflowId}/trigger/list-projects`,
-        body,
+        { connectionId, ownerType, owner },
       ),
+    enabled: enabled && !!connectionId && !!owner,
+    staleTime: 30_000,
+    retry: false,
   });
 }
 

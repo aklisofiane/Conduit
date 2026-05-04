@@ -1,24 +1,8 @@
 /**
- * Minimal GitHub Projects v2 GraphQL client.
- *
- * Two callable surfaces:
- *
- *   `fetchProjectBoardItems` — used by `pollBoardActivity`. Lists items in a
- *   single project along with their linked issue/PR and the single-select
- *   field values we care about for filtering. Pulls all pages and lets the
- *   activity do the filter/diff — pagination + rate-limit handling lives
- *   here.
- *
- *   `listProjectBoards` — used by the API at config time. Lists every
- *   Projects v2 board under an org/user along with each board's
- *   single-select fields and option values. The trigger config UI uses
- *   it to (a) prove the connection works and (b) replace the manual
- *   "type the project number" input with a real dropdown of boards, with
- *   the field options already preloaded for the filter editor.
- *
- * The queries are scoped by `owner` (and project number for items only).
- * GitHub resolves an org or user via the matching root; callers tell us
- * which via `ownerType`.
+ * Minimal GitHub Projects v2 GraphQL client. GitHub resolves a project's
+ * `owner` via either the `organization` or `user` root — callers tell us
+ * which via `ownerType`, since a single GraphQL query against both roots
+ * isn't valid (the wrong one returns null).
  */
 
 const PAGE_SIZE = 50;
@@ -67,11 +51,10 @@ export interface ListProjectBoardsQuery {
 }
 
 export interface ProjectBoardSummary {
-  /** Project number — what the polling activity uses to fetch items. */
   number: number;
   title: string;
   url: string;
-  /** Single-select fields only — these are the ones the trigger filter UI can offer as dropdowns. */
+  /** Single-select fields only — other field types are filtered out by the GraphQL fragment. */
   fields: Array<{ name: string; options: string[] }>;
 }
 
@@ -141,9 +124,6 @@ interface RawProjectItem {
 }
 
 function buildItemsQuery(ownerType: 'user' | 'org'): string {
-  // Query both roots is invalid — one of them returns null for any given
-  // login. Pick the right root up front and alias it to `owner` so the
-  // response shape is uniform regardless of ownerType.
   const root = ownerType === 'org' ? 'organization' : 'user';
   return /* GraphQL */ `
     query ConduitPollBoard(
