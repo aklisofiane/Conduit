@@ -43,13 +43,13 @@ export async function pollBoardActivity(
   if (!wf.isActive) {
     // Schedule may fire between an `isActive=false` flip and the schedule
     // pause reaching the server. Drop cleanly.
-    return emptyResult(workflowId);
+    return emptyResult(workflowId, 'inactive');
   }
 
   const definition = workflowDefinitionSchema.parse(wf.definition);
   const { trigger } = definition;
   if (trigger.mode.kind !== 'polling') {
-    return emptyResult(workflowId);
+    return emptyResult(workflowId, 'not-polling');
   }
   if (trigger.platform !== 'github') {
     throw new Error(`Polling for platform "${trigger.platform}" not implemented`);
@@ -75,6 +75,7 @@ export async function pollBoardActivity(
     projectNumber: trigger.board.number,
     token,
   });
+  const fetchedCount = items.length;
 
   const matching = items.filter((item) => itemPassesFilters(item, trigger.filters));
   const matchingIds = matching.map((item) => item.itemNodeId).sort();
@@ -82,18 +83,24 @@ export async function pollBoardActivity(
   const previousIds = readPreviousIds(wf.pollSnapshot?.matchingIds);
   const previousSet = new Set(previousIds);
   const newItems = matching.filter((item) => !previousSet.has(item.itemNodeId));
+  const alreadySeenCount = matching.length - newItems.length;
 
   // Second gate: the platform query filters by the API's current view, but
   // `matchesTrigger` also enforces platform + filter-field parity against
   // the normalized event. Cheap belt-and-braces.
-  const eventsToStart = newItems
-    .map((item) => toTriggerEvent(item))
-    .filter((event) => matchesTrigger(event, trigger));
-  const startedRunIds = (
-    await Promise.all(
-      eventsToStart.map((event) => startAgentWorkflow(workflowId, definition, event)),
-    )
-  ).filter((id): id is string => id !== undefined);
+  const candidateEvents = newItems.map((item) => toTriggerEvent(item));
+  const eventsToStart = candidateEvents.filter((event) => matchesTrigger(event, trigger));
+  const gatedOutCount = candidateEvents.length - eventsToStart.length;
+
+  const outcomes = await Promise.all(
+    eventsToStart.map((event) => startAgentWorkflow(workflowId, definition, event)),
+  );
+  const startedRunIds = outcomes
+    .filter((o): o is Extract<StartOutcome, { ok: true }> => o.ok)
+    .map((o) => o.runId);
+  const failedStarts = outcomes
+    .filter((o): o is Extract<StartOutcome, { ok: false }> => !o.ok)
+    .map(({ reason, error, issueKey }) => ({ reason, error, issueKey }));
 
   const snapshotChanged =
     startedRunIds.length > 0 ||
@@ -109,19 +116,31 @@ export async function pollBoardActivity(
 
   return {
     workflowId,
+    fetchedCount,
     matchedCount: matching.length,
+    alreadySeenCount,
     newCount: newItems.length,
+    gatedOutCount,
     startedRunIds,
+    failedStarts,
     matchingIds,
   };
 }
 
-function emptyResult(workflowId: string): PollCycleResult {
+function emptyResult(
+  workflowId: string,
+  skipReason?: PollCycleResult['skipReason'],
+): PollCycleResult {
   return {
     workflowId,
+    skipReason,
+    fetchedCount: 0,
     matchedCount: 0,
+    alreadySeenCount: 0,
     newCount: 0,
+    gatedOutCount: 0,
     startedRunIds: [],
+    failedStarts: [],
     matchingIds: [],
   };
 }
@@ -190,12 +209,17 @@ function toTriggerEvent(item: ProjectBoardItem): TriggerEvent {
   return event;
 }
 
+type StartOutcome =
+  | { ok: true; runId: string }
+  | { ok: false; reason: 'duplicate' | 'error'; error?: string; issueKey?: string };
+
 async function startAgentWorkflow(
   workflowId: string,
   definition: WorkflowDefinition,
   triggerEvent: TriggerEvent,
-): Promise<string | undefined> {
+): Promise<StartOutcome> {
   const ticketLock = ticketLockFor(definition, workflowId, triggerEvent);
+  const issueKey = triggerEvent.issue?.key;
   const run = await prisma().workflowRun.create({
     data: {
       workflowId,
@@ -219,29 +243,28 @@ async function startAgentWorkflow(
         temporalRunId: handle.firstExecutionRunId,
       },
     });
-    return run.id;
+    return { ok: true, runId: run.id };
   } catch (err) {
     if (err instanceof WorkflowExecutionAlreadyStartedError) {
       // Another Conduit start is in flight for this ticket — drop this one.
       await prisma().workflowRun.delete({ where: { id: run.id } }).catch(() => undefined);
-      return undefined;
+      return { ok: false, reason: 'duplicate', issueKey };
     }
+    const errMsg = err instanceof Error ? err.message : String(err);
     await prisma().workflowRun.update({
       where: { id: run.id },
       data: {
         status: 'FAILED',
-        error: err instanceof Error ? err.message : String(err),
+        error: errMsg,
         finishedAt: new Date(),
       },
     });
     await writeSystemLog(
       run.id,
       null,
-      `pollBoardActivity: failed to start agentWorkflow: ${
-        err instanceof Error ? err.message : String(err)
-      }`,
+      `pollBoardActivity: failed to start agentWorkflow: ${errMsg}`,
       'ERROR',
     );
-    return undefined;
+    return { ok: false, reason: 'error', error: errMsg, issueKey };
   }
 }

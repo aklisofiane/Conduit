@@ -13,13 +13,31 @@ export type PollWorkflowInput = z.infer<typeof pollWorkflowInputSchema>;
 
 /**
  * One row in the poll-cycle summary written to `ExecutionLog` for audit.
- * Not an end-user-facing shape; the activity emits it for observability.
+ * Surfaced as the `pollWorkflow` return value so each tick's "Result" tab
+ * in the Temporal UI tells the full story of which gate dropped events.
  */
 export interface PollCycleResult {
   workflowId: string;
+  /** Why the activity exited early. `undefined` means it ran the full diff. */
+  skipReason?: 'inactive' | 'not-polling';
+  /** Items returned by the platform query (pre-filter). */
+  fetchedCount: number;
+  /** Items that survived `itemPassesFilters`. */
   matchedCount: number;
+  /** Items that survived but were already in the previous PollSnapshot. */
+  alreadySeenCount: number;
+  /** New items (matched − alreadySeen) — these enter the second gate. */
   newCount: number;
+  /** Items dropped by the `matchesTrigger` second-gate validator. */
+  gatedOutCount: number;
+  /** WorkflowRun ids successfully started this tick. */
   startedRunIds: string[];
+  /** Per-event start failures. Empty when nothing failed. */
+  failedStarts: Array<{
+    issueKey?: string;
+    reason: 'duplicate' | 'error';
+    error?: string;
+  }>;
   /**
    * Matching item keys in *current* cycle — persisted to `PollSnapshot.matchingIds`
    * so the next cycle can diff against it. Stable identifier per platform:
