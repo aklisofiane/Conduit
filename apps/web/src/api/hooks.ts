@@ -66,20 +66,6 @@ export function useDeleteWorkflow() {
   });
 }
 
-export function useManualRun() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (args: {
-      workflowId: string;
-      body?: { issue?: { id: string; key: string; title: string; url: string }; actor?: string };
-    }) => api.post<{ id: string }>(`/workflows/${args.workflowId}/run`, args.body ?? {}),
-    onSuccess: (_, vars) => {
-      void qc.invalidateQueries({ queryKey: runsKey(vars.workflowId) });
-      void qc.invalidateQueries({ queryKey: WORKFLOWS });
-    },
-  });
-}
-
 export function useWorkflowRuns(workflowId: string | undefined, limit = 50) {
   return useQuery({
     queryKey: workflowId ? runsKey(workflowId) : ['workflow', 'none', 'runs'],

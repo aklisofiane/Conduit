@@ -39,10 +39,10 @@ The lever that makes Claude able to validate exit criteria autonomously.
 
 Harness spins up: Postgres + Temporal + Redis + api + worker + `StubProvider`. Drives via HTTP. Asserts on DB state, WS frames, workspace filesystem, Temporal workflow history.
 
-**Example** — Phase 1 exit criterion:
+**Example** — webhook-triggered run:
 ```
 1. POST /workflows → create workflow with one agent node, local workspace
-2. POST /workflows/:id/run → manual run
+2. POST /api/hooks/:workflowId → deliver a webhook event
 3. Connect to /runs/:id WS → collect frames
 4. Await terminal frame
 5. Assert: run row status = SUCCEEDED, frames include streamed agent output, workspace contains expected side effects

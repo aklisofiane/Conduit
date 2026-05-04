@@ -22,7 +22,7 @@ export function WorkflowRunsList({ workflowId }: WorkflowRunsListProps) {
       <div className="overflow-hidden rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-1)]">
         {isLoading && <EmptyRow text="Loading runs…" />}
         {!isLoading && runs.length === 0 && (
-          <EmptyRow text="No runs yet — use Test run to start one." />
+          <EmptyRow text="No runs yet — they'll appear once the trigger fires." />
         )}
         {runs.map((run) => (
           <RunRow key={run.id} run={run} />

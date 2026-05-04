@@ -1,21 +1,15 @@
-import { Icon } from '../canvas/Icon.js';
-
 interface WorkflowActionsProps {
   isActive: boolean;
   dirty: boolean;
   saving: boolean;
-  running: boolean;
   onSave: () => void;
-  onTestRun: () => void;
 }
 
 export function WorkflowActions({
   isActive,
   dirty,
   saving,
-  running,
   onSave,
-  onTestRun,
 }: WorkflowActionsProps) {
   return (
     <div className="flex items-center gap-3">
@@ -40,16 +34,6 @@ export function WorkflowActions({
         disabled={!dirty || saving}
       >
         {saving ? 'Saving…' : dirty ? 'Save' : 'Saved'}
-      </button>
-      <button
-        type="button"
-        className="btn primary"
-        onClick={onTestRun}
-        disabled={running || dirty}
-        title={dirty ? 'Save changes before running' : 'Start a manual run'}
-      >
-        <Icon name="play" size={11} color="currentColor" />
-        Test run
       </button>
     </div>
   );

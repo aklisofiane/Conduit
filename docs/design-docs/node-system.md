@@ -50,17 +50,17 @@ type TriggerFilter = {
 
 On each poll cycle, Conduit compares the current set of matching issues against the previous poll's set (stored in `PollSnapshot` — one row per workflow, overwritten each cycle within a transaction). Issues that are **new to the set** (not present in the last poll) trigger a run. This handles re-entry naturally: if an issue moves `Dev → Review → Dev`, it drops from the matching set when it leaves `Dev` and reappears as new when it re-enters — triggering again. Simple set diff, no transition history needed from the API.
 
-**Manual run**: any workflow can be run manually from the UI via `POST /api/workflows/:id/run`. This is a dev/debug action available on every workflow, not a trigger mode configured in `TriggerConfig`. The user can optionally provide a specific issue/PR to run against. Manual runs produce a `TriggerEvent` with `mode: 'manual'` so the agent knows how it was triggered.
+**No manual run.** There's no "run now" button or endpoint — to test a workflow, configure a polling trigger with a short interval. This keeps the trigger surface uniform: every run, dev or prod, flows through the same webhook or polling path.
 
 ### TriggerEvent
 
-All trigger modes (including manual runs) produce the same `TriggerEvent` shape, passed to every downstream node as `context.trigger`:
+Both trigger modes produce the same `TriggerEvent` shape, passed to every downstream node as `context.trigger`:
 
 ```ts
 type TriggerEvent = {
   source: 'github' | 'gitlab' | 'jira';
-  mode: 'webhook' | 'polling' | 'manual'; // how the run was triggered (manual is not a TriggerMode — it's a runtime action)
-  event: string;                          // e.g. 'status.changed', 'issues.opened', 'manual.run'
+  mode: 'webhook' | 'polling';            // how the run was triggered
+  event: string;                          // e.g. 'status.changed', 'issues.opened'
   payload: Record<string, unknown>;       // platform-specific fields, normalized by mapper
   repo?: { owner: string; name: string }; // present for repo-scoped events
   issue?: { id: string; key: string; title: string; url: string }; // present for issue-scoped events — `key` is the user-visible identifier as a string

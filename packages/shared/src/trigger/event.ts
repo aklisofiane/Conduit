@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { triggerSourceSchema } from '../platform/index';
 
 /**
- * Normalized event produced by every trigger mode (webhook, polling, manual).
+ * Normalized event produced by every trigger mode (webhook, polling).
  * Passed to every downstream node as `AgentContext.trigger`.
  *
  * `issue.id` is the platform's opaque identifier (e.g. GitHub `node_id`).
@@ -12,7 +12,7 @@ import { triggerSourceSchema } from '../platform/index';
  */
 export const triggerEventSchema = z.object({
   source: triggerSourceSchema,
-  mode: z.enum(['webhook', 'polling', 'manual']),
+  mode: z.enum(['webhook', 'polling']),
   event: z.string().min(1),
   payload: z.record(z.unknown()),
   repo: z

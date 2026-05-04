@@ -113,7 +113,6 @@ All routes prefixed `/api`. Non-webhook routes require `X-API-Key` header (see [
 | `GET` | `/workflows/:id` | Get workflow with full definition |
 | `PUT` | `/workflows/:id` | Update workflow (definition, name, active toggle — same save-time validation as create) |
 | `DELETE` | `/workflows/:id` | Delete workflow + cascade runs |
-| `POST` | `/workflows/:id/run` | Manual run — starts a run with optional issue/PR reference. Dev/debug action, not a trigger mode. |
 
 ### Runs
 

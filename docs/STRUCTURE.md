@@ -22,7 +22,7 @@ src/
   common/                              API-key guard, Zod body pipe, Prisma service
   redis/, temporal/                    clients shared across modules
   modules/
-    workflows/                         workflow CRUD, trigger-match, manual run
+    workflows/                         workflow CRUD, trigger-match, run dispatch
     runs/                              run queries + Socket.IO gateway (runs.gateway.ts)
     credentials/                       credential CRUD + AES-256-GCM (crypto.ts)
     connections/                       per-workflow WorkflowConnection CRUD (alias → credential + optional
@@ -190,7 +190,6 @@ e2e/
   mock-github.ts                       local HTTP stand-in for GitHub's GraphQL API used by the
                                        Phase 4 poller test — `startMockGithubGraphql()` +
                                        `projectBoardResponse()` build canned Projects v2 payloads
-  phase1-manual-run.test.ts            Phase 1 exit criterion as an E2E
   phase2-webhook-run.test.ts           Phase 2 — signed GitHub delivery → run → WS tool_call
   phase3-parallel-run.test.ts          Phase 3 — parallel fan-out + merge-back + .conduit/ copy
   phase4-polling-run.test.ts           Phase 4 — polling trigger, set-diff dedup, re-entry

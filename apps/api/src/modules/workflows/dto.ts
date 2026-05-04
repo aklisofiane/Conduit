@@ -20,26 +20,3 @@ export const updateWorkflowDtoSchema = z.object({
   isActive: z.boolean().optional(),
 });
 export type UpdateWorkflowDto = z.infer<typeof updateWorkflowDtoSchema>;
-
-/**
- * Manual run payload. Any of `issue`/`repo` can be passed to synthesize a
- * trigger event when running against a specific issue/PR.
- */
-export const manualRunDtoSchema = z.object({
-  issue: z
-    .object({
-      id: z.string().min(1),
-      key: z.string().min(1),
-      title: z.string(),
-      url: z.string().url(),
-    })
-    .optional(),
-  repo: z
-    .object({
-      owner: z.string().min(1),
-      name: z.string().min(1),
-    })
-    .optional(),
-  actor: z.string().optional(),
-});
-export type ManualRunDto = z.infer<typeof manualRunDtoSchema>;

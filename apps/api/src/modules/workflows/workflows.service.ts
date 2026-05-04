@@ -13,7 +13,7 @@ import {
 import { PrismaService } from '../../common/prisma.service';
 import { assertDefinitionValid } from '../../common/assert-definition-valid';
 import { DuplicateRunError, TemporalService } from '../../temporal/temporal.service';
-import type { CreateWorkflowDto, ManualRunDto, UpdateWorkflowDto } from './dto';
+import type { CreateWorkflowDto, UpdateWorkflowDto } from './dto';
 import { defaultDefinition } from './defaults';
 
 @Injectable()
@@ -121,7 +121,7 @@ export class WorkflowsService implements OnModuleInit {
    *
    *   - polling + isActive    → schedule exists + unpaused
    *   - polling + !isActive   → schedule exists + paused
-   *   - webhook / manual      → no schedule (delete if it existed)
+   *   - webhook               → no schedule (delete if it existed)
    *
    * Schedule failures are logged but never block the workflow write — an
    * inconsistent schedule will be re-reconciled on next save or boot.
@@ -150,20 +150,8 @@ export class WorkflowsService implements OnModuleInit {
   }
 
   /**
-   * Start a manual run. Creates a WorkflowRun row, then kicks off the
-   * Temporal workflow; updates the row with temporal IDs once accepted.
-   * Returns the created row so the UI can navigate to `/runs/:id`.
-   */
-  async manualRun(id: string, dto: ManualRunDto) {
-    const wf = await this.get(id);
-    const triggerEvent = buildManualTriggerEvent(wf.definition, dto);
-    return this.startRun(id, triggerEvent);
-  }
-
-  /**
-   * Shared by manual runs and inbound webhook deliveries. Creates the
-   * `WorkflowRun` row, starts the Temporal workflow, flips the row to
-   * `RUNNING` on success or `FAILED` on start failure. Callers handle
+   * Creates the `WorkflowRun` row, starts the Temporal workflow, flips the
+   * row to `RUNNING` on success or `FAILED` on start failure. Callers handle
    * trigger-matching / auth before invoking this.
    *
    * For `ticket-branch` workflows: the Temporal start uses a deterministic
@@ -224,21 +212,4 @@ function isPrismaNotFound(err: unknown): boolean {
     err !== null &&
     (err as { code?: string }).code === 'P2025'
   );
-}
-
-function buildManualTriggerEvent(
-  definition: unknown,
-  dto: ManualRunDto,
-): TriggerEvent {
-  const def = definition as Partial<WorkflowDefinition> | null;
-  const source = def?.trigger?.platform ?? 'github';
-  return {
-    source,
-    mode: 'manual',
-    event: 'manual.run',
-    payload: {},
-    repo: dto.repo,
-    issue: dto.issue,
-    actor: dto.actor ?? 'manual',
-  };
 }

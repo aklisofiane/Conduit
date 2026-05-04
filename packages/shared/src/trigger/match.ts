@@ -4,10 +4,10 @@ import type { TriggerFilter } from './filter';
 
 /**
  * Returns true if the event matches the trigger configuration — event-name
- * check first (webhook mode only; polling/manual don't carry a specific
- * event name), then all filters (AND). Filters read fields off a flat view
- * of the event so the same syntax works across platforms without special
- * casing. See docs/design-docs/node-system.md.
+ * check first (webhook mode only; polling doesn't carry a specific event
+ * name), then all filters (AND). Filters read fields off a flat view of the
+ * event so the same syntax works across platforms without special casing.
+ * See docs/design-docs/node-system.md.
  */
 export function matchesTrigger(event: TriggerEvent, trigger: TriggerConfig): boolean {
   if (event.source !== trigger.platform) return false;

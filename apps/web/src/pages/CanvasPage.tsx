@@ -15,7 +15,7 @@ import {
   type Node as FlowNode,
   type NodeChange,
 } from '@xyflow/react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import type { AgentConfig, Edge, WorkflowDefinition } from '@conduit/shared';
 import { AgentNode } from '../components/canvas/AgentNode.js';
 import { AgentConfigPanel } from '../components/canvas/AgentConfigPanel.js';
@@ -29,11 +29,7 @@ import { TriggerNode } from '../components/canvas/TriggerNode.js';
 import { WorkflowTabs, type WorkflowTabId } from '../components/layout/WorkflowTabs.js';
 import { WorkflowActions } from '../components/layout/WorkflowActions.js';
 import { WorkflowRunsList } from '../components/run/WorkflowRunsList.js';
-import {
-  useManualRun,
-  useUpdateWorkflow,
-  useWorkflow,
-} from '../api/hooks.js';
+import { useUpdateWorkflow, useWorkflow } from '../api/hooks.js';
 import { useWorkflowEditor } from '../state/workflow-editor.js';
 import { useTopbarSlots } from '../state/topbar-slots.js';
 import { relativeFromNow } from '../lib/time.js';
@@ -51,10 +47,8 @@ export function CanvasPage() {
 
 function CanvasInner() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const { data: wf, isLoading } = useWorkflow(id);
   const updateWorkflow = useUpdateWorkflow(id ?? '');
-  const manualRun = useManualRun();
   const rf = useReactFlow();
   const [activeTab, setActiveTab] = useState<WorkflowTabId>('build');
 
@@ -226,12 +220,6 @@ function CanvasInner() {
     await updateWorkflow.mutateAsync({ definition: draft });
   }, [draft, id, updateWorkflow]);
 
-  const handleRun = useCallback(async () => {
-    if (!id) return;
-    const run = await manualRun.mutateAsync({ workflowId: id, body: {} });
-    navigate(`/runs/${run.id}`);
-  }, [id, manualRun, navigate]);
-
   const tabsSlot = useMemo(
     () => <WorkflowTabs active={activeTab} onChange={setActiveTab} />,
     [activeTab],
@@ -242,19 +230,10 @@ function CanvasInner() {
         isActive={Boolean(wf?.isActive)}
         dirty={dirty}
         saving={updateWorkflow.isPending}
-        running={manualRun.isPending}
         onSave={handleSave}
-        onTestRun={handleRun}
       />
     ),
-    [
-      wf?.isActive,
-      dirty,
-      updateWorkflow.isPending,
-      manualRun.isPending,
-      handleSave,
-      handleRun,
-    ],
+    [wf?.isActive, dirty, updateWorkflow.isPending, handleSave],
   );
   useTopbarSlots({ center: tabsSlot, actions: actionsSlot });
 

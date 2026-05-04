@@ -13,10 +13,8 @@ import { ApiKeyGuard } from '../../common/api-key.guard';
 import { ZodBodyPipe } from '../../common/zod-body.pipe';
 import {
   type CreateWorkflowDto,
-  type ManualRunDto,
   type UpdateWorkflowDto,
   createWorkflowDtoSchema,
-  manualRunDtoSchema,
   updateWorkflowDtoSchema,
 } from './dto';
 import { WorkflowsService } from './workflows.service';
@@ -53,13 +51,5 @@ export class WorkflowsController {
   @HttpCode(204)
   async delete(@Param('id') id: string) {
     await this.svc.delete(id);
-  }
-
-  @Post(':id/run')
-  run(
-    @Param('id') id: string,
-    @Body(new ZodBodyPipe(manualRunDtoSchema)) dto: ManualRunDto,
-  ) {
-    return this.svc.manualRun(id, dto);
   }
 }

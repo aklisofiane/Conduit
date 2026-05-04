@@ -28,6 +28,8 @@ The smallest useful system: a workflow with one agent, started manually from the
 
 **Exit criteria**: User creates a workflow with a Claude agent + workspace, clicks "Run", agent uses SDK built-in tools (file read, shell), watches streaming output on the run detail page.
 
+> **Removed (post-launch):** the manual "Run" button, `POST /workflows/:id/run` endpoint, and `'manual'` trigger mode were dropped — fast-interval polling triggers cover the test-locally use case. The `phase1-manual-run` E2E test was removed; Phase 2's webhook E2E now covers the equivalent agent + streaming pipeline.
+
 ## Phase 1.5 — Validation harness ✅
 
 Make every later phase's exit criterion autonomously verifiable. See [VALIDATION.md](./VALIDATION.md).
