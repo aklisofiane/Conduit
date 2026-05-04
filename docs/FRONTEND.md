@@ -36,6 +36,10 @@ Left rail (`apps/web/src/components/canvas/NodePalette.tsx`). Every card is both
 
 Node positions are persisted to `Workflow.definition.ui.nodePositions` on drag-end only — see the `State` section below for the split between React Flow's measured layout and the persisted draft.
 
+### Edges
+
+Edges are drawn by a custom `WorkflowEdge` (`apps/web/src/components/canvas/WorkflowEdge.tsx`). Selection toggles a thicker accent stroke and renders a small × button at the edge midpoint via `EdgeLabelRenderer`. Backspace with an edge selected and the × button both fan into React Flow's `onEdgesChange` `remove` event — there's a single delete code path, and `flowEdgesToDomain` rebuilds the persisted `WorkflowDefinition.edges` from whatever React Flow state survives. Trigger→agent edges are user-drawn like any other; the canvas does not auto-link a freshly added agent to the trigger, so an unwired agent is visible as an orphan and is silently skipped at runtime.
+
 ### Node components
 
 - **`TriggerNode`** — pill-shaped, platform icon, event label, filter count. Output handle only.

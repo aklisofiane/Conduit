@@ -4,7 +4,7 @@ The canvas has **two node types**. That's the whole taxonomy.
 
 ## 1. Trigger node
 
-Starts a workflow. One per workflow (v1 — multi-trigger deferred).
+Starts a workflow. A trigger is a real graph node — same `id` / `name` shape as agents, addressable by `Edge.from`. The definition stores triggers as `triggers: TriggerConfig[]` and v1 caps the array length at 1, but the plural shape is what every consumer reads (worker `loadGraphActivity`, the canvas, the validator) so multi-trigger lands without another schema migration.
 
 ### Trigger modes
 
@@ -12,6 +12,8 @@ A trigger can operate in **webhook** mode (event-driven push) or **polling** mod
 
 ```ts
 type TriggerConfig = {
+  id: string;                            // stable across renames; used as React Flow node id
+  name: string;                          // unique within workflow, shares the namespace with agent names
   platform: 'github' | 'gitlab' | 'jira';
   connectionId: string;
   mode: TriggerMode;
@@ -200,12 +202,27 @@ Edges carry no config. They declare execution order — node B runs after node A
 
 ```ts
 type Edge = {
-  from: string;   // source node name
-  to: string;     // destination node name
+  from: string;   // source node name — may reference a trigger or an agent
+  to: string;     // destination node name — must reference an agent
 };
 ```
 
+`Edge.from` resolves against the union of trigger and agent names (validated in `workflowDefinitionSchema`); `Edge.to` is restricted to agents — triggers can't be edge destinations. Trigger→agent edges are first-class: nothing is auto-synthesized at render or run time, so an agent dropped on the canvas without an inbound edge is an orphan and won't execute.
+
 **No conditional edges.** Branching lives inside agents (an agent can decide to do nothing). Keeping edges dumb keeps the graph model tiny.
+
+### Edge selection and deletion
+
+The canvas renders edges through a custom `WorkflowEdge` (`apps/web/src/components/canvas/WorkflowEdge.tsx`): clicking an edge selects it and overlays a small × button at its midpoint; pressing Backspace with an edge selected removes it the same way. Both paths flow through React Flow's `onEdgesChange` `remove` event so there is exactly one edge-delete code path — `flowEdgesToDomain` rebuilds `WorkflowDefinition.edges` from the surviving React Flow state.
+
+### Execution semantics
+
+The Temporal workflow scopes the topo-sort to the subgraph reachable from a trigger:
+
+1. `loadGraphActivity` returns `{ triggers, nodes, edges, ... }`.
+2. The workflow splits edges into trigger→agent (entry edges) and agent→agent.
+3. `topoSortGroups(nodes, agentEdges, entryNames)` runs Kahn over the agent subgraph, where `entryNames` are the agents directly downstream of any trigger. Agents not transitively reachable from an entry are dropped from the schedule — orphans on the canvas are silently skipped at runtime, never executed.
+4. Cycles entirely outside the reachable subgraph are ignored; cycles within it throw.
 
 ## Workflow definition shape
 
@@ -213,9 +230,9 @@ The full `Workflow.definition` JSON stored in the DB:
 
 ```ts
 type WorkflowDefinition = {
-  trigger: TriggerConfig;          // exactly one
-  nodes: AgentConfig[];            // agent nodes (trigger is implicit in the single trigger field)
-  edges: Edge[];
+  triggers: TriggerConfig[];       // length === 1 in v1; plural-ready
+  nodes: AgentConfig[];            // agent nodes
+  edges: Edge[];                   // may originate from a trigger or an agent
   mcpServers: WorkflowMcpServer[]; // declared at workflow level, referenced by agent nodes
   ui: CanvasUI;                    // canvas positions + viewport (frontend-only state)
 };
@@ -235,15 +252,16 @@ type NodeOutput = {
 
 ## Validation rules (enforced at save)
 
-1. Exactly one trigger node.
-2. All node names unique and valid identifiers (`^[A-Za-z_][A-Za-z0-9_]*$`).
-3. No cycles within a single workflow graph. Cross-run cycles — via board transitions that re-trigger the same workflow — are the intended loop mechanism; see "Cross-run iteration" below.
-4. Every non-trigger node is reachable from the trigger.
-5. `workspace.inherit.fromNode` points to an ancestor with a `repo-clone`, `ticket-branch`, or `inherit` workspace.
-6. Every `mcpServers[].serverId` references a server defined at the workflow level.
-7. MCP servers with a `connectionId` must reference a valid `WorkflowConnection`.
-8. `ticket-branch` workspaces require a trigger that produces a populated `triggerEvent.issue`. Validated against the trigger's platform + event type at save time — webhook events that don't carry an issue (e.g., `push`, `release`, `workflow_run`, `board.column.changed`) fail validation when combined with `ticket-branch`.
-9. Polling-mode triggers require `TriggerConfig.board` to be populated. Webhook-mode triggers may omit it unless `event === 'board.column.changed'`, which also needs it so the poller / column-move handler knows which Projects v2 board to read.
+1. Exactly one trigger (`triggers.length === 1` in v1; the schema is plural so this becomes a soft cap when multi-trigger lands).
+2. Trigger and agent names are unique within their combined namespace and are valid identifiers (`^[A-Za-z_][A-Za-z0-9_]*$`). A name collision between a trigger and an agent is rejected.
+3. Every `Edge.from` references a known trigger or agent; every `Edge.to` references an agent (triggers can't be edge destinations).
+4. No cycles within a single workflow graph. Cross-run cycles — via board transitions that re-trigger the same workflow — are the intended loop mechanism; see "Cross-run iteration" below.
+5. Agents are *allowed* to be unreachable from any trigger — orphans don't fail save, they just don't execute (the runtime topo-sort drops them). This keeps edits incremental: dropping an agent on the canvas before wiring it doesn't immediately invalidate the workflow.
+6. `workspace.inherit.fromNode` points to an ancestor with a `repo-clone`, `ticket-branch`, or `inherit` workspace.
+7. Every `mcpServers[].serverId` references a server defined at the workflow level.
+8. MCP servers with a `connectionId` must reference a valid `WorkflowConnection`.
+9. `ticket-branch` workspaces require a trigger that produces a populated `triggerEvent.issue`. Validated against the trigger's platform + event type at save time — webhook events that don't carry an issue (e.g., `push`, `release`, `workflow_run`, `board.column.changed`) fail validation when combined with `ticket-branch`.
+10. Polling-mode triggers require `TriggerConfig.board` to be populated. Webhook-mode triggers may omit it unless `event === 'board.column.changed'`, which also needs it so the poller / column-move handler knows which Projects v2 board to read.
 
 ## Cross-run iteration
 

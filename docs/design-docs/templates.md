@@ -27,9 +27,9 @@ A template can contain **one or more workflow definitions**. Single-workflow tem
       "name": "Analyze",
       "description": "...",
       "definition": {
-        "trigger": { /* TriggerConfig */ },
-        "nodes": [ /* Node[] */ ],
-        "edges": [ /* Edge[] */ ],
+        "triggers": [ /* TriggerConfig — length 1 in v1 */ ],
+        "nodes": [ /* AgentConfig[] */ ],
+        "edges": [ /* Edge[] — Edge.from may reference a trigger or an agent */ ],
         "mcpServers": [ /* WorkflowMcpServer[] */ ],
         "ui": { /* CanvasUI — node positions, viewport */ }
       }
@@ -48,7 +48,7 @@ Template definitions reference `connectionId` values using `<alias>` strings. Re
 
 ```json
 {
-  "trigger": { "connectionId": "<github>", ... },
+  "triggers": [{ "connectionId": "<github>", ... }],
   "mcpServers": [{ "connectionId": "<github>", ... }],
   "nodes": [
     { "workspace": { "kind": "repo-clone", "connectionId": "<github>" } }
@@ -58,7 +58,7 @@ Template definitions reference `connectionId` values using `<alias>` strings. Re
 
 Every slot that accepts a connection id is walked by `collectTemplatePlaceholders` / `resolveTemplate`:
 
-- `definition.trigger.connectionId`
+- `definition.triggers[].connectionId`
 - `definition.mcpServers[].connectionId`
 - `definition.nodes[].workspace.connectionId` (for `repo-clone` and `ticket-branch` kinds)
 

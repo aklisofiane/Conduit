@@ -77,7 +77,13 @@
 // apps/worker/src/workflows/agent-workflow.ts
 export async function agentWorkflow(input: AgentWorkflowInput) {
   const graph = await loadGraphActivity(input.workflowId);
-  const order = topoSort(graph.nodes, graph.edges);      // inline, no Node imports
+  // Triggers and agents share a name namespace; entry agents are the targets
+  // of trigger→agent edges. The topo sort runs over the agent subgraph only,
+  // so agents not reachable from any trigger are silently skipped.
+  const triggerNames = new Set(graph.triggers.map((t) => t.name));
+  const entryNames = graph.edges.filter(e => triggerNames.has(e.from)).map(e => e.to);
+  const agentEdges = graph.edges.filter(e => !triggerNames.has(e.from));
+  const order = topoSortGroups(graph.nodes, agentEdges, entryNames); // inline, no Node imports
 
   for (const group of order) {                            // group = parallel set
     await Promise.all(group.map(async (node) => {

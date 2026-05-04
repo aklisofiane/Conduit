@@ -17,7 +17,7 @@ model Workflow {
   id          String   @id @default(cuid())
   name        String
   description String?
-  definition  Json     // { trigger, nodes: Node[], edges: Edge[], mcpServers: WorkflowMcpServer[], ui: CanvasUI } — see @conduit/shared types
+  definition  Json     // { triggers: TriggerConfig[], nodes: AgentConfig[], edges: Edge[], mcpServers: WorkflowMcpServer[], ui: CanvasUI } — see @conduit/shared types. triggers length === 1 in v1.
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
