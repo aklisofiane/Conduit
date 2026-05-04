@@ -1,9 +1,7 @@
-import { createHmac } from 'node:crypto';
-import fs from 'node:fs/promises';
-import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { WorkflowDefinition } from '@conduit/shared';
-import { loadWorkflowFixture } from '../helpers/temporal';
+import { loadEventFixture, loadWorkflowFixture } from '../helpers/temporal';
+import { deliverGithubWebhook, pollForStatus } from '../helpers/webhook';
 import { startHarness, type Harness } from './harness';
 
 /**
@@ -20,7 +18,6 @@ import { startHarness, type Harness } from './harness';
  * without hitting GitHub.
  */
 
-const FIXTURE_DIR = path.resolve(__dirname, '..', 'fixtures', 'events', 'github');
 const WEBHOOK_SECRET = 'phase2-webhook-secret';
 
 interface CreateWorkflowResponse {
@@ -111,32 +108,17 @@ describe('Phase 2 — webhook triggers a run and streams MCP tool calls', () => 
       ],
     });
 
-    // 6. Fire the signed webhook. HMAC must be computed over the exact bytes
-    //    POSTed — we build the body string once and reuse it.
-    const payload = JSON.parse(
-      await fs.readFile(path.join(FIXTURE_DIR, 'issues.opened.json'), 'utf8'),
-    );
-    const body = JSON.stringify(payload);
-    const signature = `sha256=${createHmac('sha256', WEBHOOK_SECRET).update(body).digest('hex')}`;
-
-    const res = await fetch(`${harness.apiUrl}/api/hooks/${created.id}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-GitHub-Event': 'issues',
-        'X-GitHub-Delivery': 'test-delivery-1',
-        'X-Hub-Signature-256': signature,
-      },
-      body,
+    // 6. Fire the signed webhook.
+    const payload = await loadEventFixture('github', 'issues.opened');
+    const { runId } = await deliverGithubWebhook(harness, created.id, {
+      event: 'issues',
+      deliveryId: 'test-delivery-1',
+      secret: WEBHOOK_SECRET,
+      payload,
     });
-    expect(res.status).toBe(200);
-    const webhookResult = (await res.json()) as { status: string; runId?: string };
-    expect(webhookResult.status).toBe('started');
-    expect(webhookResult.runId).toBeDefined();
 
     // 7. Observe streaming — the agent's tool_call should show up on the
     //    run WS exactly like Phase 1 did with fresh-tmpdir.
-    const runId = webhookResult.runId!;
     const collector = harness.collectRun(runId);
     try {
       await collector.waitForDone('Triage', 30_000);
@@ -175,18 +157,3 @@ describe('Phase 2 — webhook triggers a run and streams MCP tool calls', () => 
     expect([401, 404]).toContain(res.status);
   });
 });
-
-async function pollForStatus<T>(
-  fetcher: () => Promise<T>,
-  ready: (value: T) => boolean,
-  timeoutMs: number,
-): Promise<T> {
-  const deadline = Date.now() + timeoutMs;
-  let last: T | undefined;
-  while (Date.now() < deadline) {
-    last = await fetcher();
-    if (ready(last)) return last;
-    await new Promise((r) => setTimeout(r, 250));
-  }
-  throw new Error(`Timed out after ${timeoutMs}ms. Last value: ${JSON.stringify(last)}`);
-}

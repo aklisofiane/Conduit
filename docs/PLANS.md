@@ -42,7 +42,7 @@ Make every later phase's exit criterion autonomously verifiable. See [VALIDATION
 - [x] Fixture directories: `test/fixtures/workflows/` (Phase 1 JSON), `test/fixtures/mcp-stub/` (in-repo stdio MCP server). `repos/` + `events/` land in Phase 2 when they're first needed.
 - [x] Playwright MCP wiring: documented user-configured setup + per-phase smoke pattern in VALIDATION.md.
 - [x] CI: `.github/workflows/test.yml` running typecheck + lint + unit on every PR; E2E behind the unit gate; Playwright smoke on main.
-- [x] Backfill Phase 1 exit criterion as the first E2E test (`test/e2e/phase1-manual-run.test.ts`).
+- [x] Backfill Phase 1 exit criterion as the first E2E test — later removed (see Phase 1 callout above) when manual run was retired in favor of fast-interval polling triggers; Phase 2's webhook E2E now covers the agent + streaming pipeline.
 
 **Exit criteria**: `npm test` runs the full suite (unit + integration + API + E2E) against an ephemeral test stack using `StubProvider`, completes in under 5 minutes, and the Phase 1 golden path is covered by a passing E2E test. Claude can run `npm test` and read pass/fail output.
 

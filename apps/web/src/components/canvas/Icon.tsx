@@ -2,7 +2,6 @@ import type { ProviderId } from '../../styles/theme.js';
 
 export type IconName =
   | 'clock'
-  | 'play'
   | 'plus'
   | 'dot'
   | 'home'
@@ -49,12 +48,6 @@ export function Icon({
         <svg {...common}>
           <circle cx="12" cy="12" r="9" />
           <path d="M12 7v5l3 2" />
-        </svg>
-      );
-    case 'play':
-      return (
-        <svg {...common}>
-          <path d="M6 4l14 8-14 8z" fill={color} />
         </svg>
       );
     case 'plus':

@@ -1,12 +1,9 @@
-import { createHmac } from 'node:crypto';
-import fs from 'node:fs/promises';
-import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { WorkflowDefinition } from '@conduit/shared';
-import { loadWorkflowFixture } from '../helpers/temporal';
+import { loadEventFixture, loadWorkflowFixture } from '../helpers/temporal';
+import { deliverGithubWebhook, pollForStatus } from '../helpers/webhook';
 import { startHarness, type Harness } from './harness';
 
-const FIXTURE_DIR = path.resolve(__dirname, '..', 'fixtures', 'events', 'github');
 const WEBHOOK_SECRET = 'phase3-webhook-secret';
 
 /**
@@ -87,9 +84,6 @@ describe('Phase 3 — parallel fan-out, merge-back, .conduit/ propagation', () =
       },
     );
 
-    // Patch the workflow definition so every `connectionId` placeholder
-    // points at the real connection id, and activate it so the webhook
-    // handler doesn't drop the delivery.
     const patched = rewireConnectionIds(created.definition, connection.id);
     await harness.http.put(`/workflows/${created.id}`, {
       definition: patched,
@@ -197,27 +191,13 @@ describe('Phase 3 — parallel fan-out, merge-back, .conduit/ propagation', () =
       ],
     });
 
-    // Fire the signed webhook to trigger the run — same path Phase 2 takes.
-    const payload = JSON.parse(
-      await fs.readFile(path.join(FIXTURE_DIR, 'issues.opened.json'), 'utf8'),
-    );
-    const body = JSON.stringify(payload);
-    const signature = `sha256=${createHmac('sha256', WEBHOOK_SECRET).update(body).digest('hex')}`;
-
-    const res = await fetch(`${harness.apiUrl}/api/hooks/${created.id}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-GitHub-Event': 'issues',
-        'X-GitHub-Delivery': 'phase3-delivery-1',
-        'X-Hub-Signature-256': signature,
-      },
-      body,
+    const payload = await loadEventFixture('github', 'issues.opened');
+    const { runId } = await deliverGithubWebhook(harness, created.id, {
+      event: 'issues',
+      deliveryId: 'phase3-delivery-1',
+      secret: WEBHOOK_SECRET,
+      payload,
     });
-    expect(res.status).toBe(200);
-    const webhookResult = (await res.json()) as { status: string; runId?: string };
-    expect(webhookResult.status).toBe('started');
-    const runId = webhookResult.runId!;
 
     const collector = harness.collectRun(runId);
     try {
@@ -286,19 +266,4 @@ function rewireConnectionIds(def: WorkflowDefinition, connectionId: string): Wor
         : n,
     ),
   };
-}
-
-async function pollForStatus<T>(
-  fetcher: () => Promise<T>,
-  ready: (value: T) => boolean,
-  timeoutMs: number,
-): Promise<T> {
-  const deadline = Date.now() + timeoutMs;
-  let last: T | undefined;
-  while (Date.now() < deadline) {
-    last = await fetcher();
-    if (ready(last)) return last;
-    await new Promise((r) => setTimeout(r, 250));
-  }
-  throw new Error(`Timed out after ${timeoutMs}ms. Last value: ${JSON.stringify(last)}`);
 }

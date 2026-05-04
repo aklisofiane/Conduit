@@ -58,5 +58,18 @@ export async function loadWorkflowFixture(name: string): Promise<WorkflowFixture
   };
 }
 
+/**
+ * Load a platform event fixture (e.g. a captured GitHub webhook payload)
+ * from `test/fixtures/events/<platform>/<name>.json` as a parsed JSON value.
+ */
+export async function loadEventFixture(
+  platform: 'github',
+  name: string,
+): Promise<unknown> {
+  const file = path.join(FIXTURES_DIR, 'events', platform, `${name}.json`);
+  const raw = await fs.readFile(file, 'utf8');
+  return JSON.parse(raw);
+}
+
 /** Absolute path to the tiny stdio MCP stub server. */
 export const MCP_STUB_SERVER_PATH = path.join(FIXTURES_DIR, 'mcp-stub', 'server.mjs');
