@@ -26,10 +26,7 @@ import {
 } from '../components/canvas/NodePalette.js';
 import { TriggerConfigPanel } from '../components/canvas/TriggerConfigPanel.js';
 import { TriggerNode } from '../components/canvas/TriggerNode.js';
-import {
-  WorkflowEdge,
-  type WorkflowEdgeData,
-} from '../components/canvas/WorkflowEdge.js';
+import { WorkflowEdge } from '../components/canvas/WorkflowEdge.js';
 import { WorkflowTabs, type WorkflowTabId } from '../components/layout/WorkflowTabs.js';
 import { WorkflowActions } from '../components/layout/WorkflowActions.js';
 import { WorkflowRunsList } from '../components/run/WorkflowRunsList.js';
@@ -66,11 +63,9 @@ function CanvasInner() {
   const updateAgent = useWorkflowEditor((s) => s.updateAgent);
   const updateTrigger = useWorkflowEditor((s) => s.updateTrigger);
 
-  // React Flow nodes/edges are kept in local state so that the library's
-  // measured dimensions (set via ResizeObserver on first render) survive
-  // across domain-model updates. Rebuilding FlowNode objects from `draft`
-  // on every render would strip `measured`, which keeps React Flow stuck
-  // on `visibility: hidden` and nothing ever renders on the canvas.
+  // Local state preserves React Flow's `measured` dimensions across draft
+  // updates — rebuilding from `draft` would drop them and stick the
+  // canvas on visibility: hidden.
   const [flowNodes, setFlowNodes] = useState<FlowNode[]>([]);
   const [flowEdges, setFlowEdges] = useState<FlowEdge[]>([]);
 
@@ -105,16 +100,19 @@ function CanvasInner() {
     (changes: NodeChange[]) => {
       setFlowNodes((current) => {
         const next = applyNodeChanges(changes, current);
-        const dragEnded = changes.some(
-          (c) => c.type === 'position' && c.dragging === false,
+        const dropped = changes.filter(
+          (c): c is NodeChange & { type: 'position'; id: string } =>
+            c.type === 'position' && c.dragging === false,
         );
-        if (dragEnded && draft) {
-          const ui = { ...draft.ui, nodePositions: { ...draft.ui.nodePositions } };
-          for (const n of next) {
-            const key = nameForFlowId(draft, n.id) ?? n.id;
-            ui.nodePositions[key] = { x: n.position.x, y: n.position.y };
+        if (dropped.length > 0 && draft) {
+          const positions = { ...draft.ui.nodePositions };
+          for (const change of dropped) {
+            const node = next.find((n) => n.id === change.id);
+            if (!node) continue;
+            const key = nameForFlowId(draft, node.id) ?? node.id;
+            positions[key] = { x: node.position.x, y: node.position.y };
           }
-          setDraft({ ...draft, ui });
+          setDraft({ ...draft, ui: { ...draft.ui, nodePositions: positions } });
         }
         return next;
       });
@@ -148,31 +146,6 @@ function CanvasInner() {
     },
     [draft, setDraft],
   );
-
-  const handleDeleteEdge = useCallback(
-    (edgeId: string) => {
-      // Routed through onEdgesChange so the persistence path stays the same
-      // as Backspace — the React Flow change descriptor is identical.
-      onEdgesChange([{ id: edgeId, type: 'remove' }]);
-    },
-    [onEdgesChange],
-  );
-
-  // Inject the delete callback into every rendered edge so the custom edge
-  // component can show a × button without owning its own draft mutation.
-  useEffect(() => {
-    setFlowEdges((current) => {
-      let changed = false;
-      const next = current.map((e) => {
-        if ((e.data as WorkflowEdgeData | undefined)?.onDelete === handleDeleteEdge) {
-          return e;
-        }
-        changed = true;
-        return { ...e, type: WORKFLOW_EDGE_TYPE, data: { ...(e.data ?? {}), onDelete: handleDeleteEdge } };
-      });
-      return changed ? next : current;
-    });
-  }, [handleDeleteEdge]);
 
   const handleAddAgent = useCallback(
     (provider: 'claude' | 'codex', position?: { x: number; y: number }) => {
@@ -237,9 +210,6 @@ function CanvasInner() {
       if (payload.kind === 'agent') {
         handleAddAgent(payload.provider, point);
       } else {
-        // Multi-trigger UX is gated by the schema cap (=== 1) for now —
-        // dropping the trigger card just repositions the existing trigger
-        // and focuses its inspector.
         const trigger = draft.triggers[0];
         if (!trigger) return;
         const ui = {
@@ -396,9 +366,7 @@ function flowEdgesToDomain(edges: FlowEdge[], def: WorkflowDefinition): Edge[] {
   for (const edge of edges) {
     const from = nameById.get(edge.source);
     const to = nameById.get(edge.target);
-    // Edge.to must point at an agent — block trigger-as-target attempts
-    // (e.g. accidental drag onto a trigger handle, though triggers expose
-    // only a source handle, this is belt-and-braces for the schema).
+    // Edge.to must reference an agent; the schema rejects trigger targets.
     if (!from || !to || !agentIds.has(edge.target)) continue;
     result.push({ from, to });
   }

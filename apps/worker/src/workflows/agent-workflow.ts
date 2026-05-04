@@ -52,13 +52,12 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<void> {
   try {
     const graph = await loadGraphActivity(workflowId);
     const triggerNames = new Set(graph.triggers.map((t) => t.name));
-    // Agents reachable from a trigger via an explicit edge are the entry set
-    // for topo-sort. Agents not reachable from any trigger are silently
-    // skipped — that is what makes "orphan" agents on the canvas not run.
-    const entryNames = graph.edges
-      .filter((e) => triggerNames.has(e.from))
-      .map((e) => e.to);
-    const agentEdges = graph.edges.filter((e) => !triggerNames.has(e.from));
+    const entryNames: string[] = [];
+    const agentEdges: typeof graph.edges = [];
+    for (const edge of graph.edges) {
+      if (triggerNames.has(edge.from)) entryNames.push(edge.to);
+      else agentEdges.push(edge);
+    }
     const groups = topoSortGroups(graph.nodes, agentEdges, entryNames);
     const definitionOrder = new Map(graph.nodes.map((n, i) => [n.name, i]));
     const outputs = new Map<string, NodeOutput>();

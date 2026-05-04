@@ -2,19 +2,10 @@ import {
   BaseEdge,
   EdgeLabelRenderer,
   getSmoothStepPath,
+  useReactFlow,
   type EdgeProps,
 } from '@xyflow/react';
 import { tokens } from '../../styles/theme.js';
-
-/**
- * Edge data carries `onDelete` so the × button on a selected edge can
- * delegate to the same removal path as Backspace (`onEdgesChange` with a
- * `remove` change). Keeping a single source of truth means the canvas
- * draft stays in sync regardless of which delete affordance was used.
- */
-export interface WorkflowEdgeData extends Record<string, unknown> {
-  onDelete?: (edgeId: string) => void;
-}
 
 export function WorkflowEdge({
   id,
@@ -25,9 +16,9 @@ export function WorkflowEdge({
   sourcePosition,
   targetPosition,
   selected,
-  data,
   markerEnd,
 }: EdgeProps) {
+  const { deleteElements } = useReactFlow();
   const [path, labelX, labelY] = getSmoothStepPath({
     sourceX,
     sourceY,
@@ -38,7 +29,6 @@ export function WorkflowEdge({
   });
 
   const stroke = selected ? tokens.color.accent : tokens.color.edge;
-  const onDelete = (data as WorkflowEdgeData | undefined)?.onDelete;
 
   return (
     <>
@@ -48,13 +38,13 @@ export function WorkflowEdge({
         markerEnd={markerEnd}
         style={{ stroke, strokeWidth: selected ? 2 : 1.5 }}
       />
-      {selected && onDelete && (
+      {selected && (
         <EdgeLabelRenderer>
           <button
             type="button"
             onClick={(event) => {
               event.stopPropagation();
-              onDelete(id);
+              deleteElements({ edges: [{ id }] });
             }}
             aria-label="Delete edge"
             style={{

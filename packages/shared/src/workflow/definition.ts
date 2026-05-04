@@ -7,16 +7,9 @@ import { canvasUiSchema } from './canvas';
 
 /**
  * Full workflow definition stored in `Workflow.definition` (JSON column).
- *
- * Structural shape only — deeper referential checks (topology, acyclicity,
- * workspace inheritance rules, `ticket-branch` trigger compatibility) live
- * in the workflow validator and run at save time. See validation rules in
- * docs/design-docs/node-system.md.
- *
- * Triggers are graph nodes alongside agents. `Edge.from` may reference
- * either a trigger name or an agent name; `Edge.to` is always an agent.
- * The schema caps `triggers.length` at 1 today; the cap is the only thing
- * gating the future multi-trigger UX — the data model already accepts it.
+ * Structural shape only — referential checks (topology, acyclicity,
+ * workspace inheritance, `ticket-branch` compatibility) live in the
+ * workflow validator and run at save time. See docs/design-docs/node-system.md.
  */
 export const workflowDefinitionSchema = z
   .object({

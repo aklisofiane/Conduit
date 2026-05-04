@@ -23,9 +23,8 @@ export const boardRefSchema = z.object({
 export type BoardRef = z.infer<typeof boardRefSchema>;
 
 /**
- * Persisted trigger shape on `WorkflowDefinition.triggers[]`. Triggers are
- * graph nodes — `id` is the React Flow node id, `name` lives in the same
- * namespace as agent names so `Edge.from` can reference either.
+ * Persisted trigger shape on `WorkflowDefinition.triggers[]`. `name` shares
+ * a namespace with agent names so `Edge.from` can reference either.
  */
 export const triggerConfigSchema = z.object({
   id: z.string().min(1),
