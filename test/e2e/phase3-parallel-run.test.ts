@@ -55,12 +55,7 @@ describe('Phase 3 — parallel fan-out, merge-back, .conduit/ propagation', () =
     await harness?.stop();
   });
 
-  // Skipped on CI: locally finishes in ~4s but reliably hangs past 240s on
-  // GitHub Actions runners (2 vCPU, shared docker I/O). Suspect: parallel
-  // branched-worktree git ops contending on disk, or Temporal worker
-  // concurrency under-saturating. Re-enable once root-caused.
-  // TODO(phase3-ci): investigate hang and drop the skipIf.
-  it.skipIf(process.env.CI === 'true')('runs Triage → (Fix || Doc) → Review with merge-back and sibling summaries', async () => {
+  it('runs Triage → (Fix || Doc) → Review with merge-back and sibling summaries', async () => {
     await harness.seedRepoClone('acme', 'shop', {
       'src/index.ts': 'export const version = "0.1.0";\n',
     });

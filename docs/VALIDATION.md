@@ -106,10 +106,12 @@ Every phase in [PLANS.md](./PLANS.md) lands with:
 3. At least one E2E test covering the phase's exit criterion.
 4. At least one Playwright smoke test (via MCP) if the phase adds UI surface.
 
-A phase is not "done" until these pass in CI.
+A phase is not "done" until these pass — CI gates the cheap layers, the rest run locally before merge.
 
 ## CI
 
-- Every PR: unit + integration + API + E2E against ephemeral stack.
-- Playwright smoke: optional on PR (slow), required on main.
-- Test stack: `docker compose -f docker-compose.test.yml up` — separate from dev compose, different ports, ephemeral volumes.
+- **CI (every PR + push to main)**: typecheck (covers `apps/`, `packages/`, and `test/`), lint, unit. That's it — fast, deterministic, no docker.
+- **Local before merge**: integration + API contract + E2E. Bring up the test stack with `npm run test:infra:up` (separate from dev compose, different ports, ephemeral tmpfs volumes), then `npm run test:integration` / `test:api` / `test:e2e`.
+- **Playwright smoke**: local-only, run via MCP when touching UI surface.
+
+E2E was previously gated on CI but reliably hung on GHA's 2-vCPU runners (shared docker I/O + Temporal worker concurrency contention). Locally it's fast and reliable, which is where it belongs.
