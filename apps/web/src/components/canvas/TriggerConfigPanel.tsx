@@ -1,5 +1,11 @@
+import { useEffect, useState } from 'react';
 import type { BoardRef, TriggerConfig, TriggerFilter } from '@conduit/shared';
-import { useConnections } from '../../api/hooks.js';
+import {
+  useConnections,
+  useListProjectBoards,
+  type BoardSummary,
+} from '../../api/hooks.js';
+import { ApiError } from '../../api/client.js';
 import { cn } from '../../lib/cn.js';
 import { Icon } from './Icon.js';
 
@@ -32,6 +38,56 @@ export function TriggerConfigPanel({
   const platformConnections = connections.filter(
     (c) => c.credential.platform.toLowerCase() === trigger.platform,
   );
+
+  const [projectBoards, setProjectBoards] = useState<BoardSummary[] | null>(null);
+  const [boardError, setBoardError] = useState<string | null>(null);
+  const listBoards = useListProjectBoards(workflowId);
+
+  // Auto-load project list whenever the user has filled enough of the
+  // connection + owner inputs to make a meaningful query. Debounced so
+  // typing "acme" doesn't fire four GraphQL calls.
+  useEffect(() => {
+    setBoardError(null);
+    if (
+      trigger.mode.kind !== 'polling' &&
+      !(trigger.mode.kind === 'webhook' && trigger.mode.event === 'board.column.changed')
+    ) {
+      setProjectBoards(null);
+      return;
+    }
+    const connectionId = trigger.connectionId;
+    const owner = trigger.board?.owner?.trim();
+    const ownerType = trigger.board?.ownerType ?? 'org';
+    if (!connectionId || !owner) {
+      setProjectBoards(null);
+      return;
+    }
+    const handle = window.setTimeout(() => {
+      listBoards
+        .mutateAsync({ connectionId, ownerType, owner })
+        .then((boards) => {
+          setProjectBoards(boards);
+          setBoardError(null);
+        })
+        .catch((e: unknown) => {
+          setProjectBoards(null);
+          setBoardError(e instanceof ApiError ? e.message : String(e));
+        });
+    }, 400);
+    return () => window.clearTimeout(handle);
+    // listBoards is stable per-render of the hook; intentionally omitted
+    // to avoid the mutation identity flapping the effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    trigger.connectionId,
+    trigger.board?.owner,
+    trigger.board?.ownerType,
+    trigger.mode.kind,
+    trigger.mode.kind === 'webhook' ? trigger.mode.event : null,
+  ]);
+
+  const selectedBoard =
+    projectBoards?.find((b) => b.number === trigger.board?.number) ?? null;
 
   const setMode = (kind: 'webhook' | 'polling') => {
     if (kind === trigger.mode.kind) return;
@@ -190,7 +246,7 @@ export function TriggerConfigPanel({
               label="Project board"
               hint="GitHub Projects v2 — Conduit watches this board"
             >
-              <div className="grid grid-cols-[110px_1fr_90px] gap-2">
+              <div className="grid grid-cols-[110px_1fr] gap-2">
                 <select
                   className="field-input"
                   value={trigger.board?.ownerType ?? 'org'}
@@ -207,16 +263,65 @@ export function TriggerConfigPanel({
                   value={trigger.board?.owner ?? ''}
                   onChange={(e) => setBoard({ owner: e.target.value })}
                 />
-                <input
-                  className="field-input"
-                  type="number"
-                  min={1}
-                  placeholder="#"
-                  value={trigger.board?.number ?? ''}
-                  onChange={(e) =>
-                    setBoard({ number: Math.max(1, Number(e.target.value) || 1) })
-                  }
-                />
+              </div>
+              <div className="mt-2">
+                {!trigger.connectionId ? (
+                  <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
+                    Pick a connection to load projects.
+                  </div>
+                ) : !trigger.board?.owner ? (
+                  <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
+                    Type the {trigger.board?.ownerType ?? 'org'} login to load its projects.
+                  </div>
+                ) : listBoards.isPending ? (
+                  <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
+                    Loading projects…
+                  </div>
+                ) : boardError ? (
+                  <div className="font-mono text-[11px] text-[var(--color-danger,#d54c4c)]">
+                    {boardError}
+                  </div>
+                ) : projectBoards && projectBoards.length === 0 ? (
+                  <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
+                    No Projects v2 boards found under {trigger.board.owner}.
+                  </div>
+                ) : projectBoards ? (
+                  <div className="space-y-1.5">
+                    <select
+                      className="field-input"
+                      value={trigger.board?.number ?? ''}
+                      onChange={(e) =>
+                        setBoard({ number: Number(e.target.value) || 1 })
+                      }
+                    >
+                      <option value="">— select a project —</option>
+                      {projectBoards.map((b) => (
+                        <option key={b.number} value={b.number}>
+                          #{b.number} · {b.title}
+                        </option>
+                      ))}
+                    </select>
+                    {selectedBoard && (
+                      <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
+                        <a
+                          href={selectedBoard.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[var(--color-accent)] hover:underline"
+                        >
+                          open on github ↗
+                        </a>
+                        {selectedBoard.fields.length > 0 && (
+                          <span>
+                            {' · '}
+                            {selectedBoard.fields.length} single-select field
+                            {selectedBoard.fields.length === 1 ? '' : 's'}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : null}
               </div>
             </Field>
           )}
@@ -237,6 +342,7 @@ export function TriggerConfigPanel({
           <Field label="Filters" hint="AND-combined — an event must pass all">
             <FilterEditor
               filters={trigger.filters}
+              boardFields={selectedBoard?.fields}
               onChange={(filters) => onChange({ filters })}
             />
           </Field>
@@ -257,9 +363,11 @@ export function TriggerConfigPanel({
 
 function FilterEditor({
   filters,
+  boardFields,
   onChange,
 }: {
   filters: TriggerFilter[];
+  boardFields?: BoardSummary['fields'];
   onChange: (filters: TriggerFilter[]) => void;
 }) {
   const setAt = (i: number, patch: Partial<TriggerFilter>) => {
@@ -270,6 +378,32 @@ function FilterEditor({
   const add = () =>
     onChange([...filters, { field: 'status', op: 'eq', value: '' }]);
 
+  const findBoardField = (name: string) =>
+    boardFields?.find((bf) => bf.name.toLowerCase() === name.toLowerCase());
+
+  // Normalize matched rows: when a filter row matches a verified board
+  // field, the UI hides the op selector and shows a strict dropdown — so
+  // the persisted row has to be `op: 'eq'` with a single string value to
+  // avoid lying about the saved semantics.
+  useEffect(() => {
+    if (!boardFields) return;
+    let dirty = false;
+    const next = filters.map((f) => {
+      const match = boardFields.find(
+        (bf) => bf.name.toLowerCase() === f.field.toLowerCase(),
+      );
+      if (!match) return f;
+      if (f.op === 'eq' && !Array.isArray(f.value)) return f;
+      dirty = true;
+      return {
+        ...f,
+        op: 'eq' as const,
+        value: Array.isArray(f.value) ? (f.value[0] ?? '') : f.value,
+      };
+    });
+    if (dirty) onChange(next as TriggerFilter[]);
+  }, [filters, boardFields, onChange]);
+
   return (
     <div className="space-y-2">
       {filters.length === 0 && (
@@ -277,53 +411,97 @@ function FilterEditor({
           No filters — every matching event fires the workflow.
         </div>
       )}
-      {filters.map((f, i) => (
-        <div
-          key={i}
-          className="grid grid-cols-[1fr_78px_1fr_28px] gap-1.5 rounded-[var(--radius)] border border-[var(--color-divider)] bg-[var(--color-pill-bg)] p-1.5"
-        >
-          <input
-            className="field-input"
-            placeholder="field"
-            value={f.field}
-            onChange={(e) => setAt(i, { field: e.target.value })}
-          />
-          <select
-            className="field-input"
-            value={f.op}
-            onChange={(e) => setAt(i, { op: e.target.value as TriggerFilter['op'] })}
+      {filters.map((f, i) => {
+        const match = findBoardField(f.field);
+        if (match) {
+          // Verified board field → strict dropdown, no op selector. The
+          // useEffect above keeps op normalized to `eq`; until that fires
+          // we still display the first array entry so the dropdown isn't
+          // blank for one paint.
+          const currentValue = Array.isArray(f.value) ? (f.value[0] ?? '') : f.value;
+          return (
+            <div
+              key={i}
+              className="grid grid-cols-[1fr_1fr_28px] gap-1.5 rounded-[var(--radius)] border border-[var(--color-divider)] bg-[var(--color-pill-bg)] p-1.5"
+            >
+              <input
+                className="field-input"
+                placeholder="field"
+                value={f.field}
+                onChange={(e) => setAt(i, { field: e.target.value })}
+              />
+              <select
+                className="field-input"
+                value={currentValue}
+                onChange={(e) => setAt(i, { value: e.target.value })}
+              >
+                <option value="">— select —</option>
+                {match.options.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
+                ))}
+              </select>
+              <button
+                className="btn"
+                onClick={() => removeAt(i)}
+                aria-label="Remove filter"
+                title="Remove filter"
+              >
+                ×
+              </button>
+            </div>
+          );
+        }
+
+        return (
+          <div
+            key={i}
+            className="grid grid-cols-[1fr_78px_1fr_28px] gap-1.5 rounded-[var(--radius)] border border-[var(--color-divider)] bg-[var(--color-pill-bg)] p-1.5"
           >
-            <option value="eq">eq</option>
-            <option value="neq">neq</option>
-            <option value="in">in</option>
-            <option value="contains">contains</option>
-          </select>
-          <input
-            className="field-input"
-            placeholder={f.op === 'in' ? 'a, b, c' : 'value'}
-            value={Array.isArray(f.value) ? f.value.join(', ') : f.value}
-            onChange={(e) => {
-              const raw = e.target.value;
-              const next =
-                f.op === 'in'
-                  ? raw
-                      .split(',')
-                      .map((s) => s.trim())
-                      .filter(Boolean)
-                  : raw;
-              setAt(i, { value: next });
-            }}
-          />
-          <button
-            className="btn"
-            onClick={() => removeAt(i)}
-            aria-label="Remove filter"
-            title="Remove filter"
-          >
-            ×
-          </button>
-        </div>
-      ))}
+            <input
+              className="field-input"
+              placeholder="field"
+              value={f.field}
+              onChange={(e) => setAt(i, { field: e.target.value })}
+            />
+            <select
+              className="field-input"
+              value={f.op}
+              onChange={(e) => setAt(i, { op: e.target.value as TriggerFilter['op'] })}
+            >
+              <option value="eq">eq</option>
+              <option value="neq">neq</option>
+              <option value="in">in</option>
+              <option value="contains">contains</option>
+            </select>
+            <input
+              className="field-input"
+              placeholder={f.op === 'in' ? 'a, b, c' : 'value'}
+              value={Array.isArray(f.value) ? f.value.join(', ') : f.value}
+              onChange={(e) => {
+                const raw = e.target.value;
+                const next =
+                  f.op === 'in'
+                    ? raw
+                        .split(',')
+                        .map((s) => s.trim())
+                        .filter(Boolean)
+                    : raw;
+                setAt(i, { value: next });
+              }}
+            />
+            <button
+              className="btn"
+              onClick={() => removeAt(i)}
+              aria-label="Remove filter"
+              title="Remove filter"
+            >
+              ×
+            </button>
+          </div>
+        );
+      })}
       <button className="btn w-full" onClick={add}>
         + Add filter
       </button>

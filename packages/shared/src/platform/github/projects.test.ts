@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fetchProjectBoardItems } from './github-projects';
+import { fetchProjectBoardItems, listProjectBoards } from './projects';
 
 /**
  * Mapper tests — we stub `fetch` with a canned GraphQL response so the
@@ -170,6 +170,103 @@ describe('fetchProjectBoardItems', () => {
     );
     expect(seenHeaders.Authorization).toBe('Bearer tok_123');
     expect(seenHeaders['Content-Type']).toBe('application/json');
+  });
+});
+
+describe('listProjectBoards', () => {
+  it('returns every project under the owner with their single-select fields', async () => {
+    const canned = {
+      data: {
+        owner: {
+          projectsV2: {
+            nodes: [
+              {
+                number: 5,
+                title: 'Roadmap Q3',
+                url: 'https://github.com/orgs/acme/projects/5',
+                fields: {
+                  nodes: [
+                    {
+                      __typename: 'ProjectV2SingleSelectField',
+                      name: 'Status',
+                      options: [{ name: 'Todo' }, { name: 'In review' }, { name: 'Done' }],
+                    },
+                    {
+                      __typename: 'ProjectV2SingleSelectField',
+                      name: 'Priority',
+                      options: [{ name: 'P0' }, { name: 'P1' }],
+                    },
+                    // Non-single-select fields should be ignored.
+                    { __typename: 'ProjectV2Field', name: 'Title' },
+                    { __typename: 'ProjectV2IterationField', name: 'Sprint' },
+                  ],
+                },
+              },
+              {
+                number: 6,
+                title: 'Bugs',
+                url: 'https://github.com/orgs/acme/projects/6',
+                fields: { nodes: [] },
+              },
+            ],
+          },
+        },
+      },
+    };
+    const fakeFetch = makeFetch([canned]);
+    const summaries = await listProjectBoards(
+      { ownerType: 'org', owner: 'acme', token: 't' },
+      fakeFetch,
+    );
+    expect(summaries).toEqual([
+      {
+        number: 5,
+        title: 'Roadmap Q3',
+        url: 'https://github.com/orgs/acme/projects/5',
+        fields: [
+          { name: 'Status', options: ['Todo', 'In review', 'Done'] },
+          { name: 'Priority', options: ['P0', 'P1'] },
+        ],
+      },
+      {
+        number: 6,
+        title: 'Bugs',
+        url: 'https://github.com/orgs/acme/projects/6',
+        fields: [],
+      },
+    ]);
+  });
+
+  it('returns an empty list when the owner has no projects', async () => {
+    const canned = { data: { owner: { projectsV2: { nodes: [] } } } };
+    const fakeFetch = makeFetch([canned]);
+    const summaries = await listProjectBoards(
+      { ownerType: 'user', owner: 'alice', token: 't' },
+      fakeFetch,
+    );
+    expect(summaries).toEqual([]);
+  });
+
+  it('throws when the owner cannot be resolved', async () => {
+    const canned = { data: { owner: null } };
+    const fakeFetch = makeFetch([canned]);
+    await expect(
+      listProjectBoards(
+        { ownerType: 'user', owner: 'unknown', token: 't' },
+        fakeFetch,
+      ),
+    ).rejects.toThrow(/User "unknown" not found/);
+  });
+
+  it('surfaces GraphQL auth errors', async () => {
+    const canned = { errors: [{ message: 'Bad credentials', type: 'UNAUTHORIZED' }] };
+    const fakeFetch = makeFetch([canned]);
+    await expect(
+      listProjectBoards(
+        { ownerType: 'org', owner: 'acme', token: 'bad' },
+        fakeFetch,
+      ),
+    ).rejects.toThrow(/Bad credentials/);
   });
 });
 

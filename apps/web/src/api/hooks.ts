@@ -238,6 +238,27 @@ export function useIntrospectMcp() {
   });
 }
 
+export interface BoardSummary {
+  number: number;
+  title: string;
+  url: string;
+  fields: Array<{ name: string; options: string[] }>;
+}
+
+export function useListProjectBoards(workflowId: string) {
+  return useMutation({
+    mutationFn: (body: {
+      connectionId: string;
+      ownerType: 'user' | 'org';
+      owner: string;
+    }) =>
+      api.post<BoardSummary[]>(
+        `/workflows/${workflowId}/trigger/list-projects`,
+        body,
+      ),
+  });
+}
+
 export function useSkills() {
   return useQuery({
     queryKey: ['skills'],

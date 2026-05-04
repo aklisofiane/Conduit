@@ -9,6 +9,7 @@ import { McpModule } from './modules/mcp/mcp.module';
 import { RunsModule } from './modules/runs/runs.module';
 import { SkillsModule } from './modules/skills/skills.module';
 import { TemplatesModule } from './modules/templates/templates.module';
+import { TriggerModule } from './modules/trigger/trigger.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { WorkflowsModule } from './modules/workflows/workflows.module';
 
@@ -25,6 +26,7 @@ import { WorkflowsModule } from './modules/workflows/workflows.module';
     SkillsModule,
     McpModule,
     TemplatesModule,
+    TriggerModule,
     WebhooksModule,
   ],
 })

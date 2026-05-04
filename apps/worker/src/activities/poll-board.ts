@@ -19,7 +19,7 @@ import { writeSystemLog } from '../runtime/log-writer';
 import {
   fetchProjectBoardItems,
   type ProjectBoardItem,
-} from '../runtime/github-projects';
+} from '@conduit/shared/platform';
 import { getTemporalClient } from '../runtime/temporal-client';
 
 /**
