@@ -3,15 +3,23 @@ import type { AgentConfig, NodeOutput, TriggerEvent } from '@conduit/shared';
 import type * as activities from '../activities/index';
 import { topoSortGroups } from './topo-sort';
 
+// Agent sessions aren't resumable mid-conversation (see run-agent-node.ts header).
+// On timeout/failure, fail the run rather than retry from scratch and waste tokens.
+const { runAgentNode } = proxyActivities<typeof activities>({
+  startToCloseTimeout: '2 hours',
+  heartbeatTimeout: '60s',
+  retry: {
+    maximumAttempts: 1,
+  },
+});
+
 const {
   loadGraphActivity,
-  runAgentNode,
   cleanupRunActivity,
   mergeWorktreeActivity,
   copyConduitFilesActivity,
 } = proxyActivities<typeof activities>({
-  startToCloseTimeout: '30 minutes',
-  heartbeatTimeout: '60s',
+  startToCloseTimeout: '5 minutes',
   retry: {
     initialInterval: '2s',
     backoffCoefficient: 2,
