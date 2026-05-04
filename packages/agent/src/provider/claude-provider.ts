@@ -35,7 +35,7 @@ export class ClaudeProvider implements AgentProvider {
     const mcpServers = Object.fromEntries(
       req.mcpServers.map((s) => [s.id, sdkMcpConfig(s)]),
     );
-    const canUseTool = makeCanUseTool(buildMcpAllowMap(req.mcpServers));
+    const canUseTool = makeCanUseTool(req.mcpServers);
     const input = new AsyncQueue<SdkUserMessage>();
     let iterator: AsyncIterator<unknown> | undefined;
 
@@ -137,57 +137,44 @@ function sdkMcpConfig(server: AgentRequest['mcpServers'][number]): unknown {
   return { type: 'http', url: t.url, headers: t.headers ?? {} };
 }
 
-/**
- * MCP allow list keyed by server id. The SDK runs in a headless worker where
- * `permissionMode: 'default'` would deny every tool call (no UI to prompt).
- * `'all'` matches the picker's "no `allowedTools` filter" semantic
- * (`McpServerPicker.tsx` — `allAllowed = allowedTools === undefined`).
- */
-type McpAllowMap = Map<string, Set<string> | 'all'>;
-
-function buildMcpAllowMap(servers: AgentRequest['mcpServers']): McpAllowMap {
-  const map: McpAllowMap = new Map();
-  for (const s of servers) {
-    map.set(s.id, s.allowedTools ? new Set(s.allowedTools) : 'all');
-  }
-  return map;
-}
+const MCP_TOOL_PREFIX = 'mcp__';
 
 type SdkPermissionResult =
   | { behavior: 'allow'; updatedInput: Record<string, unknown> }
   | { behavior: 'deny'; message: string };
 
-type SdkCanUseTool = (
+export type SdkCanUseTool = (
   toolName: string,
   input: Record<string, unknown>,
 ) => Promise<SdkPermissionResult>;
 
 /**
- * Decides per tool call whether the SDK may execute it. Built-in tools (Bash,
- * Read, Edit, …) are always allowed — `AgentConfig` doesn't expose a built-in
- * tool whitelist today, so denying them would break every agent. MCP tools
- * are gated by the agent's per-server `allowedTools` whitelist.
+ * Built-ins pass through unconditionally — `AgentConfig` has no built-in tool
+ * whitelist today, so denying them would break every agent. MCP tools are
+ * gated by the per-server `allowedTools` list; missing means "allow all from
+ * this server", matching the picker UI semantic.
  */
-function makeCanUseTool(allow: McpAllowMap): SdkCanUseTool {
+function makeCanUseTool(servers: AgentRequest['mcpServers']): SdkCanUseTool {
+  const byId = new Map(servers.map((s) => [s.id, s] as const));
   return async (toolName, input) => {
-    if (!toolName.startsWith('mcp__')) {
+    if (!toolName.startsWith(MCP_TOOL_PREFIX)) {
       return { behavior: 'allow', updatedInput: input };
     }
-    const rest = toolName.slice('mcp__'.length);
+    const rest = toolName.slice(MCP_TOOL_PREFIX.length);
     const sep = rest.indexOf('__');
     if (sep === -1) {
       return { behavior: 'deny', message: `Malformed MCP tool name "${toolName}"` };
     }
     const serverId = rest.slice(0, sep);
     const tool = rest.slice(sep + 2);
-    const entry = allow.get(serverId);
-    if (entry === undefined) {
+    const server = byId.get(serverId);
+    if (!server) {
       return {
         behavior: 'deny',
         message: `MCP server "${serverId}" is not attached to this agent`,
       };
     }
-    if (entry === 'all' || entry.has(tool)) {
+    if (!server.allowedTools || server.allowedTools.includes(tool)) {
       return { behavior: 'allow', updatedInput: input };
     }
     return {

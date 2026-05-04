@@ -1,13 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { ClaudeProvider, __setClaudeSdkLoaderForTests } from './claude-provider';
-
-type CanUseTool = (
-  name: string,
-  input: Record<string, unknown>,
-) => Promise<{ behavior: 'allow'; updatedInput: Record<string, unknown> } | { behavior: 'deny'; message: string }>;
+import {
+  ClaudeProvider,
+  __setClaudeSdkLoaderForTests,
+  type SdkCanUseTool,
+} from './claude-provider';
 
 interface CapturedOptions {
-  canUseTool: CanUseTool;
+  canUseTool: SdkCanUseTool;
   mcpServers: Record<string, unknown>;
 }
 
