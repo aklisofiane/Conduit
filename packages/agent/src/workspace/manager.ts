@@ -98,6 +98,15 @@ export class WorkspaceManager {
     const target = nodeWorkspacePath(runId, nodeName);
     await fs.mkdir(path.dirname(target), { recursive: true });
 
+    // Idempotency under Temporal retries: a previous attempt may have
+    // created the worktree before the activity errored. Drop registration
+    // and any stranded directory before re-adding. Same pattern as
+    // ticket-branch.ts. `--force` alone won't cover an existing-but-not-
+    // registered directory, so the explicit fs.rm is load-bearing.
+    await git(['worktree', 'remove', '--force', target], { cwd: bare }).catch(() => undefined);
+    await git(['worktree', 'prune'], { cwd: bare }).catch(() => undefined);
+    await fs.rm(target, { recursive: true, force: true });
+
     // Bring the base clone up-to-date. Uses the bare clone's remote (which
     // already has auth baked in via the credential helper during clone).
     await git(['fetch', '--prune', 'origin'], { cwd: bare });
@@ -135,6 +144,14 @@ export class WorkspaceManager {
   ): Promise<ResolvedWorkspace> {
     const target = nodeWorkspacePath(runId, nodeName);
     await fs.mkdir(path.dirname(target), { recursive: true });
+
+    // Idempotency under Temporal retries — see repoClone() for rationale.
+    await git(['worktree', 'remove', '--force', target], { cwd: upstreamPath }).catch(
+      () => undefined,
+    );
+    await git(['worktree', 'prune'], { cwd: upstreamPath }).catch(() => undefined);
+    await fs.rm(target, { recursive: true, force: true });
+
     const ref = upstreamHead ?? (await git(['rev-parse', 'HEAD'], { cwd: upstreamPath })).trim();
     await git(['worktree', 'add', '--detach', target, ref], { cwd: upstreamPath });
     return {
