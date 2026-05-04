@@ -11,6 +11,7 @@ import type {
   TemplateBinding,
   TemplateSummary,
   WorkflowRow,
+  WorkflowRunListItem,
 } from './types.js';
 
 const WORKFLOWS = ['workflows'] as const;
@@ -74,6 +75,23 @@ export function useManualRun() {
     onSuccess: (_, vars) => {
       void qc.invalidateQueries({ queryKey: runsKey(vars.workflowId) });
       void qc.invalidateQueries({ queryKey: WORKFLOWS });
+    },
+  });
+}
+
+export function useWorkflowRuns(workflowId: string | undefined, limit = 50) {
+  return useQuery({
+    queryKey: workflowId ? runsKey(workflowId) : ['workflow', 'none', 'runs'],
+    queryFn: () =>
+      api.get<WorkflowRunListItem[]>(`/workflows/${workflowId!}/runs?limit=${limit}`),
+    enabled: !!workflowId,
+    // Poll on a baseline so polling/webhook-triggered runs surface even when
+    // the user did nothing locally to invalidate the cache; speed up while
+    // any row is in flight so the dot/duration update tightly.
+    refetchInterval: (q) => {
+      const data = q.state.data as WorkflowRunListItem[] | undefined;
+      const inFlight = data?.some((r) => r.status === 'PENDING' || r.status === 'RUNNING');
+      return inFlight ? 5000 : 15000;
     },
   });
 }

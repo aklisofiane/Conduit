@@ -15,7 +15,7 @@ interface TabDef {
 
 const TABS: TabDef[] = [
   { id: 'build', label: 'Build', enabled: true },
-  { id: 'runs', label: 'Runs', enabled: false },
+  { id: 'runs', label: 'Runs', enabled: true },
   { id: 'history', label: 'History', enabled: false },
 ];
 

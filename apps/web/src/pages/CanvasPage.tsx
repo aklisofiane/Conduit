@@ -28,6 +28,7 @@ import { TriggerConfigPanel } from '../components/canvas/TriggerConfigPanel.js';
 import { TriggerNode } from '../components/canvas/TriggerNode.js';
 import { WorkflowTabs, type WorkflowTabId } from '../components/layout/WorkflowTabs.js';
 import { WorkflowActions } from '../components/layout/WorkflowActions.js';
+import { WorkflowRunsList } from '../components/run/WorkflowRunsList.js';
 import {
   useManualRun,
   useUpdateWorkflow,
@@ -270,6 +271,14 @@ function CanvasInner() {
   const lastRunLabel = wf?.updatedAt
     ? `saved · ${relativeFromNow(wf.updatedAt)}`
     : 'unsaved';
+
+  if (activeTab === 'runs') {
+    return (
+      <div className="flex flex-1 min-h-0 overflow-auto">
+        <WorkflowRunsList workflowId={id} />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-1 min-h-0">

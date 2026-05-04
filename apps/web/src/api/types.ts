@@ -30,17 +30,31 @@ export interface WorkflowRunSummary {
   error: string | null;
 }
 
+export interface RunTrigger {
+  source: string;
+  mode: string;
+  event: string;
+  actor?: string;
+  issue?: { key: string; title: string; url: string };
+  repo?: { owner: string; name: string };
+}
+
+export interface WorkflowRunListItem extends WorkflowRunSummary {
+  workflowId: string;
+  trigger: RunTrigger;
+  nodes: {
+    id: string;
+    nodeName: string;
+    status: RunStatus;
+    startedAt: string | null;
+    finishedAt: string | null;
+  }[];
+}
+
 export interface RunDetail extends WorkflowRunSummary {
   workflowId: string;
   workflow: { id: string; name: string; definition: WorkflowDefinition };
-  trigger: {
-    source: string;
-    mode: string;
-    event: string;
-    actor?: string;
-    issue?: { key: string; title: string; url: string };
-    repo?: { owner: string; name: string };
-  };
+  trigger: RunTrigger;
   temporalWorkflowId: string | null;
   temporalRunId: string | null;
   nodes: NodeRunRow[];
