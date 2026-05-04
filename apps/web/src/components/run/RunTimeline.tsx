@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import type { ExecutionLogRow } from '../../api/types.js';
 import { cn } from '../../lib/cn.js';
 
@@ -9,12 +9,13 @@ interface RunTimelineProps {
 
 export function RunTimeline({ events, streaming }: RunTimelineProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const display = useMemo(() => prepareEvents(events), [events]);
   useEffect(() => {
     if (!streaming) return;
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [events, streaming]);
 
-  if (events.length === 0) {
+  if (display.length === 0) {
     return (
       <div className="flex h-full items-center justify-center font-mono text-[12px] text-[var(--color-text-4)]">
         No events yet — waiting for the agent to start.
@@ -22,17 +23,42 @@ export function RunTimeline({ events, streaming }: RunTimelineProps) {
     );
   }
 
-  const startTs = events[0] ? new Date(events[0].ts).getTime() : Date.now();
+  const startTs = new Date(display[0]!.ts).getTime();
 
   return (
     <div ref={scrollRef} className="h-full overflow-y-auto px-6 py-5">
       <div className="space-y-3">
-        {events.map((event, idx) => (
-          <TimelineEvent key={event.id} event={event} offsetSec={offsetSeconds(event.ts, startTs)} last={idx === events.length - 1 && streaming} />
+        {display.map((event, idx) => (
+          <TimelineEvent key={event.id} event={event} offsetSec={offsetSeconds(event.ts, startTs)} last={idx === display.length - 1 && streaming} />
         ))}
       </div>
     </div>
   );
+}
+
+function prepareEvents(events: ExecutionLogRow[]): ExecutionLogRow[] {
+  const out: ExecutionLogRow[] = [];
+  for (const ev of events) {
+    const p = ev.payload as { type?: string; delta?: string } | null;
+    if (p?.type === 'usage' || ev.kind === 'USAGE') continue;
+
+    const prev = out[out.length - 1];
+    const prevP = prev?.payload as { type?: string; delta?: string } | null;
+    if (
+      prev &&
+      prevP?.type === 'text' &&
+      p?.type === 'text' &&
+      prev.nodeName === ev.nodeName
+    ) {
+      out[out.length - 1] = {
+        ...prev,
+        payload: { type: 'text', delta: (prevP.delta ?? '') + (p.delta ?? '') },
+      };
+      continue;
+    }
+    out.push(ev);
+  }
+  return out;
 }
 
 function TimelineEvent({

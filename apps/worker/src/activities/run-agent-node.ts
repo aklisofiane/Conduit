@@ -252,7 +252,7 @@ async function onAgentEvent(
     usage.turns += 1;
   }
   await Promise.all([
-    writeAgentEventLog(runId, nodeName, event),
+    event.type === 'usage' ? Promise.resolve() : writeAgentEventLog(runId, nodeName, event),
     publishRunUpdate({
       runId,
       nodeName,
