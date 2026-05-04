@@ -96,7 +96,9 @@ export class WorkflowsService implements OnModuleInit {
           isActive: dto.isActive,
         },
       });
-      await this.syncPollSchedule(wf.id, wf.definition, wf.isActive);
+      if (dto.isActive !== undefined || dto.definition !== undefined) {
+        await this.syncPollSchedule(wf.id, wf.definition, wf.isActive);
+      }
       return wf;
     } catch (err) {
       if (isPrismaNotFound(err)) throw new NotFoundException(`Workflow ${id} not found`);

@@ -20,8 +20,8 @@ type TriggerConfig = {
 };
 
 type TriggerMode =
-  | { kind: 'webhook'; event: string; active: boolean }        // platform pushes events (e.g. 'issues.opened', 'board.column.changed')
-  | { kind: 'polling'; intervalSec: number; active: boolean }; // Conduit polls the board API on an interval (default 60s)
+  | { kind: 'webhook'; event: string }        // platform pushes events (e.g. 'issues.opened', 'board.column.changed')
+  | { kind: 'polling'; intervalSec: number }; // Conduit polls the board API on an interval (default 60s)
 
 type BoardRef = {
   ownerType: 'user' | 'org';  // GitHub Projects v2 are owned by a user or an org
