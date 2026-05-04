@@ -5,7 +5,7 @@
     "trigger": {
       "platform": "github",
       "connectionId": "__placeholder__",
-      "mode": { "kind": "webhook", "event": "issues.opened", "active": true },
+      "mode": { "kind": "webhook", "event": "issues.opened" },
       "filters": []
     },
     "nodes": [

@@ -329,7 +329,9 @@ function CanvasInner() {
         <TriggerConfigPanel
           trigger={draft.trigger}
           workflowId={id}
+          isActive={Boolean(wf?.isActive)}
           onChange={(patch) => updateTrigger(patch)}
+          onActiveChange={(next) => updateWorkflow.mutate({ isActive: next })}
           onSave={handleSave}
           onDiscard={() => wf && reset(wf.definition)}
           onClose={() => setSelected(undefined)}

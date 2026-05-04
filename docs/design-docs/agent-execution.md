@@ -229,7 +229,7 @@ Lifecycle:
    - `spec.intervals = [{ every: '<intervalSec>s' }]`
    - `action.type = 'startWorkflow'`, `workflowType = 'pollWorkflow'`, `workflowId = pollWorkflowId(workflowId)`
    - `policies.overlap = SKIP` — a slow poll cycle never piles up behind its successor.
-   - `state.paused = !(workflow.isActive && trigger.mode.active)`.
+   - `state.paused = !workflow.isActive`.
    Webhook-mode or non-existent triggers have their schedule deleted. Delete is idempotent (`NOT_FOUND` is swallowed).
 2. **Boot reconcile.** `WorkflowsService.onModuleInit` walks every polling workflow in the DB and calls `upsertPollSchedule` so a Temporal outage at boot doesn't leave schedules out of sync — any subsequent API restart re-asserts the state.
 3. **Tick.** The Schedule fires `pollWorkflow(workflowId)` — a sandboxed shell that just calls `pollBoardActivity`.

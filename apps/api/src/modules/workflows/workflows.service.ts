@@ -117,9 +117,9 @@ export class WorkflowsService implements OnModuleInit {
   /**
    * Keep Temporal's Schedule in sync with the workflow's current trigger:
    *
-   *   - polling + isActive + mode.active → schedule exists + unpaused
-   *   - polling + (inactive anywhere)    → schedule exists + paused
-   *   - webhook / manual                 → no schedule (delete if it existed)
+   *   - polling + isActive    → schedule exists + unpaused
+   *   - polling + !isActive   → schedule exists + paused
+   *   - webhook / manual      → no schedule (delete if it existed)
    *
    * Schedule failures are logged but never block the workflow write — an
    * inconsistent schedule will be re-reconciled on next save or boot.
@@ -135,7 +135,7 @@ export class WorkflowsService implements OnModuleInit {
         await this.temporal.upsertPollSchedule({
           workflowId,
           intervalSec: trigger.mode.intervalSec,
-          active: isActive && trigger.mode.active,
+          active: isActive,
         });
       } else {
         await this.temporal.deletePollSchedule(workflowId);

@@ -6,7 +6,9 @@ import { Icon } from './Icon.js';
 interface TriggerConfigPanelProps {
   trigger: TriggerConfig;
   workflowId: string;
+  isActive: boolean;
   onChange: (patch: Partial<TriggerConfig>) => void;
+  onActiveChange: (next: boolean) => void;
   onSave: () => void;
   onDiscard: () => void;
   onClose: () => void;
@@ -17,7 +19,9 @@ interface TriggerConfigPanelProps {
 export function TriggerConfigPanel({
   trigger,
   workflowId,
+  isActive,
   onChange,
+  onActiveChange,
   onSave,
   onDiscard,
   onClose,
@@ -36,12 +40,11 @@ export function TriggerConfigPanel({
         mode: {
           kind: 'webhook',
           event: trigger.platform === 'github' ? 'issues.opened' : '',
-          active: trigger.mode.active,
         },
       });
     } else {
       onChange({
-        mode: { kind: 'polling', intervalSec: 60, active: trigger.mode.active },
+        mode: { kind: 'polling', intervalSec: 60 },
       });
     }
   };
@@ -60,7 +63,7 @@ export function TriggerConfigPanel({
             <span
               className={cn(
                 'h-[6px] w-[6px] rounded-full',
-                trigger.mode.active ? 'bg-[var(--color-success)]' : 'bg-[var(--color-text-muted)]',
+                isActive ? 'bg-[var(--color-success)]' : 'bg-[var(--color-text-muted)]',
               )}
             />
             Trigger · {trigger.platform}
@@ -218,19 +221,15 @@ export function TriggerConfigPanel({
             </Field>
           )}
 
-          <Field label="Active" hint="pause the trigger without deleting it">
+          <Field label="Active" hint="pause the trigger without deleting it — saves immediately">
             <label className="flex cursor-pointer items-center gap-2 font-mono text-[12px]">
               <input
                 type="checkbox"
-                checked={trigger.mode.active}
-                onChange={(e) =>
-                  onChange({
-                    mode: { ...trigger.mode, active: e.target.checked } as TriggerConfig['mode'],
-                  })
-                }
+                checked={isActive}
+                onChange={(e) => onActiveChange(e.target.checked)}
               />
               <span>
-                {trigger.mode.active ? 'active — receiving events' : 'paused'}
+                {isActive ? 'active — receiving events' : 'paused'}
               </span>
             </label>
           </Field>

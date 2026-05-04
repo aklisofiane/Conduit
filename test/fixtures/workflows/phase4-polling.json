@@ -5,7 +5,7 @@
     "trigger": {
       "platform": "github",
       "connectionId": "__placeholder__",
-      "mode": { "kind": "polling", "intervalSec": 3600, "active": true },
+      "mode": { "kind": "polling", "intervalSec": 3600 },
       "filters": [{ "field": "status", "op": "eq", "value": "Dev" }],
       "board": { "ownerType": "org", "owner": "acme", "number": 5 }
     },

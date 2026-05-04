@@ -100,7 +100,7 @@ Response: `{ templateId, workflows: [{ id, name }, ...] }`.
 
 ### Created workflows are paused
 
-`Workflow.isActive` is `false` on creation. Polling schedules are created paused (`upsertPollSchedule` passes `paused: !(isActive && mode.active)`). Webhook deliveries skip inactive workflows. The user reviews the generated definition on the canvas, then flips the workflow active.
+`Workflow.isActive` is `false` on creation. Polling schedules are created paused (`upsertPollSchedule` passes `paused: !isActive`). Webhook deliveries skip inactive workflows. The user reviews the generated definition on the canvas, then flips the workflow active.
 
 ## Templates shipped with v1
 

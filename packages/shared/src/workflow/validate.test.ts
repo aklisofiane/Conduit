@@ -7,7 +7,7 @@ function baseDefinition(overrides: Partial<WorkflowDefinition> = {}): WorkflowDe
     trigger: {
       platform: 'github',
       connectionId: 'conn_1',
-      mode: { kind: 'webhook', event: 'issues.opened', active: true },
+      mode: { kind: 'webhook', event: 'issues.opened' },
       filters: [],
     },
     nodes: [],
@@ -38,7 +38,7 @@ describe('validateWorkflowDefinition', () => {
       trigger: {
         platform: 'github',
         connectionId: 'conn_1',
-        mode: { kind: 'polling', intervalSec: 60, active: true },
+        mode: { kind: 'polling', intervalSec: 60 },
         filters: [{ field: 'status', op: 'eq', value: 'Dev' }],
         board: { ownerType: 'org', owner: 'acme', number: 1 },
       },
@@ -57,7 +57,7 @@ describe('validateWorkflowDefinition', () => {
       trigger: {
         platform: 'github',
         connectionId: 'conn_1',
-        mode: { kind: 'webhook', event: 'board.column.changed', active: true },
+        mode: { kind: 'webhook', event: 'board.column.changed' },
         filters: [],
         board: { ownerType: 'org', owner: 'acme', number: 1 },
       },
@@ -74,7 +74,7 @@ describe('validateWorkflowDefinition', () => {
       trigger: {
         platform: 'github',
         connectionId: 'conn_1',
-        mode: { kind: 'webhook', event: 'push', active: true },
+        mode: { kind: 'webhook', event: 'push' },
         filters: [],
       },
     });
@@ -88,7 +88,7 @@ describe('validateWorkflowDefinition', () => {
       trigger: {
         platform: 'github',
         connectionId: 'conn_1',
-        mode: { kind: 'webhook', event: 'board.column.changed', active: true },
+        mode: { kind: 'webhook', event: 'board.column.changed' },
         filters: [],
         board: { ownerType: 'org', owner: 'acme', number: 1 },
       },

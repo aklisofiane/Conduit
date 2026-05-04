@@ -10,7 +10,7 @@ export function defaultDefinition(): WorkflowDefinition {
     trigger: {
       platform: 'github',
       connectionId: '',
-      mode: { kind: 'webhook', event: 'issues.opened', active: false },
+      mode: { kind: 'webhook', event: 'issues.opened' },
       filters: [],
     },
     nodes: [],

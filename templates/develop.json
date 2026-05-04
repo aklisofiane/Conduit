@@ -11,7 +11,7 @@
         "trigger": {
           "platform": "github",
           "connectionId": "<github>",
-          "mode": { "kind": "polling", "intervalSec": 60, "active": true },
+          "mode": { "kind": "polling", "intervalSec": 60 },
           "filters": [{ "field": "status", "op": "eq", "value": "Dev" }],
           "board": { "ownerType": "org", "owner": "acme", "number": 1 }
         },

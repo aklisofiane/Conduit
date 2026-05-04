@@ -21,7 +21,7 @@ const BASE_EVENT: TriggerEvent = {
 const BASE_TRIGGER: TriggerConfig = {
   platform: 'github',
   connectionId: 'conn_1',
-  mode: { kind: 'webhook', event: 'issues.opened', active: true },
+  mode: { kind: 'webhook', event: 'issues.opened' },
   filters: [],
 };
 
@@ -38,7 +38,7 @@ describe('matchesTrigger', () => {
     expect(
       matchesTrigger(BASE_EVENT, {
         ...BASE_TRIGGER,
-        mode: { kind: 'webhook', event: 'pull_request.opened', active: true },
+        mode: { kind: 'webhook', event: 'pull_request.opened' },
       }),
     ).toBe(false);
   });
@@ -49,7 +49,7 @@ describe('matchesTrigger', () => {
         { ...BASE_EVENT, mode: 'polling', event: 'status.changed' },
         {
           ...BASE_TRIGGER,
-          mode: { kind: 'polling', intervalSec: 60, active: true },
+          mode: { kind: 'polling', intervalSec: 60 },
         },
       ),
     ).toBe(true);
@@ -90,7 +90,7 @@ describe('matchesTrigger', () => {
     const trigger: TriggerConfig = {
       platform: 'github',
       connectionId: 'conn_1',
-      mode: { kind: 'webhook', event: 'board.column.changed', active: true },
+      mode: { kind: 'webhook', event: 'board.column.changed' },
       filters: [{ field: 'status', op: 'eq', value: 'Dev' }],
     };
     expect(matchesTrigger(webhookEvent, trigger)).toBe(true);
@@ -109,7 +109,7 @@ describe('matchesTrigger', () => {
     const trigger: TriggerConfig = {
       platform: 'github',
       connectionId: 'conn_1',
-      mode: { kind: 'polling', intervalSec: 60, active: true },
+      mode: { kind: 'polling', intervalSec: 60 },
       filters: [{ field: 'status', op: 'eq', value: 'Dev' }],
     };
     expect(matchesTrigger(pollingEvent, trigger)).toBe(true);

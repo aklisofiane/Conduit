@@ -20,7 +20,7 @@ const TEMPLATE: TemplateFile = {
         trigger: {
           platform: 'github',
           connectionId: '<github>',
-          mode: { kind: 'webhook', event: 'issues.opened', active: true },
+          mode: { kind: 'webhook', event: 'issues.opened' },
           filters: [],
         },
         nodes: [

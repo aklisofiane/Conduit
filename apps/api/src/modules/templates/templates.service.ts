@@ -130,7 +130,7 @@ export class TemplatesService implements OnModuleInit {
           await this.temporal.upsertPollSchedule({
             workflowId: id,
             intervalSec: definition.trigger.mode.intervalSec,
-            active: isActive && definition.trigger.mode.active,
+            active: isActive,
           });
         } catch (err) {
           this.logger.warn(
