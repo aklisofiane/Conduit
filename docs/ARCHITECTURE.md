@@ -150,6 +150,12 @@ All routes prefixed `/api`. Non-webhook routes require `X-API-Key` header (see [
 |---|---|---|
 | `POST` | `/mcp/introspect` | Given an MCP server config (with credentials substituted), connect via `@modelcontextprotocol/sdk`, call `tools/list`, return tool metadata. Used at config time to populate the `allowedTools` picker. |
 
+### Trigger config-time helpers
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/workflows/:id/trigger/list-projects` | Body: `{ connectionId, ownerType: 'user' \| 'org', owner }`. Resolves the workflow's connection token via `CredentialsService.getConnectionToken`, calls `listProjectBoards` (`@conduit/shared/platform`), returns `ProjectBoardSummary[]` — number, title, url, single-select fields with options. Drives the board dropdown + filter-value dropdowns in the trigger config UI. Bad token / missing scope / unknown owner surface as `400` so the message renders inline next to the input, mirroring `/mcp/introspect`. The web side calls this through `useListProjectBoards` (`useQuery`, keyed on `(connectionId, ownerType, owner)`, 30s `staleTime`), so toggling between webhook and polling modes — or revisiting the same owner — hits cache. |
+
 ### Skills
 
 | Method | Path | Description |
