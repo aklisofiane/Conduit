@@ -38,5 +38,8 @@ coverage/
 # OS
 Thumbs.db
 
+# Local specs
+.specs/
+
 # Conduit runtime state (worker writes under ~/.conduit/, but also ignore if someone sets it locally)
 .conduit/
