@@ -27,6 +27,7 @@ import {
 import { TriggerConfigPanel } from '../components/canvas/TriggerConfigPanel.js';
 import { TriggerNode } from '../components/canvas/TriggerNode.js';
 import { WorkflowEdge } from '../components/canvas/WorkflowEdge.js';
+import { WorkflowHeaderPill } from '../components/canvas/WorkflowHeaderPill.js';
 import { WorkflowTabs, type WorkflowTabId } from '../components/layout/WorkflowTabs.js';
 import { WorkflowActions } from '../components/layout/WorkflowActions.js';
 import { WorkflowRunsList } from '../components/run/WorkflowRunsList.js';
@@ -278,9 +279,7 @@ function CanvasInner() {
           onDrop={handleDrop}
         >
           <div className="pointer-events-none absolute left-[14px] top-3 z-[2] flex gap-[6px]">
-            <span className="pointer-events-auto rounded-[var(--radius-sm)] border border-[var(--color-divider)] bg-[var(--color-bg-panel)] px-2 py-[3px] font-mono text-[11px] text-[var(--color-text-2)]">
-              {wf?.name ?? 'workflow'}
-            </span>
+            <WorkflowHeaderPill workflowId={id} />
             <span className="pointer-events-auto rounded-[var(--radius-sm)] border border-[var(--color-divider)] bg-[var(--color-bg-panel)] px-2 py-[3px] font-mono text-[11px] text-[var(--color-text-muted)]">
               {lastRunLabel}
             </span>

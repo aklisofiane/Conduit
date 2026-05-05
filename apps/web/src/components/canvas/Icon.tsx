@@ -14,7 +14,8 @@ export type IconName =
   | 'webhook'
   | 'minus'
   | 'fit'
-  | 'close';
+  | 'close'
+  | 'chevron-down';
 
 interface IconProps {
   name: IconName;
@@ -142,6 +143,12 @@ export function Icon({
       return (
         <svg {...common}>
           <path d="M6 6l12 12M18 6L6 18" />
+        </svg>
+      );
+    case 'chevron-down':
+      return (
+        <svg {...common}>
+          <path d="M6 9l6 6 6-6" />
         </svg>
       );
     default:
