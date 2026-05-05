@@ -29,7 +29,10 @@ export function RowActionsMenu({
 
   useLayoutEffect(() => {
     const rect = anchorEl.getBoundingClientRect();
-    setPosition({ top: rect.bottom + 4, left: rect.right - MENU_WIDTH });
+    setPosition({
+      top: rect.bottom + 4,
+      left: Math.max(8, rect.right - MENU_WIDTH),
+    });
   }, [anchorEl]);
 
   useEffect(() => {

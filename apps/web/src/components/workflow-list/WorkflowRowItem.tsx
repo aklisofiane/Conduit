@@ -1,4 +1,9 @@
-import { useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
+import {
+  useCallback,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+} from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   useDeleteWorkflow,
@@ -45,6 +50,7 @@ export function WorkflowRowItem({
     e.stopPropagation();
     setMenuOpen((open) => !open);
   };
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
 
   const handleRenameCommit = (next: string) => {
     const trimmed = next.trim();
@@ -161,7 +167,7 @@ export function WorkflowRowItem({
       {menuOpen && menuButtonRef.current && (
         <RowActionsMenu
           anchorEl={menuButtonRef.current}
-          onClose={() => setMenuOpen(false)}
+          onClose={closeMenu}
           onRename={handleRename}
           onDuplicate={handleDuplicate}
           onDelete={handleDelete}

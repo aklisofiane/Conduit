@@ -32,16 +32,30 @@ const baseDefinition = {
     },
   ],
   edges: [],
-  mcpServers: [],
+  mcpServers: [
+    {
+      id: 'mcp1',
+      name: 'gh-mcp',
+      transport: { kind: 'http', url: 'https://example.test' },
+      connectionId: 'old_conn_b',
+    },
+    {
+      id: 'mcp2',
+      name: 'no-creds',
+      transport: { kind: 'http', url: 'https://example.test' },
+    },
+  ],
   ui: { positions: {} },
 } as unknown as WorkflowDefinition;
 
 describe('remapConnectionIds', () => {
-  it('rewrites trigger and workspace connectionIds via the map', () => {
+  it('rewrites trigger, mcpServer, and workspace connectionIds via the map', () => {
     const map = { old_conn_a: 'new_conn_a', old_conn_b: 'new_conn_b' };
     const out = remapConnectionIds(baseDefinition, map);
 
     expect(out.triggers[0]!.connectionId).toBe('new_conn_a');
+    expect(out.mcpServers[0]!.connectionId).toBe('new_conn_b');
+    expect(out.mcpServers[1]!.connectionId).toBeUndefined();
     expect((out.nodes[0]!.workspace as { connectionId: string }).connectionId).toBe(
       'new_conn_a',
     );
