@@ -15,7 +15,11 @@ export type IconName =
   | 'minus'
   | 'fit'
   | 'close'
-  | 'chevron-down';
+  | 'chevron-down'
+  | 'more-vertical'
+  | 'trash'
+  | 'pencil'
+  | 'copy';
 
 interface IconProps {
   name: IconName;
@@ -149,6 +153,37 @@ export function Icon({
       return (
         <svg {...common}>
           <path d="M6 9l6 6 6-6" />
+        </svg>
+      );
+    case 'more-vertical':
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="5" r="1.4" fill={color} stroke="none" />
+          <circle cx="12" cy="12" r="1.4" fill={color} stroke="none" />
+          <circle cx="12" cy="19" r="1.4" fill={color} stroke="none" />
+        </svg>
+      );
+    case 'trash':
+      return (
+        <svg {...common}>
+          <path d="M4 7h16" />
+          <path d="M10 11v6M14 11v6" />
+          <path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12" />
+          <path d="M9 7V4h6v3" />
+        </svg>
+      );
+    case 'pencil':
+      return (
+        <svg {...common}>
+          <path d="M4 20h4l10-10-4-4L4 16v4z" />
+          <path d="M14 6l4 4" />
+        </svg>
+      );
+    case 'copy':
+      return (
+        <svg {...common}>
+          <rect x="9" y="9" width="11" height="11" rx="2" />
+          <path d="M5 15V6a2 2 0 0 1 2-2h9" />
         </svg>
       );
     default:

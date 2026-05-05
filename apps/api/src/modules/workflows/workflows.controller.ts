@@ -52,4 +52,9 @@ export class WorkflowsController {
   async delete(@Param('id') id: string) {
     await this.svc.delete(id);
   }
+
+  @Post(':id/duplicate')
+  duplicate(@Param('id') id: string) {
+    return this.svc.duplicate(id);
+  }
 }

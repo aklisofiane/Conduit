@@ -1,11 +1,8 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { TemplatePickerDialog } from '../components/templates/TemplatePickerDialog.js';
+import { WorkflowRowItem } from '../components/workflow-list/WorkflowRowItem.js';
 import { useCreateWorkflow, useWorkflows } from '../api/hooks.js';
-import type { WorkflowRow } from '../api/types.js';
-import { duration, relativeFromNow } from '../lib/time.js';
-import { cn } from '../lib/cn.js';
-import { statusClass } from '../lib/status.js';
 
 /**
  * Workflow list — the landing screen. Matches the mockup's layout: greeting
@@ -18,6 +15,7 @@ export function HomePage() {
   const navigate = useNavigate();
   const createWorkflow = useCreateWorkflow();
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
 
   const activeCount = workflows.filter((w) => w.isActive).length;
   const runningCount = workflows.filter((w) => w.runs[0]?.status === 'RUNNING').length;
@@ -84,7 +82,13 @@ export function HomePage() {
             <EmptyRow text="No workflows yet — click “New workflow” to get started." />
           )}
           {workflows.map((wf) => (
-            <WorkflowRowItem key={wf.id} wf={wf} />
+            <WorkflowRowItem
+              key={wf.id}
+              wf={wf}
+              renaming={renamingId === wf.id}
+              onStartRename={() => setRenamingId(wf.id)}
+              onEndRename={() => setRenamingId((curr) => (curr === wf.id ? null : curr))}
+            />
           ))}
         </div>
       </section>
@@ -93,62 +97,6 @@ export function HomePage() {
         <TemplatePickerDialog onClose={() => setShowTemplatePicker(false)} />
       )}
     </div>
-  );
-}
-
-function WorkflowRowItem({ wf }: { wf: WorkflowRow }) {
-  const lastRun = wf.runs[0];
-  const agentCount = wf.definition?.nodes?.length ?? 0;
-  const providers = new Set(wf.definition?.nodes?.map((n) => n.provider) ?? []);
-
-  return (
-    <Link
-      to={`/workflows/${wf.id}`}
-      className="grid grid-cols-[20px_minmax(0,1fr)_minmax(0,1fr)_140px_60px] items-center gap-4 border-b border-[var(--color-line)] px-4 py-3 transition-colors last:border-b-0 hover:bg-[var(--color-bg-2)]"
-    >
-      <span className={cn('status-dot', statusClass(lastRun?.status))} />
-      <div className="min-w-0">
-        <div className="truncate font-mono text-[13px] font-medium text-[var(--color-text)]">{wf.name}</div>
-        <div className="mt-0.5 flex items-center gap-2 font-mono text-[11px] text-[var(--color-text-3)]">
-          {providers.has('claude') && <span className="prov-glyph claude">C</span>}
-          {providers.has('codex') && <span className="prov-glyph codex">X</span>}
-          <span>{agentCount} agent{agentCount === 1 ? '' : 's'}</span>
-        </div>
-      </div>
-      <div className="truncate font-mono text-[11px] text-[var(--color-text-2)]">
-        {wf.definition?.triggers?.[0]?.platform ? (
-          <>
-            <b className="text-[var(--color-text)]">
-              {wf.definition.triggers[0].platform.toUpperCase()}
-            </b>{' '}
-            · {triggerSummary(wf.definition)}
-          </>
-        ) : (
-          <span className="text-[var(--color-text-4)]">— trigger not configured</span>
-        )}
-      </div>
-      <div className="font-mono text-[11px] text-[var(--color-text-2)]">
-        {lastRun ? (
-          <>
-            <span className={cn('status-dot mr-1.5 inline-block', statusClass(lastRun.status))} />
-            {relativeFromNow(lastRun.startedAt)} ·{' '}
-            {lastRun.status === 'RUNNING'
-              ? `running · ${duration(lastRun.startedAt)}`
-              : lastRun.status === 'FAILED'
-                ? 'failed'
-                : duration(lastRun.startedAt, lastRun.finishedAt)}
-          </>
-        ) : (
-          <span className="text-[var(--color-text-4)]">never run</span>
-        )}
-      </div>
-      <div className="flex justify-end">
-        <span className={cn('pill', wf.isActive ? '' : 'opacity-40')}>
-          <span className="dot" style={{ background: wf.isActive ? 'var(--color-success)' : 'var(--color-text-4)' }} />
-          {wf.isActive ? 'on' : 'off'}
-        </span>
-      </div>
-    </Link>
   );
 }
 
@@ -175,11 +123,4 @@ function EmptyRow({ text }: { text: string }) {
       {text}
     </div>
   );
-}
-
-function triggerSummary(def: WorkflowRow['definition']): string {
-  const trigger = def.triggers[0];
-  if (!trigger) return 'no trigger';
-  if (trigger.mode.kind === 'webhook') return trigger.mode.event;
-  return `polling · every ${trigger.mode.intervalSec}s`;
 }

@@ -67,6 +67,14 @@ export function useDeleteWorkflow() {
   });
 }
 
+export function useDuplicateWorkflow() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.post<WorkflowRow>(`/workflows/${id}/duplicate`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: WORKFLOWS }),
+  });
+}
+
 export function useWorkflowRuns(workflowId: string | undefined, limit = 50) {
   return useQuery({
     queryKey: workflowId ? runsKey(workflowId) : ['workflow', 'none', 'runs'],

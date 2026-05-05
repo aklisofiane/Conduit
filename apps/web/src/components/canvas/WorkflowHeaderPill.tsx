@@ -19,6 +19,7 @@ import {
 import type { WorkflowRow } from '../../api/types.js';
 import { cn } from '../../lib/cn.js';
 import { relativeFromNow } from '../../lib/time.js';
+import { InlineRename } from '../common/InlineRename.js';
 import { Icon } from './Icon.js';
 
 const NAME_MAX_LENGTH = 120;
@@ -73,11 +74,13 @@ export function WorkflowHeaderPill({ workflowId }: WorkflowHeaderPillProps) {
         )}
       >
         {renaming ? (
-          <RenameInput
+          <InlineRename
             initial={name}
             saving={update.isPending}
             onCommit={handleRenameCommit}
             onCancel={handleRenameCancel}
+            maxLength={NAME_MAX_LENGTH}
+            className="w-[200px] min-w-[120px] bg-transparent px-1 py-[3px] font-mono text-[11px] text-[var(--color-text)] outline-none"
           />
         ) : (
           <>
@@ -112,46 +115,6 @@ export function WorkflowHeaderPill({ workflowId }: WorkflowHeaderPillProps) {
         />
       )}
     </>
-  );
-}
-
-interface RenameInputProps {
-  initial: string;
-  saving: boolean;
-  onCommit: (next: string) => void;
-  onCancel: () => void;
-}
-
-function RenameInput({ initial, saving, onCommit, onCancel }: RenameInputProps) {
-  const [value, setValue] = useState(initial);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    inputRef.current?.focus();
-    inputRef.current?.select();
-  }, []);
-
-  const handleKeyDown = (e: ReactKeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      onCommit(value);
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      onCancel();
-    }
-  };
-
-  return (
-    <input
-      ref={inputRef}
-      value={value}
-      maxLength={NAME_MAX_LENGTH}
-      disabled={saving}
-      onChange={(e) => setValue(e.target.value)}
-      onKeyDown={handleKeyDown}
-      onBlur={() => onCommit(value)}
-      className="w-[200px] min-w-[120px] bg-transparent px-1 py-[3px] font-mono text-[11px] text-[var(--color-text)] outline-none"
-    />
   );
 }
 

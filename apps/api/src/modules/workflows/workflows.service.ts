@@ -15,6 +15,7 @@ import { assertDefinitionValid } from '../../common/assert-definition-valid';
 import { DuplicateRunError, TemporalService } from '../../temporal/temporal.service';
 import type { CreateWorkflowDto, UpdateWorkflowDto } from './dto';
 import { defaultDefinition } from './defaults';
+import { remapConnectionIds } from './remap-connection-ids';
 
 @Injectable()
 export class WorkflowsService implements OnModuleInit {
@@ -110,11 +111,74 @@ export class WorkflowsService implements OnModuleInit {
   async delete(id: string) {
     try {
       await this.prisma.workflow.delete({ where: { id } });
-      await this.temporal.deletePollSchedule(id);
     } catch (err) {
       if (isPrismaNotFound(err)) throw new NotFoundException(`Workflow ${id} not found`);
       throw err;
     }
+    // Schedule cleanup is best-effort: the row is gone, so a leaked schedule
+    // would fire against a missing workflow and self-recover at next reconcile.
+    // Don't promote a Temporal error to a 500 after the DB delete succeeded.
+    try {
+      await this.temporal.deletePollSchedule(id);
+    } catch (err) {
+      this.logger.warn(
+        `Deleting poll schedule for workflow ${id} failed: ${errMessage(err)}`,
+      );
+    }
+  }
+
+  /**
+   * Clone a workflow + its `WorkflowConnection` rows in a single transaction,
+   * rewriting every `connectionId` reference inside the cloned `definition`
+   * to point at the new connection ids. The duplicate starts paused
+   * (`isActive: false`) so it doesn't trigger until the user reviews it.
+   *
+   * Webhook signing secrets are copied byte-for-byte — the AES-GCM ciphertext
+   * is workflow-agnostic, so the duplicate shares the source's secret. That's
+   * acceptable: webhook URLs are per-workflow (`/hooks/:workflowId`), so the
+   * duplicate gets its own URL while reusing the same secret value.
+   */
+  async duplicate(id: string) {
+    const source = await this.prisma.workflow.findUnique({
+      where: { id },
+      include: { connections: true },
+    });
+    if (!source) throw new NotFoundException(`Workflow ${id} not found`);
+
+    const created = await this.prisma.$transaction(async (tx) => {
+      const stub = await tx.workflow.create({
+        data: {
+          name: `${source.name} (copy)`,
+          description: source.description,
+          definition: {} as unknown as object,
+          isActive: false,
+        },
+      });
+
+      const idMap: Record<string, string> = {};
+      for (const conn of source.connections) {
+        const cloned = await tx.workflowConnection.create({
+          data: {
+            workflowId: stub.id,
+            alias: conn.alias,
+            credentialId: conn.credentialId,
+            owner: conn.owner,
+            repo: conn.repo,
+            webhookSecret: conn.webhookSecret,
+          },
+        });
+        idMap[conn.id] = cloned.id;
+      }
+
+      const definition = remapConnectionIds(source.definition, idMap);
+      return tx.workflow.update({
+        where: { id: stub.id },
+        data: { definition: definition as unknown as object },
+      });
+    });
+
+    await this.syncPollSchedule(created.id, created.definition, created.isActive);
+    return created;
   }
 
   /**

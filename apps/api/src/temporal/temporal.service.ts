@@ -4,6 +4,7 @@ import {
   Connection,
   ScheduleAlreadyRunning,
   ScheduleClient,
+  ScheduleNotFoundError,
   ScheduleOverlapPolicy,
   WorkflowExecutionAlreadyStartedError,
   isGrpcServiceError,
@@ -194,6 +195,7 @@ function isScheduleAlreadyRunning(err: unknown): boolean {
 const GRPC_NOT_FOUND = 5;
 
 function isScheduleNotFound(err: unknown): boolean {
+  if (err instanceof ScheduleNotFoundError) return true;
   if (!isGrpcServiceError(err)) return false;
   return (err as { code?: number }).code === GRPC_NOT_FOUND;
 }
