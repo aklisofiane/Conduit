@@ -14,6 +14,7 @@ import { PrismaService } from '../../common/prisma.service';
 import { assertDefinitionValid } from '../../common/assert-definition-valid';
 import { TemporalService } from '../../temporal/temporal.service';
 import { encrypt } from '../credentials/crypto';
+import { AgentPresetsService } from '../agent-presets/agent-presets.service';
 import { loadTemplates, type LoadedTemplate } from './template-loader';
 import type { CreateFromTemplateDto, TemplateBinding } from './dto';
 
@@ -30,10 +31,11 @@ export class TemplatesService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly temporal: TemporalService,
+    private readonly presets: AgentPresetsService,
   ) {}
 
   async onModuleInit(): Promise<void> {
-    const loaded = await loadTemplates(this.logger);
+    const loaded = await loadTemplates(this.logger, this.presets.asMap());
     this.templates = new Map(loaded.map((t) => [t.file.id, t]));
     this.logger.log(`Loaded ${this.templates.size} workflow template(s)`);
   }

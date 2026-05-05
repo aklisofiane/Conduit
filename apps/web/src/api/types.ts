@@ -9,6 +9,7 @@ import type {
   WorkflowDefinition,
 } from '@conduit/shared';
 import type { TemplateSummary } from '@conduit/shared/template';
+import type { AgentPreset } from '@conduit/shared/agent-preset';
 
 /** Row shape returned by `GET /workflows`. */
 export interface WorkflowRow {
@@ -119,7 +120,7 @@ export interface ConnectionRow {
   webhookSecretSuffix: string | null;
 }
 
-export type { TemplateSummary };
+export type { TemplateSummary, AgentPreset };
 
 export type TemplateBinding =
   | { mode: 'existing'; connectionId: string }

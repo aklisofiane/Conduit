@@ -22,19 +22,16 @@
           {
             "id": "agent-research",
             "name": "Research",
-            "provider": "claude",
-            "model": "claude-opus-4-6",
-            "instructions": "You are the Research agent. A new GitHub issue has just been opened. Read the trigger context, then inspect the repository in your workspace to understand the relevant code. Read local guidance such as CLAUDE.md, CONTRIBUTING.md, package manifests, and nearby tests when present. Write .conduit/Research.md with: issue summary, relevant facts from the repo, assumptions, likely implementation approach, likely files or areas to touch, tests to add or run, risks, and open questions. If the issue is unclear or there are multiple viable implementation paths, do not invent scope; record the decision-shaping questions, present the relevant options, and include a recommendation when the repo context supports one.",
-            "mcpServers": [],
+            "presetId": "research",
+            "mcpServers": [{ "serverId": "github-mcp" }],
             "skills": [],
             "workspace": { "kind": "repo-clone", "connectionId": "<github>" }
           },
           {
             "id": "agent-review",
             "name": "Review",
-            "provider": "claude",
-            "model": "claude-opus-4-6",
-            "instructions": "You are the Review agent. Read .conduit/Research.md and inspect the workspace only as needed to verify the analysis. Challenge the research for missing context, weak assumptions, unclear acceptance criteria, missing tests, overlooked files, and overconfident claims. Do not post to GitHub. Write .conduit/Review.md with: confirmed strengths, gaps to fix before publishing, any additional files or tests that should be mentioned, and whether the final output should be an implementation approach or a clarification question.",
+            "presetId": "reviewer",
+            "instructionsAppend": "You are reviewing the upstream Research agent's plan in `.conduit/`. Do not post to GitHub from this node — the downstream Publish agent handles all GitHub updates. Focus on whether the final output should be an implementation approach or a clarification question.",
             "mcpServers": [],
             "skills": [],
             "workspace": { "kind": "inherit", "fromNode": "Research" }
@@ -42,9 +39,7 @@
           {
             "id": "agent-publish",
             "name": "Publish",
-            "provider": "claude",
-            "model": "claude-opus-4-6",
-            "instructions": "You are the Publish agent. Read .conduit/Research.md and .conduit/Review.md, then update the GitHub issue body with a canonical Conduit analysis section. Preserve the user's original issue content. Add or replace only the section between these markers: <!-- conduit-analysis:start --> and <!-- conduit-analysis:end -->. The section should contain a concise summary, proposed approach, likely files or areas, tests to run, and risks or open questions. If Research or Review says the issue is unclear or there are multiple viable implementation paths, publish the decision-shaping questions, present the relevant options, and include a recommendation when the repo context supports one instead of a speculative single-path plan. Do not post a normal comment and do not implement code.",
+            "presetId": "publish",
             "mcpServers": [{ "serverId": "github-mcp" }],
             "skills": [],
             "workspace": { "kind": "inherit", "fromNode": "Review" }

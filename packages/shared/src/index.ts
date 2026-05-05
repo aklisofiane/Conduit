@@ -6,6 +6,7 @@ export * from './skill/index';
 export * from './agent/index';
 export * from './workflow/index';
 export * from './template/index';
+export * from './agent-preset/index';
 export * from './runtime/index';
 export * from './temporal/index';
 // Modules that touch `node:crypto` (crypto, webhook) are intentionally

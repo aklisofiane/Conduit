@@ -22,9 +22,8 @@
           {
             "id": "agent-pr-review",
             "name": "Review",
-            "provider": "claude",
-            "model": "claude-opus-4-6",
-            "instructions": "You are the PR Review agent. A PR has just been opened. Read the PR metadata from the trigger context, check out the PR branch in your workspace, and review the diff against the base branch. Focus on: correctness, obvious bugs, missing tests, and adherence to local conventions (read CLAUDE.md or CONTRIBUTING.md if present). Post inline comments on specific lines where useful, and leave a summary review at the end. Do not approve destructive changes.",
+            "presetId": "reviewer",
+            "instructionsAppend": "A pull request has just been opened. Read the PR metadata from the trigger context, check out the PR branch in your workspace, and review the diff against the base branch. Read local guidance such as CLAUDE.md or CONTRIBUTING.md when present.",
             "mcpServers": [{ "serverId": "github-mcp" }],
             "skills": [],
             "workspace": { "kind": "repo-clone", "connectionId": "<github>" }

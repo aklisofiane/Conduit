@@ -1,17 +1,17 @@
 {
   "id": "board-loop",
-  "name": "Board Loop (Worker + Critic)",
-  "description": "Iterative Worker ↔ Critic pattern. Worker commits on status = \"Dev\" and moves to \"AIReview\"; Critic reviews on \"AIReview\" and either approves or moves back to \"Dev\" to re-trigger the Worker.",
+  "name": "Board Loop (Developer + Reviewer)",
+  "description": "Iterative Developer ↔ Reviewer pattern. Developer implements on status = \"Dev\" using a persistent ticket branch; Reviewer reviews on \"AIReview\" and either approves or requests another iteration.",
   "category": "board-loop",
   "workflows": [
     {
-      "name": "Worker",
-      "description": "Polling on status=Dev. Commits and pushes to conduit/<ticket>; opens a draft PR on first push; moves ticket to AIReview.",
+      "name": "Developer",
+      "description": "Polling on status=Dev. Reads the ticket, prior analysis, and review feedback; commits to conduit/<ticket>; opens or updates a draft PR; moves ticket to AIReview.",
       "definition": {
         "triggers": [
           {
-            "id": "trigger-worker",
-            "name": "WorkerTrigger",
+            "id": "trigger-developer",
+            "name": "DeveloperTrigger",
             "platform": "github",
             "connectionId": "<github>",
             "mode": { "kind": "polling", "intervalSec": 60 },
@@ -21,17 +21,16 @@
         ],
         "nodes": [
           {
-            "id": "agent-worker",
-            "name": "Worker",
-            "provider": "claude",
-            "model": "claude-opus-4-6",
-            "instructions": "You are the Worker agent in a board-loop. The ticket entered status=Dev. Your workspace is a persistent conduit/<ticket> branch — iteration N+1 will see iteration N's commits.\n\n1. Read upstream review feedback from PR comments / ticket comments (via the GitHub MCP server). On first run these will be empty; on later iterations they contain what the Critic said.\n2. Implement changes. Commit with clear messages.\n3. `git push`. If no PR exists for this branch yet, open a draft PR referencing the ticket.\n4. Move the ticket to the \"AIReview\" column on the board.",
+            "id": "agent-developer",
+            "name": "Developer",
+            "presetId": "developer",
+            "instructionsAppend": "You are in a board-loop. The ticket entered status=Dev. Your workspace is a persistent conduit/<ticket> branch, so later iterations will see earlier commits.\n\n- Before editing, read any Conduit analysis section in the issue body, existing PR discussion, and the latest Reviewer feedback from PR comments or ticket comments via the GitHub MCP server.\n- If no PR exists for this branch yet, open a draft PR referencing the ticket. If a PR exists, update it with a concise summary of this iteration.\n- After committing and pushing, move the ticket to the \"AIReview\" column on the board.",
             "mcpServers": [{ "serverId": "github-mcp" }],
             "skills": [],
             "workspace": { "kind": "ticket-branch", "connectionId": "<github>" }
           }
         ],
-        "edges": [{ "from": "WorkerTrigger", "to": "Worker" }],
+        "edges": [{ "from": "DeveloperTrigger", "to": "Developer" }],
         "mcpServers": [
           {
             "id": "github-mcp",
@@ -47,21 +46,21 @@
         ],
         "ui": {
           "nodePositions": {
-            "WorkerTrigger": { "x": 80, "y": 120 },
-            "Worker": { "x": 440, "y": 120 }
+            "DeveloperTrigger": { "x": 80, "y": 120 },
+            "Developer": { "x": 440, "y": 120 }
           },
           "viewport": { "x": 0, "y": 0, "zoom": 1 }
         }
       }
     },
     {
-      "name": "Critic",
-      "description": "Polling on status=AIReview. Reads the branch and the PR; either approves or moves back to Dev with review feedback.",
+      "name": "Reviewer",
+      "description": "Polling on status=AIReview. Reviews the branch and PR; approves when ready or moves back to Dev with specific feedback.",
       "definition": {
         "triggers": [
           {
-            "id": "trigger-critic",
-            "name": "CriticTrigger",
+            "id": "trigger-reviewer",
+            "name": "ReviewerTrigger",
             "platform": "github",
             "connectionId": "<github>",
             "mode": { "kind": "polling", "intervalSec": 60 },
@@ -71,17 +70,16 @@
         ],
         "nodes": [
           {
-            "id": "agent-critic",
-            "name": "Critic",
-            "provider": "claude",
-            "model": "claude-opus-4-6",
-            "instructions": "You are the Critic agent in a board-loop. The ticket entered status=AIReview. Your workspace is the same persistent conduit/<ticket> branch the Worker just pushed to.\n\n1. Read the PR diff and the Worker's most recent commits.\n2. Decide: approve or request changes.\n3. If approving: leave an approving PR review and move the ticket to \"ReadyToMerge\".\n4. If requesting changes: leave specific, actionable inline comments on the PR, then move the ticket back to \"Dev\" — this re-triggers the Worker, which will read your comments on its next iteration.\n\nBe specific. Vague feedback produces vague fixes.",
+            "id": "agent-reviewer",
+            "name": "Reviewer",
+            "presetId": "reviewer",
+            "instructionsAppend": "You are the Reviewer in a board-loop. The ticket entered status=AIReview. Your workspace is the same persistent conduit/<ticket> branch the Developer just pushed to.\n\nThis workflow's role authorizes submitting APPROVE-state PR reviews when the work is ready — overriding the default \"COMMENT only\" guidance.\n\n- If the work is ready: submit an APPROVE PR review with a concise summary and move the ticket to \"ReadyToMerge\".\n- If changes are needed: leave specific, actionable inline PR comments where possible, then move the ticket back to \"Dev\" so the Developer can iterate.\n- Do not merge the PR or close the ticket.",
             "mcpServers": [{ "serverId": "github-mcp" }],
             "skills": [],
             "workspace": { "kind": "ticket-branch", "connectionId": "<github>" }
           }
         ],
-        "edges": [{ "from": "CriticTrigger", "to": "Critic" }],
+        "edges": [{ "from": "ReviewerTrigger", "to": "Reviewer" }],
         "mcpServers": [
           {
             "id": "github-mcp",
@@ -97,8 +95,8 @@
         ],
         "ui": {
           "nodePositions": {
-            "CriticTrigger": { "x": 80, "y": 120 },
-            "Critic": { "x": 440, "y": 120 }
+            "ReviewerTrigger": { "x": 80, "y": 120 },
+            "Reviewer": { "x": 440, "y": 120 }
           },
           "viewport": { "x": 0, "y": 0, "zoom": 1 }
         }

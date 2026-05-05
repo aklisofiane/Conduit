@@ -3,6 +3,7 @@ import type { DiscoveredTool, McpTransport, WorkflowDefinition } from '@conduit/
 import type { ProjectBoardSummary } from '@conduit/shared/platform';
 import { api } from './client.js';
 import type {
+  AgentPreset,
   ConnectionRow,
   CreatedFromTemplate,
   CredentialRow,
@@ -257,6 +258,14 @@ export function useTemplates() {
   return useQuery({
     queryKey: ['templates'],
     queryFn: () => api.get<TemplateSummary[]>('/templates'),
+  });
+}
+
+export function useAgentPresets() {
+  return useQuery({
+    queryKey: ['agent-presets'],
+    queryFn: () => api.get<AgentPreset[]>('/agent-presets'),
+    staleTime: 5 * 60_000,
   });
 }
 

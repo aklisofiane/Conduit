@@ -1,5 +1,7 @@
+import { useMemo } from 'react';
 import type { AgentConfig } from '@conduit/shared';
-import { useSkills } from '../../api/hooks.js';
+import { useAgentPresets, useSkills } from '../../api/hooks.js';
+import type { AgentPreset } from '../../api/types.js';
 import { cn } from '../../lib/cn.js';
 import { providerStyle } from '../../styles/theme.js';
 import { Icon } from './Icon.js';
@@ -30,8 +32,51 @@ export function AgentConfigPanel({
   const providerSkills = skills.filter(
     (s) => s.provider === 'both' || s.provider === agent.provider,
   );
+  const { data: presets = [] } = useAgentPresets();
+  const presetsByCategory = useMemo(() => {
+    const groups = new Map<string, AgentPreset[]>();
+    for (const p of presets) {
+      const list = groups.get(p.category) ?? [];
+      list.push(p);
+      groups.set(p.category, list);
+    }
+    return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
+  }, [presets]);
+  // Reflect the current agent state in the picker by content match. Once the
+  // user edits any of the three fields the match drops and we fall back to
+  // "Custom" — that's the signal that the agent has diverged from the preset.
+  const matchedPresetId = useMemo(() => {
+    return (
+      presets.find(
+        (p) =>
+          p.instructions === agent.instructions &&
+          p.model === agent.model &&
+          p.provider === agent.provider,
+      )?.id ?? ''
+    );
+  }, [presets, agent.instructions, agent.model, agent.provider]);
   const ps = providerStyle(agent.provider);
   const selectedSkillIds = new Set(agent.skills.map((s) => s.skillId));
+
+  const applyPreset = (presetId: string) => {
+    if (!presetId) return;
+    const preset = presets.find((p) => p.id === presetId);
+    if (!preset) return;
+    if (
+      agent.instructions.trim() &&
+      agent.instructions !== preset.instructions &&
+      !window.confirm(
+        `Replace this agent's instructions with the "${preset.name}" preset?`,
+      )
+    ) {
+      return;
+    }
+    onChange({
+      instructions: preset.instructions,
+      model: preset.model,
+      provider: preset.provider,
+    });
+  };
 
   return (
     <aside className="flex w-[320px] shrink-0 flex-col border-l border-[var(--color-divider)] bg-[var(--color-bg-panel)]">
@@ -61,13 +106,34 @@ export function AgentConfigPanel({
 
       <div className="flex-1 overflow-y-auto px-5 py-4">
         <div className="space-y-5">
-          <Field label="Name" hint="identifier · used as .conduit/<Name>.md">
+          <Field label="Name">
             <input
               className="field-input"
               value={agent.name}
               onChange={(e) => onChange({ name: e.target.value })}
             />
           </Field>
+
+          {presets.length > 0 && (
+            <Field label="Preset" hint="prefill instructions, model, provider">
+              <select
+                className="field-input"
+                value={matchedPresetId}
+                onChange={(e) => applyPreset(e.target.value)}
+              >
+                <option value="">Custom — write your own</option>
+                {presetsByCategory.map(([category, list]) => (
+                  <optgroup key={category} label={category}>
+                    {list.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} — {p.description}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </Field>
+          )}
 
           <Field label="Provider & model">
             <div className="grid grid-cols-2 gap-2">
