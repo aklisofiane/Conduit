@@ -171,9 +171,16 @@ All routes prefixed `/api`. Non-webhook routes require `X-API-Key` header (see [
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/templates` | List workflow templates loaded from `/templates/*.json` at boot — id, name, description, category, `workflowCount`, and the unique `<alias>` connection placeholders the bundle references. |
+| `GET` | `/templates` | List workflow templates loaded from `/templates/*.json` at boot — id, name, description, category, `workflowCount`, and the unique `<alias>` connection placeholders the bundle references. Templates that reference an unknown `presetId` are skipped at boot. |
 | `GET` | `/templates/:id` | Fetch a single template summary (same shape as list entries). 404 if the id isn't loaded. |
 | `POST` | `/workflows/from-template/:templateId` | Create **all** workflows in the template atomically. Body: `{ bindings: Record<alias, Binding> }` where `Binding` is `{ mode: 'existing', connectionId }` or `{ mode: 'new', alias, credentialId, owner?, repo?, webhookSecret? }`. A single Prisma `$transaction` inserts N workflow rows + one `WorkflowConnection` per (workflow × `new` binding), substitutes placeholder ids, runs `validateWorkflowDefinition` per workflow, then upserts Temporal poll schedules. 400 on missing bindings, unknown credential/connection ids, or post-substitution validation failures. |
+
+### Agent presets
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/agent-presets` | List reusable agent prompts loaded from `/agent-presets/*.json` at boot — id, name, category, provider, model, instructions. Drives the canvas agent config panel's preset picker and template `presetId` expansion. See [agent-presets.md](./design-docs/agent-presets.md). |
+| `GET` | `/agent-presets/:id` | Fetch one preset by id. 404 if not loaded. |
 
 ### WebSocket
 

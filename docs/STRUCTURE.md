@@ -5,11 +5,13 @@ Where things live. Read [ARCHITECTURE.md](./ARCHITECTURE.md) for *why* first; th
 ## Top-level
 
 ```
-apps/        runnable services (api, web, worker)
-packages/    libraries (shared, database, agent)
-docs/        spec — INDEX.md for read order
-templates/   bundled workflow templates (JSON) — see docs/design-docs/templates.md
-test/        cross-app test infra (e2e harness, fixtures, helpers)
+apps/            runnable services (api, web, worker)
+packages/        libraries (shared, database, agent)
+docs/            spec — INDEX.md for read order
+templates/       bundled workflow templates (JSON) — see docs/design-docs/templates.md
+agent-presets/   reusable agent prompts referenced by templates and the canvas — see
+                 docs/design-docs/agent-presets.md
+test/            cross-app test infra (e2e harness, fixtures, helpers)
 ```
 
 Root configs: `turbo.json`, `tsconfig.base.json`, `vitest.workspace.ts`, `vitest.shared.ts`, `eslint.config.mjs`, `docker-compose.yml`, `docker-compose.test.yml`, `.env`.
@@ -19,7 +21,10 @@ Root configs: `turbo.json`, `tsconfig.base.json`, `vitest.workspace.ts`, `vitest
 ```
 src/
   main.ts, app.module.ts, config.ts   Nest bootstrap
-  common/                              API-key guard, Zod body pipe, Prisma service
+  common/                              API-key guard, Zod body pipe, Prisma service,
+                                       `load-json-dir.ts` (shared JSON-folder loader used by
+                                       templates + agent-presets — read dir, parse-or-skip,
+                                       Zod-issue formatter)
   redis/, temporal/                    clients shared across modules
   modules/
     workflows/                         workflow CRUD, trigger-match, run dispatch
@@ -32,10 +37,15 @@ src/
     mcp/                               POST /mcp/introspect — live tools/list
     skills/                            GET /skills
     templates/                         template catalog: loads /templates/*.json at boot,
+                                       expands `presetId` references via AgentPresetsService,
                                        GET /templates + POST /workflows/from-template/:id
                                        (atomic $transaction creates all workflows in a bundle
                                        + per-workflow connections for `new` bindings; polling
                                        schedules upserted after commit)
+    agent-presets/                     preset catalog: loads /agent-presets/*.json at boot,
+                                       GET /agent-presets[/:id]; consumed by TemplatesService
+                                       for template expansion and by the canvas's agent
+                                       config-panel preset picker
     health/                            liveness
 ```
 
@@ -122,6 +132,11 @@ src/
   template/   Template file schema (bundle of one or more workflow definitions)
               + `<alias>` placeholder detection + `resolveTemplate` (substitutes
               placeholders with real WorkflowConnection cuids for instantiation)
+              + `expandTemplate` (rewrites `presetId`-using agents into the
+              runtime agent shape using a preset resolver)
+  agent-preset/ AgentPreset file schema — id, name, category, provider, model,
+              instructions (+ optional suggestedConstraints). Catalog data
+              referenced by templates (via presetId) and the canvas picker
   workspace/  workspace kind schemas (local, repo-clone, inherit, ticket-branch)
   skill/      skill manifest types
   platform/   Platform enum + per-platform connection shapes

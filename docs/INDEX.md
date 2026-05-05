@@ -13,10 +13,11 @@ Agent-first workflow automation for dev teams. Board-driven orchestration, atomi
 7. [design-docs/agent-context.md](./design-docs/agent-context.md) — inter-agent context via `.conduit/` folder
 8. [design-docs/branch-management.md](./design-docs/branch-management.md) — `ticket-branch` workspaces for iterative board loops
 9. [design-docs/templates.md](./design-docs/templates.md) — workflow templates shipped as starting points
-10. [data-model.md](./data-model.md) — Prisma schema spec
-11. [FRONTEND.md](./FRONTEND.md) — canvas (design), run history, run detail page
-12. [DESIGN.md](./DESIGN.md) — design tokens, palette, provider styling, the @theme bridge
-13. [SECURITY.md](./SECURITY.md) — auth, credentials, sandboxing
-14. [RELIABILITY.md](./RELIABILITY.md) — retries, crash recovery, cancellation
-15. [VALIDATION.md](./VALIDATION.md) — testing strategy, E2E harness, `StubProvider`
-16. [PLANS.md](./PLANS.md) — phased rollout
+10. [design-docs/agent-presets.md](./design-docs/agent-presets.md) — reusable agent prompts referenced by templates and the canvas
+11. [data-model.md](./data-model.md) — Prisma schema spec
+12. [FRONTEND.md](./FRONTEND.md) — canvas (design), run history, run detail page
+13. [DESIGN.md](./DESIGN.md) — design tokens, palette, provider styling, the @theme bridge
+14. [SECURITY.md](./SECURITY.md) — auth, credentials, sandboxing
+15. [RELIABILITY.md](./RELIABILITY.md) — retries, crash recovery, cancellation
+16. [VALIDATION.md](./VALIDATION.md) — testing strategy, E2E harness, `StubProvider`
+17. [PLANS.md](./PLANS.md) — phased rollout

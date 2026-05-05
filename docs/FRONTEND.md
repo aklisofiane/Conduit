@@ -56,7 +56,11 @@ Visual tokens (palette, per-provider color/font/label, radii, the `providerStyle
 Opens on node click. Form driven by Zod schema from `@conduit/shared`.
 
 - **Trigger panel**: platform picker → connection picker → mode toggle (webhook / polling) → event or interval input → `BoardRef` fieldset (org/user · owner · project picker) → filter builder. The board picker and filter editor are wired together: once a board is selected, the picker preloads its single-select fields, and any filter row whose `field` matches one of those fields collapses to a strict value dropdown (no op selector — saved as `op: 'eq'`). Other rows keep the freeform field/op/value triplet. The board list is fetched via `useListProjectBoards` (TanStack Query, keyed on `(connectionId, ownerType, owner)`, 30s `staleTime`); typing the owner is debounced 400ms before keying the query so quick keystrokes don't fan out. Mode is required for polling and for the webhook event `board.column.changed`; the picker hides itself otherwise. The `<FilterRow>` and `<BoardPicker>` components live next to `TriggerConfigPanel` in `apps/web/src/components/canvas/TriggerConfigPanel.tsx`.
-- **Agent panel**: name field (identifier validation), provider + model dropdown, instructions textarea (monospace, generous height), MCP server picker (presets with one-click add + custom server config), skill picker (see below), workspace picker (fresh tmpdir / repo-clone / inherit / ticket-branch), constraints (collapsible).
+- **Agent panel**: name field (identifier validation), preset picker (see below), provider + model dropdown, instructions textarea (monospace, generous height), MCP server picker (presets with one-click add + custom server config), skill picker (see below), workspace picker (fresh tmpdir / repo-clone / inherit / ticket-branch), constraints (collapsible).
+
+### Agent preset picker
+
+Above the provider/model row, a single `<select>` lets the user prefill `instructions`, `model`, and `provider` from a shipped preset (`GET /api/agent-presets`, fetched via `useAgentPresets`). Options are grouped by `category`. There's no separate "selected preset" state on the agent — the picker derives its current value by content match (instructions + model + provider all equal a preset's), and falls back to "Custom — write your own" the moment any of those three fields diverges. Picking a preset confirms before overwriting non-trivial existing instructions. See [design-docs/agent-presets.md](./design-docs/agent-presets.md).
 
 ### Skill picker
 
