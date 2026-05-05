@@ -35,7 +35,7 @@ export class TemplatesService implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    const loaded = await loadTemplates(this.logger, this.presets.asMap());
+    const loaded = await loadTemplates(this.logger, (id) => this.presets.resolve(id));
     this.templates = new Map(loaded.map((t) => [t.file.id, t]));
     this.logger.log(`Loaded ${this.templates.size} workflow template(s)`);
   }

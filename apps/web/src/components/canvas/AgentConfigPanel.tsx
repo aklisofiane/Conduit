@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import type { AgentConfig } from '@conduit/shared';
 import { useAgentPresets, useSkills } from '../../api/hooks.js';
 import type { AgentPreset } from '../../api/types.js';
@@ -33,33 +32,21 @@ export function AgentConfigPanel({
     (s) => s.provider === 'both' || s.provider === agent.provider,
   );
   const { data: presets = [] } = useAgentPresets();
-  const presetsByCategory = useMemo(() => {
-    const groups = new Map<string, AgentPreset[]>();
-    for (const p of presets) {
-      const list = groups.get(p.category) ?? [];
-      list.push(p);
-      groups.set(p.category, list);
-    }
-    return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [presets]);
-  // Reflect the current agent state in the picker by content match. Once the
-  // user edits any of the three fields the match drops and we fall back to
-  // "Custom" — that's the signal that the agent has diverged from the preset.
-  const matchedPresetId = useMemo(() => {
-    return (
-      presets.find(
-        (p) =>
-          p.instructions === agent.instructions &&
-          p.model === agent.model &&
-          p.provider === agent.provider,
-      )?.id ?? ''
-    );
-  }, [presets, agent.instructions, agent.model, agent.provider]);
+  const presetsByCategory = groupPresetsByCategory(presets);
+  // Picker reflects the current agent by content match; falls back to
+  // "Custom" once the user edits any of the three fields.
+  const matchedPresetId =
+    presets.find(
+      (p) =>
+        p.instructions === agent.instructions &&
+        p.model === agent.model &&
+        p.provider === agent.provider,
+    )?.id ?? '';
   const ps = providerStyle(agent.provider);
   const selectedSkillIds = new Set(agent.skills.map((s) => s.skillId));
 
   const applyPreset = (presetId: string) => {
-    if (!presetId) return;
+    if (!presetId || presetId === matchedPresetId) return;
     const preset = presets.find((p) => p.id === presetId);
     if (!preset) return;
     if (
@@ -282,4 +269,16 @@ function Field({
 function modelsFor(provider: AgentConfig['provider']): string[] {
   if (provider === 'codex') return ['gpt-5-codex'];
   return ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5'];
+}
+
+function groupPresetsByCategory(
+  presets: AgentPreset[],
+): [string, AgentPreset[]][] {
+  const groups = new Map<string, AgentPreset[]>();
+  for (const p of presets) {
+    const list = groups.get(p.category) ?? [];
+    list.push(p);
+    groups.set(p.category, list);
+  }
+  return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
 }

@@ -5,8 +5,11 @@ import type {
   TemplateAgentInput,
   TemplateInputFile,
   TemplateInputWorkflow,
+  TemplateFile,
+  TemplateWorkflow,
 } from './schema';
-import type { TemplateFile, TemplateWorkflow } from './schema';
+
+export type PresetResolver = (id: string) => AgentPreset | undefined;
 
 export class UnknownPresetError extends Error {
   constructor(
@@ -22,15 +25,13 @@ export class UnknownPresetError extends Error {
 }
 
 /**
- * Expand `presetId` references on every agent in a template input file,
- * producing the post-expansion `TemplateFile` shape that the rest of the
- * system already understands. Throws `UnknownPresetError` if any agent
- * references a preset that's not in `presetMap` — caller decides whether
- * to log + skip or surface the error.
+ * Expand `presetId` references on every agent in a template input file.
+ * Throws `UnknownPresetError` so callers can choose between log+skip
+ * (loader) and surface (test/CLI).
  */
 export function expandTemplate(
   input: TemplateInputFile,
-  presetMap: ReadonlyMap<string, AgentPreset>,
+  resolvePreset: PresetResolver,
 ): TemplateFile {
   return {
     id: input.id,
@@ -38,14 +39,14 @@ export function expandTemplate(
     description: input.description,
     category: input.category,
     workflows: input.workflows.map((wf) =>
-      expandWorkflow(wf, presetMap, input.id),
+      expandWorkflow(wf, resolvePreset, input.id),
     ),
   };
 }
 
 function expandWorkflow(
   wf: TemplateInputWorkflow,
-  presetMap: ReadonlyMap<string, AgentPreset>,
+  resolvePreset: PresetResolver,
   templateId: string,
 ): TemplateWorkflow {
   const definition: WorkflowDefinition = {
@@ -54,7 +55,7 @@ function expandWorkflow(
     mcpServers: wf.definition.mcpServers,
     ui: wf.definition.ui,
     nodes: wf.definition.nodes.map((n) =>
-      expandAgent(n, presetMap, templateId),
+      expandAgent(n, resolvePreset, templateId),
     ),
   };
   return { name: wf.name, description: wf.description, definition };
@@ -62,7 +63,7 @@ function expandWorkflow(
 
 function expandAgent(
   agent: TemplateAgentInput,
-  presetMap: ReadonlyMap<string, AgentPreset>,
+  resolvePreset: PresetResolver,
   templateId: string,
 ): AgentConfig {
   if (!agent.presetId) {
@@ -79,15 +80,14 @@ function expandAgent(
     };
   }
 
-  const preset = presetMap.get(agent.presetId);
+  const preset = resolvePreset(agent.presetId);
   if (!preset) {
     throw new UnknownPresetError(agent.presetId, templateId, agent.name);
   }
 
-  const baseInstructions = preset.instructions;
   const instructions = agent.instructionsAppend
-    ? `${baseInstructions}\n\n${agent.instructionsAppend}`
-    : baseInstructions;
+    ? `${preset.instructions}\n\n${agent.instructionsAppend}`
+    : preset.instructions;
 
   return {
     id: agent.id,

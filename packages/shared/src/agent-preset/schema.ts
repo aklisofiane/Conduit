@@ -31,6 +31,5 @@ export const agentPresetFileSchema = z.object({
 });
 export type AgentPresetFile = z.infer<typeof agentPresetFileSchema>;
 
-/** Shape returned by `GET /api/agent-presets` — same shape as the file. */
 export const agentPresetSchema = agentPresetFileSchema;
 export type AgentPreset = z.infer<typeof agentPresetSchema>;

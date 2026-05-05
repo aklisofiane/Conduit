@@ -28,8 +28,7 @@ export class AgentPresetsService implements OnModuleInit {
     return p;
   }
 
-  /** Read-only view used by other modules (e.g. template expansion). */
-  asMap(): ReadonlyMap<string, AgentPreset> {
-    return this.presets;
+  resolve(id: string): AgentPreset | undefined {
+    return this.presets.get(id);
   }
 }

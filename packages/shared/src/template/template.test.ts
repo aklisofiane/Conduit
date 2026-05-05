@@ -117,6 +117,7 @@ const RESEARCH_PRESET: AgentPreset = {
 const PRESET_MAP = new Map<string, AgentPreset>([
   [RESEARCH_PRESET.id, RESEARCH_PRESET],
 ]);
+const resolveFromMap = (id: string) => PRESET_MAP.get(id);
 
 const PRESET_TEMPLATE: TemplateInputFile = {
   id: 'demo-presets',
@@ -180,7 +181,7 @@ describe('templateInputFileSchema + expandTemplate', () => {
   });
 
   it('expandTemplate fills instructions/model/provider from the preset', () => {
-    const expanded = expandTemplate(PRESET_TEMPLATE, PRESET_MAP);
+    const expanded = expandTemplate(PRESET_TEMPLATE, resolveFromMap);
     const node = expanded.workflows[0]!.definition.nodes[0]!;
     expect(node.instructions).toBe(RESEARCH_PRESET.instructions);
     expect(node.model).toBe(RESEARCH_PRESET.model);
@@ -192,7 +193,7 @@ describe('templateInputFileSchema + expandTemplate', () => {
   it('expandTemplate concatenates instructionsAppend after the preset prompt', () => {
     const t = structuredClone(PRESET_TEMPLATE);
     t.workflows[0]!.definition.nodes[0]!.instructionsAppend = 'Extra workflow guidance.';
-    const expanded = expandTemplate(t, PRESET_MAP);
+    const expanded = expandTemplate(t, resolveFromMap);
     const out = expanded.workflows[0]!.definition.nodes[0]!.instructions;
     expect(out.startsWith(RESEARCH_PRESET.instructions)).toBe(true);
     expect(out.endsWith('Extra workflow guidance.')).toBe(true);
@@ -200,7 +201,7 @@ describe('templateInputFileSchema + expandTemplate', () => {
   });
 
   it('expandTemplate throws UnknownPresetError when the preset is missing', () => {
-    expect(() => expandTemplate(PRESET_TEMPLATE, new Map())).toThrow(
+    expect(() => expandTemplate(PRESET_TEMPLATE, () => undefined)).toThrow(
       UnknownPresetError,
     );
   });

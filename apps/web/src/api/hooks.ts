@@ -265,7 +265,6 @@ export function useAgentPresets() {
   return useQuery({
     queryKey: ['agent-presets'],
     queryFn: () => api.get<AgentPreset[]>('/agent-presets'),
-    staleTime: 5 * 60_000,
   });
 }
 
