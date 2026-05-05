@@ -31,14 +31,14 @@ export function WorkflowHeaderPill({ workflowId }: WorkflowHeaderPillProps) {
   const { data: wf } = useWorkflow(workflowId);
   const update = useUpdateWorkflow(workflowId);
 
-  const [mode, setMode] = useState<'view' | 'rename'>('view');
+  const [renaming, setRenaming] = useState(false);
   const [popoverOpen, setPopoverOpen] = useState(false);
   const anchorRef = useRef<HTMLDivElement>(null);
 
   const handleRenameCommit = useCallback(
     (next: string) => {
       const trimmed = next.trim();
-      setMode('view');
+      setRenaming(false);
       if (!trimmed || trimmed === wf?.name) return;
       if (trimmed.length > NAME_MAX_LENGTH) return;
       update.mutate(
@@ -52,7 +52,7 @@ export function WorkflowHeaderPill({ workflowId }: WorkflowHeaderPillProps) {
     [update, wf?.name],
   );
 
-  const handleRenameCancel = useCallback(() => setMode('view'), []);
+  const handleRenameCancel = useCallback(() => setRenaming(false), []);
 
   const togglePopover = useCallback((e: ReactMouseEvent) => {
     e.stopPropagation();
@@ -69,10 +69,10 @@ export function WorkflowHeaderPill({ workflowId }: WorkflowHeaderPillProps) {
         ref={anchorRef}
         className={cn(
           'pointer-events-auto inline-flex items-center rounded-[var(--radius-sm)] border border-[var(--color-divider)] bg-[var(--color-bg-panel)] font-mono text-[11px]',
-          mode === 'rename' ? 'px-1' : '',
+          renaming ? 'px-1' : '',
         )}
       >
-        {mode === 'rename' ? (
+        {renaming ? (
           <RenameInput
             initial={name}
             saving={update.isPending}
@@ -84,7 +84,7 @@ export function WorkflowHeaderPill({ workflowId }: WorkflowHeaderPillProps) {
             <button
               type="button"
               title={name}
-              onClick={() => setMode('rename')}
+              onClick={() => setRenaming(true)}
               className="max-w-[260px] truncate px-2 py-[3px] text-left text-[var(--color-text-2)] hover:text-[var(--color-text)]"
             >
               {name}
@@ -92,7 +92,7 @@ export function WorkflowHeaderPill({ workflowId }: WorkflowHeaderPillProps) {
             <button
               type="button"
               aria-label="Switch workflow"
-              onMouseDown={togglePopover}
+              onClick={togglePopover}
               className={cn(
                 'flex h-full items-center border-l border-[var(--color-divider)] px-1.5 py-[3px] text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text)]',
                 popoverOpen && 'text-[var(--color-text)]',
@@ -170,10 +170,7 @@ function SwitcherPopover({ anchorEl, currentId, onClose }: SwitcherPopoverProps)
 
   const [query, setQuery] = useState('');
   const [cursor, setCursor] = useState(0);
-  const [position, setPosition] = useState(() => {
-    const rect = anchorEl.getBoundingClientRect();
-    return { top: rect.bottom + 6, left: rect.left };
-  });
+  const [position, setPosition] = useState({ top: 0, left: 0 });
 
   useLayoutEffect(() => {
     const rect = anchorEl.getBoundingClientRect();
@@ -188,8 +185,7 @@ function SwitcherPopover({ anchorEl, currentId, onClose }: SwitcherPopoverProps)
     const q = query.trim().toLowerCase();
     return rows
       .filter((r) => r.id !== currentId)
-      .filter((r) => !q || r.name.toLowerCase().includes(q))
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      .filter((r) => !q || r.name.toLowerCase().includes(q));
   }, [rows, currentId, query]);
 
   useEffect(() => {
@@ -219,14 +215,18 @@ function SwitcherPopover({ anchorEl, currentId, onClose }: SwitcherPopoverProps)
     navigate(`/workflows/${id}`);
   };
 
-  const handleNew = async () => {
-    try {
-      const created = await create.mutateAsync({ name: 'Untitled workflow' });
-      onClose();
-      navigate(`/workflows/${created.id}`);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : String(err));
-    }
+  const handleNew = () => {
+    create.mutate(
+      { name: 'Untitled workflow' },
+      {
+        onSuccess: (created) => {
+          onClose();
+          navigate(`/workflows/${created.id}`);
+        },
+        onError: (err) =>
+          alert(err instanceof Error ? err.message : String(err)),
+      },
+    );
   };
 
   const handleKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
