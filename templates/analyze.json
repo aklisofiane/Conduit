@@ -1,12 +1,12 @@
 {
   "id": "analyze",
   "name": "Analyze",
-  "description": "Review a new issue's intent and propose an implementation approach. Triggered on GitHub issues.opened.",
+  "description": "Analyze a new issue, internally review the plan for gaps, and update the issue description with a grounded implementation approach. Triggered on GitHub issues.opened.",
   "category": "triage",
   "workflows": [
     {
       "name": "Analyze",
-      "description": "Reads a freshly opened issue, inspects the source code, posts a comment with a proposed approach.",
+      "description": "Reads a freshly opened issue, inspects the source code, reviews the analysis for gaps, and updates the issue body with a marked Conduit analysis section.",
       "definition": {
         "triggers": [
           {
@@ -20,17 +20,41 @@
         ],
         "nodes": [
           {
-            "id": "agent-analyze",
-            "name": "Analyze",
+            "id": "agent-research",
+            "name": "Research",
             "provider": "claude",
             "model": "claude-opus-4-6",
-            "instructions": "You are the Analyze agent. A new issue has just been opened. Read the issue body from the trigger context. Clone the repo via your workspace, skim the relevant files, and post a GitHub comment with a short implementation approach (1–2 paragraphs + bullet list of files to touch). If the issue is unclear, ask a question as the comment instead of proposing an approach.",
-            "mcpServers": [{ "serverId": "github-mcp" }],
+            "instructions": "You are the Research agent. A new GitHub issue has just been opened. Read the trigger context, then inspect the repository in your workspace to understand the relevant code. Read local guidance such as CLAUDE.md, CONTRIBUTING.md, package manifests, and nearby tests when present. Write .conduit/Research.md with: issue summary, relevant facts from the repo, assumptions, likely implementation approach, likely files or areas to touch, tests to add or run, risks, and open questions. If the issue is unclear or there are multiple viable implementation paths, do not invent scope; record the decision-shaping questions, present the relevant options, and include a recommendation when the repo context supports one.",
+            "mcpServers": [],
             "skills": [],
             "workspace": { "kind": "repo-clone", "connectionId": "<github>" }
+          },
+          {
+            "id": "agent-review",
+            "name": "Review",
+            "provider": "claude",
+            "model": "claude-opus-4-6",
+            "instructions": "You are the Review agent. Read .conduit/Research.md and inspect the workspace only as needed to verify the analysis. Challenge the research for missing context, weak assumptions, unclear acceptance criteria, missing tests, overlooked files, and overconfident claims. Do not post to GitHub. Write .conduit/Review.md with: confirmed strengths, gaps to fix before publishing, any additional files or tests that should be mentioned, and whether the final output should be an implementation approach or a clarification question.",
+            "mcpServers": [],
+            "skills": [],
+            "workspace": { "kind": "inherit", "fromNode": "Research" }
+          },
+          {
+            "id": "agent-publish",
+            "name": "Publish",
+            "provider": "claude",
+            "model": "claude-opus-4-6",
+            "instructions": "You are the Publish agent. Read .conduit/Research.md and .conduit/Review.md, then update the GitHub issue body with a canonical Conduit analysis section. Preserve the user's original issue content. Add or replace only the section between these markers: <!-- conduit-analysis:start --> and <!-- conduit-analysis:end -->. The section should contain a concise summary, proposed approach, likely files or areas, tests to run, and risks or open questions. If Research or Review says the issue is unclear or there are multiple viable implementation paths, publish the decision-shaping questions, present the relevant options, and include a recommendation when the repo context supports one instead of a speculative single-path plan. Do not post a normal comment and do not implement code.",
+            "mcpServers": [{ "serverId": "github-mcp" }],
+            "skills": [],
+            "workspace": { "kind": "inherit", "fromNode": "Review" }
           }
         ],
-        "edges": [{ "from": "AnalyzeTrigger", "to": "Analyze" }],
+        "edges": [
+          { "from": "AnalyzeTrigger", "to": "Research" },
+          { "from": "Research", "to": "Review" },
+          { "from": "Review", "to": "Publish" }
+        ],
         "mcpServers": [
           {
             "id": "github-mcp",
@@ -47,7 +71,9 @@
         "ui": {
           "nodePositions": {
             "AnalyzeTrigger": { "x": 80, "y": 120 },
-            "Analyze": { "x": 440, "y": 120 }
+            "Research": { "x": 360, "y": 120 },
+            "Review": { "x": 640, "y": 120 },
+            "Publish": { "x": 920, "y": 120 }
           },
           "viewport": { "x": 0, "y": 0, "zoom": 1 }
         }
