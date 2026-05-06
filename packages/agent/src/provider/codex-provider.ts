@@ -172,6 +172,8 @@ function serverToCodexConfig(server: ResolvedMcpServer): Record<string, unknown>
       command: t.command,
       ...(t.args?.length ? { args: t.args } : {}),
       ...(t.env && Object.keys(t.env).length ? { env: t.env } : {}),
+      ...(server.allowedTools?.length ? { enabled_tools: server.allowedTools } : {}),
+      default_tools_approval_mode: 'approve',
     };
   }
   // Codex supports remote MCP servers via the `url` form. Header injection
@@ -180,6 +182,8 @@ function serverToCodexConfig(server: ResolvedMcpServer): Record<string, unknown>
   return {
     url: t.url,
     ...(t.headers && Object.keys(t.headers).length ? { headers: t.headers } : {}),
+    ...(server.allowedTools?.length ? { enabled_tools: server.allowedTools } : {}),
+    default_tools_approval_mode: 'approve',
   };
 }
 

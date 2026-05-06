@@ -4,11 +4,17 @@ import { __setCodexSdkLoaderForTests } from './codex-provider';
 
 interface StubCodexOptions {
   scriptedEvents: unknown[];
+  onConstruct?: (options: Record<string, unknown> | undefined) => void;
+  onStartThread?: (options: Record<string, unknown> | undefined) => void;
 }
 
 function installStub(opts: StubCodexOptions): void {
   class StubCodex {
-    startThread() {
+    constructor(options?: Record<string, unknown>) {
+      opts.onConstruct?.(options);
+    }
+    startThread(options?: Record<string, unknown>) {
+      opts.onStartThread?.(options);
       async function* events() {
         for (const ev of opts.scriptedEvents) yield ev;
       }
@@ -102,6 +108,58 @@ describe('CodexProvider', () => {
     expect(events[3]).toMatchObject({ type: 'tool_result', id: 'call_1' });
     expect(events[4]).toMatchObject({ type: 'usage', inputTokens: 10, outputTokens: 5 });
     expect(events[5]).toEqual({ type: 'done' });
+  });
+
+  it('passes resolved MCP servers to Codex with non-interactive approvals and tool allow-list', async () => {
+    let constructOptions: Record<string, unknown> | undefined;
+    installStub({
+      scriptedEvents: [{ type: 'turn.completed', usage: { input_tokens: 1, output_tokens: 1 } }],
+      onConstruct: (options) => {
+        constructOptions = options;
+      },
+    });
+
+    const session = new CodexProvider().startSession(
+      {
+        model: 'gpt-5-codex',
+        systemPrompt: '',
+        workspacePath: '/tmp',
+        webSearch: false,
+        constraints: {},
+        mcpServers: [
+          {
+            id: 'github-mcp',
+            name: 'GitHub',
+            transport: {
+              kind: 'stdio',
+              command: 'npx',
+              args: ['-y', '@modelcontextprotocol/server-github'],
+              env: { GITHUB_PERSONAL_ACCESS_TOKEN: 'token' },
+            },
+            allowedTools: ['get_issue', 'update_issue'],
+          },
+        ],
+      },
+      new AbortController().signal,
+    );
+
+    for await (const _ of session.run('')) {
+      void _;
+    }
+
+    expect(constructOptions).toMatchObject({
+      config: {
+        mcp_servers: {
+          'github-mcp': {
+            command: 'npx',
+            args: ['-y', '@modelcontextprotocol/server-github'],
+            env: { GITHUB_PERSONAL_ACCESS_TOKEN: 'token' },
+            enabled_tools: ['get_issue', 'update_issue'],
+            default_tools_approval_mode: 'approve',
+          },
+        },
+      },
+    });
   });
 
   it('throws on turn.failed', async () => {
