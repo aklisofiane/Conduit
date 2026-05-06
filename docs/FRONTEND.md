@@ -56,7 +56,7 @@ Visual tokens (palette, per-provider color/font/label, radii, the `providerStyle
 Opens on node click. Form driven by Zod schema from `@conduit/shared`.
 
 - **Trigger panel**: platform picker → connection picker → mode toggle (webhook / polling) → event or interval input → `BoardRef` fieldset (org/user · owner · project picker) → filter builder. The board picker and filter editor are wired together: once a board is selected, the picker preloads its single-select fields, and any filter row whose `field` matches one of those fields collapses to a strict value dropdown (no op selector — saved as `op: 'eq'`). Other rows keep the freeform field/op/value triplet. The board list is fetched via `useListProjectBoards` (TanStack Query, keyed on `(connectionId, ownerType, owner)`, 30s `staleTime`); typing the owner is debounced 400ms before keying the query so quick keystrokes don't fan out. Mode is required for polling and for the webhook event `board.column.changed`; the picker hides itself otherwise. The `<FilterRow>` and `<BoardPicker>` components live next to `TriggerConfigPanel` in `apps/web/src/components/canvas/TriggerConfigPanel.tsx`.
-- **Agent panel**: name field (identifier validation), preset picker (see below), provider + model dropdown, instructions textarea (monospace, generous height), **Web search** checkbox (off by default — toggles the provider's built-in web search/fetch; see [agent-execution.md](./design-docs/agent-execution.md#web-search)), MCP server picker (presets with one-click add + custom server config), skill picker (see below), workspace picker (fresh tmpdir / repo-clone / inherit / ticket-branch), constraints (collapsible).
+- **Agent panel**: name field (identifier validation), preset picker (see below), provider + model dropdown, instructions textarea (monospace, generous height), **Web search** checkbox (off by default — toggles the provider's built-in web search/fetch; see [agent-execution.md](./design-docs/agent-execution.md#web-search)), **Issue writeback** control (opt-in checkbox + pill-toggle groups for allowed statuses + labels — see below), MCP server picker (presets with one-click add + custom server config), skill picker (see below), workspace picker (fresh tmpdir / repo-clone / inherit / ticket-branch), constraints (collapsible).
 
 ### Agent preset picker
 
@@ -69,6 +69,18 @@ The agent config panel includes a skills section:
 - Each skill shown as a card with name and description (from `SKILL.md` frontmatter).
 - Click to attach/detach. Attached skills are copied into the workspace at runtime.
 - Skills are filtered by provider — Claude skills shown when provider is Claude, Codex skills when Codex. Skills present in both formats shown for either.
+
+### Issue writeback control
+
+Above the MCP server picker, an opt-in control that lets an agent end its run by updating the triggering GitHub issue:
+
+- **Checkbox** — turns the feature on; presence of the field on `AgentConfig` (vs. `undefined`) is the on/off signal.
+- **Allowed statuses** pills — the trigger board's `Status` single-select options, fetched via `useListProjectBoards`.
+- **Allowed labels** pills — the trigger repo's labels, fetched via `useListLabels` (`POST /api/workflows/:id/trigger/list-labels`).
+
+If the workflow has no GitHub trigger, the control collapses to a hint. With the checkbox on but nothing picked, a muted note warns that the runtime will skip the writeback turn. The runtime side is documented in [agent-execution.md > Issue writeback](./design-docs/agent-execution.md#issue-writeback).
+
+Internal helpers `PillSection` (loading/empty wrapper) and `PillToggleGroup` (the toggle row itself) live in the same file and aren't reused elsewhere — kept local until a second consumer appears.
 
 ### MCP server picker
 

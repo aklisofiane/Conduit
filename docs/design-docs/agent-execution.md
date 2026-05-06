@@ -65,9 +65,10 @@ Activities use Temporal **heartbeats** so long-running agent sessions don't get 
      - Decrypt linked WorkflowConnection secrets and substitute `{{credential}}` in env/headers
      - Pass the resolved configs + allowedTools filtering to the provider
      - SDK handles spawning, connecting, tool invocation, and teardown
-5. Start a provider session and drive two turns on it:
+5. Start a provider session and drive turns on it:
      a. `session.run(serializeAgentContext(ctx))` — main work. Events stream out: text chunk, tool call start, tool call result, token delta. Each is heartbeated + published to Redis `conduit:run-updates`.
-     b. `session.run(finalSummaryPrompt(nodeName))` — reuses the same session so conversation state is retained. The agent writes `.conduit/<NodeName>.md` via its file tools. A placeholder is dropped in by the runtime if the file is missing at the end.
+     b. `session.run(issueWritebackPrompt(...))` — **only when the agent has `issueWriteback` configured and the run was fired by a GitHub issue trigger.** Soft-allowlist directive landing as the freshest user message before the summary turn. See [Issue writeback](#issue-writeback) below.
+     c. `session.run(finalSummaryPrompt(nodeName))` — reuses the same session so conversation state is retained. The agent writes `.conduit/<NodeName>.md` via its file tools. A placeholder is dropped in by the runtime if the file is missing at the end.
      Dispose the session in a `finally` (closes SDK thread / streaming-input queue).
 7. On finish:
      - Capture changed files (git diff vs. workspace base)
@@ -182,6 +183,38 @@ No LLM is involved. In practice parallel agents typically touch different files,
 ### Deferred: conflict-resolution agent session
 
 The original design called for `mergeWorktreeActivity` to be a lightweight agent session — short-lived, workspace-tools only, hardcoded system prompt ("merge branch X into Y, resolve conflicts sensibly, commit") — so conflicts could be resolved inline instead of aborting. That session is not implemented yet; `MergeConflictError` is shaped (it carries `conflicts: string[]` and the source ref) so a future handler can pick it up and drive the resolution. Tracked under "later" in [PLANS.md](../PLANS.md).
+
+## Issue writeback
+
+Optional per-agent capability: at end of run, the agent updates the triggering GitHub issue's project Status and/or applies repo labels. Opt-in via `AgentConfig.issueWriteback` (`packages/shared/src/agent/issue-writeback.ts`) — its mere presence is the "feature is on" signal. Both arrays may be empty; an empty allowlist is treated as enabled-but-unselected and the runtime skips the writeback turn entirely.
+
+### Config-time
+
+The agent panel's **Issue writeback** field renders a checkbox plus two pill-toggle groups (`AgentConfigPanel.IssueWritebackControl` in `apps/web/src/components/canvas/AgentConfigPanel.tsx`):
+
+- **Allowed statuses** — the trigger's project board's `Status` single-select options, fetched via `useListProjectBoards` (already used by the trigger panel).
+- **Allowed labels** — the trigger connection's repo labels, fetched via `useListLabels` → `POST /api/workflows/:id/trigger/list-labels` → `listRepoLabels` (`packages/shared/src/platform/github/labels.ts`).
+
+The field is hidden behind a hint when the workflow has no GitHub trigger. Picking nothing is allowed at save time, but explicit copy warns the user that the runtime will skip the turn.
+
+### Run-time
+
+Between the main turn and the summary turn, `runAgentNode` injects a third turn driven by `issueWritebackPrompt` (`packages/agent/src/context.ts`). The prompt interpolates the allowlist values verbatim — *only what the user picked appears* — so the choice set is encoded entirely in the prompt wording. There is no schema-level enforcement and no post-run validation; the agent is trusted to pick one of the listed values, or skip if none fit. Prompt construction is per-list — if only statuses (or only labels) are allowlisted, no phantom second list shows up in the directive.
+
+`resolveWritebackContext` returns `undefined` (skipping the turn) when:
+
+- the agent has no `issueWriteback` field;
+- both `allowedStatuses` and `allowedLabels` are empty;
+- the run wasn't fired by a GitHub trigger;
+- `triggerEvent.issue` or `triggerEvent.repo` is missing (manual runs, future non-GitHub triggers).
+
+### Synthetic GitHub MCP auto-attach
+
+The agent needs the GitHub MCP to actually call the writeback. `runAgentNode` checks whether the agent already references a GitHub MCP server on the workflow (`agentReferencesGithubMcp` matches by transport args derived from `findMcpPreset('github')`, so a rename of the npm package doesn't break the check). If not, it builds a synthetic `WorkflowMcpServer` (id `__conduit_writeback_github__`, preset transport, bound to the workflow's GitHub trigger connection) and appends it to both `effectiveNode.mcpServers` and `effectiveMcpServers` for this activity invocation only — nothing is persisted to the workflow definition.
+
+When the user *has* added a GitHub MCP, that one wins regardless of which connection it uses. No double-attach.
+
+Trust surface: the auto-attached server inherits the same trigger token the rest of the workflow uses, so the writeback never asks for an extra PAT. The token lifetime is the activity, same as any other resolved MCP server. Writeback failures (bad scope, GitHub 4xx) surface as agent-visible tool errors, not workflow failures — the run still completes.
 
 ## Streaming & live updates
 

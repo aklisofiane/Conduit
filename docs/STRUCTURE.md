@@ -120,7 +120,8 @@ Zod schemas + cross-process contracts. Domain directories line up with subpath e
 
 ```
 src/
-  agent/      AgentEvent, provider contract types
+  agent/      AgentEvent, provider contract types, `issue-writeback.ts`
+              (per-agent allowlist for end-of-run GitHub issue updates)
   trigger/    TriggerEvent + TriggerConfig (incl. `BoardRef` for Projects v2 polling),
               filter/match logic, `poll.ts` (PollWorkflowInput + PollCycleResult)
   mcp/        MCP server config + tool schemas
@@ -139,7 +140,11 @@ src/
               referenced by templates (via presetId) and the canvas picker
   workspace/  workspace kind schemas (local, repo-clone, inherit, ticket-branch)
   skill/      skill manifest types
-  platform/   Platform enum + per-platform connection shapes
+  platform/   Platform enum + per-platform connection shapes. Under `github/`,
+              shared HTTP plumbing (`http.ts` — lazy URL/header helpers, web-bundle
+              safe), the Projects v2 GraphQL client (`projects.ts`), and the
+              repo-labels REST client (`labels.ts`, used by the agent panel's
+              issue-writeback picker)
   runtime/    AgentEvent → ExecutionLogKind mapping, Redis channel name
   temporal/   task queue name + workflow-type constants (AGENT_WORKFLOW_TYPE,
               POLL_WORKFLOW_TYPE) + deterministic id helpers (`pollScheduleId`,
