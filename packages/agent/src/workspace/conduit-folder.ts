@@ -66,3 +66,29 @@ export async function copyConduitSummaries(
 export async function clearConduitFolder(workspacePath: string): Promise<void> {
   await fs.rm(path.join(workspacePath, CONDUIT_DIR), { recursive: true, force: true });
 }
+
+/**
+ * Copy the upstream's `.conduit/` folder into a freshly-created branched
+ * worktree. `git worktree add` only checks out tracked files and `.conduit/`
+ * is gitignored, so without this step parallel siblings can't see the
+ * upstream's handoff summary. Best-effort; no upstream `.conduit/` is a no-op.
+ */
+export async function cloneConduitFolder(
+  fromWorkspacePath: string,
+  toWorkspacePath: string,
+): Promise<void> {
+  const src = path.join(fromWorkspacePath, CONDUIT_DIR);
+  const dst = path.join(toWorkspacePath, CONDUIT_DIR);
+  try {
+    await fs.cp(src, dst, { recursive: true, errorOnExist: false, force: true });
+  } catch (err) {
+    if (isNotFound(err)) return;
+    throw err;
+  }
+}
+
+function isNotFound(err: unknown): boolean {
+  return (
+    typeof err === 'object' && err !== null && 'code' in err && (err as { code?: string }).code === 'ENOENT'
+  );
+}

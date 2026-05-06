@@ -98,6 +98,41 @@ describe('WorkspaceManager retry idempotency', () => {
     await expect(fs.access(path.join(second.path, 'wip.txt'))).rejects.toThrow();
   });
 
+  it('parallel-branched inherit copies the upstream .conduit/ into the sibling', async () => {
+    const manager = new WorkspaceManager();
+    const runId = 'run-conduit-propagate';
+    const store = makeFakeStore();
+
+    const upstream = await manager.resolve({
+      runId,
+      nodeName: 'Seed',
+      spec: { kind: 'ticket-branch' },
+      connection,
+      ticket: { id: '13', title: 'Conduit propagation' },
+      ticketBranchStore: store,
+    });
+
+    // Seed wrote its handoff summary — this is exactly what should appear in
+    // each parallel sibling at session start so they have the upstream plan.
+    await fs.mkdir(path.join(upstream.path, '.conduit'), { recursive: true });
+    await fs.writeFile(
+      path.join(upstream.path, '.conduit', 'Seed.md'),
+      '# Seed\nhandoff body\n',
+    );
+
+    const sibling = await manager.resolve({
+      runId,
+      nodeName: 'Dev',
+      spec: { kind: 'inherit', fromNode: 'Seed' },
+      upstreamPath: upstream.path,
+      upstreamHead: upstream.head,
+      parallelBranch: true,
+    });
+
+    const copied = await fs.readFile(path.join(sibling.path, '.conduit', 'Seed.md'), 'utf8');
+    expect(copied).toBe('# Seed\nhandoff body\n');
+  });
+
   it('cleanupRun unregisters worktrees from the bare clone, not just the dir', async () => {
     const manager = new WorkspaceManager();
     const runId = 'run-cleanup-worktrees';

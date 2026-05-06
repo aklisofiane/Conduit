@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { WorkspaceError } from '../errors/index';
+import { cloneConduitFolder } from './conduit-folder';
 import { git } from './git';
 import { nodeWorkspacePath, runDir } from './paths';
 import { resolveTicketBranchWorkspace } from './ticket-branch';
@@ -105,6 +106,10 @@ export class WorkspaceManager {
 
     const ref = upstreamHead ?? (await git(['rev-parse', 'HEAD'], { cwd: upstreamPath })).trim();
     await git(['worktree', 'add', '--detach', target, ref], { cwd: upstreamPath });
+    // `.conduit/` is gitignored, so `worktree add` doesn't carry the upstream's
+    // handoff summary into the sibling. Copy it explicitly so this node's
+    // agent starts with the same context downstream nodes will see post-merge.
+    await cloneConduitFolder(upstreamPath, target);
     return {
       path: target,
       kind: 'inherit',

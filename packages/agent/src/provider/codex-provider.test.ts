@@ -110,6 +110,39 @@ describe('CodexProvider', () => {
     expect(events[5]).toEqual({ type: 'done' });
   });
 
+  it('forwards additionalDirectories to startThread so the agent can write outside the workspace dir', async () => {
+    let threadOptions: Record<string, unknown> | undefined;
+    installStub({
+      scriptedEvents: [{ type: 'turn.completed', usage: { input_tokens: 1, output_tokens: 1 } }],
+      onStartThread: (options) => {
+        threadOptions = options;
+      },
+    });
+
+    const session = new CodexProvider().startSession(
+      {
+        model: 'gpt-5-codex',
+        systemPrompt: '',
+        mcpServers: [],
+        workspacePath: '/runs/r1/Dev',
+        // The bare clone path lives outside the workspace dir; without
+        // forwarding this list every `git commit` from a worktree fails with
+        // `Read-only file system` on `.git/index.lock`.
+        additionalDirectories: ['/runs/r1', '/home/u/.conduit/base-clones'],
+        webSearch: false,
+        constraints: {},
+      } as never,
+      new AbortController().signal,
+    );
+    for await (const _ of session.run('')) void _;
+
+    expect(threadOptions).toMatchObject({
+      workingDirectory: '/runs/r1/Dev',
+      sandboxMode: 'workspace-write',
+      additionalDirectories: ['/runs/r1', '/home/u/.conduit/base-clones'],
+    });
+  });
+
   it('passes resolved MCP servers to Codex with non-interactive approvals and tool allow-list', async () => {
     let constructOptions: Record<string, unknown> | undefined;
     installStub({

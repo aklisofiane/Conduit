@@ -3,6 +3,7 @@ import path from 'node:path';
 import { Context } from '@temporalio/activity';
 import {
   WorkspaceManager,
+  baseClonesRoot,
   buildAgentContext,
   clearConduitFolder,
   discoverSkills,
@@ -196,7 +197,11 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
         // Without this, Claude Code blocks any tool call that touches the
         // run dir (the workspace's parent), which contradicts the design
         // assumption noted in push-auth.ts.
-        additionalDirectories: [runDir(runId)],
+        // `baseClonesRoot()` covers the bare clones that back every worktree:
+        // a `.git` pointer file inside the workspace dereferences to
+        // `<baseClones>/.../<repo>.git/worktrees/<name>/`, so committing or
+        // pushing from the agent requires that path to be writable too.
+        additionalDirectories: [runDir(runId), baseClonesRoot()],
         webSearch: node.webSearch,
         constraints: node.constraints ?? {},
       },
