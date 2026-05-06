@@ -1,6 +1,5 @@
 import type { AgentConfig } from '../agent/index';
 import type { Edge } from './edge';
-import type { TriggerConfig } from '../trigger/index';
 import type { WorkspaceSpec } from '../workspace/index';
 import type { WorkflowDefinition } from './definition';
 
@@ -57,8 +56,8 @@ export function deriveWorkspaces(
 }
 
 interface NodeIncoming {
-  fromTriggers: string[];
-  fromAgents: string[];
+  fromTriggers: Set<string>;
+  fromAgents: Set<string>;
 }
 
 function buildIncomingMap(
@@ -68,15 +67,15 @@ function buildIncomingMap(
 ): Map<string, NodeIncoming> {
   const map = new Map<string, NodeIncoming>();
   for (const name of agentNames) {
-    map.set(name, { fromTriggers: [], fromAgents: [] });
+    map.set(name, { fromTriggers: new Set(), fromAgents: new Set() });
   }
   for (const edge of edges) {
     const bucket = map.get(edge.to);
     if (!bucket) continue;
     if (triggerNames.has(edge.from)) {
-      if (!bucket.fromTriggers.includes(edge.from)) bucket.fromTriggers.push(edge.from);
+      bucket.fromTriggers.add(edge.from);
     } else if (agentNames.has(edge.from)) {
-      if (!bucket.fromAgents.includes(edge.from)) bucket.fromAgents.push(edge.from);
+      bucket.fromAgents.add(edge.from);
     }
   }
   return map;
@@ -89,28 +88,26 @@ function deriveOne(
 ): WorkspaceSpec {
   const inc = incoming.get(nodeName);
   if (!inc) return { kind: 'ticket-branch' };
-  if (inc.fromTriggers.length > 0) return { kind: 'ticket-branch' };
-  if (inc.fromAgents.length === 0) return { kind: 'ticket-branch' };
-  if (inc.fromAgents.length === 1) {
-    return { kind: 'inherit', fromNode: inc.fromAgents[0]! };
+  if (inc.fromTriggers.size > 0) return { kind: 'ticket-branch' };
+  if (inc.fromAgents.size === 0) return { kind: 'ticket-branch' };
+  const agents = [...inc.fromAgents];
+  if (agents.length === 1) {
+    return { kind: 'inherit', fromNode: agents[0]! };
   }
 
-  // Fan-in: intersect ancestor sets, pick topo-latest from the intersection.
-  // Each upstream is a member of its own ancestor set so a direct shared
-  // parent (Seed in develop.json) is captured.
-  const ancestorSets = inc.fromAgents.map((agent) => {
-    const set = collectAgentAncestors(agent, incoming);
-    set.add(agent);
-    return set;
-  });
-  let common: Set<string> = new Set(ancestorSets[0]);
-  for (let i = 1; i < ancestorSets.length; i++) {
-    common = new Set([...common].filter((x) => ancestorSets[i]!.has(x)));
+  // Fan-in: intersect ancestor closures (each closure includes its own start),
+  // then pick topo-latest from the intersection. A direct shared parent like
+  // Seed in develop.json is captured because each upstream's closure contains
+  // itself.
+  const closures = agents.map((agent) => agentClosure(agent, incoming));
+  let common: Set<string> = new Set(closures[0]);
+  for (let i = 1; i < closures.length; i++) {
+    common = new Set([...common].filter((x) => closures[i]!.has(x)));
   }
   if (common.size === 0) {
     // Disconnected upstreams (graph error — would also fail topo-sort).
     // Fall back to first upstream so derivation still produces a valid spec.
-    return { kind: 'inherit', fromNode: inc.fromAgents[0]! };
+    return { kind: 'inherit', fromNode: agents[0]! };
   }
   let bestName = '';
   let bestIdx = -1;
@@ -124,11 +121,12 @@ function deriveOne(
   return { kind: 'inherit', fromNode: bestName };
 }
 
-function collectAgentAncestors(
+/** Set of `start` plus all transitive agent ancestors. */
+function agentClosure(
   start: string,
   incoming: Map<string, NodeIncoming>,
 ): Set<string> {
-  const result = new Set<string>();
+  const result = new Set<string>([start]);
   const stack = [start];
   while (stack.length > 0) {
     const cur = stack.pop()!;
@@ -172,8 +170,10 @@ function topoIndexMap(
   }
   const order = new Map<string, number>();
   let i = 0;
-  while (queue.length > 0) {
-    const cur = queue.shift()!;
+  // Index pointer instead of queue.shift() — the latter is O(n) per call,
+  // turning Kahn's into O(V²). We never re-read consumed slots.
+  for (let head = 0; head < queue.length; head++) {
+    const cur = queue[head]!;
     order.set(cur, i++);
     for (const next of adjacency.get(cur) ?? []) {
       const remaining = (indegree.get(next) ?? 0) - 1;

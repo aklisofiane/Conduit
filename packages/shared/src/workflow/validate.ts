@@ -72,9 +72,7 @@ export function validateWorkflowDefinition(
   if (distinctConnectionIds.size > 1) {
     issues.push({
       code: 'triggers-must-share-connection',
-      message:
-        `All triggers in a workflow must reference the same connectionId — found ${distinctConnectionIds.size} distinct connections. ` +
-        `Per-node / per-trigger connections are deferred (see docs/design-docs/branch-management.md).`,
+      message: `All triggers in a workflow must reference the same connectionId — found ${distinctConnectionIds.size} distinct connections.`,
     });
   }
 

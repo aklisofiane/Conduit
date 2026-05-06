@@ -41,8 +41,8 @@ export interface TicketBranchResolveInput {
  *                    off the cached row's base (or the freshly-resolved
  *                    default branch on first-ever create).
  *   5. Clean the remote URL of any auth so `git remote -v` is tidy; push
- *      auth is supplied at run time by the caller (see step 2 of the
- *      Phase 5 plan — env var + credential helper).
+ *      auth is supplied at run time by `installPushCredentials` via a
+ *      per-run env var + credential helper.
  *
  * Idempotent under Temporal retries: a retry lands back at step 1, the lock
  * queues behind any in-flight resolve, and the upsert/add sequence re-does

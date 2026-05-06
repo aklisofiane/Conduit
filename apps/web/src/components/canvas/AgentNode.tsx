@@ -74,8 +74,6 @@ export function AgentNode({ data, selected }: NodeProps) {
         </div>
       </div>
 
-      {/* Pill row — model only. Workspace is derived from edges at runtime
-          (see derive-workspace.ts) and isn't surfaced on the canvas. */}
       <div className="flex flex-wrap gap-[6px] px-[10px] pb-2">
         <NodePill borderColor={ps.promptBorder} bg={ps.prompt}>
           <span style={{ color: tokens.color.text2 }}>{agent.model}</span>

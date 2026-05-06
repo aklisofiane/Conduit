@@ -28,6 +28,12 @@ import {
   type TriggerEvent,
   type WorkflowMcpServer,
 } from '@conduit/shared';
+import type {
+  ConnectionContext,
+  PrContext,
+  TicketBranchStore,
+  TicketContext,
+} from '@conduit/agent';
 import { config } from '../config';
 import { loadConnectionContext } from '../runtime/connection-context';
 import { makeCredentialLookup } from '../runtime/credential-lookup';
@@ -104,58 +110,33 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
   });
 
   try {
-    // ticket-branch workspaces resolve their connection from the workflow's
-    // single trigger (save-time validation enforces "all triggers share the
-    // same connectionId"). Per-node connection ids are gone post-Phase-2.
-    const connectionId =
-      node.workspace.kind === 'ticket-branch'
-        ? triggers[0]?.connectionId
-        : undefined;
-    const connection = connectionId
-      ? await loadConnectionContext(connectionId)
-      : undefined;
-    if (connectionId && !connection) {
-      throw new Error(
-        `ticket-branch workspace on node "${node.name}" references unknown connection ${connectionId}`,
-      );
-    }
-
-    const ticket =
-      node.workspace.kind === 'ticket-branch' && triggerEvent.issue
-        ? { id: triggerEvent.issue.key, title: triggerEvent.issue.title }
-        : undefined;
-    const ticketBranchStore =
-      node.workspace.kind === 'ticket-branch' ? makeTicketBranchStore() : undefined;
-    const pr =
-      node.workspace.kind === 'ticket-branch' && triggerEvent.pr
-        ? { ...triggerEvent.pr }
-        : undefined;
+    const ticketBranch = await resolveTicketBranchInputs(node, triggers, triggerEvent);
 
     const workspace = await workspaceManager.resolve({
       runId,
       nodeName: node.name,
       spec: node.workspace,
-      connection,
+      connection: ticketBranch?.connection,
       upstreamPath: upstreamWorkspacePath,
       upstreamHead,
       parallelBranch,
-      ticket,
-      ticketBranchStore,
-      pr,
+      ticket: ticketBranch?.ticket,
+      ticketBranchStore: ticketBranch?.store,
+      pr: ticketBranch?.pr,
     });
 
     if (workspace.ticketBranchId) {
-      await ticketBranchStore?.markRunStart(workspace.ticketBranchId);
+      await ticketBranch?.store?.markRunStart(workspace.ticketBranchId);
     }
 
     // Installed on the shared .git/config so inherit-chain children pick it
     // up automatically; cleanupRunActivity wipes the run dir after.
-    if (workspace.kind === 'ticket-branch' && connection?.token) {
+    if (workspace.kind === 'ticket-branch' && ticketBranch?.connection?.token) {
       await installPushCredentials({
         runId,
         nodeName: node.name,
         worktreePath: workspace.path,
-        token: connection.token,
+        token: ticketBranch.connection.token,
       });
     }
 
@@ -396,6 +377,41 @@ async function listChangedFiles(workspacePath: string): Promise<string[]> {
 
 export async function cleanupConduitFolder(workspacePath: string): Promise<void> {
   await clearConduitFolder(workspacePath);
+}
+
+interface TicketBranchInputs {
+  connection?: ConnectionContext;
+  ticket?: TicketContext;
+  store?: TicketBranchStore;
+  pr?: PrContext;
+}
+
+/**
+ * Gather the per-run inputs needed by the `ticket-branch` workspace resolver.
+ * The connection comes from the workflow's first trigger — save-time
+ * validation enforces that all triggers share a connectionId.
+ */
+async function resolveTicketBranchInputs(
+  node: AgentConfigWithWorkspace,
+  triggers: TriggerConfig[],
+  triggerEvent: TriggerEvent,
+): Promise<TicketBranchInputs | undefined> {
+  if (node.workspace.kind !== 'ticket-branch') return undefined;
+  const connectionId = triggers[0]?.connectionId;
+  const connection = connectionId ? await loadConnectionContext(connectionId) : undefined;
+  if (connectionId && !connection) {
+    throw new Error(
+      `ticket-branch workspace on node "${node.name}" references unknown connection ${connectionId}`,
+    );
+  }
+  return {
+    connection,
+    ticket: triggerEvent.issue
+      ? { id: triggerEvent.issue.key, title: triggerEvent.issue.title }
+      : undefined,
+    store: makeTicketBranchStore(),
+    pr: triggerEvent.pr ? { ...triggerEvent.pr } : undefined,
+  };
 }
 
 /** Reserved id for the auto-attached GitHub MCP server. Underscored to make
