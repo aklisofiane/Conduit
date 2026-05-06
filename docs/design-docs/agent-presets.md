@@ -90,6 +90,13 @@ Templates reference presets via `presetId` instead of inlining literal prompts. 
 
 All ship with `provider: claude`, `model: claude-opus-4-6`. The reviewer preset's prompt explicitly **does not** authorize `APPROVE`-state PR reviews — workflows that need that (e.g. `board-loop`'s Reviewer) re-grant the permission via `instructionsAppend`.
 
+Two prompt directives are load-bearing across the catalog and worth calling out:
+
+- **Pattern comparison.** When a request introduces a new instance of a kind that already exists in the repo (a new provider, a new node type, a new transport, …), the Research preset requires the agent to compare the proposal against each existing implementation along the same dimensions and quote the relevant files. The Reviewer preset enforces this from the other side — if upstream skipped the comparison and an obvious one was available, raise it as a research gap.
+- **Unverified-claim flagging.** Both presets treat factual claims about external dependencies as unverified by default. Research lists them under "Unverified claims" rather than relaying as fact (using web search to verify when the agent has it enabled); Reviewer treats unverified third-party claims as gaps unless they can be confirmed from the workspace.
+
+Both directives live in the preset prompt, not in node config, so workflow authors don't have to re-state them per agent. Tightening them was a response to repeated runs that accepted issue framings as fact and missed in-repo divergences even when the existing patterns sat in the same workspace.
+
 ## Why static files, not DB
 
 Same reasoning as templates — version-controlled, no schema, easy to add new ones, simple invalidation (existing agents/workflows aren't affected). If user-created presets become a feature later, the upgrade path is to add a `AgentPreset` table seeded from the JSON files on boot; the canvas picker and template loader contracts don't change.

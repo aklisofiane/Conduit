@@ -84,11 +84,12 @@ Runs a Claude or Codex session with MCP servers and a workspace.
 type AgentConfig = {
   id: string;
   name: string;                    // unique within workflow, used as .conduit/<name>.md
-  provider: 'claude' | 'codex';
-  model: string;                   // e.g. 'claude-opus-4-6', 'gpt-5-codex'
+  provider: AgentProviderId;       // 'claude' | 'codex'
+  model: string;                   // e.g. 'claude-opus-4-6', 'gpt-5.3-codex' — see PROVIDER_MODELS / DEFAULT_MODEL in @conduit/shared/agent
   instructions: string;            // system prompt. Plain text.
   mcpServers: McpServerRef[];      // which MCP servers this agent can use
   skills: SkillRef[];              // which skills this agent can use (see "Skills" below)
+  webSearch: boolean;              // toggles the provider's built-in web search/fetch (default false). See agent-execution.md
   workspace: WorkspaceSpec;        // always present — Conduit is project-based
   constraints?: {
     maxTurns?: number;

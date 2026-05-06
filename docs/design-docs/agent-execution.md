@@ -102,6 +102,7 @@ type AgentRequest = {
   systemPrompt: string;              // agent node's instructions — delivered as the SDK system prompt
   mcpServers: ResolvedMcpServer[];   // configs with credentials substituted; SDK spawns/manages them
   workspacePath: string;             // always present — workspace is required
+  webSearch: boolean;                // gates the provider's built-in web search/fetch (off by default)
   constraints: AgentConstraints;
 };
 
@@ -119,6 +120,18 @@ type AgentEvent =
 - **`CodexProvider`** wraps `@openai/codex-sdk`. Same shape. Codex SDK has its own built-in filesystem tools and MCP support.
 
 Both providers are **dumb adapters** — they translate `AgentRequest`/`AgentEvent` to/from the SDK. No retry logic (Temporal handles it), no MCP lifecycle (SDK handles it), no credential decryption (done upstream before the config reaches the SDK).
+
+### Web search
+
+`webSearch` on `AgentRequest` is a per-agent boolean — off by default — that toggles the provider's built-in web tooling. It is *not* exposed as an MCP server; both SDKs have native support and Conduit just routes the flag.
+
+| Provider | Off | On |
+|---|---|---|
+| Claude | `disallowedTools: ['WebSearch', 'WebFetch']` strips them from the `claude_code` preset | `disallowedTools: undefined` — `WebSearch` / `WebFetch` are exposed |
+| Codex | `webSearchMode: 'disabled'` on `startThread` | `webSearchMode: 'cached'` — reuses prior search results to avoid per-fetch cost; promote to `'live'` only if a workflow needs fresh hits |
+| Stub | ignored | ignored |
+
+Codex emits `web_search` items with no `status` field; the provider adapter translates `item.started` → `tool_call` (carrying the query) and `item.completed` → `tool_result`, so searches show up in the run timeline alongside other tool calls.
 
 ## Workspace manager
 
