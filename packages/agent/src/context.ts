@@ -64,6 +64,12 @@ export function issueWritebackPrompt(args: {
     allowedLabels.length > 0
       ? `- Apply whichever of these labels best fit (you may apply more than one, or none if none apply): ${allowedLabels.map((l) => `"${l}"`).join(', ')}.`
       : null;
+  const noopStatusLine = statusLine
+    ? `- Do not set any project Status that isn't in the list above.`
+    : null;
+  const noopLabelLine = labelLine
+    ? `- Do not apply any label that isn't in the list above.`
+    : null;
 
   return [
     `Final step before you finish: update the GitHub issue this run was triggered by.`,
@@ -73,7 +79,8 @@ export function issueWritebackPrompt(args: {
     `Use the GitHub MCP tools available to you. Constraints:`,
     statusLine,
     labelLine,
-    `- Do not set any status or apply any label that isn't in the lists above.`,
+    noopStatusLine,
+    noopLabelLine,
     `- If none apply, say so explicitly and skip the update — don't pick a default.`,
     ``,
     `When done, briefly state what you set and why.`,

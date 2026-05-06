@@ -5,21 +5,10 @@
  * isn't valid (the wrong one returns null).
  */
 
+import { githubAuthHeaders, githubGraphqlUrl } from './http';
+
 const PAGE_SIZE = 50;
 const MAX_PAGES = 40; // 2000 items ceiling — plenty for v1, bounded by design.
-
-/**
- * Lazy because this module is re-exported through the root `@conduit/shared`
- * barrel and ends up in the browser bundle (web reads types/schemas from
- * the same barrel). Reading `process.env` at module init crashes Vite —
- * resolve at call time so server consumers still pick up overrides while
- * the web bundle stays inert.
- */
-function graphqlUrl(): string {
-  const env =
-    typeof process !== 'undefined' ? process.env?.GITHUB_GRAPHQL_URL : undefined;
-  return env ?? 'https://api.github.com/graphql';
-}
 
 export interface ProjectBoardQuery {
   ownerType: 'user' | 'org';
@@ -310,13 +299,11 @@ async function callGraphQL<T>(
   token: string,
   fetchImpl: typeof fetch,
 ): Promise<GraphQLResponse<T>> {
-  const resp = await fetchImpl(graphqlUrl(), {
+  const resp = await fetchImpl(githubGraphqlUrl(), {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${token}`,
+      ...githubAuthHeaders(token),
       'Content-Type': 'application/json',
-      'User-Agent': 'conduit-poll/0.1',
-      Accept: 'application/vnd.github+json',
     },
     body: JSON.stringify(body),
   });

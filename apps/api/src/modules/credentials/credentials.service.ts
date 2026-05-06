@@ -76,28 +76,10 @@ export class CredentialsService {
   }
 
   /**
-   * Like `decryptForConnection`, but rejects if the connection isn't on the
-   * given workflow — used by config-time helpers exposed over the public API
-   * so a user can only resolve tokens for connections they own.
-   */
-  async getConnectionToken(workflowId: string, connectionId: string): Promise<string> {
-    const conn = await this.prisma.workflowConnection.findUnique({
-      where: { id: connectionId },
-      include: { credential: true },
-    });
-    if (!conn || conn.workflowId !== workflowId) {
-      throw new NotFoundException(
-        `Connection ${connectionId} not found on workflow ${workflowId}`,
-      );
-    }
-    return decrypt(conn.credential.secret);
-  }
-
-  /**
    * Returns the connection's platform binding (owner/repo) along with its
-   * decrypted token. Used by config-time helpers that need to call repo-
-   * scoped GitHub APIs (e.g. listing labels) without re-asking the user for
-   * fields already stored on the connection row.
+   * decrypted token. Rejects if the connection isn't on the given workflow,
+   * so config-time helpers exposed over the public API can only resolve
+   * tokens for connections the caller owns.
    */
   async getConnectionBinding(
     workflowId: string,

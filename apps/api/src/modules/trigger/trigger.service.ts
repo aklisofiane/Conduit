@@ -23,7 +23,10 @@ export class TriggerService {
     workflowId: string,
     dto: ListProjectsDto,
   ): Promise<ProjectBoardSummary[]> {
-    const token = await this.credentials.getConnectionToken(workflowId, dto.connectionId);
+    const { token } = await this.credentials.getConnectionBinding(
+      workflowId,
+      dto.connectionId,
+    );
 
     try {
       return await listProjectBoards({

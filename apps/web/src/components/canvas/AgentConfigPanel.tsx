@@ -379,81 +379,41 @@ function IssueWritebackControl({
 
       {enabled && (
         <div className="space-y-3 rounded-[var(--radius)] border border-[var(--color-divider)] bg-[var(--color-bg)] p-3">
-          <div>
-            <div className="mb-1 font-mono text-[10.5px] uppercase tracking-[0.06em] text-[var(--color-text-muted)]">
-              Allowed statuses
-            </div>
-            {!board ? (
-              <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
-                Trigger has no project board — set one to pick statuses.
-              </div>
-            ) : boardsQuery.isLoading ? (
-              <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
-                Loading…
-              </div>
-            ) : statusOptions.length === 0 ? (
-              <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
-                No Status field options found on the trigger's project.
-              </div>
-            ) : (
-              <div className="flex flex-wrap gap-1.5">
-                {statusOptions.map((opt) => {
-                  const selected = value?.allowedStatuses.includes(opt) ?? false;
-                  return (
-                    <button
-                      key={opt}
-                      type="button"
-                      onClick={() => toggleStatus(opt)}
-                      className={cn(
-                        'rounded-[var(--radius-sm)] border px-2 py-[3px] font-mono text-[11px] transition-colors',
-                        selected
-                          ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-text)]'
-                          : 'border-[var(--color-divider)] text-[var(--color-text-muted)] hover:border-[var(--color-text-muted)]',
-                      )}
-                    >
-                      {opt}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+          <PillSection
+            label="Allowed statuses"
+            empty={
+              !board
+                ? "Trigger has no project board — set one to pick statuses."
+                : boardsQuery.isLoading
+                  ? 'Loading…'
+                  : statusOptions.length === 0
+                    ? "No Status field options found on the trigger's project."
+                    : null
+            }
+          >
+            <PillToggleGroup
+              options={statusOptions}
+              selected={value?.allowedStatuses ?? []}
+              onToggle={toggleStatus}
+            />
+          </PillSection>
 
-          <div>
-            <div className="mb-1 font-mono text-[10.5px] uppercase tracking-[0.06em] text-[var(--color-text-muted)]">
-              Allowed labels
-            </div>
-            {labelsQuery.isLoading ? (
-              <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
-                Loading…
-              </div>
-            ) : labelOptions.length === 0 ? (
-              <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
-                No labels found on the trigger's repo.
-              </div>
-            ) : (
-              <div className="flex flex-wrap gap-1.5">
-                {labelOptions.map((label) => {
-                  const selected = value?.allowedLabels.includes(label.name) ?? false;
-                  return (
-                    <button
-                      key={label.name}
-                      type="button"
-                      onClick={() => toggleLabel(label.name)}
-                      className={cn(
-                        'rounded-[var(--radius-sm)] border px-2 py-[3px] font-mono text-[11px] transition-colors',
-                        selected
-                          ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-text)]'
-                          : 'border-[var(--color-divider)] text-[var(--color-text-muted)] hover:border-[var(--color-text-muted)]',
-                      )}
-                    >
-                      {label.name}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+          <PillSection
+            label="Allowed labels"
+            empty={
+              labelsQuery.isLoading
+                ? 'Loading…'
+                : labelOptions.length === 0
+                  ? "No labels found on the trigger's repo."
+                  : null
+            }
+          >
+            <PillToggleGroup
+              options={labelOptions.map((l) => l.name)}
+              selected={value?.allowedLabels ?? []}
+              onToggle={toggleLabel}
+            />
+          </PillSection>
 
           {value &&
             value.allowedStatuses.length === 0 &&
@@ -465,6 +425,60 @@ function IssueWritebackControl({
             )}
         </div>
       )}
+    </div>
+  );
+}
+
+function PillSection({
+  label,
+  empty,
+  children,
+}: {
+  label: string;
+  /** Non-null shows a muted hint instead of children — covers loading and empty states. */
+  empty: string | null;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <div className="mb-1 font-mono text-[10.5px] uppercase tracking-[0.06em] text-[var(--color-text-muted)]">
+        {label}
+      </div>
+      {empty !== null ? (
+        <div className="font-mono text-[11px] text-[var(--color-text-muted)]">{empty}</div>
+      ) : (
+        children
+      )}
+    </div>
+  );
+}
+
+function PillToggleGroup({
+  options,
+  selected,
+  onToggle,
+}: {
+  options: string[];
+  selected: string[];
+  onToggle: (value: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {options.map((opt) => (
+        <button
+          key={opt}
+          type="button"
+          onClick={() => onToggle(opt)}
+          className={cn(
+            'rounded-[var(--radius-sm)] border px-2 py-[3px] font-mono text-[11px] transition-colors',
+            selected.includes(opt)
+              ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-text)]'
+              : 'border-[var(--color-divider)] text-[var(--color-text-muted)] hover:border-[var(--color-text-muted)]',
+          )}
+        >
+          {opt}
+        </button>
+      ))}
     </div>
   );
 }

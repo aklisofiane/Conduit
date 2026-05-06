@@ -6,19 +6,10 @@
  * to populate the "Allowed labels" picker on the agent panel.
  */
 
+import { githubAuthHeaders, githubRestUrl } from './http';
+
 const PAGE_SIZE = 100;
 const MAX_PAGES = 10; // 1000 labels ceiling — generous for any realistic repo.
-
-/**
- * Lazy for the same reason as `projects.ts:graphqlUrl`: this module is
- * re-exported through the root `@conduit/shared` barrel and ends up in
- * the browser bundle. Reading `process.env` at module init crashes Vite.
- */
-function restUrl(): string {
-  const env =
-    typeof process !== 'undefined' ? process.env?.GITHUB_REST_URL : undefined;
-  return env ?? 'https://api.github.com';
-}
 
 export interface ListRepoLabelsQuery {
   owner: string;
@@ -44,13 +35,11 @@ export async function listRepoLabels(
 ): Promise<RepoLabel[]> {
   const labels: RepoLabel[] = [];
   for (let page = 1; page <= MAX_PAGES; page += 1) {
-    const url = `${restUrl()}/repos/${encodeURIComponent(q.owner)}/${encodeURIComponent(q.repo)}/labels?per_page=${PAGE_SIZE}&page=${page}`;
+    const url = `${githubRestUrl()}/repos/${encodeURIComponent(q.owner)}/${encodeURIComponent(q.repo)}/labels?per_page=${PAGE_SIZE}&page=${page}`;
     const resp = await fetchImpl(url, {
       method: 'GET',
       headers: {
-        Authorization: `Bearer ${q.token}`,
-        'User-Agent': 'conduit-poll/0.1',
-        Accept: 'application/vnd.github+json',
+        ...githubAuthHeaders(q.token),
         'X-GitHub-Api-Version': '2022-11-28',
       },
     });

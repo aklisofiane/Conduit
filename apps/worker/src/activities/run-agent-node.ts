@@ -161,12 +161,8 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
       await installSkillsIntoWorkspace(workspace.path, selected, node.provider);
     }
 
-    // Auto-attach a synthetic GitHub MCP server for issue writeback when the
-    // user has enabled it on this agent. The token comes from the workflow's
-    // GitHub trigger connection — the user does not need to provision a
-    // separate PAT or add the GitHub MCP to the workflow themselves. Skipped
-    // if the agent already references a GitHub MCP server (the user-attached
-    // one wins; we don't double-mount).
+    // Skip auto-attach if a GitHub MCP is already referenced — the user-
+    // configured one wins, regardless of which connection it uses.
     const writebackContext = resolveWritebackContext(node, triggers, triggerEvent);
     const writebackAttach =
       writebackContext && !agentReferencesGithubMcp(node, mcpServers)
@@ -435,23 +431,25 @@ function resolveWritebackContext(
  * True when the agent already references a GitHub MCP server defined on the
  * workflow (matched by transport command/args, since user-defined ids are
  * arbitrary). When true, we skip auto-attach so the user-configured server
- * wins — same connection or not.
+ * wins — same connection or not. Args are derived from the GitHub preset
+ * so this stays correct if the underlying package ever moves.
  */
 function agentReferencesGithubMcp(
   node: AgentConfig,
   mcpServers: WorkflowMcpServer[],
 ): boolean {
+  const preset = findMcpPreset('github');
+  const presetArgs =
+    preset?.transport.kind === 'stdio' ? (preset.transport.args ?? []) : [];
+  if (presetArgs.length === 0) return false;
   const byId = new Map(mcpServers.map((s) => [s.id, s]));
   for (const ref of node.mcpServers) {
     const def = byId.get(ref.serverId);
     if (!def) continue;
     const t = def.transport;
-    if (
-      t.kind === 'stdio' &&
-      (t.args ?? []).some((a) => a.includes('@modelcontextprotocol/server-github'))
-    ) {
-      return true;
-    }
+    if (t.kind !== 'stdio') continue;
+    const args = t.args ?? [];
+    if (presetArgs.some((a) => args.includes(a))) return true;
   }
   return false;
 }
