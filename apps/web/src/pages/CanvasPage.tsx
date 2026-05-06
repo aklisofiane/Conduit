@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useState, type DragEvent as ReactDragEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent as ReactDragEvent,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import {
   Background,
   BackgroundVariant,
@@ -40,6 +48,14 @@ const NODE_TYPES = { agent: AgentNode, trigger: TriggerNode } as const;
 const EDGE_TYPES = { workflow: WorkflowEdge } as const;
 const WORKFLOW_EDGE_TYPE = 'workflow';
 
+const PANEL_WIDTH_KEY = 'conduit:canvas:inspector-width';
+const PANEL_DEFAULT_WIDTH = 320;
+const PANEL_MIN_WIDTH = 280;
+const panelMaxWidth = () =>
+  typeof window === 'undefined'
+    ? 720
+    : Math.max(PANEL_MIN_WIDTH, Math.floor(window.innerWidth * 0.4));
+
 export function CanvasPage() {
   return (
     <ReactFlowProvider>
@@ -69,6 +85,55 @@ function CanvasInner() {
   // canvas on visibility: hidden.
   const [flowNodes, setFlowNodes] = useState<FlowNode[]>([]);
   const [flowEdges, setFlowEdges] = useState<FlowEdge[]>([]);
+
+  const [panelWidth, setPanelWidth] = useState<number>(() => {
+    if (typeof window === 'undefined') return PANEL_DEFAULT_WIDTH;
+    const raw = window.localStorage.getItem(PANEL_WIDTH_KEY);
+    const parsed = raw ? Number.parseInt(raw, 10) : NaN;
+    const seed = Number.isFinite(parsed) ? parsed : PANEL_DEFAULT_WIDTH;
+    return Math.min(panelMaxWidth(), Math.max(PANEL_MIN_WIDTH, seed));
+  });
+  const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
+
+  const startPanelResize = useCallback(
+    (event: ReactPointerEvent) => {
+      event.preventDefault();
+      dragRef.current = { startX: event.clientX, startWidth: panelWidth };
+      const onMove = (e: PointerEvent) => {
+        const drag = dragRef.current;
+        if (!drag) return;
+        const next = drag.startWidth - (e.clientX - drag.startX);
+        setPanelWidth(Math.min(panelMaxWidth(), Math.max(PANEL_MIN_WIDTH, next)));
+      };
+      const onUp = () => {
+        dragRef.current = null;
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+        window.removeEventListener('pointercancel', onUp);
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      };
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+      window.addEventListener('pointercancel', onUp);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    },
+    [panelWidth],
+  );
+
+  useEffect(() => {
+    window.localStorage.setItem(PANEL_WIDTH_KEY, String(panelWidth));
+  }, [panelWidth]);
+
+  // Re-clamp when the viewport shrinks so the panel can't exceed half the window.
+  useEffect(() => {
+    const onResize = () => {
+      setPanelWidth((w) => Math.min(panelMaxWidth(), Math.max(PANEL_MIN_WIDTH, w)));
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   useEffect(() => {
     if (wf) reset(wf.definition);
@@ -312,6 +377,8 @@ function CanvasInner() {
         <AgentConfigPanel
           agent={selectedAgent}
           workflowId={id}
+          width={panelWidth}
+          onResizeStart={startPanelResize}
           onChange={(patch) => updateAgent(selectedAgent.id, patch)}
           onSave={handleSave}
           onDiscard={() => wf && reset(wf.definition)}
@@ -325,6 +392,8 @@ function CanvasInner() {
         <TriggerConfigPanel
           trigger={selectedTrigger}
           workflowId={id}
+          width={panelWidth}
+          onResizeStart={startPanelResize}
           isActive={Boolean(wf?.isActive)}
           onChange={(patch) => updateTrigger(selectedTrigger.id, patch)}
           onActiveChange={(next) => updateWorkflow.mutate({ isActive: next })}

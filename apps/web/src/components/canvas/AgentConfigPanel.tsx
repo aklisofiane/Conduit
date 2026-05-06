@@ -1,3 +1,4 @@
+import type { PointerEvent as ReactPointerEvent } from 'react';
 import type { AgentConfig } from '@conduit/shared';
 import { useAgentPresets, useSkills } from '../../api/hooks.js';
 import type { AgentPreset } from '../../api/types.js';
@@ -5,10 +6,13 @@ import { cn } from '../../lib/cn.js';
 import { providerStyle } from '../../styles/theme.js';
 import { Icon } from './Icon.js';
 import { McpServerPicker } from './McpServerPicker.js';
+import { ResizeHandle } from './ResizeHandle.js';
 
 interface AgentConfigPanelProps {
   agent: AgentConfig;
   workflowId: string;
+  width: number;
+  onResizeStart: (event: ReactPointerEvent) => void;
   onChange: (patch: Partial<AgentConfig>) => void;
   onSave: () => void;
   onDiscard: () => void;
@@ -20,6 +24,8 @@ interface AgentConfigPanelProps {
 export function AgentConfigPanel({
   agent,
   workflowId,
+  width,
+  onResizeStart,
   onChange,
   onSave,
   onDiscard,
@@ -66,7 +72,11 @@ export function AgentConfigPanel({
   };
 
   return (
-    <aside className="flex w-[320px] shrink-0 flex-col border-l border-[var(--color-divider)] bg-[var(--color-bg-panel)]">
+    <aside
+      className="relative flex shrink-0 flex-col border-l border-[var(--color-divider)] bg-[var(--color-bg-panel)]"
+      style={{ width }}
+    >
+      <ResizeHandle onPointerDown={onResizeStart} />
       <div className="flex items-start justify-between border-b border-[var(--color-divider)] px-5 py-4">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 font-mono text-[10px] font-medium uppercase tracking-[0.06em] text-[var(--color-text-muted)]">
