@@ -66,12 +66,21 @@ async function resolveSingle(
   return {
     id: def.id,
     name: def.name,
-    transport: substitute(def.transport, secret),
+    transport: substituteCredentialInTransport(def.transport, secret),
     allowedTools: ref.allowedTools,
   };
 }
 
-function substitute(transport: McpTransport, secret: string | undefined): McpTransport {
+/**
+ * Substitute `{{credential}}` in `transport.env` (stdio) or `transport.headers`
+ * (sse / streamable-http) with the given secret. Returns the input unchanged
+ * when no secret is supplied. Exported so config-time helpers (introspection,
+ * UI previews) can use the same substitution path the runtime resolver does.
+ */
+export function substituteCredentialInTransport(
+  transport: McpTransport,
+  secret: string | undefined,
+): McpTransport {
   if (secret === undefined) return transport;
   const replace = (v: string): string => v.split(CREDENTIAL_PLACEHOLDER).join(secret);
   if (transport.kind === 'stdio') {

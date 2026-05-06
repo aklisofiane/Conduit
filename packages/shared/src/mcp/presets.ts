@@ -46,15 +46,14 @@ export const MCP_PRESETS: readonly McpPreset[] = [
     id: 'github',
     name: 'GitHub',
     description:
-      'Read and write GitHub issues, PRs, files, and branches via the official GitHub MCP server.',
+      'Read and write GitHub issues, PRs, projects, files, and branches via the remote GitHub MCP server.',
     platform: 'GITHUB',
-    credentialHint: 'Personal access token with repo + workflow scopes.',
+    credentialHint: 'Personal access token with repo + workflow + project scopes.',
     transport: {
-      kind: 'stdio',
-      command: 'npx',
-      args: ['-y', '@modelcontextprotocol/server-github'],
-      env: {
-        GITHUB_PERSONAL_ACCESS_TOKEN: CREDENTIAL_PLACEHOLDER_VALUE,
+      kind: 'streamable-http',
+      url: 'https://api.githubcopilot.com/mcp/',
+      headers: {
+        Authorization: `Bearer ${CREDENTIAL_PLACEHOLDER_VALUE}`,
       },
     },
   },

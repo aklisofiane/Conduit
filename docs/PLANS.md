@@ -55,7 +55,7 @@ Make it useful for real dev work.
 - [x] Codex provider (full implementation wrapping `@openai/codex-sdk`).
 - [x] Webhook ingestion (`POST /api/hooks/:workflowId`) with HMAC verification.
 - [x] `TriggerEvent` normalization for GitHub (issue opened, PR opened, PR comment).
-- [x] GitHub MCP server preset (`@modelcontextprotocol/server-github`) with credential binding.
+- [x] GitHub MCP server preset (`https://api.githubcopilot.com/mcp/`) with credential binding.
 - [x] `WorkflowConnection` + `PlatformCredential` UI.
 - [x] ~~Workspace `repo-clone` kind~~ — superseded by the workspace-consolidation pass; `ticket-branch` is now the sole entry kind, derived from graph topology. See `.specs/workspace-consolidation.md`.
 - [x] Custom MCP server config UI (stdio + SSE/HTTP transports).

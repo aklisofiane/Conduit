@@ -1,18 +1,29 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import type { DiscoveredTool, McpTransport } from '@conduit/shared';
-import { introspectMcpServer, McpIntrospectionError } from '@conduit/agent';
+import type { DiscoveredTool } from '@conduit/shared';
+import {
+  introspectMcpServer,
+  McpIntrospectionError,
+  substituteCredentialInTransport,
+} from '@conduit/agent';
+import { PrismaService } from '../../common/prisma.service';
+import { decrypt } from '../credentials/crypto';
+import type { IntrospectMcpDto } from './dto';
 
 /**
- * MCP introspection. Connects to the server with the provided transport,
- * calls `tools/list`, returns the discovered tools. Used at config time so
- * the UI can render an `allowedTools` picker. Errors surfaced as 400 so the
- * user who just typed a bad command / URL / credential sees it inline.
+ * MCP introspection. Resolves the `{{credential}}` placeholder when the
+ * caller passes a workflow + connection (the runtime resolver does the same
+ * substitution at run time), then calls `tools/list` on the MCP server.
+ * Errors surface as 400 so the user who just typed a bad command / URL /
+ * credential sees the message inline.
  */
 @Injectable()
 export class McpService {
   private readonly logger = new Logger(McpService.name);
 
-  async introspect(transport: McpTransport): Promise<DiscoveredTool[]> {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async introspect(dto: IntrospectMcpDto): Promise<DiscoveredTool[]> {
+    const transport = await this.substituteCredential(dto);
     try {
       return await introspectMcpServer(transport);
     } catch (e: unknown) {
@@ -22,5 +33,19 @@ export class McpService {
       }
       throw e;
     }
+  }
+
+  private async substituteCredential(dto: IntrospectMcpDto) {
+    if (!dto.connectionId) return dto.transport;
+    const conn = await this.prisma.workflowConnection.findUnique({
+      where: { id: dto.connectionId },
+      include: { credential: true },
+    });
+    if (!conn || (dto.workflowId && conn.workflowId !== dto.workflowId)) {
+      throw new BadRequestException(
+        `Connection ${dto.connectionId} not found${dto.workflowId ? ` on workflow ${dto.workflowId}` : ''}`,
+      );
+    }
+    return substituteCredentialInTransport(dto.transport, decrypt(conn.credential.secret));
   }
 }

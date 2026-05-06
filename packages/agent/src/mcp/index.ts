@@ -1,4 +1,8 @@
-export { resolveMcpServers, CREDENTIAL_PLACEHOLDER } from './resolve';
+export {
+  resolveMcpServers,
+  substituteCredentialInTransport,
+  CREDENTIAL_PLACEHOLDER,
+} from './resolve';
 export type { CredentialLookup } from './resolve';
 export {
   introspectMcpServer,

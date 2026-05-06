@@ -23,11 +23,12 @@ describe('resolveMcpServers + presets', () => {
 
     expect(resolved?.id).toBe('github');
     expect(resolved?.allowedTools).toEqual(['create_issue']);
-    if (resolved?.transport.kind !== 'stdio') throw new Error('expected stdio');
-    expect(resolved.transport.env?.GITHUB_PERSONAL_ACCESS_TOKEN).toBe('ghp_secretvalue');
-    // Command / args remain untouched.
-    expect(resolved.transport.command).toBe('npx');
-    expect(resolved.transport.args).toEqual(['-y', '@modelcontextprotocol/server-github']);
+    if (resolved?.transport.kind !== 'streamable-http') {
+      throw new Error('expected streamable-http');
+    }
+    expect(resolved.transport.headers?.Authorization).toBe('Bearer ghp_secretvalue');
+    // URL remains untouched.
+    expect(resolved.transport.url).toBe('https://api.githubcopilot.com/mcp/');
   });
 
   it('fails clearly when the linked connection has no secret', async () => {

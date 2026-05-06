@@ -11,6 +11,6 @@ export class McpController {
 
   @Post('introspect')
   introspect(@Body(new ZodBodyPipe(introspectMcpDtoSchema)) dto: IntrospectMcpDto) {
-    return this.svc.introspect(dto.transport);
+    return this.svc.introspect(dto);
   }
 }

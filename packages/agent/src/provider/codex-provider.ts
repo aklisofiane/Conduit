@@ -50,6 +50,7 @@ export class CodexProvider implements AgentProvider {
     const seenText = new Map<string, string>();
     const openToolCalls = new Set<string>();
     const todoSnapshots = new Map<string, number>();
+    const codexConfig = buildConfigOverrides(req.mcpServers);
     let thread: CodexThread | undefined;
     let firstTurn = true;
 
@@ -58,7 +59,7 @@ export class CodexProvider implements AgentProvider {
       const { Codex } = await loadCodexSdk();
       const codex = new Codex({
         apiKey: this.opts.apiKey,
-        config: buildConfigOverrides(req.mcpServers),
+        config: codexConfig.config,
       });
       thread = codex.startThread({
         model: req.model,
@@ -101,6 +102,7 @@ export class CodexProvider implements AgentProvider {
       // Codex SDK has no explicit thread teardown — dropping the reference
       // is sufficient. Kept for symmetry with other providers.
       thread = undefined;
+      for (const key of codexConfig.envKeys) delete process.env[key];
     };
 
     return { run, dispose };
@@ -154,37 +156,80 @@ export function __setCodexSdkLoaderForTests(
  * The SDK's `config` option accepts a nested object and flattens it.
  * Shape mirrors Codex's `mcp_servers.<name> = { ... }` config block.
  */
-function buildConfigOverrides(
-  mcpServers: readonly ResolvedMcpServer[],
-): Record<string, unknown> | undefined {
-  if (mcpServers.length === 0) return undefined;
+function buildConfigOverrides(mcpServers: readonly ResolvedMcpServer[]): {
+  config: Record<string, unknown> | undefined;
+  envKeys: string[];
+} {
+  if (mcpServers.length === 0) return { config: undefined, envKeys: [] };
   const entries: Record<string, unknown> = {};
-  for (const s of mcpServers) {
-    entries[s.id] = serverToCodexConfig(s);
+  const envKeys: string[] = [];
+  const sessionPart = Math.random().toString(36).slice(2, 10).toUpperCase();
+  for (const [index, s] of mcpServers.entries()) {
+    const envPrefix = `CONDUIT_CODEX_MCP_${sessionPart}_${index}_${sanitizeEnvPart(s.id)}`;
+    const config = serverToCodexConfig(s, envPrefix);
+    entries[s.id] = config.config;
+    envKeys.push(...config.envKeys);
   }
-  return { mcp_servers: entries };
+  return { config: { mcp_servers: entries }, envKeys };
 }
 
-function serverToCodexConfig(server: ResolvedMcpServer): Record<string, unknown> {
+function serverToCodexConfig(
+  server: ResolvedMcpServer,
+  envPrefix: string,
+): { config: Record<string, unknown>; envKeys: string[] } {
   const t = server.transport;
   if (t.kind === 'stdio') {
     return {
-      command: t.command,
-      ...(t.args?.length ? { args: t.args } : {}),
-      ...(t.env && Object.keys(t.env).length ? { env: t.env } : {}),
-      ...(server.allowedTools?.length ? { enabled_tools: server.allowedTools } : {}),
-      default_tools_approval_mode: 'approve',
+      config: {
+        command: t.command,
+        ...(t.args?.length ? { args: t.args } : {}),
+        ...(t.env && Object.keys(t.env).length ? { env: t.env } : {}),
+        ...(server.allowedTools?.length ? { enabled_tools: server.allowedTools } : {}),
+        default_tools_approval_mode: 'approve',
+      },
+      envKeys: [],
     };
   }
-  // Codex supports remote MCP servers via the `url` form. Header injection
-  // for SSE/HTTP isn't documented on the SDK surface; we pass the URL and
-  // let the transport carry the auth if headers are already substituted.
+  const { headers, bearerTokenEnvVar, envKeys } = codexRemoteAuth(t.headers, envPrefix);
   return {
-    url: t.url,
-    ...(t.headers && Object.keys(t.headers).length ? { headers: t.headers } : {}),
-    ...(server.allowedTools?.length ? { enabled_tools: server.allowedTools } : {}),
-    default_tools_approval_mode: 'approve',
+    config: {
+      url: t.url,
+      ...(headers && Object.keys(headers).length ? { headers } : {}),
+      ...(bearerTokenEnvVar ? { bearer_token_env_var: bearerTokenEnvVar } : {}),
+      ...(server.allowedTools?.length ? { enabled_tools: server.allowedTools } : {}),
+      default_tools_approval_mode: 'approve',
+    },
+    envKeys,
   };
+}
+
+function codexRemoteAuth(
+  headers: Record<string, string> | undefined,
+  envPrefix: string,
+): {
+  headers: Record<string, string> | undefined;
+  bearerTokenEnvVar: string | undefined;
+  envKeys: string[];
+} {
+  if (!headers) return { headers, bearerTokenEnvVar: undefined, envKeys: [] };
+  const out = { ...headers };
+  const authKey = Object.keys(out).find((k) => k.toLowerCase() === 'authorization');
+  const authValue = authKey ? out[authKey] : undefined;
+  const match = authValue?.match(/^Bearer\s+(.+)$/i);
+  if (!authKey || !match) return { headers, bearerTokenEnvVar: undefined, envKeys: [] };
+
+  const envKey = `${envPrefix}_BEARER_TOKEN`;
+  process.env[envKey] = match[1]!;
+  delete out[authKey];
+  return {
+    headers: Object.keys(out).length ? out : undefined,
+    bearerTokenEnvVar: envKey,
+    envKeys: [envKey],
+  };
+}
+
+function sanitizeEnvPart(value: string): string {
+  return value.replace(/[^A-Za-z0-9_]/g, '_').toUpperCase();
 }
 
 /**
@@ -228,9 +273,7 @@ function translate(
 
     case 'turn.failed': {
       const message =
-        typeof ev.error === 'object' && ev.error?.message
-          ? ev.error.message
-          : 'Codex turn failed';
+        typeof ev.error === 'object' && ev.error?.message ? ev.error.message : 'Codex turn failed';
       throw new Error(message);
     }
 
@@ -280,7 +323,7 @@ function translateItemEvent(
         {
           type: 'tool_result',
           id,
-          output: item.result ?? (error ?? ''),
+          output: item.result ?? error ?? '',
           error,
         },
       ];

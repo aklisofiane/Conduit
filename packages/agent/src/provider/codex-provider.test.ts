@@ -162,6 +162,63 @@ describe('CodexProvider', () => {
     });
   });
 
+  it('passes remote bearer auth to Codex through bearer_token_env_var', async () => {
+    let constructOptions: Record<string, unknown> | undefined;
+    installStub({
+      scriptedEvents: [{ type: 'turn.completed', usage: { input_tokens: 1, output_tokens: 1 } }],
+      onConstruct: (options) => {
+        constructOptions = options;
+      },
+    });
+
+    const session = new CodexProvider().startSession(
+      {
+        model: 'gpt-5-codex',
+        systemPrompt: '',
+        workspacePath: '/tmp',
+        webSearch: false,
+        constraints: {},
+        mcpServers: [
+          {
+            id: 'github-mcp',
+            name: 'GitHub',
+            transport: {
+              kind: 'streamable-http',
+              url: 'https://api.githubcopilot.com/mcp/',
+              headers: {
+                Authorization: 'Bearer ghp_secretvalue',
+                'X-Custom': 'keep-me',
+              },
+            },
+            allowedTools: ['update_project_item'],
+          },
+        ],
+      },
+      new AbortController().signal,
+    );
+
+    for await (const _ of session.run('')) {
+      void _;
+    }
+
+    const mcp = (
+      constructOptions?.config as { mcp_servers?: Record<string, Record<string, unknown>> }
+    )?.mcp_servers?.['github-mcp'];
+    const envVar = mcp?.bearer_token_env_var as string | undefined;
+
+    expect(mcp).toMatchObject({
+      url: 'https://api.githubcopilot.com/mcp/',
+      headers: { 'X-Custom': 'keep-me' },
+      enabled_tools: ['update_project_item'],
+      default_tools_approval_mode: 'approve',
+    });
+    expect(envVar).toMatch(/^CONDUIT_CODEX_MCP_[A-Z0-9]+_0_GITHUB_MCP_BEARER_TOKEN$/);
+    expect(process.env[envVar!]).toBe('ghp_secretvalue');
+
+    session.dispose();
+    expect(process.env[envVar!]).toBeUndefined();
+  });
+
   it('throws on turn.failed', async () => {
     installStub({
       scriptedEvents: [

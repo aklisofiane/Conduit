@@ -33,10 +33,9 @@
             "id": "github-mcp",
             "name": "GitHub",
             "transport": {
-              "kind": "stdio",
-              "command": "npx",
-              "args": ["-y", "@modelcontextprotocol/server-github"],
-              "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "{{credential}}" }
+              "kind": "streamable-http",
+              "url": "https://api.githubcopilot.com/mcp/",
+              "headers": { "Authorization": "Bearer {{credential}}" }
             },
             "connectionId": "<github>"
           }

@@ -79,6 +79,7 @@ export function McpServerPicker({ agent, workflowId, onChange }: Props) {
         <ServerCard
           key={server.id}
           server={server}
+          workflowId={workflowId}
           connections={connections}
           attachedRef={attachedByServerId.get(server.id)}
           onToggleAttached={() => toggleAttached(server.id)}
@@ -113,6 +114,7 @@ export function McpServerPicker({ agent, workflowId, onChange }: Props) {
 
 function ServerCard({
   server,
+  workflowId,
   connections,
   attachedRef,
   onToggleAttached,
@@ -120,6 +122,7 @@ function ServerCard({
   onRemoveFromWorkflow,
 }: {
   server: WorkflowMcpServer;
+  workflowId: string;
   connections: ConnectionOption[];
   attachedRef: McpServerRef | undefined;
   onToggleAttached: () => void;
@@ -132,7 +135,11 @@ function ServerCard({
 
   const handleIntrospect = async () => {
     try {
-      const tools = await introspect.mutateAsync({ transport: server.transport });
+      const tools = await introspect.mutateAsync({
+        transport: server.transport,
+        workflowId,
+        connectionId: server.connectionId,
+      });
       updateMcpServer(server.id, { discoveredTools: tools });
     } catch (e) {
       alert(e instanceof ApiError ? e.message : String(e));

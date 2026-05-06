@@ -80,7 +80,7 @@ Part of Phase 1 deliverables alongside `ClaudeProvider`.
 - **Seed workflows**: JSON files under `test/fixtures/workflows/` covering each node topology (single agent, parallel, polling, ticket-branch, multi-trigger).
 - **Seed git repos**: tarballs under `test/fixtures/repos/` containing pre-built bare repos with commit history, ready to clone locally. No GitHub network access in tests.
 - **Seed trigger events**: JSON payloads for GitHub webhook events (issue opened, PR opened, PR comment, `projects_v2_item` single-select change) captured from real payloads once, checked in.
-- **Seed MCP servers**: a tiny in-repo stdio MCP server (`test/fixtures/mcp-stub/`) that exposes a handful of tools with predictable behavior, used instead of the real `@modelcontextprotocol/server-github` in tests.
+- **Seed MCP servers**: a tiny in-repo stdio MCP server (`test/fixtures/mcp-stub/`) that exposes a handful of tools with predictable behavior, used instead of real GitHub MCP servers in tests.
 - **Mock GitHub GraphQL**: `test/e2e/mock-github.ts` stands up a local HTTP server that serves canned Projects v2 payloads. `startMockGithubGraphql()` returns `{ url, enqueue, close }`; the URL is injected into the worker subprocess via `GITHUB_GRAPHQL_URL`. Used by the Phase 4 E2E to drive `pollBoardActivity` deterministically across cycles.
 
 ## Temporal testing specifics
@@ -95,7 +95,7 @@ Part of Phase 1 deliverables alongside `ClaudeProvider`.
 
 - Real Anthropic/OpenAI model behavior. Out of scope; covered by manual smoke runs before release.
 - Real GitHub webhook delivery. HMAC verification is tested; delivery reliability is GitHub's problem.
-- Real MCP server binaries (`@modelcontextprotocol/server-github` etc.). The discovery + config path is tested against the stub MCP server; third-party server correctness is their problem.
+- Real MCP servers (`https://api.githubcopilot.com/mcp/`, npm binaries, etc.). The discovery + config path is tested against the stub MCP server; third-party server correctness is their problem.
 - Performance / load. Not in scope for v1; revisit post-ship.
 
 ## Per-phase validation checklist

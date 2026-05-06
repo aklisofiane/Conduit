@@ -229,8 +229,11 @@ export function useDeleteConnection(workflowId: string) {
 
 export function useIntrospectMcp() {
   return useMutation({
-    mutationFn: (body: { transport: McpTransport }) =>
-      api.post<DiscoveredTool[]>('/mcp/introspect', body),
+    mutationFn: (body: {
+      transport: McpTransport;
+      workflowId?: string;
+      connectionId?: string;
+    }) => api.post<DiscoveredTool[]>('/mcp/introspect', body),
   });
 }
 

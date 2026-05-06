@@ -35,12 +35,12 @@ describe('MCP presets', () => {
     const github = findMcpPreset('github');
     expect(github).toBeDefined();
     expect(github?.transport).toMatchObject({
-      kind: 'stdio',
-      command: 'npx',
+      kind: 'streamable-http',
+      url: 'https://api.githubcopilot.com/mcp/',
     });
-    if (github?.transport.kind === 'stdio') {
-      expect(github.transport.env?.GITHUB_PERSONAL_ACCESS_TOKEN).toBe(
-        CREDENTIAL_PLACEHOLDER_VALUE,
+    if (github?.transport.kind === 'streamable-http') {
+      expect(github.transport.headers?.Authorization).toBe(
+        `Bearer ${CREDENTIAL_PLACEHOLDER_VALUE}`,
       );
     }
     expect(github?.platform).toBe('GITHUB');

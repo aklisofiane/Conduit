@@ -54,7 +54,7 @@ describe('Phase 2 — webhook triggers a run and streams MCP tool calls', () => 
     await harness.seedTicketBranchRepo('acme', 'triage-tests');
 
     // 1. Platform credential — doubles as the {{credential}} the GitHub MCP
-    //    server would receive as GITHUB_PERSONAL_ACCESS_TOKEN.
+    //    server would receive in its Authorization header.
     const cred = await harness.http.post<{ id: string }>('/credentials', {
       platform: 'GITHUB',
       name: 'e2e-github-pat',
