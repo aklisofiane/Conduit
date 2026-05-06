@@ -40,6 +40,9 @@ function RunRow({ run }: { run: WorkflowRunListItem }) {
       ? `running · ${duration(run.startedAt)}`
       : duration(run.startedAt, run.finishedAt);
 
+  const isError = run.status === 'FAILED' && Boolean(run.error);
+  const subtitle = isError ? run.error : triggerSubtitle(run.trigger);
+
   return (
     <Link
       to={`/runs/${run.id}`}
@@ -48,15 +51,16 @@ function RunRow({ run }: { run: WorkflowRunListItem }) {
       <span className={cn('status-dot', statusClass(run.status))} />
       <div className="min-w-0">
         <div className="truncate font-mono text-[13px] font-medium text-[var(--color-text)]">
-          {run.id.slice(0, 8)}
+          {triggerHeadline(run.trigger)}
         </div>
-        {run.status === 'FAILED' && run.error ? (
-          <div className="mt-0.5 truncate font-mono text-[11px] text-[var(--color-error)]">
-            {run.error}
-          </div>
-        ) : (
-          <div className="mt-0.5 font-mono text-[11px] text-[var(--color-text-3)]">
-            {triggerSummary(run.trigger)}
+        {subtitle && (
+          <div
+            className={cn(
+              'mt-0.5 truncate font-mono text-[11px]',
+              isError ? 'text-[var(--color-error)]' : 'text-[var(--color-text-3)]',
+            )}
+          >
+            {subtitle}
           </div>
         )}
       </div>
@@ -89,10 +93,21 @@ function EmptyRow({ text }: { text: string }) {
   );
 }
 
-function triggerSummary(trigger: RunTrigger): string {
-  if (trigger.issue) return `${trigger.source} · ${trigger.issue.key}`;
+function triggerHeadline(trigger: RunTrigger): string {
+  if (trigger.issue) {
+    // Repo is implicit (one workflow → one repo); Jira keys look like ids, GitHub/GitLab keys are numeric.
+    const ref = trigger.source === 'jira' ? trigger.issue.key : `#${trigger.issue.key}`;
+    return trigger.issue.title ? `${ref} — ${trigger.issue.title}` : ref;
+  }
   if (trigger.event && trigger.event !== trigger.source) {
     return `${trigger.source} · ${trigger.event}`;
   }
   return trigger.source;
+}
+
+function triggerSubtitle(trigger: RunTrigger): string {
+  const parts: string[] = [];
+  if (trigger.issue) parts.push(`${trigger.source} · ${trigger.event}`);
+  if (trigger.actor) parts.push(`by ${trigger.actor}`);
+  return parts.join(' · ');
 }
