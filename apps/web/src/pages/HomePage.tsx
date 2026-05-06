@@ -31,9 +31,9 @@ export function HomePage() {
       <section className="flex flex-col gap-2">
         <h1
           className="text-[44px] font-semibold leading-none tracking-tight text-[var(--color-text)]"
-          style={{ fontFamily: 'var(--font-serif)' }}
+          style={{ fontFamily: 'var(--font-serif)', fontVariantLigatures: 'none' }}
         >
-          Workflows<em className="text-[var(--color-claude)] not-italic">.</em>
+          Workflows
         </h1>
         <div className="font-mono text-[12px] text-[var(--color-text-2)]">
           <b className="text-[var(--color-text)]">{activeCount} active</b> ·{' '}
