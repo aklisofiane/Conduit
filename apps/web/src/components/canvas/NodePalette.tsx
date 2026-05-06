@@ -37,7 +37,7 @@ export function NodePalette({ onAddAgent, onSelectTrigger }: NodePaletteProps) {
         <AgentPaletteCard
           provider="codex"
           name="Codex"
-          description="gpt-5-codex"
+          description="gpt-5 family · codex"
           onClick={() => onAddAgent('codex')}
         />
       </PaletteSection>

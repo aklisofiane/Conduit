@@ -1,4 +1,4 @@
-import type { AgentConfig } from '@conduit/shared';
+import { PROVIDER_MODELS, type AgentConfig } from '@conduit/shared';
 import { useAgentPresets, useSkills } from '../../api/hooks.js';
 import type { AgentPreset } from '../../api/types.js';
 import { cn } from '../../lib/cn.js';
@@ -129,7 +129,7 @@ export function AgentConfigPanel({
                 value={agent.provider}
                 onChange={(e) => {
                   const provider = e.target.value as AgentConfig['provider'];
-                  const models = modelsFor(provider);
+                  const models = PROVIDER_MODELS[provider];
                   const model = models.includes(agent.model) ? agent.model : models[0];
                   onChange({ provider, model });
                 }}
@@ -142,7 +142,7 @@ export function AgentConfigPanel({
                 value={agent.model}
                 onChange={(e) => onChange({ model: e.target.value })}
               >
-                {modelsFor(agent.provider).map((m) => (
+                {PROVIDER_MODELS[agent.provider].map((m) => (
                   <option key={m} value={m}>
                     {m}
                   </option>
@@ -267,11 +267,6 @@ function Field({
       {children}
     </div>
   );
-}
-
-function modelsFor(provider: AgentConfig['provider']): string[] {
-  if (provider === 'codex') return ['gpt-5-codex'];
-  return ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5'];
 }
 
 function groupPresetsByCategory(

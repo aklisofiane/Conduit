@@ -30,7 +30,7 @@ describe('CodexProvider', () => {
   it('reports capabilities', () => {
     const p = new CodexProvider();
     const caps = p.getCapabilities();
-    expect(caps.models).toContain('gpt-5-codex');
+    expect(caps.models).toContain('gpt-5.3-codex');
     expect(caps.supportsMcp).toBe(true);
   });
 

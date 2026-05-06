@@ -24,7 +24,12 @@ import {
   type NodeChange,
 } from '@xyflow/react';
 import { useParams } from 'react-router-dom';
-import type { AgentConfig, Edge, WorkflowDefinition } from '@conduit/shared';
+import {
+  DEFAULT_MODEL,
+  type AgentConfig,
+  type Edge,
+  type WorkflowDefinition,
+} from '@conduit/shared';
 import { AgentNode } from '../components/canvas/AgentNode.js';
 import { AgentConfigPanel } from '../components/canvas/AgentConfigPanel.js';
 import { InspectorShell } from '../components/canvas/InspectorShell.js';
@@ -236,7 +241,7 @@ function CanvasInner() {
         id: agentId,
         name,
         provider,
-        model: provider === 'claude' ? 'claude-opus-4-6' : 'gpt-5-codex',
+        model: DEFAULT_MODEL[provider],
         instructions: '',
         mcpServers: [],
         skills: [],

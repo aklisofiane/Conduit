@@ -1,8 +1,9 @@
-import type {
-  AgentEvent,
-  AgentRequest,
-  ProviderCapabilities,
-  ResolvedMcpServer,
+import {
+  PROVIDER_MODELS,
+  type AgentEvent,
+  type AgentRequest,
+  type ProviderCapabilities,
+  type ResolvedMcpServer,
 } from '@conduit/shared';
 import { applyCounters, checkConstraints, newCounters } from './constraints';
 import type { AgentProvider, AgentSession } from './types';
@@ -37,7 +38,7 @@ export class CodexProvider implements AgentProvider {
 
   getCapabilities(): ProviderCapabilities {
     return {
-      models: ['gpt-5-codex'],
+      models: [...PROVIDER_MODELS.codex],
       maxTokens: 200_000,
       supportsMcp: true,
     };

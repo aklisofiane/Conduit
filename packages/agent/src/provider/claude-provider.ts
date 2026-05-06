@@ -1,4 +1,9 @@
-import type { AgentEvent, AgentRequest, ProviderCapabilities } from '@conduit/shared';
+import {
+  PROVIDER_MODELS,
+  type AgentEvent,
+  type AgentRequest,
+  type ProviderCapabilities,
+} from '@conduit/shared';
 import { AsyncQueue } from './async-queue';
 import { applyCounters, checkConstraints, newCounters } from './constraints';
 import type { AgentProvider, AgentSession } from './types';
@@ -23,7 +28,7 @@ export class ClaudeProvider implements AgentProvider {
 
   getCapabilities(): ProviderCapabilities {
     return {
-      models: ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5'],
+      models: [...PROVIDER_MODELS.claude],
       maxTokens: 200_000,
       supportsMcp: true,
     };
