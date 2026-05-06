@@ -57,7 +57,7 @@ Make it useful for real dev work.
 - [x] `TriggerEvent` normalization for GitHub (issue opened, PR opened, PR comment).
 - [x] GitHub MCP server preset (`@modelcontextprotocol/server-github`) with credential binding.
 - [x] `WorkflowConnection` + `PlatformCredential` UI.
-- [x] Workspace `repo-clone` kind — seeded from base clone, token stripped.
+- [x] ~~Workspace `repo-clone` kind~~ — superseded by the workspace-consolidation pass; `ticket-branch` is now the sole entry kind, derived from graph topology. See `.specs/workspace-consolidation.md`.
 - [x] Custom MCP server config UI (stdio + SSE/HTTP transports).
 - [x] Per-tool `allowedTools` filtering in the MCP server picker (uses cached `discoveredTools`).
 

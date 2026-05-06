@@ -23,11 +23,9 @@
             "id": "agent-pr-review",
             "name": "Review",
             "presetId": "reviewer",
-            "instructionsAppend": "A pull request has just been opened. Read the PR metadata from the trigger context, check out the PR branch in your workspace, and review the diff against the base branch. Read local guidance such as CLAUDE.md or CONTRIBUTING.md when present.",
+            "instructionsAppend": "A pull request has just been opened. Read the PR metadata from the trigger context and review the diff against the base branch. Read local guidance such as CLAUDE.md or CONTRIBUTING.md when present.",
             "mcpServers": [{ "serverId": "github-mcp" }],
-            "skills": [],
-            "workspace": { "kind": "repo-clone", "connectionId": "<github>" }
-          }
+            "skills": []          }
         ],
         "edges": [{ "from": "PRReviewTrigger", "to": "Review" }],
         "mcpServers": [

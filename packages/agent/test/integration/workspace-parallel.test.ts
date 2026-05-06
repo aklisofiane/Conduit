@@ -8,14 +8,22 @@ import {
   MergeConflictError,
   WorkspaceManager,
   copyConduitSummaries,
+  deriveSlug,
+  formatBranchName,
   mergeBranchedWorktree,
   readConduitSummary,
 } from '../../src/index';
+import type {
+  ConnectionContext,
+  TicketBranchRow,
+  TicketBranchStore,
+} from '../../src/workspace/types';
 
 /**
  * Exercises the real-git bits of Phase 3 against a seeded local repo:
  *
- *   1. `repo-clone` seeds a worktree off a local bare repo.
+ *   1. `ticket-branch` seeds a worktree off a local bare repo (the only
+ *      "trigger-anchored" workspace kind post-Phase-2).
  *   2. Parallel-branched `inherit` creates sibling worktrees off the
  *      upstream HEAD.
  *   3. Agents commit different files in each sibling; merge-back folds
@@ -33,30 +41,32 @@ async function git(cwd: string, ...args: string[]): Promise<string> {
 
 describe('parallel `inherit` + merge-back + .conduit copy', () => {
   let home: string;
-  let bareRepo: string;
   let originalConduitHome: string | undefined;
+  let connection: ConnectionContext;
 
   beforeEach(async () => {
     home = await fs.mkdtemp(path.join(os.tmpdir(), 'conduit-int-'));
     originalConduitHome = process.env.CONDUIT_HOME;
     process.env.CONDUIT_HOME = home;
 
-    // Build a local seed clone + bare remote under the workspace manager's
-    // expected `base-clones/github/<owner>/<repo>.git` path so `repoClone()`
-    // doesn't try to hit the network.
-    const seed = path.join(home, 'seed');
-    await fs.mkdir(seed, { recursive: true });
-    await git(seed, 'init', '-q', '-b', 'main');
-    await git(seed, 'config', 'user.email', 'seed@conduit.test');
-    await git(seed, 'config', 'user.name', 'Seed');
-    await fs.writeFile(path.join(seed, 'README.md'), '# seed\n');
-    await git(seed, 'add', '-A');
-    await git(seed, 'commit', '-q', '-m', 'seed');
+    // Local "remote" — the workspace manager treats this as upstream origin
+    // via `cloneUrl` and clones into `base-clones/<...>` on demand.
+    const remote = path.join(home, 'remote');
+    await fs.mkdir(remote, { recursive: true });
+    await git(remote, 'init', '-q', '-b', 'main');
+    await git(remote, 'config', 'user.email', 'seed@conduit.test');
+    await git(remote, 'config', 'user.name', 'Seed');
+    await fs.writeFile(path.join(remote, 'README.md'), '# seed\n');
+    await git(remote, 'add', '-A');
+    await git(remote, 'commit', '-q', '-m', 'seed');
 
-    bareRepo = path.join(home, 'base-clones', 'github', 'acme', 'shop.git');
-    await fs.mkdir(path.dirname(bareRepo), { recursive: true });
-    await git(path.dirname(bareRepo), 'clone', '--bare', '-q', seed, bareRepo);
-    await git(bareRepo, 'remote', 'set-url', 'origin', seed);
+    connection = {
+      id: 'conn-1',
+      platform: 'github',
+      owner: 'acme',
+      repo: 'shop',
+      cloneUrl: remote,
+    };
   });
 
   afterEach(async () => {
@@ -72,14 +82,10 @@ describe('parallel `inherit` + merge-back + .conduit copy', () => {
     const triage = await manager.resolve({
       runId,
       nodeName: 'Triage',
-      spec: { kind: 'repo-clone', connectionId: 'conn-1' },
-      connection: {
-        id: 'conn-1',
-        platform: 'github',
-        owner: 'acme',
-        repo: 'shop',
-        cloneUrl: 'file://does-not-matter',
-      },
+      spec: { kind: 'ticket-branch' },
+      connection,
+      ticket: { id: '11', title: 'parallel merge-back' },
+      ticketBranchStore: makeFakeStore(),
     });
     expect(triage.head).toBeTruthy();
 
@@ -173,14 +179,10 @@ describe('parallel `inherit` + merge-back + .conduit copy', () => {
     const triage = await manager.resolve({
       runId,
       nodeName: 'Triage',
-      spec: { kind: 'repo-clone', connectionId: 'conn-1' },
-      connection: {
-        id: 'conn-1',
-        platform: 'github',
-        owner: 'acme',
-        repo: 'shop',
-        cloneUrl: 'file://does-not-matter',
-      },
+      spec: { kind: 'ticket-branch' },
+      connection,
+      ticket: { id: '12', title: 'conflict scenario' },
+      ticketBranchStore: makeFakeStore(),
     });
     await fs.writeFile(path.join(triage.path, 'shared.txt'), 'base\n');
     await git(triage.path, 'add', '-A');
@@ -242,3 +244,31 @@ describe('parallel `inherit` + merge-back + .conduit copy', () => {
     expect(status).toBe('');
   });
 });
+
+function makeFakeStore(): TicketBranchStore {
+  const rows = new Map<string, TicketBranchRow>();
+  const key = (p: string, o: string, r: string, t: string) => `${p}:${o}/${r}:${t}`;
+  return {
+    async upsert(input) {
+      const k = key(input.platform, input.owner, input.repo, input.ticketId);
+      const existing = rows.get(k);
+      if (existing) return existing;
+      const slug = deriveSlug(input.ticketTitle);
+      const row: TicketBranchRow = {
+        id: `tb_${rows.size + 1}`,
+        platform: input.platform,
+        owner: input.owner,
+        repo: input.repo,
+        ticketId: input.ticketId,
+        slug,
+        branchName: formatBranchName(input.ticketId, slug),
+        baseRef: input.baseRef,
+      };
+      rows.set(k, row);
+      return row;
+    },
+    async markRunStart() {
+      /* no-op */
+    },
+  };
+}

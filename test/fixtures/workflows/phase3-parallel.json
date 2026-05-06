@@ -20,9 +20,7 @@
         "model": "stub-model",
         "instructions": "Clone the repo and classify the issue.",
         "mcpServers": [],
-        "skills": [],
-        "workspace": { "kind": "repo-clone", "connectionId": "__placeholder__" }
-      },
+        "skills": []      },
       {
         "id": "agent-fix",
         "name": "Fix",
@@ -30,9 +28,7 @@
         "model": "stub-model",
         "instructions": "Propose a patch in src/fix.ts.",
         "mcpServers": [],
-        "skills": [],
-        "workspace": { "kind": "inherit", "fromNode": "Triage" }
-      },
+        "skills": []      },
       {
         "id": "agent-doc",
         "name": "Doc",
@@ -40,9 +36,7 @@
         "model": "stub-model",
         "instructions": "Update the README for the bug fix.",
         "mcpServers": [],
-        "skills": [],
-        "workspace": { "kind": "inherit", "fromNode": "Triage" }
-      },
+        "skills": []      },
       {
         "id": "agent-review",
         "name": "Review",
@@ -50,9 +44,7 @@
         "model": "stub-model",
         "instructions": "Review the merged branches and leave a summary.",
         "mcpServers": [],
-        "skills": [],
-        "workspace": { "kind": "inherit", "fromNode": "Triage" }
-      }
+        "skills": []      }
     ],
     "edges": [
       { "from": "Phase3Trigger", "to": "Triage" },

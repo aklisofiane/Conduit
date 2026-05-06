@@ -7,7 +7,9 @@ import type { WorkflowDefinition } from '@conduit/shared';
  * validation later.
  *
  * Mirrors the slot enumeration in `@conduit/shared/template/resolve.ts` —
- * any new connection-bearing field there must be added here too.
+ * any new connection-bearing field there must be added here too. Node
+ * workspaces no longer carry connections (post Phase 2 consolidation): the
+ * trigger's connection is the workflow's single source of truth.
  */
 export function remapConnectionIds(
   definition: unknown,
@@ -23,13 +25,6 @@ export function remapConnectionIds(
   for (const server of cloned.mcpServers ?? []) {
     const next = remap(server.connectionId);
     if (next) server.connectionId = next;
-  }
-  for (const node of cloned.nodes ?? []) {
-    const ws = node.workspace;
-    if (ws && (ws.kind === 'repo-clone' || ws.kind === 'ticket-branch')) {
-      const next = remap(ws.connectionId);
-      if (next) ws.connectionId = next;
-    }
   }
   return cloned as WorkflowDefinition;
 }

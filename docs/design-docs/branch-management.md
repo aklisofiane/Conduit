@@ -18,18 +18,22 @@ Conduit is stateless across runs. `.conduit/` remains intra-run only. No cycle e
 Declared in [node-system.md](./node-system.md):
 
 ```ts
-| { kind: 'ticket-branch'; connectionId: string; baseRef?: string }
+| { kind: 'ticket-branch' }
 ```
 
-At runtime, `runAgentNode`:
+The trigger event determines which arm runs:
 
-1. Derives the branch name (`conduit/<ticket-id>-<slug>`).
-2. Checks the remote — adds a worktree from the branch if it exists, or creates it with `-b <baseRef>` if it doesn't. When `baseRef` is omitted, the runtime reads the base clone's `HEAD` symbolic ref to resolve the repo's default branch (typically `main`). The resolved ref is cached in `TicketBranch.baseRef` for display.
-3. Injects a platform token into the agent process env and configures a git credential helper so the agent can `git push`.
+- **Issue trigger** (`issues.opened` webhook, polling on board status):
+  1. Derive the branch name (`conduit/<ticket-id>-<slug>`).
+  2. Upsert the `TicketBranch` row — first call writes the slug + base ref; later calls return the row verbatim so name and base stay stable across workflows.
+  3. Check the remote — add a worktree from the branch if it exists, or create it with `-b <baseRef>` if it doesn't. The base ref is resolved from the base clone's `HEAD` symbolic ref (typically `main`).
+- **PR trigger** (`pull_request.opened` webhook): no row, no slug. Add a worktree directly at `pr.headRef` after fetching. For Conduit-internal flows where a Worker pushed and opened a PR, this lands the Reviewer on the same `conduit/<id>-<slug>` branch the Worker built; for external/human-opened PRs, on whatever ref the contributor opened from.
 
-**First-create-wins for `baseRef`**: the `TicketBranch` row is shared across workflows targeting the same ticket. The first workflow to create the branch writes its `baseRef` to the row; subsequent workflows targeting the same ticket ignore their own declared `baseRef` and resolve to the existing branch. The branch, once created, is the source of truth — it's too late to change its base.
+In both arms, the runtime injects a platform token into the agent process env and configures a git credential helper so the agent can `git push`. The connection comes from the workflow's single trigger configuration — agents and the workspace itself no longer carry a `connectionId`.
 
-Validation at save time: `ticket-branch` requires a trigger that carries an issue/PR identifier.
+**First-create-wins for `baseRef`** (issue arm only): the `TicketBranch` row is shared across workflows targeting the same ticket. The first workflow to create the branch writes its `baseRef`; subsequent workflows resolve to the existing branch. The branch, once created, is the source of truth.
+
+Validation at save time: every trigger must surface an issue or PR identifier (rejected webhook events: `push`, `release`, `workflow_run`, `board.column.changed`); polling triggers always pull issue identity from the GraphQL response and pass unconditionally.
 
 ## Ownership model
 
@@ -71,7 +75,7 @@ Format: `conduit/<ticket-id>-<slug>`.
 
 ## Concurrency
 
-**Concurrent triggers on the same ticket (same workflow)**: one active run per `(workflow, ticket)` at a time. The workflow ID is deterministic: `run-<workflowId>-<ticketId>`. While a run is in flight, Temporal rejects a duplicate start with `WorkflowExecutionAlreadyStarted` — the trigger handler catches it, drops the trigger silently (no new `WorkflowRun` row, no error surfaced to the platform). Once the run terminates (any status), `WorkflowIdReusePolicy = ALLOW_DUPLICATE` lets the same ID be reused, so a ticket re-entering `Dev` fires the Worker again. This is what keeps board cycles (Dev → Review → Dev) working. Applies only to `ticket-branch` workflows; ephemeral `repo-clone` workflows use per-run workflow IDs and allow concurrent runs.
+**Concurrent triggers on the same ticket (same workflow)**: one active run per `(workflow, ticket)` at a time. The workflow ID is deterministic: `run-<workflowId>-<ticketId>`. While a run is in flight, Temporal rejects a duplicate start with `WorkflowExecutionAlreadyStarted` — the trigger handler catches it, drops the trigger silently (no new `WorkflowRun` row, no error surfaced to the platform). Once the run terminates (any status), `WorkflowIdReusePolicy = ALLOW_DUPLICATE` lets the same ID be reused, so a ticket re-entering `Dev` fires the Worker again. This is what keeps board cycles (Dev → Review → Dev) working. Applies to every v1 workflow — every entry node is `ticket-branch`.
 
 **Base-clone race on the same host**: two activities (different tickets, same repo) might call `git worktree add` against the shared base clone at the same moment. A local file lock on the base-clone path serializes these. Local-process only, not distributed.
 

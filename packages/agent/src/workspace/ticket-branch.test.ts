@@ -59,7 +59,6 @@ describe('resolveTicketBranchWorkspace', () => {
     const first = await resolveTicketBranchWorkspace({
       runId: 'run_1',
       nodeName: 'Worker',
-      spec: { kind: 'ticket-branch', connectionId: 'conn_test' },
       connection,
       ticket: { id: '42', title: 'Fix crash in checkout!' },
       store,
@@ -81,7 +80,6 @@ describe('resolveTicketBranchWorkspace', () => {
     const second = await resolveTicketBranchWorkspace({
       runId: 'run_2',
       nodeName: 'Worker',
-      spec: { kind: 'ticket-branch', connectionId: 'conn_test' },
       connection,
       ticket: { id: '42', title: 'Fix crash in checkout!' },
       store,
@@ -99,7 +97,6 @@ describe('resolveTicketBranchWorkspace', () => {
     const first = await resolveTicketBranchWorkspace({
       runId: 'run_1',
       nodeName: 'Worker',
-      spec: { kind: 'ticket-branch', connectionId: 'conn_test' },
       connection,
       ticket: { id: '7', title: 'Initial title' },
       store,
@@ -108,7 +105,6 @@ describe('resolveTicketBranchWorkspace', () => {
     const second = await resolveTicketBranchWorkspace({
       runId: 'run_2',
       nodeName: 'Worker',
-      spec: { kind: 'ticket-branch', connectionId: 'conn_test' },
       connection,
       ticket: { id: '7', title: 'Completely different title now' },
       store,
@@ -118,30 +114,55 @@ describe('resolveTicketBranchWorkspace', () => {
     expect(second.branchName).toBe(formatBranchName('7', 'initial-title'));
   });
 
-  it('honors the spec-level baseRef on first create only', async () => {
-    // Add a second branch "dev" on the remote.
-    await git(['checkout', '-q', '-b', 'dev'], { cwd: remote });
-    await fs.writeFile(path.join(remote, 'dev-only.txt'), 'dev\n');
+  it('lands on pr.headRef without creating a row when called with PR context', async () => {
+    // Simulate the upstream Worker's PR branch already on the remote.
+    await git(['checkout', '-q', '-b', 'conduit/55-add-feature'], { cwd: remote });
+    await fs.writeFile(path.join(remote, 'feature.ts'), 'export const feature = 1;\n');
     await git(['add', '-A'], { cwd: remote });
-    await git(['commit', '-q', '-m', 'dev'], { cwd: remote });
+    await git(['commit', '-q', '-m', 'feature'], { cwd: remote });
     await git(['checkout', '-q', 'main'], { cwd: remote });
 
     const store = makeFakeStore();
 
-    const first = await resolveTicketBranchWorkspace({
-      runId: 'run_1',
-      nodeName: 'Worker',
-      spec: { kind: 'ticket-branch', connectionId: 'conn_test', baseRef: 'dev' },
+    const resolved = await resolveTicketBranchWorkspace({
+      runId: 'run_pr',
+      nodeName: 'Reviewer',
       connection,
-      ticket: { id: '99', title: 'From dev' },
+      // Issue context still passed through (GitHub conflates issues/PRs by
+      // number) — the resolver must prefer pr.headRef and skip the row.
+      ticket: { id: '55', title: 'PR-opened title that should be ignored' },
       store,
+      pr: { headRef: 'conduit/55-add-feature', baseRef: 'main' },
     });
 
-    const onDisk = await fs.readFile(path.join(first.path, 'dev-only.txt'), 'utf8');
-    expect(onDisk).toBe('dev\n');
-    const rows = store._rows();
-    expect(rows).toHaveLength(1);
-    expect(rows[0]!.baseRef).toBe('dev');
+    expect(resolved.kind).toBe('ticket-branch');
+    expect(resolved.branchName).toBe('conduit/55-add-feature');
+    expect(resolved.remoteBranchExisted).toBe(true);
+    expect(resolved.ticketBranchId).toBeUndefined();
+    expect(store._rows()).toHaveLength(0);
+
+    const onDisk = await fs.readFile(path.join(resolved.path, 'feature.ts'), 'utf8');
+    expect(onDisk).toBe('export const feature = 1;\n');
+  });
+
+  it('lands on pr.headRef with no store/ticket needed (external PR)', async () => {
+    await git(['checkout', '-q', '-b', 'patch-1'], { cwd: remote });
+    await fs.writeFile(path.join(remote, 'patch.ts'), 'export const x = 2;\n');
+    await git(['add', '-A'], { cwd: remote });
+    await git(['commit', '-q', '-m', 'patch'], { cwd: remote });
+    await git(['checkout', '-q', 'main'], { cwd: remote });
+
+    const resolved = await resolveTicketBranchWorkspace({
+      runId: 'run_ext_pr',
+      nodeName: 'Reviewer',
+      connection,
+      pr: { headRef: 'patch-1', baseRef: 'main' },
+    });
+
+    expect(resolved.branchName).toBe('patch-1');
+    expect(resolved.ticketBranchId).toBeUndefined();
+    const onDisk = await fs.readFile(path.join(resolved.path, 'patch.ts'), 'utf8');
+    expect(onDisk).toBe('export const x = 2;\n');
   });
 });
 

@@ -22,9 +22,7 @@
           "model": "stub-model",
           "instructions": "Worker node — commit and push to the conduit/<ticket> branch.",
           "mcpServers": [],
-          "skills": [],
-          "workspace": { "kind": "ticket-branch", "connectionId": "__placeholder__" }
-        }
+          "skills": []        }
       ],
       "edges": [{ "from": "Phase5WorkerTrigger", "to": "Worker" }],
       "mcpServers": [],
@@ -60,9 +58,7 @@
           "model": "stub-model",
           "instructions": "Critic node — read the branch and file a review.",
           "mcpServers": [],
-          "skills": [],
-          "workspace": { "kind": "ticket-branch", "connectionId": "__placeholder__" }
-        }
+          "skills": []        }
       ],
       "edges": [{ "from": "Phase5CriticTrigger", "to": "Critic" }],
       "mcpServers": [],

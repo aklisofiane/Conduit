@@ -50,7 +50,7 @@
 |---|---|
 | `@conduit/shared` | Types + Zod schemas, plus the cross-process contracts API/worker/web all import (AES-256-GCM crypto, Redis run-updates channel, Temporal task queue name, `AgentEvent → ExecutionLogKind` mapping). `"sideEffects": false` so Vite tree-shakes `node:crypto` out of the web bundle. |
 | `@conduit/database` | Prisma schema + `PrismaClient` re-export. See [data-model.md](./data-model.md). |
-| `@conduit/agent` | Agent provider abstraction (`AgentProvider` interface), Claude + Codex providers, workspace manager (git worktree seeding, tmpdir sandboxing, persistent branch resolution for `ticket-branch`), MCP config resolution (decrypt credentials, substitute `{{credential}}`, hand to SDK). **Core of the system.** |
+| `@conduit/agent` | Agent provider abstraction (`AgentProvider` interface), Claude + Codex providers, workspace manager (`ticket-branch` worktree resolution + parallel-`inherit` branched worktrees + merge-back), MCP config resolution (decrypt credentials, substitute `{{credential}}`, hand to SDK). **Core of the system.** |
 
 ## Dependency graph
 
@@ -115,7 +115,7 @@ All routes prefixed `/api`. Non-webhook routes require `X-API-Key` header (see [
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/workflows` | List workflows (name, status, last run) |
-| `POST` | `/workflows` | Create workflow (400 on `validateWorkflowDefinition` issues — e.g. `ticket-branch` without an issue-carrying trigger) |
+| `POST` | `/workflows` | Create workflow (400 on `validateWorkflowDefinition` issues — e.g. a webhook trigger that doesn't carry an issue/PR ref) |
 | `GET` | `/workflows/:id` | Get workflow with full definition |
 | `PUT` | `/workflows/:id` | Update workflow (definition, name, active toggle — same save-time validation as create) |
 | `DELETE` | `/workflows/:id` | Delete workflow + cascade runs |

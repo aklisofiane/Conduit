@@ -15,20 +15,24 @@ const baseDefinition = {
   ],
   nodes: [
     {
-      name: 'Repo',
-      workspace: { kind: 'repo-clone', connectionId: 'old_conn_a' },
+      id: 'agent-a',
+      name: 'A',
+      provider: 'claude',
+      model: 'stub',
+      instructions: 'do something',
+      mcpServers: [],
+      skills: [],
+      webSearch: false,
     },
     {
-      name: 'Ticket',
-      workspace: { kind: 'ticket-branch', connectionId: 'old_conn_b' },
-    },
-    {
-      name: 'Inherit',
-      workspace: { kind: 'inherit', fromNode: 'Repo' },
-    },
-    {
-      name: 'Tmp',
-      workspace: { kind: 'fresh-tmpdir' },
+      id: 'agent-b',
+      name: 'B',
+      provider: 'claude',
+      model: 'stub',
+      instructions: 'do something else',
+      mcpServers: [],
+      skills: [],
+      webSearch: false,
     },
   ],
   edges: [],
@@ -49,33 +53,26 @@ const baseDefinition = {
 } as unknown as WorkflowDefinition;
 
 describe('remapConnectionIds', () => {
-  it('rewrites trigger, mcpServer, and workspace connectionIds via the map', () => {
+  it('rewrites trigger and mcpServer connectionIds via the map', () => {
     const map = { old_conn_a: 'new_conn_a', old_conn_b: 'new_conn_b' };
     const out = remapConnectionIds(baseDefinition, map);
 
     expect(out.triggers[0]!.connectionId).toBe('new_conn_a');
     expect(out.mcpServers[0]!.connectionId).toBe('new_conn_b');
     expect(out.mcpServers[1]!.connectionId).toBeUndefined();
-    expect((out.nodes[0]!.workspace as { connectionId: string }).connectionId).toBe(
-      'new_conn_a',
-    );
-    expect((out.nodes[1]!.workspace as { connectionId: string }).connectionId).toBe(
-      'new_conn_b',
-    );
   });
 
-  it('leaves inherit/fresh-tmpdir workspaces untouched', () => {
+  it('leaves nodes untouched (workspaces no longer carry connections)', () => {
     const out = remapConnectionIds(baseDefinition, { old_conn_a: 'new_conn_a' });
-    expect(out.nodes[2]!.workspace).toEqual({ kind: 'inherit', fromNode: 'Repo' });
-    expect(out.nodes[3]!.workspace).toEqual({ kind: 'fresh-tmpdir' });
+    for (const node of out.nodes) {
+      expect(node.workspace).toBeUndefined();
+    }
   });
 
   it('leaves unknown ids intact', () => {
     const out = remapConnectionIds(baseDefinition, { other: 'x' });
     expect(out.triggers[0]!.connectionId).toBe('old_conn_a');
-    expect((out.nodes[1]!.workspace as { connectionId: string }).connectionId).toBe(
-      'old_conn_b',
-    );
+    expect(out.mcpServers[0]!.connectionId).toBe('old_conn_b');
   });
 
   it('does not mutate the input', () => {

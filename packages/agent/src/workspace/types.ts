@@ -22,9 +22,9 @@ export interface ResolvedWorkspace {
   /** Absolute path the agent's CWD should be set to. */
   path: string;
   kind: WorkspaceSpec['kind'];
-  /** Populated for repo-clone, parallel-branched inherit, and ticket-branch. */
+  /** Populated for parallel-branched inherit and ticket-branch. */
   head?: string;
-  /** Populated for repo-clone and ticket-branch. */
+  /** Populated for ticket-branch. */
   branchName?: string;
   /**
    * True when the workspace is a throwaway git worktree owned by this node
@@ -70,6 +70,15 @@ export interface WorkspaceResolveInput {
   ticket?: TicketContext;
   /** Populated for `ticket-branch`. Lets the manager look up / create the `TicketBranch` row. */
   ticketBranchStore?: TicketBranchStore;
+  /**
+   * Populated for `ticket-branch` when the trigger is a PR event. Tells the
+   * resolver to land directly on `pr.headRef` instead of deriving a
+   * `conduit/<id>-<slug>` branch — Conduit-internal flows naturally land on
+   * the same branch the upstream Worker pushed; external PRs land on
+   * whatever ref the contributor opened the PR from. Skips the
+   * `TicketBranch` row upsert (no row created for PR-anchored runs).
+   */
+  pr?: PrContext;
 }
 
 /** Ticket identity passed into `ticket-branch` resolution. */
@@ -78,6 +87,16 @@ export interface TicketContext {
   id: string;
   /** Ticket title — seeds the slug on *first* creation only. */
   title: string;
+}
+
+/** PR identity passed into `ticket-branch` resolution for PR-anchored runs. */
+export interface PrContext {
+  /** PR head branch name (e.g. `conduit/42-fix-login`, or arbitrary for external PRs). */
+  headRef: string;
+  /** PR base branch — informational; resolver doesn't need it for the worktree add. */
+  baseRef: string;
+  /** Populated only when the head lives in a different (forked) repo. */
+  headRepo?: { owner: string; name: string };
 }
 
 /** Row-shaped view of a `TicketBranch` DB entry — see `packages/database`. */

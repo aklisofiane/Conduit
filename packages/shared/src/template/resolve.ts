@@ -69,15 +69,6 @@ function* enumerateConnectionSlots(
       },
     };
   }
-  for (const node of def.nodes) {
-    const ws = node.workspace;
-    if (ws.kind === 'repo-clone' || ws.kind === 'ticket-branch') {
-      yield {
-        value: ws.connectionId,
-        set: (v) => {
-          ws.connectionId = v;
-        },
-      };
-    }
-  }
+  // Nodes no longer carry their own connection — derived ticket-branch
+  // workspaces resolve their connection from the workflow's trigger.
 }

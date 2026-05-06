@@ -122,7 +122,7 @@ describe('Phase 6 — create workflows from template', () => {
     // Atomic creation → both workflows come back in one response.
     expect(result.workflows).toHaveLength(2);
     const names = result.workflows.map((w) => w.name).sort();
-    expect(names).toEqual(['Critic', 'Worker']);
+    expect(names).toEqual(['Developer', 'Reviewer']);
 
     // Each workflow row now exists and has the placeholder substituted in
     // every connection slot with a real connection cuid (not `<github>`).
@@ -137,10 +137,10 @@ describe('Phase 6 — create workflows from template', () => {
       for (const server of def.mcpServers) {
         expect(server.connectionId).not.toMatch(/^</);
       }
-      const workerNode = def.nodes.find((n) => n.workspace.kind === 'ticket-branch');
-      expect(workerNode).toBeDefined();
-      if (workerNode && workerNode.workspace.kind === 'ticket-branch') {
-        expect(workerNode.workspace.connectionId).not.toMatch(/^</);
+      // Templates no longer carry per-node workspace — the trigger's
+      // connectionId above is the only repo connection on the workflow.
+      for (const node of def.nodes) {
+        expect(node.workspace).toBeUndefined();
       }
 
       // A real WorkflowConnection row was created for this workflow.

@@ -21,8 +21,7 @@
         "model": "stub-model",
         "instructions": "Pick up the ticket entering the Dev column.",
         "mcpServers": [],
-        "skills": [],
-        "workspace": { "kind": "fresh-tmpdir" }
+        "skills": []
       }
     ],
     "edges": [{ "from": "Phase4Trigger", "to": "Dev" }],

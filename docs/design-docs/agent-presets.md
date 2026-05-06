@@ -31,7 +31,7 @@ Schema: `agentPresetFileSchema` in `packages/shared/src/agent-preset/schema.ts`.
 - `provider` / `model` / `instructions` — the three fields prefilled into the agent.
 - `suggestedConstraints` — optional. Not currently consumed by the canvas picker; reserved for future use.
 
-Workflow-scoped fields (`workspace`, `mcpServers`, `skills`) are intentionally **absent**. The user wires those up per-workflow after applying a preset, because they depend on the workflow's connections and topology.
+Workflow-scoped fields (`mcpServers`, `skills`) are intentionally **absent**. The user wires those up per-workflow after applying a preset, because they depend on the workflow's connections. Workspaces aren't on this list either — they're derived from edges at load time, not user-authored.
 
 ## Load lifecycle
 

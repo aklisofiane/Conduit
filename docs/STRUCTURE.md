@@ -138,7 +138,8 @@ src/
   agent-preset/ AgentPreset file schema — id, name, category, provider, model,
               instructions (+ optional suggestedConstraints). Catalog data
               referenced by templates (via presetId) and the canvas picker
-  workspace/  workspace kind schemas (local, repo-clone, inherit, ticket-branch)
+  workspace/  workspace kind schemas (inherit, ticket-branch — derived from
+              edges by `workflow/derive-workspace.ts`, not user-authored)
   skill/      skill manifest types
   platform/   Platform enum + per-platform connection shapes. Under `github/`,
               shared HTTP plumbing (`http.ts` — lazy URL/header helpers, web-bundle

@@ -47,7 +47,13 @@ describe('normalizeGithubWebhook — real payload fixtures', () => {
         title: 'Fix checkout crash on empty cart',
         url: 'https://github.com/acme/shop/pull/7',
       },
+      pr: {
+        headRef: 'fix/checkout-empty-cart',
+        baseRef: 'main',
+      },
     });
+    // Same-repo PR: no headRepo on the event.
+    expect(evt?.pr?.headRepo).toBeUndefined();
     expect(triggerEventSchema.safeParse(evt).success).toBe(true);
   });
 

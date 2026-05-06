@@ -26,9 +26,7 @@
             "presetId": "developer",
             "instructionsAppend": "You are in a board-loop. The ticket entered status=Dev. Your workspace is a persistent conduit/<ticket> branch, so later iterations will see earlier commits.\n\n- Before editing, read any Conduit analysis section in the issue body, existing PR discussion, and the latest Reviewer feedback from PR comments or ticket comments via the GitHub MCP server.\n- If no PR exists for this branch yet, open a draft PR referencing the ticket. If a PR exists, update it with a concise summary of this iteration.\n- After committing and pushing, move the ticket to the \"AIReview\" column on the board.",
             "mcpServers": [{ "serverId": "github-mcp" }],
-            "skills": [],
-            "workspace": { "kind": "ticket-branch", "connectionId": "<github>" }
-          }
+            "skills": []          }
         ],
         "edges": [{ "from": "DeveloperTrigger", "to": "Developer" }],
         "mcpServers": [
@@ -75,9 +73,7 @@
             "presetId": "reviewer",
             "instructionsAppend": "You are the Reviewer in a board-loop. The ticket entered status=AIReview. Your workspace is the same persistent conduit/<ticket> branch the Developer just pushed to.\n\nThis workflow's role authorizes submitting APPROVE-state PR reviews when the work is ready — overriding the default \"COMMENT only\" guidance.\n\n- If the work is ready: submit an APPROVE PR review with a concise summary and move the ticket to \"ReadyToMerge\".\n- If changes are needed: leave specific, actionable inline PR comments where possible, then move the ticket back to \"Dev\" so the Developer can iterate.\n- Do not merge the PR or close the ticket.",
             "mcpServers": [{ "serverId": "github-mcp" }],
-            "skills": [],
-            "workspace": { "kind": "ticket-branch", "connectionId": "<github>" }
-          }
+            "skills": []          }
         ],
         "edges": [{ "from": "ReviewerTrigger", "to": "Reviewer" }],
         "mcpServers": [

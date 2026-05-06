@@ -47,11 +47,66 @@ describe('normalizeGithubWebhook', () => {
         number: 7,
         title: 'Wire up checkout retry',
         html_url: 'https://github.com/acme/shop/pull/7',
+        head: {
+          ref: 'conduit/7-wire-up-checkout-retry',
+          repo: { name: 'shop', owner: { login: 'acme' } },
+        },
+        base: {
+          ref: 'main',
+          repo: { name: 'shop', owner: { login: 'acme' } },
+        },
       },
     });
 
     expect(evt?.event).toBe('pull_request.opened');
     expect(evt?.issue?.key).toBe('7');
+    expect(evt?.pr).toEqual({
+      headRef: 'conduit/7-wire-up-checkout-retry',
+      baseRef: 'main',
+    });
+  });
+
+  it('marks pr.headRepo on fork PRs', () => {
+    const evt = normalizeGithubWebhook('pull_request', {
+      action: 'opened',
+      repository: BASE_REPO,
+      pull_request: {
+        node_id: 'PR_fork',
+        number: 12,
+        title: 'External contribution',
+        html_url: 'https://github.com/acme/shop/pull/12',
+        head: {
+          ref: 'patch-1',
+          repo: { name: 'shop', owner: { login: 'forker' } },
+        },
+        base: {
+          ref: 'main',
+          repo: { name: 'shop', owner: { login: 'acme' } },
+        },
+      },
+    });
+
+    expect(evt?.pr).toEqual({
+      headRef: 'patch-1',
+      baseRef: 'main',
+      headRepo: { owner: 'forker', name: 'shop' },
+    });
+  });
+
+  it('leaves pr undefined when pull_request payload omits head/base refs', () => {
+    const evt = normalizeGithubWebhook('pull_request', {
+      action: 'opened',
+      repository: BASE_REPO,
+      pull_request: {
+        node_id: 'PR_minimal',
+        number: 13,
+        title: 'Minimal payload',
+        html_url: 'https://github.com/acme/shop/pull/13',
+      },
+    });
+
+    expect(evt?.event).toBe('pull_request.opened');
+    expect(evt?.pr).toBeUndefined();
   });
 
   it('normalizes issue_comment.created only for PR comments', () => {

@@ -39,17 +39,16 @@ Activities use Temporal **heartbeats** so long-running agent sessions don't get 
 
 ```
 1. Build AgentContext from triggerEvent (slim: { trigger, workflow, run })
-2. Resolve workspace:
-     - fresh-tmpdir   → mkdtemp
-     - repo-clone     → workspaceManager.seed(connection, ref)
+2. Resolve workspace (derived from graph topology by `deriveWorkspaces`):
      - inherit        → branch worktree from upstream's HEAD (or reuse if sequential).
-                        If the upstream chain traces back to a `ticket-branch` ancestor, the push env + credential helper are carried through — any agent in the chain can `git push`.
-     - ticket-branch  → derive branch name `conduit/<ticket-id>-<slug>` (slug stored in TicketBranch row at first creation).
-                        Check remote:
-                          - if exists: `git worktree add <tmpdir> conduit/<ticket-id>-<slug>` off the base clone.
-                          - if not:    `git worktree add -b conduit/<ticket-id>-<slug> <tmpdir> <baseRef>`.
+                        Push env + credential helper carry through from the `ticket-branch` ancestor — any agent in the chain can `git push`.
+     - ticket-branch  → entry kind. Two arms dispatched by trigger event:
+                        - Issue trigger: derive `conduit/<ticket-id>-<slug>` (slug stored in `TicketBranch` row at first creation).
+                          - if remote branch exists: `git worktree add <tmpdir> conduit/<ticket-id>-<slug>` off the base clone.
+                          - if not: `git worktree add -b conduit/<ticket-id>-<slug> <tmpdir> <baseRef>`.
+                        - PR trigger: `git worktree add <tmpdir> <pr.headRef>` after fetch. No row created.
                         Check-then-create is serialized by a local file lock on the base clone (handles retry and cross-workflow races on the same host).
-                        Inject platform token into agent process env and configure a git credential helper reading from env — token never written to `.git/config` or remote URL. See [SECURITY.md](../SECURITY.md).
+                        Connection is read from the workflow's single trigger configuration. Inject platform token into agent process env and configure a git credential helper reading from env — token never written to `.git/config` or remote URL. See [SECURITY.md](../SECURITY.md).
                         Must be idempotent under Temporal activity retries.
 3. Enable workspace tools:
      - Configure provider's SDK built-in tools (file read/write/edit, shell, glob, grep)
@@ -238,13 +237,11 @@ Frontend flow:
 
 ## Per-ticket concurrency
 
-For workflows with a `ticket-branch` workspace, concurrent runs on the same ticket would race on `git worktree add` and push. Intent: one active run per `(workflow, ticket)` at a time; duplicate triggers during that run are silently dropped; once the run terminates (any status), a new trigger starts fresh so board cycles (Dev → Review → Dev) keep re-firing the workflow. Handled at the Temporal boundary:
+Concurrent runs on the same workflow + ticket would race on `git worktree add` and push. Intent: one active run per `(workflow, ticket)` at a time; duplicate triggers during that run are silently dropped; once the run terminates (any status), a new trigger starts fresh so board cycles (Dev → Review → Dev) keep re-firing the workflow. Handled at the Temporal boundary:
 
-- `agentWorkflow` for a `ticket-branch` workflow is started with deterministic ID `run-<workflowId>-<ticketId>`.
+- `agentWorkflow` is started with deterministic ID `run-<workflowId>-<ticketId>`.
 - `WorkflowIdReusePolicy = ALLOW_DUPLICATE` (Temporal default; stated explicitly because it's load-bearing for board cycles) — after termination, the same ID can be reused, so a ticket re-entering `Dev` triggers a fresh Worker run.
 - `WorkflowIdConflictPolicy = FAIL` (Temporal's default for an already-running ID) — starting a second workflow with the ID of an in-flight one throws `WorkflowExecutionAlreadyStarted`. The API / trigger handler catches it, logs at debug, and drops the trigger: webhook handlers return 200 so the platform doesn't retry; poll-loop skips are internal. No `WorkflowRun` row is created for the dropped trigger.
-
-For non-`ticket-branch` workflows, the workflow ID is per-run (`run-<runId>`) with no dedup key — concurrent runs on the same ticket are allowed and operate on independent ephemeral worktrees.
 
 The base-clone file lock mentioned in the lifecycle step 2 covers the smaller window where two *different* workflows or tickets might race on `git worktree add` against the same shared base clone.
 

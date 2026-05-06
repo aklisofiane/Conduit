@@ -1,5 +1,9 @@
 import { proxyActivities } from '@temporalio/workflow';
-import type { AgentConfig, NodeOutput, TriggerEvent } from '@conduit/shared';
+import type {
+  AgentConfigWithWorkspace,
+  NodeOutput,
+  TriggerEvent,
+} from '@conduit/shared';
 import type * as activities from '../activities/index';
 import { topoSortGroups } from './topo-sort';
 
@@ -149,7 +153,9 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<void> {
  * A key with >1 values means that upstream is being fanned out — the
  * siblings need branched worktrees plus a merge-back pass.
  */
-function inheritSiblingsByUpstream(group: AgentConfig[]): Map<string, string[]> {
+function inheritSiblingsByUpstream(
+  group: AgentConfigWithWorkspace[],
+): Map<string, string[]> {
   const byUpstream = new Map<string, string[]>();
   for (const node of group) {
     if (node.workspace.kind !== 'inherit') continue;

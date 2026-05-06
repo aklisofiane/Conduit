@@ -9,6 +9,13 @@ import { triggerSourceSchema } from '../platform/index';
  * `issue.key` is the user-visible identifier as a string — `"42"` for GitHub,
  * `"PROJ-123"` for Jira. Anything needing a stable human-readable ticket id
  * (branch names, DB keys, Temporal workflow IDs) reads `issue.key`.
+ *
+ * `pr` is populated only on PR-shaped events (`pull_request.*` and PR-scoped
+ * `issue_comment.created`). It carries the head/base refs the workspace
+ * manager needs to land directly on the PR's branch — `ticket-branch`'s
+ * PR arm uses `pr.headRef` instead of deriving a `conduit/<id>-<slug>` name.
+ * `issue` continues to be populated for PR events so trigger filters that
+ * key on `issue.key` keep working unchanged.
  */
 export const triggerEventSchema = z.object({
   source: triggerSourceSchema,
@@ -27,6 +34,18 @@ export const triggerEventSchema = z.object({
       key: z.string().min(1),
       title: z.string(),
       url: z.string().url(),
+    })
+    .optional(),
+  pr: z
+    .object({
+      headRef: z.string().min(1),
+      baseRef: z.string().min(1),
+      headRepo: z
+        .object({
+          owner: z.string().min(1),
+          name: z.string().min(1),
+        })
+        .optional(),
     })
     .optional(),
   actor: z.string().optional(),

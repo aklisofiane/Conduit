@@ -1,4 +1,3 @@
-import { isTicketBranchWorkflow } from './identity';
 import type { WorkflowDefinition } from './definition';
 
 /**
@@ -6,16 +5,16 @@ import type { WorkflowDefinition } from './definition';
  * on *structure* (discriminated unions, field presence) and puts
  * referential / semantic checks here.
  *
- * Starts narrow (Phase 5 rules only) — broader checks from
- * docs/design-docs/node-system.md "Validation rules" land here as we need
- * them.
+ * v1 is ticket/PR-anchored: every workflow targets exactly one repo
+ * connection, every trigger must surface an issue or PR identifier, and
+ * graph-derived workspaces enforce inheritance from a real upstream node.
  */
 export interface WorkflowValidationIssue {
   code:
-    | 'ticket-branch-requires-issue-trigger'
-    | 'ticket-branch-rejects-board-column-webhook';
+    | 'trigger-requires-issue-or-pr'
+    | 'triggers-must-share-connection';
   message: string;
-  /** Optional node name the issue is attached to, for UI highlighting. */
+  /** Optional node name (or trigger name) the issue is attached to, for UI highlighting. */
   nodeName?: string;
 }
 
@@ -27,52 +26,56 @@ export class WorkflowValidationError extends Error {
 }
 
 /**
- * Events whose normalized `TriggerEvent` carries a populated `issue.key`.
- * Must stay in lockstep with `normalizeGithubWebhook` in
- * `@conduit/shared/webhook`.
+ * Webhook events whose normalized `TriggerEvent` carries an issue or PR
+ * identifier. Must stay in lockstep with `normalizeGithubWebhook` in
+ * `@conduit/shared/webhook`. `board.column.changed` is intentionally
+ * excluded — its payload carries no issue number, so polling is the
+ * supported mode for board loops.
  */
-const ISSUE_CARRYING_WEBHOOK_EVENTS = new Set([
+const ISSUE_OR_PR_WEBHOOK_EVENTS = new Set([
   'issues.opened',
   'pull_request.opened',
   'issue_comment.created',
 ]);
 
-export function validateWorkflowDefinition(definition: WorkflowDefinition): WorkflowValidationIssue[] {
+export function validateWorkflowDefinition(
+  definition: WorkflowDefinition,
+): WorkflowValidationIssue[] {
   const issues: WorkflowValidationIssue[] = [];
 
-  if (isTicketBranchWorkflow(definition)) {
-    const trigger = definition.triggers[0];
-    if (!trigger) return issues;
-    const ticketBranchNodes = definition.nodes
-      .filter((n) => n.workspace.kind === 'ticket-branch')
-      .map((n) => n.name);
+  const triggers = definition.triggers;
+  if (triggers.length === 0) return issues;
 
-    if (trigger.mode.kind === 'webhook') {
-      const event = trigger.mode.event;
-      if (event === 'board.column.changed') {
-        for (const nodeName of ticketBranchNodes) {
-          issues.push({
-            code: 'ticket-branch-rejects-board-column-webhook',
-            message:
-              `Node "${nodeName}" uses ticket-branch but the trigger is a board.column.changed webhook, ` +
-              `which carries no issue identifier. Use polling mode instead — see docs/design-docs/branch-management.md.`,
-            nodeName,
-          });
-        }
-      } else if (!ISSUE_CARRYING_WEBHOOK_EVENTS.has(event)) {
-        for (const nodeName of ticketBranchNodes) {
-          issues.push({
-            code: 'ticket-branch-requires-issue-trigger',
-            message:
-              `Node "${nodeName}" uses ticket-branch but the trigger's webhook event "${event}" ` +
-              `does not carry an issue identifier. Supported webhook events: ${[...ISSUE_CARRYING_WEBHOOK_EVENTS].join(', ')}.`,
-            nodeName,
-          });
-        }
-      }
+  // Rule: every trigger must surface an issue or PR identifier — Conduit
+  // is ticket/PR-driven in v1. Polling on a project board always pulls
+  // issue identity from the GraphQL response, so polling mode is allowed
+  // unconditionally; webhooks are restricted to the issue/PR event set.
+  for (const trigger of triggers) {
+    if (trigger.mode.kind === 'polling') continue;
+    const event = trigger.mode.event;
+    if (!ISSUE_OR_PR_WEBHOOK_EVENTS.has(event)) {
+      issues.push({
+        code: 'trigger-requires-issue-or-pr',
+        message:
+          `Trigger "${trigger.name}" uses webhook event "${event}", which carries no issue or PR identifier. ` +
+          `Supported webhook events: ${[...ISSUE_OR_PR_WEBHOOK_EVENTS].join(', ')}; ` +
+          `or use polling mode for board-status workflows.`,
+        nodeName: trigger.name,
+      });
     }
-    // Polling triggers always produce `issue.key` from the GraphQL response —
-    // no per-event validation needed on that path.
+  }
+
+  // Rule: a workflow targets exactly one repo connection, so every trigger
+  // must reference the same connectionId. v1 has a single trigger today,
+  // but the rule is written for the multi-trigger future without changing.
+  const distinctConnectionIds = new Set(triggers.map((t) => t.connectionId));
+  if (distinctConnectionIds.size > 1) {
+    issues.push({
+      code: 'triggers-must-share-connection',
+      message:
+        `All triggers in a workflow must reference the same connectionId — found ${distinctConnectionIds.size} distinct connections. ` +
+        `Per-node / per-trigger connections are deferred (see docs/design-docs/branch-management.md).`,
+    });
   }
 
   return issues;

@@ -45,7 +45,7 @@ Edges are drawn by a custom `WorkflowEdge` (`apps/web/src/components/canvas/Work
 - **`TriggerNode`** — pill-shaped, platform icon, event label, filter count. Output handle only.
 - **`AgentNode`** — large card. Visual style varies by provider for quick at-a-glance identification via distinct accent colors and a letter glyph (e.g., "C" for Claude in warm amber, "X" for Codex in cool teal) paired with the plain-text provider name.
   - Header: name, provider label ("Claude" / "Codex"), model
-  - Body: instructions preview (first 2 lines), MCP server chips (up to 4 + "+N more"), skill chips, workspace kind icon
+  - Body: instructions preview (first 2 lines), MCP server chips (up to 4 + "+N more"), skill chips. (Workspace kind is derived from graph topology — not surfaced on the canvas.)
   - Input + output handles
   - **No runtime state on the canvas** — no status dots, no streaming text. Runtime observation lives on the dedicated run page.
 
@@ -56,7 +56,7 @@ Visual tokens (palette, per-provider color/font/label, radii, the `providerStyle
 Opens on node click. Form driven by Zod schema from `@conduit/shared`.
 
 - **Trigger panel**: platform picker → connection picker → mode toggle (webhook / polling) → event or interval input → `BoardRef` fieldset (org/user · owner · project picker) → filter builder. The board picker and filter editor are wired together: once a board is selected, the picker preloads its single-select fields, and any filter row whose `field` matches one of those fields collapses to a strict value dropdown (no op selector — saved as `op: 'eq'`). Other rows keep the freeform field/op/value triplet. The board list is fetched via `useListProjectBoards` (TanStack Query, keyed on `(connectionId, ownerType, owner)`, 30s `staleTime`); typing the owner is debounced 400ms before keying the query so quick keystrokes don't fan out. Mode is required for polling and for the webhook event `board.column.changed`; the picker hides itself otherwise. The `<FilterRow>` and `<BoardPicker>` components live next to `TriggerConfigPanel` in `apps/web/src/components/canvas/TriggerConfigPanel.tsx`.
-- **Agent panel**: name field (identifier validation), preset picker (see below), provider + model dropdown, instructions textarea (monospace, generous height), **Web search** checkbox (off by default — toggles the provider's built-in web search/fetch; see [agent-execution.md](./design-docs/agent-execution.md#web-search)), **Issue writeback** control (opt-in checkbox + pill-toggle groups for allowed statuses + labels — see below), MCP server picker (presets with one-click add + custom server config), skill picker (see below), workspace picker (fresh tmpdir / repo-clone / inherit / ticket-branch), constraints (collapsible).
+- **Agent panel**: name field (identifier validation), preset picker (see below), provider + model dropdown, instructions textarea (monospace, generous height), **Web search** checkbox (off by default — toggles the provider's built-in web search/fetch; see [agent-execution.md](./design-docs/agent-execution.md#web-search)), **Issue writeback** control (opt-in checkbox + pill-toggle groups for allowed statuses + labels — see below), MCP server picker (presets with one-click add + custom server config), skill picker (see below), constraints (collapsible). No workspace picker — workspace is derived from graph position (see [node-system.md](./design-docs/node-system.md#workspace-inheritance)).
 
 ### Agent preset picker
 

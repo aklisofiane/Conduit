@@ -20,8 +20,7 @@
         "model": "stub-model",
         "instructions": "Read the issue, post a triage comment via GitHub.",
         "mcpServers": [{ "serverId": "github-mcp" }],
-        "skills": [],
-        "workspace": { "kind": "fresh-tmpdir" }
+        "skills": []
       }
     ],
     "edges": [{ "from": "Phase2Trigger", "to": "Triage" }],

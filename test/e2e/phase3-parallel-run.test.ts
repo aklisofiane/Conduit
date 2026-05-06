@@ -56,7 +56,7 @@ describe('Phase 3 — parallel fan-out, merge-back, .conduit/ propagation', () =
   });
 
   it('runs Triage → (Fix || Doc) → Review with merge-back and sibling summaries', async () => {
-    await harness.seedRepoClone('acme', 'shop', {
+    await harness.seedTicketBranchRepo('acme', 'parallel-tests', {
       'src/index.ts': 'export const version = "0.1.0";\n',
     });
 
@@ -79,7 +79,7 @@ describe('Phase 3 — parallel fan-out, merge-back, .conduit/ propagation', () =
         alias: 'github-main',
         credentialId: cred.id,
         owner: 'acme',
-        repo: 'shop',
+        repo: 'parallel-tests',
         webhookSecret: WEBHOOK_SECRET,
       },
     );
@@ -259,13 +259,13 @@ describe('Phase 3 — parallel fan-out, merge-back, .conduit/ propagation', () =
 });
 
 function rewireConnectionIds(def: WorkflowDefinition, connectionId: string): WorkflowDefinition {
+  // Workspaces are derived from edges at load time and no longer carry a
+  // connection — only triggers + mcpServers point at the repo connection.
   return {
     ...def,
     triggers: def.triggers.map((t) => ({ ...t, connectionId })),
-    nodes: def.nodes.map((n) =>
-      n.workspace.kind === 'repo-clone' || n.workspace.kind === 'ticket-branch'
-        ? { ...n, workspace: { ...n.workspace, connectionId } }
-        : n,
+    mcpServers: def.mcpServers.map((s) =>
+      s.connectionId !== undefined ? { ...s, connectionId } : s,
     ),
   };
 }

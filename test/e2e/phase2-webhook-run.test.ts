@@ -49,6 +49,10 @@ describe('Phase 2 — webhook triggers a run and streams MCP tool calls', () => 
   });
 
   it('verifies HMAC, matches the trigger, starts a run, and streams a tool_call', async () => {
+    // Trigger-connected agents derive `ticket-branch` workspaces — the
+    // workspace manager needs a real bare remote it can clone from.
+    await harness.seedTicketBranchRepo('acme', 'triage-tests');
+
     // 1. Platform credential — doubles as the {{credential}} the GitHub MCP
     //    server would receive as GITHUB_PERSONAL_ACCESS_TOKEN.
     const cred = await harness.http.post<{ id: string }>('/credentials', {
@@ -74,7 +78,7 @@ describe('Phase 2 — webhook triggers a run and streams MCP tool calls', () => 
         alias: 'github-main',
         credentialId: cred.id,
         owner: 'acme',
-        repo: 'shop',
+        repo: 'triage-tests',
         webhookSecret: WEBHOOK_SECRET,
       },
     );

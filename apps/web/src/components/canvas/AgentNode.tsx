@@ -6,7 +6,7 @@ import {
   tokens,
   type ProviderId,
 } from '../../styles/theme.js';
-import { Icon, ProviderGlyph } from './Icon.js';
+import { ProviderGlyph } from './Icon.js';
 
 export interface AgentNodeData extends Record<string, unknown> {
   agent: AgentConfig;
@@ -74,16 +74,11 @@ export function AgentNode({ data, selected }: NodeProps) {
         </div>
       </div>
 
-      {/* Pill row — model + workspace */}
+      {/* Pill row — model only. Workspace is derived from edges at runtime
+          (see derive-workspace.ts) and isn't surfaced on the canvas. */}
       <div className="flex flex-wrap gap-[6px] px-[10px] pb-2">
         <NodePill borderColor={ps.promptBorder} bg={ps.prompt}>
           <span style={{ color: tokens.color.text2 }}>{agent.model}</span>
-        </NodePill>
-        <NodePill borderColor={ps.promptBorder} bg={ps.prompt}>
-          <Icon name="dot" size={6} color={ps.mark} />
-          <span style={{ color: tokens.color.textMuted }}>
-            {workspaceLabel(agent)}
-          </span>
         </NodePill>
       </div>
 
@@ -155,17 +150,3 @@ function NodePill({
   );
 }
 
-function workspaceLabel(agent: AgentConfig): string {
-  const ws = agent.workspace;
-  switch (ws.kind) {
-    case 'repo-clone':
-      return `repo · ${ws.ref ?? 'main'}`;
-    case 'inherit':
-      return `inherit · ${ws.fromNode || '?'}`;
-    case 'ticket-branch':
-      return 'ticket-branch';
-    case 'fresh-tmpdir':
-    default:
-      return 'fresh-tmpdir';
-  }
-}

@@ -3,12 +3,16 @@ import type { WorkflowDefinition } from './definition';
 import type { TicketLock } from '../temporal/queue';
 
 /**
- * True when the workflow contains at least one agent with a `ticket-branch`
- * workspace. These workflows get deterministic Temporal IDs keyed on the
- * ticket so concurrent triggers against an in-flight run collapse into one.
+ * True for every well-formed workflow in v1 — every workflow has at least
+ * one trigger feeding a node, and graph-derived workspaces always make
+ * trigger-connected nodes `ticket-branch`. The function survives Phase 2
+ * because callers (Temporal id construction, validators) still want a
+ * single yes/no signal even though the answer is now "yes if there's a
+ * trigger." Empty-trigger / empty-node definitions return `false` so
+ * incomplete drafts on the canvas don't pretend to be ticket-locked.
  */
 export function isTicketBranchWorkflow(definition: WorkflowDefinition): boolean {
-  return definition.nodes.some((n) => n.workspace.kind === 'ticket-branch');
+  return definition.triggers.length > 0 && definition.nodes.length > 0;
 }
 
 /**

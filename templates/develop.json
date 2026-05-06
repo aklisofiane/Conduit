@@ -26,43 +26,33 @@
             "presetId": "research",
             "instructionsAppend": "Your final summary is the plan Dev / Tests / Docs will read in parallel — list the files, the intended change per file, and anything downstream agents need to know.",
             "mcpServers": [{ "serverId": "github-mcp" }],
-            "skills": [],
-            "workspace": { "kind": "repo-clone", "connectionId": "<github>" }
-          },
+            "skills": []          },
           {
             "id": "agent-dev",
             "name": "Dev",
             "presetId": "developer",
             "instructionsAppend": "Sibling agents Tests and Docs run in parallel — do not touch test files or user-facing documentation. Focus only on production code.",
             "mcpServers": [],
-            "skills": [],
-            "workspace": { "kind": "inherit", "fromNode": "Seed" }
-          },
+            "skills": []          },
           {
             "id": "agent-tests",
             "name": "Tests",
             "presetId": "tests",
             "mcpServers": [],
-            "skills": [],
-            "workspace": { "kind": "inherit", "fromNode": "Seed" }
-          },
+            "skills": []          },
           {
             "id": "agent-docs",
             "name": "Docs",
             "presetId": "docs",
             "mcpServers": [],
-            "skills": [],
-            "workspace": { "kind": "inherit", "fromNode": "Seed" }
-          },
+            "skills": []          },
           {
             "id": "agent-qa",
             "name": "QA",
             "presetId": "qa",
             "instructionsAppend": "After opening the draft PR, move the ticket to the \"Review\" column on the board.",
             "mcpServers": [{ "serverId": "github-mcp" }],
-            "skills": [],
-            "workspace": { "kind": "inherit", "fromNode": "Seed" }
-          }
+            "skills": []          }
         ],
         "edges": [
           { "from": "DevelopTrigger", "to": "Seed" },

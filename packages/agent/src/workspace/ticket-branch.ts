@@ -6,19 +6,22 @@ import { withPathLock } from './lock';
 import { baseClonePath, nodeWorkspacePath } from './paths';
 import type {
   ConnectionContext,
+  PrContext,
   ResolvedWorkspace,
   TicketBranchStore,
   TicketContext,
-  WorkspaceSpec,
 } from './types';
 
 export interface TicketBranchResolveInput {
   runId: string;
   nodeName: string;
-  spec: Extract<WorkspaceSpec, { kind: 'ticket-branch' }>;
   connection: ConnectionContext;
-  ticket: TicketContext;
-  store: TicketBranchStore;
+  /** Required for issue-anchored runs; absent on PR-anchored runs. */
+  ticket?: TicketContext;
+  /** Required for issue-anchored runs; absent on PR-anchored runs. */
+  store?: TicketBranchStore;
+  /** Populated for PR-anchored runs — short-circuits row upsert + slug derivation. */
+  pr?: PrContext;
 }
 
 /**
@@ -49,9 +52,17 @@ export interface TicketBranchResolveInput {
 export async function resolveTicketBranchWorkspace(
   input: TicketBranchResolveInput,
 ): Promise<ResolvedWorkspace> {
-  const { runId, nodeName, spec, connection, ticket, store } = input;
+  const { runId, nodeName, connection, ticket, store, pr } = input;
   const bare = baseClonePath(connection.platform, connection.owner, connection.repo);
   const target = nodeWorkspacePath(runId, nodeName);
+
+  if (!pr && (!ticket || !store)) {
+    // Defensive — `WorkspaceManager` validates this earlier, but the resolver
+    // is exported and might be called from another path.
+    throw new WorkspaceError(
+      `resolveTicketBranchWorkspace requires either a PR context or both a ticket and a TicketBranchStore (node "${nodeName}")`,
+    );
+  }
 
   return withPathLock(bare, async () => {
     await ensureBaseClone(bare, connection);
@@ -71,13 +82,32 @@ export async function resolveTicketBranchWorkspace(
       fs.mkdir(path.dirname(target), { recursive: true }),
     ]);
 
-    const baseRef = spec.baseRef ?? (await defaultBranch(bare));
-    const row = await store.upsert({
+    if (pr) {
+      // PR-anchored: the head ref already exists on the remote (GitHub
+      // guarantees it at `pull_request.opened`). No row, no slug — just land
+      // on the PR's branch so the agent reviews the same commits the human
+      // is reviewing on github.com.
+      await addTrackingWorktree(bare, target, pr.headRef);
+      await stripRemoteAuth(target, connection.cloneUrl);
+      const head = (await git(['rev-parse', 'HEAD'], { cwd: target })).trim();
+      return {
+        path: target,
+        kind: 'ticket-branch',
+        head,
+        branchName: pr.headRef,
+        remoteBranchExisted: true,
+      };
+    }
+
+    // Issue-anchored — derive `conduit/<id>-<slug>`, upsert the row,
+    // create-or-track the branch off the repo's default branch.
+    const baseRef = await defaultBranch(bare);
+    const row = await store!.upsert({
       platform: connection.platform,
       owner: connection.owner,
       repo: connection.repo,
-      ticketId: ticket.id,
-      ticketTitle: ticket.title,
+      ticketId: ticket!.id,
+      ticketTitle: ticket!.title,
       baseRef,
     });
 

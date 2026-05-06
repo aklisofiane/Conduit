@@ -77,7 +77,7 @@ Rules enforced by `templateAgentInputSchema.superRefine`:
 - `instructionsAppend` requires `presetId` (it's appended after the preset's prompt with `\n\n`).
 - An unknown `presetId` causes the whole template file to be **skipped at load time** with a warning. The template won't appear in `GET /templates`.
 
-Workflow-scoped fields (`workspace`, `mcpServers`, `skills`) are always set per-agent regardless of which shape is used — presets deliberately don't carry them. See [agent-presets.md](./agent-presets.md).
+Workflow-scoped fields (`mcpServers`, `skills`) are always set per-agent regardless of which shape is used — presets deliberately don't carry them. (Workspaces aren't in this list — they're derived from edges at load time, not authored.) See [agent-presets.md](./agent-presets.md).
 
 ## Placeholder format
 
@@ -86,10 +86,7 @@ Template definitions reference `connectionId` values using `<alias>` strings. Re
 ```json
 {
   "triggers": [{ "connectionId": "<github>", ... }],
-  "mcpServers": [{ "connectionId": "<github>", ... }],
-  "nodes": [
-    { "workspace": { "kind": "repo-clone", "connectionId": "<github>" } }
-  ]
+  "mcpServers": [{ "connectionId": "<github>", ... }]
 }
 ```
 
@@ -97,7 +94,6 @@ Every slot that accepts a connection id is walked by `collectTemplatePlaceholder
 
 - `definition.triggers[].connectionId`
 - `definition.mcpServers[].connectionId`
-- `definition.nodes[].workspace.connectionId` (for `repo-clone` and `ticket-branch` kinds)
 
 Placeholders are **bundle-scoped**: the same `<github>` alias in workflow A and workflow B resolves to the same per-workflow binding at creation time — the user supplies one binding for `<github>` and it's applied to both workflows.
 
@@ -126,7 +122,7 @@ Behavior:
 2. Unknown `credentialId` / `connectionId` → `400`.
 3. Wraps everything in a Prisma `$transaction`:
    - For each template workflow: create the `Workflow` row (with an empty placeholder definition), then for each unique `<alias>` placeholder create a `WorkflowConnection` row (`mode: 'new'`) or read the id (`mode: 'existing'`), then substitute placeholders and update the row with the resolved definition.
-   - `assertValidWorkflowDefinition` runs on the resolved definition inside the transaction — any failure (e.g. `ticket-branch` on a webhook without an issue identifier) rolls back the whole bundle.
+   - `assertValidWorkflowDefinition` runs on the resolved definition inside the transaction — any failure (e.g. a webhook trigger that doesn't carry an issue/PR ref) rolls back the whole bundle.
 4. After commit, iterates the created workflows and calls `TemporalService.upsertPollSchedule` for any polling-mode trigger. Schedule failures are logged (not rolled back) — an inconsistent schedule recovers on next save or API boot via `WorkflowsService.onModuleInit`.
 
 Response: `{ templateId, workflows: [{ id, name }, ...] }`.
@@ -143,10 +139,10 @@ Response: `{ templateId, workflows: [{ id, name }, ...] }`.
 
 | File | Workflows | Pipeline |
 |---|---|---|
-| `templates/analyze.json` | 1 | GitHub `issues.opened` webhook → `Research` (repo-clone + GitHub MCP) → `Review` (inherit) → `Publish` (inherit + GitHub MCP) updates the issue body with a marker-bracketed analysis section. Uses `research` / `reviewer` / `publish` presets. |
-| `templates/pr-review.json` | 1 | GitHub `pull_request.opened` webhook → single `Review` agent with `repo-clone` workspace + GitHub MCP checks out the PR branch and reviews the diff. Uses `reviewer` preset with an `instructionsAppend` for PR-branch checkout. |
-| `templates/develop.json` | 1 | Polling on `status = "Dev"` → `Seed` (repo-clone, `research` preset) fans out to `Dev` (`developer` preset) + `Tests` (`tests` preset) + `Docs` (`docs` preset) on inherited branched worktrees → merge-back → `QA` (`qa` preset) opens a draft PR and moves the ticket to `"Review"`. |
-| `templates/board-loop.json` | 2 | **Developer** (polling on `status = "Dev"`, `ticket-branch` workspace, pushes to `conduit/<ticket>`, opens a draft PR on first push, moves to `"AIReview"` — `developer` preset) + **Reviewer** (polling on `status = "AIReview"`, same `ticket-branch`, approves or moves back to `"Dev"` — `reviewer` preset; the `instructionsAppend` re-grants `APPROVE`-state PR reviews, which the base preset disallows). Shares a single `<github>` placeholder across both workflows. |
+| `templates/analyze.json` | 1 | GitHub `issues.opened` webhook → `Research` (GitHub MCP) → `Review` → `Publish` (GitHub MCP) updates the issue body with a marker-bracketed analysis section. Uses `research` / `reviewer` / `publish` presets. |
+| `templates/pr-review.json` | 1 | GitHub `pull_request.opened` webhook → single `Review` agent (lands directly on `pr.headRef`) + GitHub MCP reviews the diff. Uses `reviewer` preset. |
+| `templates/develop.json` | 1 | Polling on `status = "Dev"` → `Seed` (`research` preset) fans out to `Dev` (`developer` preset) + `Tests` (`tests` preset) + `Docs` (`docs` preset) on branched worktrees → merge-back → `QA` (`qa` preset) opens a draft PR and moves the ticket to `"Review"`. |
+| `templates/board-loop.json` | 2 | **Developer** (polling on `status = "Dev"`, pushes to `conduit/<ticket>`, opens a draft PR on first push, moves to `"AIReview"` — `developer` preset) + **Reviewer** (polling on `status = "AIReview"`, same branch, approves or moves back to `"Dev"` — `reviewer` preset; the `instructionsAppend` re-grants `APPROVE`-state PR reviews, which the base preset disallows). Shares a single `<github>` placeholder across both workflows. |
 
 Instructions in the shipped templates **do not** tell agents to "write `.conduit/<Node>.md`" — the runtime already drives a second turn with `finalSummaryPrompt(node.name)` and drops a placeholder if the agent didn't write one. See [agent-execution.md](./agent-execution.md#runagentnode-lifecycle).
 

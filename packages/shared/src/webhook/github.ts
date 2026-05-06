@@ -57,6 +57,7 @@ export function normalizeGithubWebhook(
         title: String(p.pull_request.title ?? ''),
         url: String(p.pull_request.html_url ?? ''),
       },
+      pr: extractPr(p.pull_request),
       actor,
     };
   }
@@ -64,6 +65,12 @@ export function normalizeGithubWebhook(
   // `issue_comment` fires for both issue and PR comments — gate on presence
   // of `pull_request` to scope to PR comments (Critic workflows).
   if (eventName === 'issue_comment' && action === 'created' && p.issue?.pull_request) {
+    // The `issue_comment` payload's top-level `pull_request` field is absent
+    // (only `issue.pull_request` exists, and it's a thin reference to the PR
+    // API URL — no head/base refs). PR-comment workflows that need the head
+    // ref must rely on the worktree already being on the PR branch (set up
+    // by an earlier `pull_request.opened` run on the same ticket-branch row).
+    // Leaving `pr` undefined here keeps the existing behavior intact.
     return {
       source: 'github',
       mode: 'webhook',
@@ -123,6 +130,20 @@ interface GithubWebhookPayload {
     number?: number;
     title?: string;
     html_url?: string;
+    head?: {
+      ref?: string;
+      repo?: {
+        name?: string;
+        owner?: { login?: string };
+      } | null;
+    };
+    base?: {
+      ref?: string;
+      repo?: {
+        name?: string;
+        owner?: { login?: string };
+      } | null;
+    };
   };
   changes?: {
     field_value?: {
@@ -148,4 +169,32 @@ function extractRepo(
 ): TriggerEvent['repo'] {
   if (!r?.owner?.login || !r.name) return undefined;
   return { owner: r.owner.login, name: r.name };
+}
+
+/**
+ * Pull head/base refs out of a `pull_request` payload. `headRepo` is only
+ * surfaced when the head lives in a different repo (fork PR) — same-repo PRs
+ * leave it undefined so consumers can treat presence as the fork signal.
+ */
+function extractPr(
+  pr: NonNullable<GithubWebhookPayload['pull_request']>,
+): TriggerEvent['pr'] {
+  const headRef = pr.head?.ref;
+  const baseRef = pr.base?.ref;
+  if (!headRef || !baseRef) return undefined;
+  const headRepoOwner = pr.head?.repo?.owner?.login;
+  const headRepoName = pr.head?.repo?.name;
+  const baseRepoOwner = pr.base?.repo?.owner?.login;
+  const baseRepoName = pr.base?.repo?.name;
+  const isFork =
+    !!headRepoOwner &&
+    !!headRepoName &&
+    !!baseRepoOwner &&
+    !!baseRepoName &&
+    (headRepoOwner !== baseRepoOwner || headRepoName !== baseRepoName);
+  return {
+    headRef,
+    baseRef,
+    ...(isFork ? { headRepo: { owner: headRepoOwner!, name: headRepoName! } } : {}),
+  };
 }

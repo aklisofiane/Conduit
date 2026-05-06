@@ -24,25 +24,21 @@
             "name": "Research",
             "presetId": "research",
             "mcpServers": [{ "serverId": "github-mcp" }],
-            "skills": [],
-            "workspace": { "kind": "repo-clone", "connectionId": "<github>" }
-          },
+            "skills": []          },
           {
             "id": "agent-review",
             "name": "Review",
             "presetId": "reviewer",
             "instructionsAppend": "You are reviewing the upstream Research agent's plan in `.conduit/`. Do not post to GitHub from this node — the downstream Publish agent handles all GitHub updates. Focus on whether the final output should be an implementation approach or a clarification question.",
             "mcpServers": [],
-            "skills": [],
-            "workspace": { "kind": "inherit", "fromNode": "Research" }
+            "skills": []
           },
           {
             "id": "agent-publish",
             "name": "Publish",
             "presetId": "publish",
             "mcpServers": [{ "serverId": "github-mcp" }],
-            "skills": [],
-            "workspace": { "kind": "inherit", "fromNode": "Review" }
+            "skills": []
           }
         ],
         "edges": [

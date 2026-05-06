@@ -27,7 +27,7 @@ function baseDefinition(overrides: Partial<WorkflowDefinition> = {}): WorkflowDe
   };
 }
 
-function ticketBranchNode(name = 'Worker') {
+function agentNode(name = 'Worker') {
   return {
     id: `agent-${name.toLowerCase()}`,
     name,
@@ -37,14 +37,13 @@ function ticketBranchNode(name = 'Worker') {
     mcpServers: [],
     skills: [],
     webSearch: false,
-    workspace: { kind: 'ticket-branch', connectionId: 'conn_1' } as const,
   };
 }
 
 describe('validateWorkflowDefinition', () => {
-  it('passes a ticket-branch workflow with a polling trigger', () => {
+  it('passes a workflow with a polling trigger', () => {
     const def = baseDefinition({
-      nodes: [ticketBranchNode()],
+      nodes: [agentNode()],
       triggers: [
         trigger({
           mode: { kind: 'polling', intervalSec: 60 },
@@ -56,14 +55,22 @@ describe('validateWorkflowDefinition', () => {
     expect(validateWorkflowDefinition(def)).toEqual([]);
   });
 
-  it('passes a ticket-branch workflow with issues.opened webhook', () => {
-    const def = baseDefinition({ nodes: [ticketBranchNode()] });
+  it('passes a workflow with issues.opened webhook', () => {
+    const def = baseDefinition({ nodes: [agentNode()] });
     expect(validateWorkflowDefinition(def)).toEqual([]);
   });
 
-  it('rejects a ticket-branch workflow with a board.column.changed webhook', () => {
+  it('passes a workflow with pull_request.opened webhook', () => {
     const def = baseDefinition({
-      nodes: [ticketBranchNode()],
+      nodes: [agentNode()],
+      triggers: [trigger({ mode: { kind: 'webhook', event: 'pull_request.opened' } })],
+    });
+    expect(validateWorkflowDefinition(def)).toEqual([]);
+  });
+
+  it('rejects a workflow whose webhook event carries no issue/PR identifier', () => {
+    const def = baseDefinition({
+      nodes: [agentNode()],
       triggers: [
         trigger({
           mode: { kind: 'webhook', event: 'board.column.changed' },
@@ -73,30 +80,30 @@ describe('validateWorkflowDefinition', () => {
     });
     const issues = validateWorkflowDefinition(def);
     expect(issues).toHaveLength(1);
-    expect(issues[0]!.code).toBe('ticket-branch-rejects-board-column-webhook');
-    expect(issues[0]!.nodeName).toBe('Worker');
+    expect(issues[0]!.code).toBe('trigger-requires-issue-or-pr');
+    expect(issues[0]!.nodeName).toBe('Trigger1');
   });
 
-  it('rejects a ticket-branch workflow with an unsupported webhook event', () => {
+  it('rejects an unsupported webhook event', () => {
     const def = baseDefinition({
-      nodes: [ticketBranchNode()],
+      nodes: [agentNode()],
       triggers: [trigger({ mode: { kind: 'webhook', event: 'push' } })],
     });
     const issues = validateWorkflowDefinition(def);
     expect(issues).toHaveLength(1);
-    expect(issues[0]!.code).toBe('ticket-branch-requires-issue-trigger');
+    expect(issues[0]!.code).toBe('trigger-requires-issue-or-pr');
   });
 
-  it('leaves non-ticket-branch workflows alone', () => {
+  it('rejects a workflow whose triggers reference different connections', () => {
     const def = baseDefinition({
+      nodes: [agentNode()],
       triggers: [
-        trigger({
-          mode: { kind: 'webhook', event: 'board.column.changed' },
-          board: { ownerType: 'org', owner: 'acme', number: 1 },
-        }),
+        trigger({ id: 't1', name: 'T1', connectionId: 'conn_a' }),
+        trigger({ id: 't2', name: 'T2', connectionId: 'conn_b' }),
       ],
     });
-    expect(validateWorkflowDefinition(def)).toEqual([]);
+    const issues = validateWorkflowDefinition(def);
+    expect(issues.map((i) => i.code)).toContain('triggers-must-share-connection');
   });
 });
 
@@ -127,7 +134,7 @@ describe('workflowDefinitionSchema', () => {
 
   it('rejects an edge whose `from` is unknown', () => {
     const result = workflowDefinitionSchema.safeParse({
-      ...baseDefinition({ nodes: [ticketBranchNode('A')] }),
+      ...baseDefinition({ nodes: [agentNode('A')] }),
       edges: [{ from: 'Ghost', to: 'A' }],
     });
     expect(result.success).toBe(false);
@@ -135,7 +142,7 @@ describe('workflowDefinitionSchema', () => {
 
   it('accepts a trigger->agent edge', () => {
     const result = workflowDefinitionSchema.safeParse({
-      ...baseDefinition({ nodes: [ticketBranchNode('A')] }),
+      ...baseDefinition({ nodes: [agentNode('A')] }),
       edges: [{ from: 'Trigger1', to: 'A' }],
     });
     expect(result.success).toBe(true);
@@ -143,7 +150,7 @@ describe('workflowDefinitionSchema', () => {
 
   it('rejects a name shared between trigger and agent', () => {
     const result = workflowDefinitionSchema.safeParse({
-      ...baseDefinition({ nodes: [ticketBranchNode('Trigger1')] }),
+      ...baseDefinition({ nodes: [agentNode('Trigger1')] }),
     });
     expect(result.success).toBe(false);
   });

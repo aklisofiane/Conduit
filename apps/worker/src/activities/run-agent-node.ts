@@ -20,6 +20,7 @@ import {
 import {
   findMcpPreset,
   type AgentConfig,
+  type AgentConfigWithWorkspace,
   type AgentEvent,
   type McpServerRef,
   type NodeOutput,
@@ -39,9 +40,10 @@ export interface RunAgentNodeInput {
   workflowId: string;
   workflowName: string;
   runId: string;
-  node: AgentConfig;
+  /** Workspace populated by `deriveWorkspaces` upstream of this activity. */
+  node: AgentConfigWithWorkspace;
   mcpServers: WorkflowMcpServer[];
-  /** Workflow triggers — used to resolve the GitHub trigger's connection for issue-writeback. */
+  /** Workflow triggers — used to resolve the GitHub trigger's connection for issue-writeback and ticket-branch workspaces. */
   triggers: TriggerConfig[];
   triggerEvent: TriggerEvent;
   /** Populated when the node has a `workspace.inherit.fromNode`. */
@@ -102,16 +104,19 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
   });
 
   try {
+    // ticket-branch workspaces resolve their connection from the workflow's
+    // single trigger (save-time validation enforces "all triggers share the
+    // same connectionId"). Per-node connection ids are gone post-Phase-2.
     const connectionId =
-      node.workspace.kind === 'repo-clone' || node.workspace.kind === 'ticket-branch'
-        ? node.workspace.connectionId
+      node.workspace.kind === 'ticket-branch'
+        ? triggers[0]?.connectionId
         : undefined;
     const connection = connectionId
       ? await loadConnectionContext(connectionId)
       : undefined;
     if (connectionId && !connection) {
       throw new Error(
-        `${node.workspace.kind} workspace on node "${node.name}" references unknown connection ${connectionId}`,
+        `ticket-branch workspace on node "${node.name}" references unknown connection ${connectionId}`,
       );
     }
 
@@ -121,6 +126,10 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
         : undefined;
     const ticketBranchStore =
       node.workspace.kind === 'ticket-branch' ? makeTicketBranchStore() : undefined;
+    const pr =
+      node.workspace.kind === 'ticket-branch' && triggerEvent.pr
+        ? { ...triggerEvent.pr }
+        : undefined;
 
     const workspace = await workspaceManager.resolve({
       runId,
@@ -132,6 +141,7 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
       parallelBranch,
       ticket,
       ticketBranchStore,
+      pr,
     });
 
     if (workspace.ticketBranchId) {
@@ -333,7 +343,11 @@ async function publishSystemEvent(
   });
 }
 
-function systemMessage(node: AgentConfig, workspacePath: string, parallelBranch?: boolean): string {
+function systemMessage(
+  node: AgentConfigWithWorkspace,
+  workspacePath: string,
+  parallelBranch?: boolean,
+): string {
   const branchHint = parallelBranch ? ' · branched-worktree' : '';
   return `workspace ${node.workspace.kind}${branchHint} · ${node.provider}/${node.model} · ${workspacePath}`;
 }

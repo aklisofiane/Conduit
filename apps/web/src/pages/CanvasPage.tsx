@@ -247,7 +247,6 @@ function CanvasInner() {
         mcpServers: [],
         skills: [],
         webSearch: false,
-        workspace: { kind: 'fresh-tmpdir' },
       };
       const ui = {
         ...draft.ui,

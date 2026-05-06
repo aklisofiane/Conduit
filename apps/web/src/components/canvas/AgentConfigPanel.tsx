@@ -173,30 +173,6 @@ export function AgentConfigPanel({
             />
           </Field>
 
-          <Field label="Workspace">
-            <select
-              className="field-input"
-              value={agent.workspace.kind}
-              onChange={(e) => {
-                const kind = e.target.value as AgentConfig['workspace']['kind'];
-                if (kind === 'fresh-tmpdir') {
-                  onChange({ workspace: { kind: 'fresh-tmpdir' } });
-                } else if (kind === 'repo-clone') {
-                  onChange({ workspace: { kind: 'repo-clone', connectionId: '' } });
-                } else if (kind === 'inherit') {
-                  onChange({ workspace: { kind: 'inherit', fromNode: '' } });
-                } else if (kind === 'ticket-branch') {
-                  onChange({ workspace: { kind: 'ticket-branch', connectionId: '' } });
-                }
-              }}
-            >
-              <option value="fresh-tmpdir">fresh-tmpdir</option>
-              <option value="repo-clone">repo-clone</option>
-              <option value="inherit">inherit</option>
-              <option value="ticket-branch">ticket-branch</option>
-            </select>
-          </Field>
-
           <Field label="Web search">
             <label className="flex cursor-pointer items-center gap-2 font-mono text-[12px]">
               <input

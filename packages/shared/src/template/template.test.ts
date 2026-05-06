@@ -42,7 +42,6 @@ const TEMPLATE: TemplateFile = {
             mcpServers: [],
             skills: [],
             webSearch: false,
-            workspace: { kind: 'repo-clone', connectionId: '<github>' },
           },
         ],
         edges: [],
@@ -84,8 +83,9 @@ describe('resolveTemplate', () => {
     const resolved = resolveTemplate(TEMPLATE, { github: 'conn_123' })[0]!;
     expect(resolved.definition.triggers[0]!.connectionId).toBe('conn_123');
     expect(resolved.definition.mcpServers[0]!.connectionId).toBe('conn_123');
-    const ws = resolved.definition.nodes[0]!.workspace;
-    expect(ws.kind === 'repo-clone' && ws.connectionId).toBe('conn_123');
+    // Workspaces are derived from edges at runtime; templates carry no
+    // workspace fields, so there's nothing to substitute on a node.
+    expect(resolved.definition.nodes[0]!.workspace).toBeUndefined();
     // Input untouched.
     expect(TEMPLATE.workflows[0]!.definition.triggers[0]!.connectionId).toBe('<github>');
   });
@@ -147,7 +147,6 @@ const PRESET_TEMPLATE: TemplateInputFile = {
             mcpServers: [],
             skills: [],
             webSearch: false,
-            workspace: { kind: 'repo-clone', connectionId: '<github>' },
           },
         ],
         edges: [],

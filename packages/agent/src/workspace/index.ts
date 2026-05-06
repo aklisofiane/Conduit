@@ -1,6 +1,7 @@
 export { WorkspaceManager } from './manager';
 export type {
   ConnectionContext,
+  PrContext,
   ResolvedWorkspace,
   TicketBranchRow,
   TicketBranchStore,

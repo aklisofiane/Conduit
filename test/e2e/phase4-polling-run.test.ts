@@ -110,6 +110,10 @@ describe('Phase 4 — polling trigger fires runs on board set-diff', () => {
   });
 
   it('only starts a run for items that are new to the matching set', async () => {
+    // Trigger-connected agents derive `ticket-branch` workspaces; even a
+    // throw-away polling-fired run needs a real bare remote to clone from.
+    await harness.seedTicketBranchRepo('acme', 'poll-tests');
+
     // 1. Credential + workflow + connection — same wiring pattern as Phase 2.
     const cred = await harness.http.post<{ id: string }>('/credentials', {
       platform: 'GITHUB',
@@ -130,7 +134,7 @@ describe('Phase 4 — polling trigger fires runs on board set-diff', () => {
         alias: 'github-main',
         credentialId: cred.id,
         owner: 'acme',
-        repo: 'shop',
+        repo: 'poll-tests',
       },
     );
 

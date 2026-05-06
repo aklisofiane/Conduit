@@ -24,7 +24,14 @@ export const agentConfigSchema = z.object({
   mcpServers: z.array(mcpServerRefSchema).default([]),
   skills: z.array(skillRefSchema).default([]),
   webSearch: z.boolean().default(false),
-  workspace: workspaceSpecSchema,
+  /**
+   * Graph-derived at runtime by `deriveWorkspaces` — the canvas never
+   * supplies this and the persisted JSON omits it. Stays optional on the
+   * schema so a stored workflow round-trips through Zod cleanly; runtime
+   * consumers (worker `loadGraphActivity`, anything that iterates nodes
+   * after derivation) see it populated.
+   */
+  workspace: workspaceSpecSchema.optional(),
   constraints: agentConstraintsSchema.optional(),
   issueWriteback: agentIssueWritebackSchema.optional(),
 });

@@ -228,11 +228,6 @@ describe('Phase 5 — board loop (Worker ↔ Critic) over ticket-branch', () => 
         ...t,
         connectionId: workerConn.id,
       })),
-      nodes: worker.definition.nodes.map((n) =>
-        n.workspace.kind === 'ticket-branch'
-          ? { ...n, workspace: { ...n.workspace, connectionId: workerConn.id } }
-          : n,
-      ),
     };
     await harness.http.put(`/workflows/${worker.id}`, {
       definition: patchedWorker,
@@ -255,11 +250,6 @@ describe('Phase 5 — board loop (Worker ↔ Critic) over ticket-branch', () => 
         ...t,
         connectionId: criticConn.id,
       })),
-      nodes: critic.definition.nodes.map((n) =>
-        n.workspace.kind === 'ticket-branch'
-          ? { ...n, workspace: { ...n.workspace, connectionId: criticConn.id } }
-          : n,
-      ),
     };
     await harness.http.put(`/workflows/${critic.id}`, {
       definition: patchedCritic,
