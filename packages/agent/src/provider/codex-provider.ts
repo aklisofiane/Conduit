@@ -49,6 +49,7 @@ export class CodexProvider implements AgentProvider {
     const startedAt = Date.now();
     const seenText = new Map<string, string>();
     const openToolCalls = new Set<string>();
+    const todoSnapshots = new Map<string, number>();
     let thread: CodexThread | undefined;
     let firstTurn = true;
 
@@ -86,7 +87,7 @@ export class CodexProvider implements AgentProvider {
       const { events } = await t.runStreamed(input, { signal });
       for await (const raw of events) {
         if (signal.aborted) return;
-        const translated = translate(raw, seenText, openToolCalls);
+        const translated = translate(raw, seenText, openToolCalls, todoSnapshots);
         for (const event of translated) {
           applyCounters(event, counters);
           checkConstraints(req, counters, startedAt);
@@ -191,6 +192,7 @@ function translate(
   raw: unknown,
   seenText: Map<string, string>,
   openToolCalls: Set<string>,
+  todoSnapshots: Map<string, number>,
 ): AgentEvent[] {
   if (!raw || typeof raw !== 'object') return [];
   const ev = raw as {
@@ -205,7 +207,7 @@ function translate(
     case 'item.started':
     case 'item.updated':
     case 'item.completed':
-      return translateItemEvent(ev, seenText, openToolCalls);
+      return translateItemEvent(ev, seenText, openToolCalls, todoSnapshots);
 
     case 'turn.completed': {
       const events: AgentEvent[] = [];
@@ -245,6 +247,7 @@ function translateItemEvent(
   },
   seenText: Map<string, string>,
   openToolCalls: Set<string>,
+  todoSnapshots: Map<string, number>,
 ): AgentEvent[] {
   const item = ev.item;
   if (!item?.id || !item.type) return [];
@@ -321,6 +324,72 @@ function translateItemEvent(
       return [{ type: 'tool_result', id, output: query }];
     }
     return [];
+  }
+
+  // `file_change` is emitted once per patch on item.completed (the SDK never
+  // surfaces in-progress patches). Codex applies the patch atomically and
+  // tells us only `{path, kind}` per change — no content or diff. We map
+  // each change onto the Write/Edit/Delete tool name the UI already
+  // pretty-prints (apps/web/src/components/run/tool-summary.ts), so bulk
+  // patches collapse into `× N Write calls` via the timeline's same-tool
+  // grouping.
+  if (item.type === 'file_change') {
+    if (ev.type !== 'item.completed') return [];
+    const changes = Array.isArray(item.changes) ? item.changes : [];
+    const failed = item.status === 'failed';
+    const out: AgentEvent[] = [];
+    changes.forEach((c, idx) => {
+      const change = c as { path?: unknown; kind?: unknown };
+      const path = typeof change.path === 'string' ? change.path : '';
+      const kind = typeof change.kind === 'string' ? change.kind : '';
+      const name = kind === 'add' ? 'Write' : kind === 'delete' ? 'Delete' : 'Edit';
+      const childId = `${id}:${idx}`;
+      out.push({ type: 'tool_call', id: childId, name, input: { file_path: path } });
+      out.push({
+        type: 'tool_result',
+        id: childId,
+        output: failed ? 'patch failed' : kind,
+        ...(failed ? { error: 'patch failed' } : {}),
+      });
+    });
+    return out;
+  }
+
+  // `todo_list` lifecycle: item.started (often empty) → item.updated (any
+  // number) → item.completed. We skip `item.started` and treat each later
+  // emission as a fresh TodoWrite snapshot, matching how Claude's TodoWrite
+  // already renders. Synthesised ids prevent the UI from coalescing distinct
+  // snapshots into a single tool row.
+  if (item.type === 'todo_list') {
+    if (ev.type === 'item.started') return [];
+    const items = Array.isArray(item.items) ? item.items : [];
+    const todos = items
+      .map((entry) => {
+        const t = entry as { text?: unknown; completed?: unknown };
+        if (typeof t.text !== 'string') return undefined;
+        return { content: t.text, status: t.completed ? 'completed' : 'pending' };
+      })
+      .filter((t): t is { content: string; status: string } => t !== undefined);
+    const seq = (todoSnapshots.get(id) ?? 0) + 1;
+    todoSnapshots.set(id, seq);
+    const childId = `${id}:${seq}`;
+    return [
+      { type: 'tool_call', id: childId, name: 'TodoWrite', input: { todos } },
+      { type: 'tool_result', id: childId, output: `${todos.length} todos` },
+    ];
+  }
+
+  // Item-level non-fatal errors. Surfaced as a paired tool_call/tool_result
+  // with `error` set so the UI's StatusPill renders them red. Stream-level
+  // `error` events and `turn.failed` keep the throw-and-terminate behaviour
+  // upstream in `translate`.
+  if (item.type === 'error') {
+    if (ev.type !== 'item.completed') return [];
+    const message = typeof item.message === 'string' ? item.message : 'Codex error';
+    return [
+      { type: 'tool_call', id, name: 'codex.error', input: { message } },
+      { type: 'tool_result', id, output: message, error: message },
+    ];
   }
 
   return [];

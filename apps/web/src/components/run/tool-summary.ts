@@ -27,6 +27,7 @@ export function summarizeToolCall(
     case 'Read':
     case 'Write':
     case 'Edit':
+    case 'Delete':
     case 'NotebookEdit':
       return { summary: tail(stringField(input.file_path), 60), status };
     case 'Bash':
