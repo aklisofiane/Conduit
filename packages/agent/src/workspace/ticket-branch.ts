@@ -3,7 +3,8 @@ import path from 'node:path';
 import { WorkspaceError } from '../errors/index';
 import { git, GitError } from './git';
 import { withPathLock } from './lock';
-import { baseClonePath, nodeWorkspacePath, runsRoot } from './paths';
+import { baseClonePath, nodeWorkspacePath } from './paths';
+import { dropConflictingWorktrees } from './worktree-cleanup';
 import type {
   ConnectionContext,
   PrContext,
@@ -66,14 +67,10 @@ export async function resolveTicketBranchWorkspace(
 
   return withPathLock(bare, async () => {
     await ensureBaseClone(bare, connection);
-    // Drop stale worktree metadata before fetch. If a previous attempt
-    // crashed mid-activity, git still thinks that worktree has the branch
-    // checked out and refuses to update the ref on the next fetch
-    // ("refusing to fetch into branch X checked out at Y"). Actively remove
-    // any worktree registered at our target path, then prune so git forgets
-    // orphaned entries whose directory has been nuked by cleanupRunActivity.
-    await git(['worktree', 'remove', '--force', target], { cwd: bare }).catch(() => undefined);
-    await git(['worktree', 'prune'], { cwd: bare }).catch(() => undefined);
+    // Must precede the fetch: if a previous attempt crashed mid-activity,
+    // git still thinks that worktree has the branch checked out and refuses
+    // ("refusing to fetch into branch X checked out at Y").
+    await dropConflictingWorktrees(bare, target);
     // Keep the base clone's mirrored refs fresh so `git worktree add <branch>`
     // can resolve a branch someone else pushed between runs. Fetch uses the
     // tokenized URL so private repos still authenticate.
@@ -206,82 +203,24 @@ async function createTrackingWorktree(
     return;
   } catch (err) {
     if (!(err instanceof GitError)) throw err;
-    // Recovery: a prior run may have crashed before cleanup, leaving an
-    // orphan worktree dir + registration that pins this branch. `prune`
-    // alone can't free it (prune only collects entries whose dir is
-    // missing), so we explicitly force-remove every worktree registered
-    // for `target` *or* holding `branchName` and wipe their dirs.
-    //
-    // Retry uses `--force -B`: `--force` overrides "already used by
-    // worktree at <path>" if a registration leaks through the cleanup,
-    // and `-B` resets `branchName` instead of failing on "branch already
-    // exists" — the failed first attempt creates the branch ref at
-    // <baseRef> before bailing, and a stale loose ref from a crashed run
-    // can be in the same shape. Reset is safe here because the caller
-    // already confirmed the branch doesn't exist on the remote, so any
-    // local-only ref is data we can't recover regardless.
+    // Retry uses `--force -B` because the failed `add -b` creates the branch
+    // ref at `<baseRef>` before bailing; a stale loose ref from a crashed
+    // run can be in the same shape. Reset is safe — the caller confirmed
+    // the branch doesn't exist on the remote, so a local-only ref is data
+    // we can't recover regardless.
     try {
       await dropConflictingWorktrees(bare, target, branchName);
       await git(['worktree', 'add', '--force', '-B', branchName, target, baseRef], {
         cwd: bare,
       });
-    } catch {
+    } catch (recoveryErr) {
+      const recoveryStderr =
+        recoveryErr instanceof GitError ? recoveryErr.stderr.trim() : String(recoveryErr);
       throw new WorkspaceError(
-        `git worktree add -b ${branchName} from ${baseRef} failed: ${err.stderr.trim()}`,
+        `git worktree add -b ${branchName} from ${baseRef} failed: ${err.stderr.trim()}; recovery: ${recoveryStderr}`,
       );
     }
   }
-}
-
-/**
- * Force-remove every worktree registered against `bare` whose path matches
- * `target` or whose checked-out branch matches `branchName`. Each match's
- * dir is also `fs.rm`'d as a backstop in case `git worktree remove` left
- * something behind. Final `prune` collects any registrations whose dirs
- * vanished as a side-effect.
- *
- * Scoped to paths inside the runs root so a misparse can never blast an
- * unrelated directory.
- */
-async function dropConflictingWorktrees(
-  bare: string,
-  target: string,
-  branchName: string,
-): Promise<void> {
-  const branchRef = `refs/heads/${branchName}`;
-  const list = await git(['worktree', 'list', '--porcelain'], { cwd: bare }).catch(() => '');
-  const conflicting = parseWorktreePorcelain(list).filter(
-    (w) => w.path === target || w.branch === branchRef,
-  );
-  const runs = runsRoot();
-  for (const w of conflicting) {
-    await git(['worktree', 'remove', '--force', w.path], { cwd: bare }).catch(() => undefined);
-    if (w.path.startsWith(`${runs}${path.sep}`) || w.path === target) {
-      await fs.rm(w.path, { recursive: true, force: true });
-    }
-  }
-  await git(['worktree', 'prune'], { cwd: bare }).catch(() => undefined);
-}
-
-/**
- * Parse `git worktree list --porcelain` into `{ path, branch }` records.
- * Skips the leading bare-clone block (no `worktree` line is missing here,
- * but it also has no `branch` line, so callers' filters drop it).
- */
-function parseWorktreePorcelain(output: string): Array<{ path: string; branch?: string }> {
-  const result: Array<{ path: string; branch?: string }> = [];
-  let current: { path?: string; branch?: string } = {};
-  for (const line of output.split('\n')) {
-    if (line === '') {
-      if (current.path) result.push({ path: current.path, branch: current.branch });
-      current = {};
-      continue;
-    }
-    if (line.startsWith('worktree ')) current.path = line.slice('worktree '.length);
-    else if (line.startsWith('branch ')) current.branch = line.slice('branch '.length);
-  }
-  if (current.path) result.push({ path: current.path, branch: current.branch });
-  return result;
 }
 
 async function stripRemoteAuth(worktreePath: string, cleanUrl: string): Promise<void> {

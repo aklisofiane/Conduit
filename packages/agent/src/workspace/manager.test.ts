@@ -117,8 +117,7 @@ describe('WorkspaceManager retry idempotency', () => {
 
     await manager.cleanupRun(runId);
 
-    // Run dir is gone, and the bare clone has no orphan worktree entry —
-    // a re-resolve on the same branch wouldn't trip over stale metadata.
+    // No orphan registration left to trip up the next resolve on this branch.
     await expect(fs.access(ws.path)).rejects.toThrow();
     expect(await listBareWorktreeNames(bare)).toEqual([]);
   });

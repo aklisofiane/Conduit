@@ -1,4 +1,3 @@
-import type { Dirent } from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { WorkspaceError } from '../errors/index';
@@ -6,9 +5,7 @@ import { git } from './git';
 import { nodeWorkspacePath, runDir } from './paths';
 import { resolveTicketBranchWorkspace } from './ticket-branch';
 import type { ResolvedWorkspace, WorkspaceResolveInput } from './types';
-
-/** Regex for the `gitdir:` line in a worktree's `.git` pointer file. */
-const GITDIR_POINTER_RE = /^gitdir:\s*(.+?)\s*$/m;
+import { dropConflictingWorktrees } from './worktree-cleanup';
 
 /**
  * Resolves a workspace spec into a concrete on-disk path. Two arms:
@@ -74,16 +71,9 @@ export class WorkspaceManager {
   }
 
   /**
-   * Delete the per-run workspace tree. Best-effort — cleanup failures are
-   * logged upstream and don't surface to the user. Base clones are preserved.
-   *
-   * Worktrees are unregistered from their bare clones *before* the directory
-   * is wiped. Skipping that step leaves an orphan `<bare>/worktrees/<name>`
-   * entry that pins the branch — the next run that tries to check out the
-   * same branch fails with "already used by worktree at <old-run-path>",
-   * even after `git worktree prune` (prune ignores entries whose dir still
-   * exists, and our `fs.rm` would happen too late to convert this one into
-   * an orphan it would clean up).
+   * Best-effort delete of the per-run workspace tree; unregisters worktrees
+   * from their owning bare clones first. Base clones are preserved. Cleanup
+   * failures are logged upstream and don't surface to the user.
    */
   async cleanupRun(runId: string): Promise<void> {
     const root = runDir(runId);
@@ -109,17 +99,9 @@ export class WorkspaceManager {
     const target = nodeWorkspacePath(runId, nodeName);
     await fs.mkdir(path.dirname(target), { recursive: true });
 
-    // Idempotency under Temporal retries: a previous attempt may have
-    // created the worktree before the activity errored. Drop registration
-    // and any stranded directory before re-adding. `--force` alone won't
-    // cover an existing-but-not-registered directory, so the explicit
-    // fs.rm is load-bearing.
-
-    await git(['worktree', 'remove', '--force', target], { cwd: upstreamPath }).catch(
-      () => undefined,
-    );
-    await git(['worktree', 'prune'], { cwd: upstreamPath }).catch(() => undefined);
-    await fs.rm(target, { recursive: true, force: true });
+    // Idempotency under Temporal retries: a previous attempt may have left
+    // a worktree registration and/or a stranded directory at `target`.
+    await dropConflictingWorktrees(upstreamPath, target);
 
     const ref = upstreamHead ?? (await git(['rev-parse', 'HEAD'], { cwd: upstreamPath })).trim();
     await git(['worktree', 'add', '--detach', target, ref], { cwd: upstreamPath });
@@ -133,50 +115,56 @@ export class WorkspaceManager {
 }
 
 /**
- * For every worktree directory directly under `<root>` (the run dir), force-
- * remove its registration from the owning bare clone, then prune each bare
- * clone once. Non-worktree siblings (`.credential-helpers/`, fresh-tmpdir
- * dirs, etc.) are skipped silently — they don't carry git metadata to leak.
+ * Without this step, `fs.rm`'ing the run dir leaves the bare clone's
+ * `<bare>/worktrees/<name>` entry behind, pinning the branch — the next run
+ * that tries to check out the same branch fails with "already used by
+ * worktree at <old-run-path>". `git worktree prune` doesn't help: it only
+ * collects entries whose dir is missing, and we'd be calling it after the
+ * `fs.rm`, on a different bare clone with no awareness of the dead entry.
+ *
+ * Non-worktree siblings (`.credential-helpers/`, tmp dirs, etc.) skip
+ * silently — they have no `.git` pointer file to dereference.
  */
 async function unregisterRunWorktrees(root: string): Promise<void> {
-  let entries: Dirent[];
+  let entries: string[];
   try {
-    entries = await fs.readdir(root, { withFileTypes: true });
+    entries = await fs.readdir(root);
   } catch {
     return;
   }
-  const bareClones = new Set<string>();
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
-    const workspacePath = path.join(root, entry.name);
-    const bare = await readBareCloneFromWorktree(workspacePath);
-    if (!bare) continue;
-    bareClones.add(bare);
-    await git(['worktree', 'remove', '--force', workspacePath], { cwd: bare }).catch(
-      () => undefined,
-    );
-  }
-  for (const bare of bareClones) {
-    await git(['worktree', 'prune'], { cwd: bare }).catch(() => undefined);
-  }
+  const bareClones = new Set(
+    (
+      await Promise.all(
+        entries.map(async (name) => {
+          const workspacePath = path.join(root, name);
+          const bare = await bareCloneOf(workspacePath);
+          if (!bare) return null;
+          await git(['worktree', 'remove', '--force', workspacePath], { cwd: bare }).catch(
+            () => undefined,
+          );
+          return bare;
+        }),
+      )
+    ).filter((b): b is string => b !== null),
+  );
+  await Promise.all(
+    [...bareClones].map((bare) =>
+      git(['worktree', 'prune'], { cwd: bare }).catch(() => undefined),
+    ),
+  );
 }
 
 /**
- * A worktree's `.git` is a pointer file like:
- *   `gitdir: /path/to/<bare>.git/worktrees/<name>`
- * Strip the `/worktrees/<name>` suffix to get the bare clone. Returns null
- * for anything that isn't a worktree (no `.git` file, or a `.git` dir).
+ * Read the bare clone owning `workspacePath` from its `.git` pointer file:
+ *   `gitdir: <bare>/worktrees/<name>`
+ * Returns null for non-worktree dirs (no `.git` pointer, `.git` is a dir,
+ * or no `/worktrees/` segment).
  */
-async function readBareCloneFromWorktree(workspacePath: string): Promise<string | null> {
-  try {
-    const pointer = await fs.readFile(path.join(workspacePath, '.git'), 'utf8');
-    const match = pointer.match(GITDIR_POINTER_RE);
-    const gitdir = match?.[1];
-    if (!gitdir) return null;
-    const idx = gitdir.indexOf('/worktrees/');
-    if (idx === -1) return null;
-    return gitdir.slice(0, idx);
-  } catch {
-    return null;
-  }
+async function bareCloneOf(workspacePath: string): Promise<string | null> {
+  const pointer = await fs
+    .readFile(path.join(workspacePath, '.git'), 'utf8')
+    .catch(() => null);
+  const gitdir = pointer?.match(/^gitdir:\s*(.+?)\s*$/m)?.[1];
+  const idx = gitdir?.indexOf('/worktrees/') ?? -1;
+  return idx === -1 ? null : gitdir!.slice(0, idx);
 }
