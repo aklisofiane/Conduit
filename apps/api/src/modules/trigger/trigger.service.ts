@@ -1,7 +1,12 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import { listProjectBoards, type ProjectBoardSummary } from '@conduit/shared/platform';
+import {
+  listProjectBoards,
+  listRepoLabels,
+  type ProjectBoardSummary,
+  type RepoLabel,
+} from '@conduit/shared/platform';
 import { CredentialsService } from '../credentials/credentials.service';
-import type { ListProjectsDto } from './dto';
+import type { ListLabelsDto, ListProjectsDto } from './dto';
 
 /**
  * Trigger-config-time helpers. Failures (bad token, missing scope, unknown
@@ -30,6 +35,31 @@ export class TriggerService {
       const message = e instanceof Error ? e.message : String(e);
       this.logger.warn(
         `List Projects v2 failed (${dto.ownerType}/${dto.owner}): ${message}`,
+      );
+      throw new BadRequestException({ message });
+    }
+  }
+
+  async listLabels(workflowId: string, dto: ListLabelsDto): Promise<RepoLabel[]> {
+    const binding = await this.credentials.getConnectionBinding(
+      workflowId,
+      dto.connectionId,
+    );
+    if (!binding.owner || !binding.repo) {
+      throw new BadRequestException({
+        message: `Connection ${dto.connectionId} is not bound to a repo (owner/repo missing)`,
+      });
+    }
+    try {
+      return await listRepoLabels({
+        owner: binding.owner,
+        repo: binding.repo,
+        token: binding.token,
+      });
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      this.logger.warn(
+        `List labels failed (${binding.owner}/${binding.repo}): ${message}`,
       );
       throw new BadRequestException({ message });
     }

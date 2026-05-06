@@ -43,3 +43,6 @@ Thumbs.db
 
 # Conduit runtime state (worker writes under ~/.conduit/, but also ignore if someone sets it locally)
 .conduit/
+
+# Playwright artifacts
+*.png

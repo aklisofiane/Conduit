@@ -40,3 +40,44 @@ export function finalSummaryPrompt(nodeName: string): string {
     `Keep it short. Plain markdown. No JSON. Do not repeat the task prompt.`,
   ].join('\n');
 }
+
+/**
+ * Trailing user turn injected between the main turn and the summary turn
+ * when the agent has `issueWriteback` configured and the run was triggered
+ * by a GitHub issue event. The allowlist values are interpolated verbatim
+ * — only what the user picked appears here, so the prompt itself encodes
+ * the choice set. Soft enforcement only.
+ */
+export function issueWritebackPrompt(args: {
+  owner: string;
+  repo: string;
+  issueNumber: string;
+  allowedStatuses: string[];
+  allowedLabels: string[];
+}): string {
+  const { owner, repo, issueNumber, allowedStatuses, allowedLabels } = args;
+  const statusLine =
+    allowedStatuses.length > 0
+      ? `- Set the issue's project Status to whichever of these best fits what you just did: ${allowedStatuses.map((s) => `"${s}"`).join(', ')}.`
+      : null;
+  const labelLine =
+    allowedLabels.length > 0
+      ? `- Apply whichever of these labels best fit (you may apply more than one, or none if none apply): ${allowedLabels.map((l) => `"${l}"`).join(', ')}.`
+      : null;
+
+  return [
+    `Final step before you finish: update the GitHub issue this run was triggered by.`,
+    ``,
+    `Issue: ${owner}/${repo}#${issueNumber}`,
+    ``,
+    `Use the GitHub MCP tools available to you. Constraints:`,
+    statusLine,
+    labelLine,
+    `- Do not set any status or apply any label that isn't in the lists above.`,
+    `- If none apply, say so explicitly and skip the update — don't pick a default.`,
+    ``,
+    `When done, briefly state what you set and why.`,
+  ]
+    .filter((line): line is string => line !== null)
+    .join('\n');
+}

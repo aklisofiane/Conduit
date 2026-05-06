@@ -89,6 +89,7 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<void> {
             runId,
             node,
             mcpServers: graph.mcpServers,
+            triggers: graph.triggers,
             triggerEvent,
             upstreamWorkspacePath: upstreamOutput?.workspacePath,
             upstreamHead: upstreamOutput?.head,

@@ -93,6 +93,32 @@ export class CredentialsService {
     return decrypt(conn.credential.secret);
   }
 
+  /**
+   * Returns the connection's platform binding (owner/repo) along with its
+   * decrypted token. Used by config-time helpers that need to call repo-
+   * scoped GitHub APIs (e.g. listing labels) without re-asking the user for
+   * fields already stored on the connection row.
+   */
+  async getConnectionBinding(
+    workflowId: string,
+    connectionId: string,
+  ): Promise<{ owner: string | null; repo: string | null; token: string }> {
+    const conn = await this.prisma.workflowConnection.findUnique({
+      where: { id: connectionId },
+      include: { credential: true },
+    });
+    if (!conn || conn.workflowId !== workflowId) {
+      throw new NotFoundException(
+        `Connection ${connectionId} not found on workflow ${workflowId}`,
+      );
+    }
+    return {
+      owner: conn.owner,
+      repo: conn.repo,
+      token: decrypt(conn.credential.secret),
+    };
+  }
+
   private async findOrThrow(id: string) {
     const cred = await this.prisma.platformCredential.findUnique({ where: { id } });
     if (!cred) throw new NotFoundException(`Credential ${id} not found`);

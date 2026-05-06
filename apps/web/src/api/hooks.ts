@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { DiscoveredTool, McpTransport, WorkflowDefinition } from '@conduit/shared';
-import type { ProjectBoardSummary } from '@conduit/shared/platform';
+import type { ProjectBoardSummary, RepoLabel } from '@conduit/shared/platform';
 import { api } from './client.js';
 import type {
   AgentPreset,
@@ -250,6 +250,24 @@ export function useListProjectBoards(args: {
         { connectionId, ownerType, owner },
       ),
     enabled: enabled && !!connectionId && !!owner,
+    staleTime: 30_000,
+    retry: false,
+  });
+}
+
+export function useListLabels(args: {
+  workflowId: string;
+  connectionId: string;
+  enabled: boolean;
+}) {
+  const { workflowId, connectionId, enabled } = args;
+  return useQuery({
+    queryKey: ['workflow', workflowId, 'labels', connectionId] as const,
+    queryFn: () =>
+      api.post<RepoLabel[]>(`/workflows/${workflowId}/trigger/list-labels`, {
+        connectionId,
+      }),
+    enabled: enabled && !!connectionId,
     staleTime: 30_000,
     retry: false,
   });

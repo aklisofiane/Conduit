@@ -10,18 +10,22 @@ import {
   git,
   installPushCredentials,
   installSkillsIntoWorkspace,
+  issueWritebackPrompt,
   readConduitSummary,
   resolveMcpServers,
   resolveProvider,
   runDir,
   serializeAgentContext,
 } from '@conduit/agent';
-import type {
-  AgentConfig,
-  AgentEvent,
-  NodeOutput,
-  TriggerEvent,
-  WorkflowMcpServer,
+import {
+  findMcpPreset,
+  type AgentConfig,
+  type AgentEvent,
+  type McpServerRef,
+  type NodeOutput,
+  type TriggerConfig,
+  type TriggerEvent,
+  type WorkflowMcpServer,
 } from '@conduit/shared';
 import { config } from '../config';
 import { loadConnectionContext } from '../runtime/connection-context';
@@ -37,6 +41,8 @@ export interface RunAgentNodeInput {
   runId: string;
   node: AgentConfig;
   mcpServers: WorkflowMcpServer[];
+  /** Workflow triggers — used to resolve the GitHub trigger's connection for issue-writeback. */
+  triggers: TriggerConfig[];
   triggerEvent: TriggerEvent;
   /** Populated when the node has a `workspace.inherit.fromNode`. */
   upstreamWorkspacePath?: string;
@@ -74,6 +80,7 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
     workflowId,
     workflowName,
     mcpServers,
+    triggers,
     triggerEvent,
     upstreamWorkspacePath,
     upstreamHead,
@@ -154,7 +161,29 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
       await installSkillsIntoWorkspace(workspace.path, selected, node.provider);
     }
 
-    const resolvedMcp = await resolveMcpServers(node, mcpServers, makeCredentialLookup());
+    // Auto-attach a synthetic GitHub MCP server for issue writeback when the
+    // user has enabled it on this agent. The token comes from the workflow's
+    // GitHub trigger connection — the user does not need to provision a
+    // separate PAT or add the GitHub MCP to the workflow themselves. Skipped
+    // if the agent already references a GitHub MCP server (the user-attached
+    // one wins; we don't double-mount).
+    const writebackContext = resolveWritebackContext(node, triggers, triggerEvent);
+    const writebackAttach =
+      writebackContext && !agentReferencesGithubMcp(node, mcpServers)
+        ? buildSyntheticGithubMcp(writebackContext.connectionId)
+        : null;
+    const effectiveNode: AgentConfig = writebackAttach
+      ? { ...node, mcpServers: [...node.mcpServers, writebackAttach.ref] }
+      : node;
+    const effectiveMcpServers: WorkflowMcpServer[] = writebackAttach
+      ? [...mcpServers, writebackAttach.server]
+      : mcpServers;
+
+    const resolvedMcp = await resolveMcpServers(
+      effectiveNode,
+      effectiveMcpServers,
+      makeCredentialLookup(),
+    );
 
     const provider = resolveProvider(node.provider, {
       anthropicApiKey: config.anthropicApiKey,
@@ -202,7 +231,25 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
         await onAgentEvent(runId, node.name, event, usage);
       }
 
-      // Turn 2 — final summary. Same session, so conversation state is
+      // Turn 2a — issue writeback. Soft-allowlist directive interpolated
+      // into a user message; agent uses the GitHub MCP to apply the change.
+      // Skipped silently when not configured or when the run had no GitHub
+      // issue trigger (manual runs, future non-GitHub triggers).
+      if (writebackContext) {
+        for await (const event of session.run(
+          issueWritebackPrompt({
+            owner: writebackContext.repoOwner,
+            repo: writebackContext.repoName,
+            issueNumber: writebackContext.issueNumber,
+            allowedStatuses: writebackContext.allowedStatuses,
+            allowedLabels: writebackContext.allowedLabels,
+          }),
+        )) {
+          await onAgentEvent(runId, node.name, event, usage);
+        }
+      }
+
+      // Turn 2b — final summary. Same session, so conversation state is
       // retained. The agent is expected to write `.conduit/<NodeName>.md`.
       phase = 'summary';
       for await (const event of session.run(finalSummaryPrompt(node.name))) {
@@ -339,4 +386,91 @@ async function listChangedFiles(workspacePath: string): Promise<string[]> {
 
 export async function cleanupConduitFolder(workspacePath: string): Promise<void> {
   await clearConduitFolder(workspacePath);
+}
+
+/** Reserved id for the auto-attached GitHub MCP server. Underscored to make
+ * a collision with a user-defined server vanishingly unlikely. */
+const WRITEBACK_GITHUB_MCP_ID = '__conduit_writeback_github__';
+
+interface WritebackContext {
+  connectionId: string;
+  repoOwner: string;
+  repoName: string;
+  issueNumber: string;
+  allowedStatuses: string[];
+  allowedLabels: string[];
+}
+
+/**
+ * Resolve the per-run writeback context. Returns undefined when the feature
+ * is not configured for this agent, when the workflow has no GitHub trigger,
+ * when this run wasn't fired by a GitHub issue event, or when the user
+ * enabled the checkbox without picking any statuses or labels.
+ */
+function resolveWritebackContext(
+  node: AgentConfig,
+  triggers: TriggerConfig[],
+  triggerEvent: TriggerEvent,
+): WritebackContext | undefined {
+  const writeback = node.issueWriteback;
+  if (!writeback) return undefined;
+  if (writeback.allowedStatuses.length === 0 && writeback.allowedLabels.length === 0) {
+    return undefined;
+  }
+  if (triggerEvent.source !== 'github') return undefined;
+  if (!triggerEvent.issue || !triggerEvent.repo) return undefined;
+  const trigger = triggers.find((t) => t.platform === 'github');
+  if (!trigger) return undefined;
+  return {
+    connectionId: trigger.connectionId,
+    repoOwner: triggerEvent.repo.owner,
+    repoName: triggerEvent.repo.name,
+    issueNumber: triggerEvent.issue.key,
+    allowedStatuses: writeback.allowedStatuses,
+    allowedLabels: writeback.allowedLabels,
+  };
+}
+
+/**
+ * True when the agent already references a GitHub MCP server defined on the
+ * workflow (matched by transport command/args, since user-defined ids are
+ * arbitrary). When true, we skip auto-attach so the user-configured server
+ * wins — same connection or not.
+ */
+function agentReferencesGithubMcp(
+  node: AgentConfig,
+  mcpServers: WorkflowMcpServer[],
+): boolean {
+  const byId = new Map(mcpServers.map((s) => [s.id, s]));
+  for (const ref of node.mcpServers) {
+    const def = byId.get(ref.serverId);
+    if (!def) continue;
+    const t = def.transport;
+    if (
+      t.kind === 'stdio' &&
+      (t.args ?? []).some((a) => a.includes('@modelcontextprotocol/server-github'))
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Build the synthetic GitHub MCP server entry + agent ref for auto-attach. */
+function buildSyntheticGithubMcp(connectionId: string): {
+  server: WorkflowMcpServer;
+  ref: McpServerRef;
+} {
+  const preset = findMcpPreset('github');
+  if (!preset) {
+    throw new Error('GitHub MCP preset missing — required for issue writeback auto-attach');
+  }
+  const server: WorkflowMcpServer = {
+    id: WRITEBACK_GITHUB_MCP_ID,
+    name: 'GitHub (writeback)',
+    transport: preset.transport,
+    connectionId,
+  };
+  const ref: McpServerRef = { serverId: WRITEBACK_GITHUB_MCP_ID };
+  return { server, ref };
 }

@@ -5,6 +5,7 @@ import { workspaceSpecSchema } from '../workspace/index';
 import { nodeNameSchema } from './node-name';
 import { agentProviderIdSchema } from './provider';
 import { agentConstraintsSchema } from './constraints';
+import { agentIssueWritebackSchema } from './issue-writeback';
 
 /**
  * Agent node — the canvas's second and only runtime node type (trigger is
@@ -25,5 +26,6 @@ export const agentConfigSchema = z.object({
   webSearch: z.boolean().default(false),
   workspace: workspaceSpecSchema,
   constraints: agentConstraintsSchema.optional(),
+  issueWriteback: agentIssueWritebackSchema.optional(),
 });
 export type AgentConfig = z.infer<typeof agentConfigSchema>;

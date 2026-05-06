@@ -6,3 +6,8 @@ export const listProjectsDtoSchema = z.object({
   owner: z.string().min(1),
 });
 export type ListProjectsDto = z.infer<typeof listProjectsDtoSchema>;
+
+export const listLabelsDtoSchema = z.object({
+  connectionId: z.string().min(1),
+});
+export type ListLabelsDto = z.infer<typeof listLabelsDtoSchema>;

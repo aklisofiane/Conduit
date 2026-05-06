@@ -1,5 +1,10 @@
-import { PROVIDER_MODELS, type AgentConfig } from '@conduit/shared';
-import { useAgentPresets, useSkills } from '../../api/hooks.js';
+import {
+  PROVIDER_MODELS,
+  type AgentConfig,
+  type AgentIssueWriteback,
+  type TriggerConfig,
+} from '@conduit/shared';
+import { useAgentPresets, useListLabels, useListProjectBoards, useSkills } from '../../api/hooks.js';
 import type { AgentPreset } from '../../api/types.js';
 import { cn } from '../../lib/cn.js';
 import { providerStyle } from '../../styles/theme.js';
@@ -9,6 +14,12 @@ import { McpServerPicker } from './McpServerPicker.js';
 interface AgentConfigPanelProps {
   agent: AgentConfig;
   workflowId: string;
+  /**
+   * The workflow's GitHub trigger, when present. Drives the issue-writeback
+   * pickers (project Status options + repo labels). Undefined disables the
+   * writeback field with a hint.
+   */
+  githubTrigger?: TriggerConfig;
   onChange: (patch: Partial<AgentConfig>) => void;
   onSave: () => void;
   onDiscard: () => void;
@@ -20,6 +31,7 @@ interface AgentConfigPanelProps {
 export function AgentConfigPanel({
   agent,
   workflowId,
+  githubTrigger,
   onChange,
   onSave,
   onDiscard,
@@ -196,6 +208,18 @@ export function AgentConfigPanel({
             </label>
           </Field>
 
+          <Field
+            label="Issue writeback"
+            hint="set status / apply labels at end of run"
+          >
+            <IssueWritebackControl
+              workflowId={workflowId}
+              trigger={githubTrigger}
+              value={agent.issueWriteback}
+              onChange={(next) => onChange({ issueWriteback: next })}
+            />
+          </Field>
+
           <Field label="MCP servers" hint="tools from external services">
             <McpServerPicker
               agent={agent}
@@ -276,6 +300,171 @@ function Field({
         {hint && <span className="hint">{hint}</span>}
       </div>
       {children}
+    </div>
+  );
+}
+
+function IssueWritebackControl({
+  workflowId,
+  trigger,
+  value,
+  onChange,
+}: {
+  workflowId: string;
+  trigger: TriggerConfig | undefined;
+  value: AgentIssueWriteback | undefined;
+  onChange: (next: AgentIssueWriteback | undefined) => void;
+}) {
+  const enabled = value !== undefined;
+  const board = trigger?.board;
+  const connectionId = trigger?.connectionId ?? '';
+
+  const boardsQuery = useListProjectBoards({
+    workflowId,
+    connectionId,
+    ownerType: board?.ownerType ?? 'org',
+    owner: board?.owner ?? '',
+    enabled: enabled && !!trigger && !!board,
+  });
+  const matchedBoard =
+    boardsQuery.data?.find((b) => b.number === board?.number) ?? null;
+  const statusOptions =
+    matchedBoard?.fields.find((f) => f.name.toLowerCase() === 'status')?.options ?? [];
+
+  const labelsQuery = useListLabels({
+    workflowId,
+    connectionId,
+    enabled: enabled && !!trigger,
+  });
+  const labelOptions = labelsQuery.data ?? [];
+
+  const toggle = (next: boolean) => {
+    onChange(next ? { allowedStatuses: [], allowedLabels: [] } : undefined);
+  };
+
+  const toggleStatus = (status: string) => {
+    if (!value) return;
+    const set = new Set(value.allowedStatuses);
+    if (set.has(status)) set.delete(status);
+    else set.add(status);
+    onChange({ ...value, allowedStatuses: [...set] });
+  };
+
+  const toggleLabel = (label: string) => {
+    if (!value) return;
+    const set = new Set(value.allowedLabels);
+    if (set.has(label)) set.delete(label);
+    else set.add(label);
+    onChange({ ...value, allowedLabels: [...set] });
+  };
+
+  if (!trigger) {
+    return (
+      <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
+        Add a GitHub trigger to enable issue writeback.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <label className="flex cursor-pointer items-center gap-2 font-mono text-[12px]">
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(e) => toggle(e.target.checked)}
+        />
+        <span>Allow updating issue status / labels</span>
+      </label>
+
+      {enabled && (
+        <div className="space-y-3 rounded-[var(--radius)] border border-[var(--color-divider)] bg-[var(--color-bg)] p-3">
+          <div>
+            <div className="mb-1 font-mono text-[10.5px] uppercase tracking-[0.06em] text-[var(--color-text-muted)]">
+              Allowed statuses
+            </div>
+            {!board ? (
+              <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
+                Trigger has no project board — set one to pick statuses.
+              </div>
+            ) : boardsQuery.isLoading ? (
+              <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
+                Loading…
+              </div>
+            ) : statusOptions.length === 0 ? (
+              <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
+                No Status field options found on the trigger's project.
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {statusOptions.map((opt) => {
+                  const selected = value?.allowedStatuses.includes(opt) ?? false;
+                  return (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => toggleStatus(opt)}
+                      className={cn(
+                        'rounded-[var(--radius-sm)] border px-2 py-[3px] font-mono text-[11px] transition-colors',
+                        selected
+                          ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-text)]'
+                          : 'border-[var(--color-divider)] text-[var(--color-text-muted)] hover:border-[var(--color-text-muted)]',
+                      )}
+                    >
+                      {opt}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <div className="mb-1 font-mono text-[10.5px] uppercase tracking-[0.06em] text-[var(--color-text-muted)]">
+              Allowed labels
+            </div>
+            {labelsQuery.isLoading ? (
+              <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
+                Loading…
+              </div>
+            ) : labelOptions.length === 0 ? (
+              <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
+                No labels found on the trigger's repo.
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {labelOptions.map((label) => {
+                  const selected = value?.allowedLabels.includes(label.name) ?? false;
+                  return (
+                    <button
+                      key={label.name}
+                      type="button"
+                      onClick={() => toggleLabel(label.name)}
+                      className={cn(
+                        'rounded-[var(--radius-sm)] border px-2 py-[3px] font-mono text-[11px] transition-colors',
+                        selected
+                          ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-text)]'
+                          : 'border-[var(--color-divider)] text-[var(--color-text-muted)] hover:border-[var(--color-text-muted)]',
+                      )}
+                    >
+                      {label.name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {value &&
+            value.allowedStatuses.length === 0 &&
+            value.allowedLabels.length === 0 && (
+              <div className="font-mono text-[10.5px] text-[var(--color-text-muted)]">
+                Pick at least one status or label — without selections, the
+                writeback turn is skipped at run time.
+              </div>
+            )}
+        </div>
+      )}
     </div>
   );
 }
