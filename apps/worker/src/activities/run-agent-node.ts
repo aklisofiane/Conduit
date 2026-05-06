@@ -181,6 +181,7 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
         // run dir (the workspace's parent), which contradicts the design
         // assumption noted in push-auth.ts.
         additionalDirectories: [runDir(runId)],
+        webSearch: node.webSearch,
         constraints: node.constraints ?? {},
       },
       abortController.signal,

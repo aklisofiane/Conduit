@@ -188,4 +188,51 @@ describe('CodexProvider', () => {
       output: 'file1\nfile2\n',
     });
   });
+
+  it('translates web_search items as tool_call / tool_result', async () => {
+    installStub({
+      scriptedEvents: [
+        { type: 'thread.started', thread_id: 't_1' },
+        { type: 'turn.started' },
+        {
+          type: 'item.started',
+          item: { id: 'ws_1', type: 'web_search', query: 'kimi agent sdk npm' },
+        },
+        {
+          type: 'item.completed',
+          item: { id: 'ws_1', type: 'web_search', query: 'kimi agent sdk npm' },
+        },
+        { type: 'turn.completed', usage: { input_tokens: 1, output_tokens: 1 } },
+      ],
+    });
+
+    const p = new CodexProvider();
+    const events: unknown[] = [];
+    const session = p.startSession(
+      {
+        model: 'gpt-5-codex',
+        systemPrompt: '',
+        mcpServers: [],
+        workspacePath: '/tmp',
+        webSearch: true,
+        constraints: {},
+      } as never,
+      new AbortController().signal,
+    );
+    for await (const e of session.run('')) {
+      events.push(e);
+    }
+
+    expect(events[0]).toMatchObject({
+      type: 'tool_call',
+      id: 'ws_1',
+      name: 'web_search',
+      input: { query: 'kimi agent sdk npm' },
+    });
+    expect(events[1]).toMatchObject({
+      type: 'tool_result',
+      id: 'ws_1',
+      output: 'kimi agent sdk npm',
+    });
+  });
 });

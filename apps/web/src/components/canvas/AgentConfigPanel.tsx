@@ -185,6 +185,17 @@ export function AgentConfigPanel({
             </select>
           </Field>
 
+          <Field label="Web search">
+            <label className="flex cursor-pointer items-center gap-2 font-sans text-[12px] text-[var(--color-text)]">
+              <input
+                type="checkbox"
+                checked={agent.webSearch ?? false}
+                onChange={(e) => onChange({ webSearch: e.target.checked })}
+              />
+              Enable
+            </label>
+          </Field>
+
           <Field label="MCP servers" hint="tools from external services">
             <McpServerPicker
               agent={agent}

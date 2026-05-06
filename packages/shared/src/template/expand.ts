@@ -75,6 +75,7 @@ function expandAgent(
       instructions: agent.instructions!,
       mcpServers: agent.mcpServers,
       skills: agent.skills,
+      webSearch: agent.webSearch ?? false,
       workspace: agent.workspace,
       constraints: agent.constraints,
     };
@@ -97,6 +98,7 @@ function expandAgent(
     instructions,
     mcpServers: agent.mcpServers,
     skills: agent.skills,
+    webSearch: agent.webSearch ?? false,
     workspace: agent.workspace,
     constraints: agent.constraints,
   };

@@ -22,6 +22,7 @@ export const agentConfigSchema = z.object({
   instructions: z.string(),
   mcpServers: z.array(mcpServerRefSchema).default([]),
   skills: z.array(skillRefSchema).default([]),
+  webSearch: z.boolean().default(false),
   workspace: workspaceSpecSchema,
   constraints: agentConstraintsSchema.optional(),
 });

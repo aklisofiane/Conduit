@@ -36,6 +36,7 @@ function ticketBranchNode(name = 'Worker') {
     instructions: 'do work',
     mcpServers: [],
     skills: [],
+    webSearch: false,
     workspace: { kind: 'ticket-branch', connectionId: 'conn_1' } as const,
   };
 }

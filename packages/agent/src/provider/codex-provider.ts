@@ -67,6 +67,9 @@ export class CodexProvider implements AgentProvider {
         sandboxMode: 'workspace-write',
         skipGitRepoCheck: true,
         approvalPolicy: 'never',
+        // SDK default `webSearchMode` is `cached` when enabled — adequate for
+        // research without paying live-fetch cost. Live mode is a follow-up.
+        webSearchEnabled: req.webSearch,
       });
       return thread;
     };
@@ -298,6 +301,23 @@ function translateItemEvent(
           ? `exit ${typeof item.exit_code === 'number' ? item.exit_code : 'unknown'}`
           : undefined;
       return [{ type: 'tool_result', id, output, error }];
+    }
+    return [];
+  }
+
+  // `web_search` items have no `status` field — they fire item.started when
+  // dispatched and item.completed when results return to the agent. Results
+  // themselves arrive via the agent's reasoning/messages; we surface only
+  // the query so the timeline shows the search happened.
+  if (item.type === 'web_search') {
+    const query = typeof item.query === 'string' ? item.query : '';
+    if (ev.type === 'item.started' && !openToolCalls.has(id)) {
+      openToolCalls.add(id);
+      return [{ type: 'tool_call', id, name: 'web_search', input: { query } }];
+    }
+    if (ev.type === 'item.completed') {
+      openToolCalls.delete(id);
+      return [{ type: 'tool_result', id, output: query }];
     }
     return [];
   }

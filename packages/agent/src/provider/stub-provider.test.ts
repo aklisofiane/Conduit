@@ -23,6 +23,7 @@ function baseRequest(overrides: Partial<AgentRequest> = {}): AgentRequest {
     systemPrompt: 'do the thing',
     mcpServers: [],
     workspacePath: overrides.workspacePath ?? '/tmp/unused',
+    webSearch: false,
     constraints: {},
     ...overrides,
   };

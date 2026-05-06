@@ -20,6 +20,13 @@ export const agentRequestSchema = z.object({
    * `additionalDirectories` option; Codex/Stub ignore it.
    */
   additionalDirectories: z.array(z.string()).optional(),
+  /**
+   * Enable the provider's built-in web search/fetch capability for this
+   * session. Claude wires this to the SDK's `disallowedTools` option (off
+   * means WebSearch/WebFetch are removed from context); Codex wires it to
+   * `webSearchEnabled` on `ThreadOptions`. Stub ignores it.
+   */
+  webSearch: z.boolean().default(false),
   constraints: agentConstraintsSchema,
 });
 export type AgentRequest = z.infer<typeof agentRequestSchema>;

@@ -8,6 +8,7 @@ import {
 interface CapturedOptions {
   canUseTool: SdkCanUseTool;
   mcpServers: Record<string, unknown>;
+  disallowedTools?: string[];
 }
 
 function installStub(): { capturedOptions: CapturedOptions | undefined } {
@@ -94,5 +95,43 @@ describe('ClaudeProvider', () => {
     expect(await opts.canUseTool('mcp__unknown__foo', {})).toMatchObject({
       behavior: 'deny',
     });
+  });
+
+  it('disables WebSearch and WebFetch when webSearch is false', async () => {
+    const captured = installStub();
+    const p = new ClaudeProvider();
+    const session = p.startSession(
+      {
+        model: 'claude-sonnet-4-6',
+        systemPrompt: 'sys',
+        mcpServers: [],
+        workspacePath: '/tmp/x',
+        webSearch: false,
+        constraints: {},
+      } as never,
+      new AbortController().signal,
+    );
+    for await (const _ of session.run('hi')) void _;
+
+    expect(captured.capturedOptions?.disallowedTools).toEqual(['WebSearch', 'WebFetch']);
+  });
+
+  it('leaves WebSearch and WebFetch available when webSearch is true', async () => {
+    const captured = installStub();
+    const p = new ClaudeProvider();
+    const session = p.startSession(
+      {
+        model: 'claude-sonnet-4-6',
+        systemPrompt: 'sys',
+        mcpServers: [],
+        workspacePath: '/tmp/x',
+        webSearch: true,
+        constraints: {},
+      } as never,
+      new AbortController().signal,
+    );
+    for await (const _ of session.run('hi')) void _;
+
+    expect(captured.capturedOptions?.disallowedTools).toBeUndefined();
   });
 });

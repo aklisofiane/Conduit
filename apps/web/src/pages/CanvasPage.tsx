@@ -246,6 +246,7 @@ function CanvasInner() {
         instructions: '',
         mcpServers: [],
         skills: [],
+        webSearch: false,
         workspace: { kind: 'fresh-tmpdir' },
       };
       const ui = {
