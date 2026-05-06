@@ -27,6 +27,7 @@ import { useParams } from 'react-router-dom';
 import type { AgentConfig, Edge, WorkflowDefinition } from '@conduit/shared';
 import { AgentNode } from '../components/canvas/AgentNode.js';
 import { AgentConfigPanel } from '../components/canvas/AgentConfigPanel.js';
+import { InspectorShell } from '../components/canvas/InspectorShell.js';
 import {
   NodePalette,
   PALETTE_DRAG_MIME,
@@ -55,6 +56,8 @@ const panelMaxWidth = () =>
   typeof window === 'undefined'
     ? 720
     : Math.max(PANEL_MIN_WIDTH, Math.floor(window.innerWidth * 0.4));
+const clampPanelWidth = (w: number, max = panelMaxWidth()) =>
+  Math.min(max, Math.max(PANEL_MIN_WIDTH, w));
 
 export function CanvasPage() {
   return (
@@ -90,46 +93,51 @@ function CanvasInner() {
     if (typeof window === 'undefined') return PANEL_DEFAULT_WIDTH;
     const raw = window.localStorage.getItem(PANEL_WIDTH_KEY);
     const parsed = raw ? Number.parseInt(raw, 10) : NaN;
-    const seed = Number.isFinite(parsed) ? parsed : PANEL_DEFAULT_WIDTH;
-    return Math.min(panelMaxWidth(), Math.max(PANEL_MIN_WIDTH, seed));
+    return clampPanelWidth(Number.isFinite(parsed) ? parsed : PANEL_DEFAULT_WIDTH);
   });
-  const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
+  const panelWidthRef = useRef(panelWidth);
+  panelWidthRef.current = panelWidth;
+  const dragCleanupRef = useRef<(() => void) | null>(null);
 
-  const startPanelResize = useCallback(
-    (event: ReactPointerEvent) => {
-      event.preventDefault();
-      dragRef.current = { startX: event.clientX, startWidth: panelWidth };
-      const onMove = (e: PointerEvent) => {
-        const drag = dragRef.current;
-        if (!drag) return;
-        const next = drag.startWidth - (e.clientX - drag.startX);
-        setPanelWidth(Math.min(panelMaxWidth(), Math.max(PANEL_MIN_WIDTH, next)));
-      };
-      const onUp = () => {
-        dragRef.current = null;
-        window.removeEventListener('pointermove', onMove);
-        window.removeEventListener('pointerup', onUp);
-        window.removeEventListener('pointercancel', onUp);
-        document.body.style.cursor = '';
-        document.body.style.userSelect = '';
-      };
-      window.addEventListener('pointermove', onMove);
-      window.addEventListener('pointerup', onUp);
-      window.addEventListener('pointercancel', onUp);
-      document.body.style.cursor = 'col-resize';
-      document.body.style.userSelect = 'none';
-    },
-    [panelWidth],
-  );
+  const startPanelResize = useCallback((event: ReactPointerEvent) => {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = panelWidthRef.current;
+    // Cache max for the duration of the drag — viewport changes are handled
+    // by the resize listener, and reading `innerWidth` on every pointermove
+    // can force layout while the body's cursor/userSelect are mutating.
+    const maxWidth = panelMaxWidth();
+    const onMove = (e: PointerEvent) => {
+      setPanelWidth(clampPanelWidth(startWidth - (e.clientX - startX), maxWidth));
+    };
+    const onUp = () => {
+      dragCleanupRef.current?.();
+      window.localStorage.setItem(PANEL_WIDTH_KEY, String(panelWidthRef.current));
+    };
+    dragCleanupRef.current = () => {
+      dragCleanupRef.current = null;
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, []);
 
-  useEffect(() => {
-    window.localStorage.setItem(PANEL_WIDTH_KEY, String(panelWidth));
-  }, [panelWidth]);
+  useEffect(() => () => dragCleanupRef.current?.(), []);
 
-  // Re-clamp when the viewport shrinks so the panel can't exceed half the window.
   useEffect(() => {
     const onResize = () => {
-      setPanelWidth((w) => Math.min(panelMaxWidth(), Math.max(PANEL_MIN_WIDTH, w)));
+      const before = panelWidthRef.current;
+      const next = clampPanelWidth(before);
+      if (next === before) return;
+      setPanelWidth(next);
+      window.localStorage.setItem(PANEL_WIDTH_KEY, String(next));
     };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
@@ -374,35 +382,35 @@ function CanvasInner() {
       </div>
 
       {selectedAgent && (
-        <AgentConfigPanel
-          agent={selectedAgent}
-          workflowId={id}
-          width={panelWidth}
-          onResizeStart={startPanelResize}
-          onChange={(patch) => updateAgent(selectedAgent.id, patch)}
-          onSave={handleSave}
-          onDiscard={() => wf && reset(wf.definition)}
-          onClose={() => setSelected(undefined)}
-          saving={updateWorkflow.isPending}
-          dirty={dirty}
-        />
+        <InspectorShell width={panelWidth} onResizeStart={startPanelResize}>
+          <AgentConfigPanel
+            agent={selectedAgent}
+            workflowId={id}
+            onChange={(patch) => updateAgent(selectedAgent.id, patch)}
+            onSave={handleSave}
+            onDiscard={() => wf && reset(wf.definition)}
+            onClose={() => setSelected(undefined)}
+            saving={updateWorkflow.isPending}
+            dirty={dirty}
+          />
+        </InspectorShell>
       )}
 
       {selectedTrigger && (
-        <TriggerConfigPanel
-          trigger={selectedTrigger}
-          workflowId={id}
-          width={panelWidth}
-          onResizeStart={startPanelResize}
-          isActive={Boolean(wf?.isActive)}
-          onChange={(patch) => updateTrigger(selectedTrigger.id, patch)}
-          onActiveChange={(next) => updateWorkflow.mutate({ isActive: next })}
-          onSave={handleSave}
-          onDiscard={() => wf && reset(wf.definition)}
-          onClose={() => setSelected(undefined)}
-          saving={updateWorkflow.isPending}
-          dirty={dirty}
-        />
+        <InspectorShell width={panelWidth} onResizeStart={startPanelResize}>
+          <TriggerConfigPanel
+            trigger={selectedTrigger}
+            workflowId={id}
+            isActive={Boolean(wf?.isActive)}
+            onChange={(patch) => updateTrigger(selectedTrigger.id, patch)}
+            onActiveChange={(next) => updateWorkflow.mutate({ isActive: next })}
+            onSave={handleSave}
+            onDiscard={() => wf && reset(wf.definition)}
+            onClose={() => setSelected(undefined)}
+            saving={updateWorkflow.isPending}
+            dirty={dirty}
+          />
+        </InspectorShell>
       )}
     </div>
   );

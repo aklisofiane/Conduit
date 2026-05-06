@@ -1,19 +1,16 @@
-import { useEffect, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useState } from 'react';
 import type { BoardRef, TriggerConfig, TriggerFilter } from '@conduit/shared';
 import type { ProjectBoardSummary } from '@conduit/shared/platform';
 import { useConnections, useListProjectBoards } from '../../api/hooks.js';
 import { ApiError } from '../../api/client.js';
 import { cn } from '../../lib/cn.js';
 import { Icon } from './Icon.js';
-import { ResizeHandle } from './ResizeHandle.js';
 
 type BoardField = ProjectBoardSummary['fields'][number];
 
 interface TriggerConfigPanelProps {
   trigger: TriggerConfig;
   workflowId: string;
-  width: number;
-  onResizeStart: (event: ReactPointerEvent) => void;
   isActive: boolean;
   onChange: (patch: Partial<TriggerConfig>) => void;
   onActiveChange: (next: boolean) => void;
@@ -27,8 +24,6 @@ interface TriggerConfigPanelProps {
 export function TriggerConfigPanel({
   trigger,
   workflowId,
-  width,
-  onResizeStart,
   isActive,
   onChange,
   onActiveChange,
@@ -91,11 +86,7 @@ export function TriggerConfigPanel({
   };
 
   return (
-    <aside
-      className="relative flex shrink-0 flex-col border-l border-[var(--color-divider)] bg-[var(--color-bg-panel)]"
-      style={{ width }}
-    >
-      <ResizeHandle onPointerDown={onResizeStart} />
+    <>
       <div className="flex items-start justify-between border-b border-[var(--color-divider)] px-5 py-4">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 font-mono text-[10px] font-medium uppercase tracking-[0.06em] text-[var(--color-text-muted)]">
@@ -292,7 +283,7 @@ export function TriggerConfigPanel({
           {saving ? 'Saving…' : 'Save changes'}
         </button>
       </div>
-    </aside>
+    </>
   );
 }
 
