@@ -112,8 +112,6 @@ describe('WorkspaceManager retry idempotency', () => {
       ticketBranchStore: store,
     });
 
-    // Seed wrote its handoff summary — this is exactly what should appear in
-    // each parallel sibling at session start so they have the upstream plan.
     await fs.mkdir(path.join(upstream.path, '.conduit'), { recursive: true });
     await fs.writeFile(
       path.join(upstream.path, '.conduit', 'Seed.md'),

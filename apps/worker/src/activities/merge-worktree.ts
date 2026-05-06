@@ -25,39 +25,32 @@ export interface MergeWorktreeInput {
  */
 export async function mergeWorktreeActivity(input: MergeWorktreeInput): Promise<void> {
   const { runId, sourceWorkspacePath, targetWorkspacePath, sourceNodeName, targetNodeName } = input;
+  const log = (body: string, level?: 'WARN' | 'ERROR') =>
+    writeSystemLog(runId, targetNodeName, `merge ${sourceNodeName} → ${targetNodeName}: ${body}`, level);
 
-  // Non-git workspaces (e.g. fresh-tmpdir, if ever introduced) have nothing
-  // to merge — bail cleanly without escalating. Real git workspaces fall
-  // through to staging, where any error is a true failure we want to surface.
-  if (!(await isGitWorktree(sourceWorkspacePath))) return;
-
-  const dirtyBeforeAdd = await workingTreeDirty(sourceWorkspacePath);
+  // `git status --porcelain` errors on a non-git workspace (e.g. fresh-tmpdir):
+  // bail cleanly. Empty output = clean tree; non-empty = dirty before staging.
+  let dirtyBeforeAdd: boolean;
+  try {
+    const porcelain = (await git(['status', '--porcelain'], { cwd: sourceWorkspacePath })).trim();
+    dirtyBeforeAdd = porcelain.length > 0;
+  } catch (err) {
+    if (err instanceof GitError) return;
+    throw err;
+  }
 
   try {
     await git(['add', '-A', '--', '.', ':(exclude).conduit'], { cwd: sourceWorkspacePath });
   } catch (err) {
-    if (err instanceof GitError) {
-      await writeSystemLog(
-        runId,
-        targetNodeName,
-        `merge ${sourceNodeName} → ${targetNodeName}: git add -A failed: ${err.stderr.trim()}`,
-        'ERROR',
-      );
-    }
+    if (err instanceof GitError) await log(`git add -A failed: ${err.stderr.trim()}`, 'ERROR');
     throw err;
   }
 
   const hasStaged = await stagedChangesExist(sourceWorkspacePath);
   if (!hasStaged && dirtyBeforeAdd) {
-    // The working tree had un-ignored changes, but `git add -A` produced no
-    // staged content — usually means a too-broad `.gitignore` swallowed the
-    // edits. Surface it so the run shows why nothing got merged.
-    await writeSystemLog(
-      runId,
-      targetNodeName,
-      `merge ${sourceNodeName} → ${targetNodeName}: working tree was dirty but nothing staged — check .gitignore`,
-      'WARN',
-    );
+    // Dirty tree but nothing staged usually means a too-broad `.gitignore`
+    // swallowed the edits. Surface it so the run shows why nothing got merged.
+    await log('working tree was dirty but nothing staged — check .gitignore', 'WARN');
   }
   if (hasStaged) {
     await git(
@@ -79,11 +72,7 @@ export async function mergeWorktreeActivity(input: MergeWorktreeInput): Promise<
     git(['rev-parse', 'HEAD'], { cwd: targetWorkspacePath }).then((s) => s.trim()),
   ]);
   if (sourceHead === targetHead) {
-    await writeSystemLog(
-      runId,
-      targetNodeName,
-      `merge ${sourceNodeName} → ${targetNodeName}: no new commits, skipping`,
-    );
+    await log('no new commits, skipping');
     return;
   }
 
@@ -117,23 +106,5 @@ async function stagedChangesExist(cwd: string): Promise<boolean> {
     return false;
   } catch {
     return true;
-  }
-}
-
-async function isGitWorktree(cwd: string): Promise<boolean> {
-  try {
-    const out = await git(['rev-parse', '--is-inside-work-tree'], { cwd });
-    return out.trim() === 'true';
-  } catch {
-    return false;
-  }
-}
-
-async function workingTreeDirty(cwd: string): Promise<boolean> {
-  try {
-    const out = await git(['status', '--porcelain'], { cwd });
-    return out.trim().length > 0;
-  } catch {
-    return false;
   }
 }

@@ -74,11 +74,11 @@ export async function clearConduitFolder(workspacePath: string): Promise<void> {
  * upstream's handoff summary. Best-effort; no upstream `.conduit/` is a no-op.
  */
 export async function cloneConduitFolder(
-  fromWorkspacePath: string,
-  toWorkspacePath: string,
+  sourceWorkspacePath: string,
+  targetWorkspacePath: string,
 ): Promise<void> {
-  const src = path.join(fromWorkspacePath, CONDUIT_DIR);
-  const dst = path.join(toWorkspacePath, CONDUIT_DIR);
+  const src = path.join(sourceWorkspacePath, CONDUIT_DIR);
+  const dst = path.join(targetWorkspacePath, CONDUIT_DIR);
   try {
     await fs.cp(src, dst, { recursive: true, errorOnExist: false, force: true });
   } catch (err) {

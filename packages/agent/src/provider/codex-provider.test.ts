@@ -125,9 +125,6 @@ describe('CodexProvider', () => {
         systemPrompt: '',
         mcpServers: [],
         workspacePath: '/runs/r1/Dev',
-        // The bare clone path lives outside the workspace dir; without
-        // forwarding this list every `git commit` from a worktree fails with
-        // `Read-only file system` on `.git/index.lock`.
         additionalDirectories: ['/runs/r1', '/home/u/.conduit/base-clones'],
         webSearch: false,
         constraints: {},

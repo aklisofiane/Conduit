@@ -73,10 +73,8 @@ export class CodexProvider implements AgentProvider {
         // SDK defaults (read-only) are incompatible with repo-clone / ticket-branch
         // workflows where the agent is expected to commit and edit.
         sandboxMode: 'workspace-write',
-        // The bare clone (where worktree indexes live) sits outside
-        // `workingDirectory`. Without forwarding `additionalDirectories`, every
-        // `git add`/`git commit` from the agent fails with `Read-only file
-        // system` on `.git/index.lock`.
+        // Forwarded so the sandbox permits writes outside `workingDirectory`
+        // (e.g. the bare clone backing a worktree). See run-agent-node.ts.
         additionalDirectories: req.additionalDirectories,
         skipGitRepoCheck: true,
         approvalPolicy: 'never',
