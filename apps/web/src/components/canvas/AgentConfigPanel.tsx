@@ -127,9 +127,12 @@ export function AgentConfigPanel({
               <select
                 className="field-input"
                 value={agent.provider}
-                onChange={(e) =>
-                  onChange({ provider: e.target.value as AgentConfig['provider'] })
-                }
+                onChange={(e) => {
+                  const provider = e.target.value as AgentConfig['provider'];
+                  const models = modelsFor(provider);
+                  const model = models.includes(agent.model) ? agent.model : models[0];
+                  onChange({ provider, model });
+                }}
               >
                 <option value="claude">Claude</option>
                 <option value="codex">Codex</option>
