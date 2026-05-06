@@ -97,7 +97,86 @@ describe('WorkspaceManager retry idempotency', () => {
     expect(second.head).toBe(first.head);
     await expect(fs.access(path.join(second.path, 'wip.txt'))).rejects.toThrow();
   });
+
+  it('cleanupRun unregisters worktrees from the bare clone, not just the dir', async () => {
+    const manager = new WorkspaceManager();
+    const runId = 'run-cleanup-worktrees';
+    const store = makeFakeStore();
+
+    const ws = await manager.resolve({
+      runId,
+      nodeName: 'Dev',
+      spec: { kind: 'ticket-branch' },
+      connection,
+      ticket: { id: '11', title: 'Cleanup probe' },
+      ticketBranchStore: store,
+    });
+
+    const bare = path.join(conduitHome, 'base-clones', 'github', 'acme', 'shop.git');
+    expect(await listBareWorktreeNames(bare)).not.toEqual([]);
+
+    await manager.cleanupRun(runId);
+
+    // Run dir is gone, and the bare clone has no orphan worktree entry —
+    // a re-resolve on the same branch wouldn't trip over stale metadata.
+    await expect(fs.access(ws.path)).rejects.toThrow();
+    expect(await listBareWorktreeNames(bare)).toEqual([]);
+  });
+
+  it('createTrackingWorktree recovers from a stale orphan that pins the branch', async () => {
+    const manager = new WorkspaceManager();
+    const store = makeFakeStore();
+
+    // Run A creates the ticket-branch worktree, then crashes — directory
+    // and bare-clone worktree registration both leak. To make the next
+    // run hit the *create* (not *track*) path, we also delete the local
+    // branch ref to mimic a `fetch --prune` having eaten it (the branch
+    // was never pushed to the remote).
+    const runA = 'run-a-crashed';
+    const wsA = await manager.resolve({
+      runId: runA,
+      nodeName: 'Dev',
+      spec: { kind: 'ticket-branch' },
+      connection,
+      ticket: { id: '42', title: 'Stale orphan' },
+      ticketBranchStore: store,
+    });
+    const branchName = wsA.branchName!;
+    const bare = path.join(conduitHome, 'base-clones', 'github', 'acme', 'shop.git');
+    // Simulate `fetch --prune` deleting the local-only branch ref while
+    // the worktree still names it. `git update-ref -d` refuses for an
+    // in-use branch, so we drop the loose ref file directly — same end
+    // state on disk.
+    await fs.rm(path.join(bare, 'refs', 'heads', branchName), { force: true });
+
+    // Run B tries to land on the same ticket — the branch ref is gone so
+    // it falls into createTrackingWorktree, where the orphan registration
+    // from run A would normally fail the `git worktree add -b ...` call.
+    const runB = 'run-b-recovers';
+    const wsB = await manager.resolve({
+      runId: runB,
+      nodeName: 'Dev',
+      spec: { kind: 'ticket-branch' },
+      connection,
+      ticket: { id: '42', title: 'Stale orphan' },
+      ticketBranchStore: store,
+    });
+
+    expect(wsB.branchName).toBe(branchName);
+    expect(wsB.path).not.toBe(wsA.path);
+    expect(await listBareWorktreeNames(bare)).toContain(path.basename(wsB.path));
+    // Run A's directory was reaped during recovery.
+    await expect(fs.access(wsA.path)).rejects.toThrow();
+  });
 });
+
+async function listBareWorktreeNames(bare: string): Promise<string[]> {
+  try {
+    return await fs.readdir(path.join(bare, 'worktrees'));
+  } catch {
+    return [];
+  }
+}
 
 function makeFakeStore(): TicketBranchStore {
   const rows = new Map<string, TicketBranchRow>();
