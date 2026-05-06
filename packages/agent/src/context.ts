@@ -76,7 +76,7 @@ export function issueWritebackPrompt(args: {
     ``,
     `Issue: ${owner}/${repo}#${issueNumber}`,
     ``,
-    `Use the GitHub MCP tools available to you. Constraints:`,
+    `Use the gh CLI available to you. Constraints:`,
     statusLine,
     labelLine,
     noopStatusLine,
