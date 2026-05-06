@@ -1,12 +1,11 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import type { DiscoveredTool } from '@conduit/shared';
+import type { DiscoveredTool, McpTransport } from '@conduit/shared';
 import {
   introspectMcpServer,
   McpIntrospectionError,
   substituteCredentialInTransport,
 } from '@conduit/agent';
-import { PrismaService } from '../../common/prisma.service';
-import { decrypt } from '../credentials/crypto';
+import { CredentialsService } from '../credentials/credentials.service';
 import type { IntrospectMcpDto } from './dto';
 
 /**
@@ -20,10 +19,10 @@ import type { IntrospectMcpDto } from './dto';
 export class McpService {
   private readonly logger = new Logger(McpService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly credentials: CredentialsService) {}
 
   async introspect(dto: IntrospectMcpDto): Promise<DiscoveredTool[]> {
-    const transport = await this.substituteCredential(dto);
+    const transport = await this.resolveTransport(dto);
     try {
       return await introspectMcpServer(transport);
     } catch (e: unknown) {
@@ -35,17 +34,12 @@ export class McpService {
     }
   }
 
-  private async substituteCredential(dto: IntrospectMcpDto) {
-    if (!dto.connectionId) return dto.transport;
-    const conn = await this.prisma.workflowConnection.findUnique({
-      where: { id: dto.connectionId },
-      include: { credential: true },
-    });
-    if (!conn || (dto.workflowId && conn.workflowId !== dto.workflowId)) {
-      throw new BadRequestException(
-        `Connection ${dto.connectionId} not found${dto.workflowId ? ` on workflow ${dto.workflowId}` : ''}`,
-      );
-    }
-    return substituteCredentialInTransport(dto.transport, decrypt(conn.credential.secret));
+  private async resolveTransport(dto: IntrospectMcpDto): Promise<McpTransport> {
+    if (!dto.connectionId || !dto.workflowId) return dto.transport;
+    const { token } = await this.credentials.getConnectionBinding(
+      dto.workflowId,
+      dto.connectionId,
+    );
+    return substituteCredentialInTransport(dto.transport, token);
   }
 }

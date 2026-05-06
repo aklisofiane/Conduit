@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import {
   PROVIDER_MODELS,
   type AgentEvent,
@@ -50,16 +51,21 @@ export class CodexProvider implements AgentProvider {
     const seenText = new Map<string, string>();
     const openToolCalls = new Set<string>();
     const todoSnapshots = new Map<string, number>();
-    const codexConfig = buildConfigOverrides(req.mcpServers);
+    const plan = planCodexConfig(req.mcpServers);
     let thread: CodexThread | undefined;
     let firstTurn = true;
 
     const ensureThread = async (): Promise<CodexThread> => {
       if (thread) return thread;
+      // Apply env bindings here (not in startSession) so a session that's
+      // never run leaves no process.env entries behind. The activity wraps
+      // the first run() in a try/finally that calls dispose, so writes are
+      // guaranteed to be cleaned up.
+      for (const { key, value } of plan.envBindings) process.env[key] = value;
       const { Codex } = await loadCodexSdk();
       const codex = new Codex({
         apiKey: this.opts.apiKey,
-        config: codexConfig.config,
+        config: plan.config,
       });
       thread = codex.startThread({
         model: req.model,
@@ -102,7 +108,7 @@ export class CodexProvider implements AgentProvider {
       // Codex SDK has no explicit thread teardown — dropping the reference
       // is sufficient. Kept for symmetry with other providers.
       thread = undefined;
-      for (const key of codexConfig.envKeys) delete process.env[key];
+      for (const { key } of plan.envBindings) delete process.env[key];
     };
 
     return { run, dispose };
@@ -151,32 +157,46 @@ export function __setCodexSdkLoaderForTests(
   _sdk = undefined;
 }
 
-/**
- * The Codex CLI consumes MCP config via TOML-flattened `--config` overrides.
- * The SDK's `config` option accepts a nested object and flattens it.
- * Shape mirrors Codex's `mcp_servers.<name> = { ... }` config block.
- */
-function buildConfigOverrides(mcpServers: readonly ResolvedMcpServer[]): {
-  config: Record<string, unknown> | undefined;
-  envKeys: string[];
-} {
-  if (mcpServers.length === 0) return { config: undefined, envKeys: [] };
-  const entries: Record<string, unknown> = {};
-  const envKeys: string[] = [];
-  const sessionPart = Math.random().toString(36).slice(2, 10).toUpperCase();
-  for (const [index, s] of mcpServers.entries()) {
-    const envPrefix = `CONDUIT_CODEX_MCP_${sessionPart}_${index}_${sanitizeEnvPart(s.id)}`;
-    const config = serverToCodexConfig(s, envPrefix);
-    entries[s.id] = config.config;
-    envKeys.push(...config.envKeys);
-  }
-  return { config: { mcp_servers: entries }, envKeys };
+interface EnvBinding {
+  key: string;
+  value: string;
 }
 
-function serverToCodexConfig(
+/**
+ * Plans the Codex SDK `config` block for the given MCP servers, plus any
+ * env-var bindings the caller must apply before constructing the SDK.
+ *
+ * Codex's remote-MCP transport accepts auth only via `bearer_token_env_var`
+ * (not inline headers), so a `Bearer <token>` header gets stashed under a
+ * unique env-var name and the name is passed through `bearer_token_env_var`.
+ * Bindings are returned rather than applied so callers control the lifetime
+ * (apply right before SDK construction; delete on dispose).
+ */
+function planCodexConfig(mcpServers: readonly ResolvedMcpServer[]): {
+  config: Record<string, unknown> | undefined;
+  envBindings: EnvBinding[];
+} {
+  if (mcpServers.length === 0) return { config: undefined, envBindings: [] };
+  const sessionNonce = randomBytes(4).toString('hex').toUpperCase();
+  const entries: Record<string, unknown> = {};
+  const envBindings: EnvBinding[] = [];
+  for (const [index, server] of mcpServers.entries()) {
+    const envPrefix = `CONDUIT_CODEX_MCP_${sessionNonce}_${index}_${sanitizeEnvPart(server.id)}`;
+    const planned = planServer(server, envPrefix);
+    entries[server.id] = planned.config;
+    if (planned.envBinding) envBindings.push(planned.envBinding);
+  }
+  return { config: { mcp_servers: entries }, envBindings };
+}
+
+function planServer(
   server: ResolvedMcpServer,
   envPrefix: string,
-): { config: Record<string, unknown>; envKeys: string[] } {
+): { config: Record<string, unknown>; envBinding?: EnvBinding } {
+  const common = {
+    ...(server.allowedTools?.length ? { enabled_tools: server.allowedTools } : {}),
+    default_tools_approval_mode: 'approve' as const,
+  };
   const t = server.transport;
   if (t.kind === 'stdio') {
     return {
@@ -184,47 +204,34 @@ function serverToCodexConfig(
         command: t.command,
         ...(t.args?.length ? { args: t.args } : {}),
         ...(t.env && Object.keys(t.env).length ? { env: t.env } : {}),
-        ...(server.allowedTools?.length ? { enabled_tools: server.allowedTools } : {}),
-        default_tools_approval_mode: 'approve',
+        ...common,
       },
-      envKeys: [],
     };
   }
-  const { headers, bearerTokenEnvVar, envKeys } = codexRemoteAuth(t.headers, envPrefix);
+  const bearer = extractBearer(t.headers, envPrefix);
   return {
     config: {
       url: t.url,
-      ...(headers && Object.keys(headers).length ? { headers } : {}),
-      ...(bearerTokenEnvVar ? { bearer_token_env_var: bearerTokenEnvVar } : {}),
-      ...(server.allowedTools?.length ? { enabled_tools: server.allowedTools } : {}),
-      default_tools_approval_mode: 'approve',
+      ...(bearer.headers && Object.keys(bearer.headers).length ? { headers: bearer.headers } : {}),
+      ...(bearer.envBinding ? { bearer_token_env_var: bearer.envBinding.key } : {}),
+      ...common,
     },
-    envKeys,
+    envBinding: bearer.envBinding,
   };
 }
 
-function codexRemoteAuth(
+function extractBearer(
   headers: Record<string, string> | undefined,
   envPrefix: string,
-): {
-  headers: Record<string, string> | undefined;
-  bearerTokenEnvVar: string | undefined;
-  envKeys: string[];
-} {
-  if (!headers) return { headers, bearerTokenEnvVar: undefined, envKeys: [] };
-  const out = { ...headers };
-  const authKey = Object.keys(out).find((k) => k.toLowerCase() === 'authorization');
-  const authValue = authKey ? out[authKey] : undefined;
-  const match = authValue?.match(/^Bearer\s+(.+)$/i);
-  if (!authKey || !match) return { headers, bearerTokenEnvVar: undefined, envKeys: [] };
-
-  const envKey = `${envPrefix}_BEARER_TOKEN`;
-  process.env[envKey] = match[1]!;
-  delete out[authKey];
+): { headers: Record<string, string> | undefined; envBinding?: EnvBinding } {
+  if (!headers) return { headers };
+  const authKey = Object.keys(headers).find((k) => k.toLowerCase() === 'authorization');
+  const match = authKey ? headers[authKey]?.match(/^Bearer\s+(.+)$/i) : undefined;
+  if (!authKey || !match) return { headers };
+  const { [authKey]: _drop, ...rest } = headers;
   return {
-    headers: Object.keys(out).length ? out : undefined,
-    bearerTokenEnvVar: envKey,
-    envKeys: [envKey],
+    headers: Object.keys(rest).length ? rest : undefined,
+    envBinding: { key: `${envPrefix}_BEARER_TOKEN`, value: match[1]! },
   };
 }
 

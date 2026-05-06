@@ -9,9 +9,14 @@ import { mcpTransportSchema } from '@conduit/shared';
  * because the placeholder fails their `Authorization` format check. The
  * stdio path can also rely on this for env substitution.
  */
-export const introspectMcpDtoSchema = z.object({
-  transport: mcpTransportSchema,
-  workflowId: z.string().min(1).optional(),
-  connectionId: z.string().min(1).optional(),
-});
+export const introspectMcpDtoSchema = z
+  .object({
+    transport: mcpTransportSchema,
+    workflowId: z.string().min(1).optional(),
+    connectionId: z.string().min(1).optional(),
+  })
+  .refine((v) => !v.connectionId || v.workflowId, {
+    message: 'workflowId is required when connectionId is set',
+    path: ['workflowId'],
+  });
 export type IntrospectMcpDto = z.infer<typeof introspectMcpDtoSchema>;
