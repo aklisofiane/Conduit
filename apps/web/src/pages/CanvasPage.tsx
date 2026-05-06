@@ -27,6 +27,7 @@ import { useParams } from 'react-router-dom';
 import {
   DEFAULT_MODEL,
   type AgentConfig,
+  type AgentProviderId,
   type Edge,
   type WorkflowDefinition,
 } from '@conduit/shared';
@@ -227,7 +228,7 @@ function CanvasInner() {
   );
 
   const handleAddAgent = useCallback(
-    (provider: 'claude' | 'codex', position?: { x: number; y: number }) => {
+    (provider: AgentProviderId, position?: { x: number; y: number }) => {
       if (!draft) return;
       const name = uniqueNodeName(draft, provider === 'claude' ? 'Agent' : 'Codex');
       const agentId = `agent_${Math.random().toString(36).slice(2, 10)}`;

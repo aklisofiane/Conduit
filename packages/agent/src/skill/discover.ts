@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import type { AgentProviderId, SkillProviderTag } from '@conduit/shared';
 
 /**
  * A skill discovered on disk via its `SKILL.md` front-matter. Kept flat so
@@ -17,7 +18,7 @@ export interface DiscoveredSkill {
   /** Where the skill was discovered — `repo` (inside a user repo) or `worker` (host-level). */
   source: 'repo' | 'worker';
   /** Which provider's directory convention picked this up. */
-  provider: 'claude' | 'codex' | 'both';
+  provider: SkillProviderTag;
 }
 
 export interface DiscoverOptions {
@@ -39,7 +40,7 @@ const REPO_ROOTS = [
 export async function discoverSkills(opts: DiscoverOptions = {}): Promise<DiscoveredSkill[]> {
   const out: DiscoveredSkill[] = [];
   const seen = new Map<string, DiscoveredSkill>();
-  const roots: Array<{ base: string; source: 'repo' | 'worker'; provider: 'claude' | 'codex' }> = [];
+  const roots: Array<{ base: string; source: 'repo' | 'worker'; provider: AgentProviderId }> = [];
 
   const home = os.homedir();
   for (const r of WORKER_ROOTS) {
@@ -78,7 +79,7 @@ const FRONT_MATTER_READ_BYTES = 2048;
 async function scanRoot(
   base: string,
   source: 'repo' | 'worker',
-  provider: 'claude' | 'codex',
+  provider: AgentProviderId,
 ): Promise<DiscoveredSkill[]> {
   const entries = await fs.readdir(base, { withFileTypes: true }).catch(() => []);
   const dirs = entries.filter((e) => e.isDirectory());

@@ -1,8 +1,9 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import type { AgentProviderId } from '@conduit/shared';
 import type { DiscoveredSkill } from './discover';
 
-const DEST_BY_PROVIDER: Record<'claude' | 'codex', string> = {
+const DEST_BY_PROVIDER: Record<AgentProviderId, string> = {
   claude: '.claude/skills',
   codex: '.agents/skills',
 };
@@ -15,7 +16,7 @@ const DEST_BY_PROVIDER: Record<'claude' | 'codex', string> = {
 export async function installSkillsIntoWorkspace(
   workspacePath: string,
   skills: DiscoveredSkill[],
-  providerId: 'claude' | 'codex',
+  providerId: AgentProviderId,
 ): Promise<void> {
   const dest = path.join(workspacePath, DEST_BY_PROVIDER[providerId]);
   const compatible = skills.filter(

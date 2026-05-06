@@ -6,6 +6,7 @@ import type {
   NodeType,
   RunStatus,
   RunUpdateMessage,
+  SkillProviderTag,
   WorkflowDefinition,
 } from '@conduit/shared';
 import type { TemplateSummary } from '@conduit/shared/template';
@@ -144,7 +145,7 @@ export interface DiscoveredSkill {
   description: string;
   path: string;
   source: 'repo' | 'worker';
-  provider: 'claude' | 'codex' | 'both';
+  provider: SkillProviderTag;
 }
 
 export type { AgentEvent, DiscoveredTool, RunStatus, NodeType, ExecutionLogKind };
