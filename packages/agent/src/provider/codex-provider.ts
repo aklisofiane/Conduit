@@ -67,9 +67,10 @@ export class CodexProvider implements AgentProvider {
         sandboxMode: 'workspace-write',
         skipGitRepoCheck: true,
         approvalPolicy: 'never',
-        // SDK default `webSearchMode` is `cached` when enabled — adequate for
-        // research without paying live-fetch cost. Live mode is a follow-up.
-        webSearchEnabled: req.webSearch,
+        // Cached mode reuses prior search results when available; live mode
+        // pays per-fetch cost. Start with cached — promote to live behind a
+        // toggle if research workflows need fresh hits.
+        webSearchMode: req.webSearch ? 'cached' : 'disabled',
       });
       return thread;
     };

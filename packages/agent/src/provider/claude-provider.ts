@@ -56,8 +56,7 @@ export class ClaudeProvider implements AgentProvider {
           additionalDirectories: req.additionalDirectories,
           mcpServers,
           canUseTool,
-          // The `claude_code` preset includes WebSearch/WebFetch by default.
-          // Strip them when the agent didn't opt into web access.
+          // `claude_code` preset enables WebSearch/WebFetch — strip them when off.
           disallowedTools: req.webSearch ? undefined : ['WebSearch', 'WebFetch'],
           maxTurns: req.constraints.maxTurns,
           abortController: abortControllerFromSignal(signal),

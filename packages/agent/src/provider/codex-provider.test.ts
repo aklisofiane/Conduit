@@ -216,7 +216,7 @@ describe('CodexProvider', () => {
         workspacePath: '/tmp',
         webSearch: true,
         constraints: {},
-      } as never,
+      },
       new AbortController().signal,
     );
     for await (const e of session.run('')) {

@@ -108,7 +108,7 @@ describe('ClaudeProvider', () => {
         workspacePath: '/tmp/x',
         webSearch: false,
         constraints: {},
-      } as never,
+      },
       new AbortController().signal,
     );
     for await (const _ of session.run('hi')) void _;
@@ -127,7 +127,7 @@ describe('ClaudeProvider', () => {
         workspacePath: '/tmp/x',
         webSearch: true,
         constraints: {},
-      } as never,
+      },
       new AbortController().signal,
     );
     for await (const _ of session.run('hi')) void _;

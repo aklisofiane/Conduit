@@ -186,13 +186,13 @@ export function AgentConfigPanel({
           </Field>
 
           <Field label="Web search">
-            <label className="flex cursor-pointer items-center gap-2 font-sans text-[12px] text-[var(--color-text)]">
+            <label className="flex cursor-pointer items-center gap-2 font-mono text-[12px]">
               <input
                 type="checkbox"
-                checked={agent.webSearch ?? false}
+                checked={agent.webSearch}
                 onChange={(e) => onChange({ webSearch: e.target.checked })}
               />
-              Enable
+              <span>Enable</span>
             </label>
           </Field>
 
