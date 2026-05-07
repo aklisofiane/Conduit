@@ -2,6 +2,11 @@ node_modules
 **/node_modules
 **/dist
 **/.turbo
+# Host-side incremental-build state. If these leak into the agent-runner
+# build context, the container's `tsc --build` decides everything is
+# already compiled and emits nothing — dist never materialises and the
+# runtime stage's COPY fails with `dist: not found`.
+**/*.tsbuildinfo
 .git
 .next
 coverage

@@ -73,4 +73,14 @@ COPY --from=builder /build/packages/agent/package.json ./node_modules/@conduit/a
 COPY --from=builder /build/apps/agent-runner/dist ./dist
 COPY --from=builder /build/apps/agent-runner/package.json ./package.json
 
+# A writable HOME for the runner. The container runs as the host worker UID
+# (set per-spawn, not at image build time), so we cannot pre-chown to a
+# specific user — instead the directory is mode 0777 sticky so any UID can
+# write here. Pre-creating `.codex/` keeps codex's auth.json bind mount
+# (`oauth-mount` auth) from materialising a root-owned parent directory that
+# would block sibling writes (session log, telemetry, refreshed tokens).
+RUN mkdir -p /home/runner/.codex \
+ && chmod 1777 /home/runner /home/runner/.codex
+ENV HOME=/home/runner
+
 ENTRYPOINT ["node", "/opt/agent-runner/dist/main.js"]

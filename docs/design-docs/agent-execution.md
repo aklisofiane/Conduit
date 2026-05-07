@@ -156,7 +156,7 @@ The orchestrator activity calls `resolveRunnerSpawner().spawn(req, signal)`. Pha
 | Mode | What it does | When |
 |---|---|---|
 | `api-key` *(default)* | Credentials travel only through `RunnerRequest.provider`. No host credential files mounted. | Production / shared environments |
-| `oauth-mount` | Additionally bind-mounts **only** `~/.codex/auth.json` (Codex has no `setup-token` flow yet) at the same absolute path; sets `HOME` so the SDK finds it. Worker logs a boot warning. A compromised agent can read or rewrite the host file. | Local dev only |
+| `oauth-mount` | Additionally bind-mounts **only** the host's `~/.codex/auth.json` at `/home/runner/.codex/auth.json` inside the container (Codex has no `setup-token` flow yet). Worker logs a boot warning. A compromised agent can read or rewrite the host file. | Local dev only |
 
 Claude OAuth uses `CLAUDE_CODE_OAUTH_TOKEN` forwarded through the protocol — no mount needed, regardless of mode.
 

@@ -135,7 +135,10 @@ describe('CodexProvider', () => {
 
     expect(threadOptions).toMatchObject({
       workingDirectory: '/runs/r1/Dev',
-      sandboxMode: 'workspace-write',
+      // The runner container is the sandbox; codex's bubblewrap wrapper
+      // can't run inside Docker's default seccomp profile, so we delegate
+      // shell-command isolation to the container itself.
+      sandboxMode: 'danger-full-access',
       additionalDirectories: ['/runs/r1', '/home/u/.conduit/base-clones'],
     });
   });

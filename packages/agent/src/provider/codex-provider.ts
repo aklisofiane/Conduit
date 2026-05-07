@@ -70,11 +70,18 @@ export class CodexProvider implements AgentProvider {
       thread = codex.startThread({
         model: req.model,
         workingDirectory: req.workspacePath,
-        // SDK defaults (read-only) are incompatible with repo-clone / ticket-branch
-        // workflows where the agent is expected to commit and edit.
-        sandboxMode: 'workspace-write',
-        // Forwarded so the sandbox permits writes outside `workingDirectory`
-        // (e.g. the bare clone backing a worktree). See run-agent-node.ts.
+        // The runner container is the sandbox: non-root UID, only the run
+        // dir + bare clone bind-mounted, default bridge networking. Codex's
+        // own per-command sandbox (`workspace-write`) wraps every shell call
+        // in `bubblewrap`, which needs `unshare(CLONE_NEWUSER)` — blocked
+        // by Docker's default seccomp profile, so the agent can't run any
+        // shell command. `danger-full-access` skips that wrapper; the
+        // effective trust boundary is the same because the container caps
+        // all writes to the mounted paths anyway.
+        sandboxMode: 'danger-full-access',
+        // Forwarded for parity with non-container deployments (the SDK
+        // ignores it under `danger-full-access`); the bare clone is already
+        // bind-mounted at the same absolute path, so writes resolve.
         additionalDirectories: req.additionalDirectories,
         skipGitRepoCheck: true,
         approvalPolicy: 'never',

@@ -11,6 +11,14 @@ import type { RunnerHandle, RunnerSpawner } from './spawner';
 export type { AgentAuthMode };
 
 /**
+ * Writable HOME baked into the runner image (see `apps/agent-runner/Dockerfile`).
+ * Codex (and other CLIs the agent reaches for) write to `$HOME` at startup
+ * — RC files for PATH updates, `~/.codex/` for session/log state — and abort
+ * if it isn't writable. Same path inside every runner container.
+ */
+const HOME_IN_CONTAINER = '/home/runner';
+
+/**
  * Phase-1 implementation of `RunnerSpawner`. Shells out to `docker run --rm`
  * with bind mounts wired so the agent inside the container reads/writes the
  * exact host paths the orchestrator already resolved.
@@ -63,11 +71,6 @@ export class LocalDockerSpawner implements RunnerSpawner {
       uid,
       gid,
       authMounts,
-      // The bind mounts use the host's absolute paths; setting HOME inside
-      // the container so `os.homedir()` (which the SDKs call) resolves to
-      // the same path is what makes them findable. No-op when there are no
-      // mounts to find.
-      homeOverride: authMode === 'oauth-mount' ? os.homedir() : undefined,
       testMounts,
       // Test-mode env passthrough is gated on `testMounts` being non-empty
       // — the same signal that says "this run has the trust boundary
@@ -122,19 +125,13 @@ export interface BuildArgsInput {
   uid: number;
   gid: number;
   /**
-   * Extra read-write bind mounts (host paths) for OAuth credential files
-   * when `CONDUIT_AGENT_AUTH=oauth-mount`. Same-path mounts only — host
-   * path == container path so the SDK finds them via `os.homedir()` after
-   * `homeOverride` aligns the in-container HOME with the host's. Empty
-   * under `api-key` mode.
+   * Read-write bind mounts for OAuth credential files when
+   * `CONDUIT_AGENT_AUTH=oauth-mount`. The source is a host path; the target
+   * is rewritten under the in-container HOME (`/home/runner/.codex/...`)
+   * so the SDK finds it via `os.homedir()` while host paths stay private to
+   * the host. Empty under `api-key` mode.
    */
-  authMounts: string[];
-  /**
-   * Sets the container's HOME env var. Required when `authMounts` is
-   * non-empty so `os.homedir()` inside the runner returns the same
-   * absolute path as the bind mount source. Undefined when not needed.
-   */
-  homeOverride: string | undefined;
+  authMounts: AuthMount[];
   /**
    * Test-only same-path mounts driven by `CONDUIT_RUNNER_TEST_MOUNTS`. The
    * e2e harness uses this to make per-test scaffolding (test remote bare
@@ -149,6 +146,13 @@ export interface BuildArgsInput {
    * "test mode is on" signal. Empty in production runs.
    */
   forwardedEnv: Record<string, string>;
+}
+
+export interface AuthMount {
+  /** Host path; bind-mount source. */
+  source: string;
+  /** Path inside the container; bind-mount target. Must live under `HOME_IN_CONTAINER`. */
+  target: string;
 }
 
 /**
@@ -178,15 +182,18 @@ export function buildDockerArgs(input: BuildArgsInput): string[] {
   if (input.bareClone) {
     args.push('-v', `${input.bareClone}:${input.bareClone}:rw`);
   }
-  for (const p of input.authMounts) {
-    args.push('-v', `${p}:${p}:rw`);
+  for (const m of input.authMounts) {
+    args.push('-v', `${m.source}:${m.target}:rw`);
   }
   for (const p of input.testMounts) {
     args.push('-v', `${p}:${p}:rw`);
   }
-  if (input.homeOverride !== undefined) {
-    args.push('-e', `HOME=${input.homeOverride}`);
-  }
+  // HOME is always set to the writable directory baked into the image.
+  // Without this, codex aborts trying to write to `$HOME/.codex/` on
+  // startup. The image's `ENV HOME=...` already covers the empty-env case;
+  // setting it explicitly here keeps the contract visible at the call site
+  // and unaffected by future base-image changes.
+  args.push('-e', `HOME=${HOME_IN_CONTAINER}`);
   for (const [k, v] of Object.entries(input.forwardedEnv)) {
     args.push('-e', `${k}=${v}`);
   }
@@ -231,16 +238,19 @@ function testModeForwardedEnv(): Record<string, string> {
  * not via a bind mount. Codex doesn't (yet) expose an equivalent token,
  * so its OAuth flow still requires its on-disk `auth.json`.
  *
- * Returns `~/.codex/auth.json` if it exists on the host, else nothing.
- * Skipping a missing file means a user who hasn't logged into Codex can
- * still run Claude; the SDK will 401 if Codex is then invoked, which is
- * the same failure mode as the api-key path.
+ * Returns `~/.codex/auth.json` (host) mapped to `/home/runner/.codex/auth.json`
+ * (container) if the host file exists, else nothing. Skipping a missing
+ * file means a user who hasn't logged into Codex can still run Claude;
+ * the SDK will 401 if Codex is then invoked, which is the same failure
+ * mode as the api-key path.
  */
-async function resolveOauthMounts(): Promise<string[]> {
+async function resolveOauthMounts(): Promise<AuthMount[]> {
   const codexAuth = path.join(os.homedir(), '.codex', 'auth.json');
   try {
     await fs.stat(codexAuth);
-    return [codexAuth];
+    return [
+      { source: codexAuth, target: path.join(HOME_IN_CONTAINER, '.codex', 'auth.json') },
+    ];
   } catch {
     return [];
   }

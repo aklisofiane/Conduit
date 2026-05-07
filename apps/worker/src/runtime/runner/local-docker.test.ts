@@ -21,7 +21,6 @@ describe('buildDockerArgs', () => {
     uid: 1000,
     gid: 1000,
     authMounts: [],
-    homeOverride: undefined,
     testMounts: [],
     forwardedEnv: {},
   };
@@ -76,9 +75,18 @@ describe('buildDockerArgs', () => {
     expect(args).toContain('-i');
   });
 
-  it('omits HOME and any auth bind mounts under api-key mode (default)', () => {
+  it('always sets HOME to the in-container writable dir, even under api-key mode', () => {
+    // codex aborts on startup if `$HOME` is unset or unwritable (it tries to
+    // touch `~/.codex/`). The image bakes `/home/runner` mode 1777; the
+    // spawner pins `HOME` to it explicitly so the contract survives base-
+    // image changes.
     const args = buildDockerArgs(base);
-    expect(args.some((a) => a.startsWith('HOME='))).toBe(false);
+    const envs = args.flatMap((a, i) => (args[i - 1] === '-e' ? [a] : []));
+    expect(envs).toContain('HOME=/home/runner');
+  });
+
+  it('omits any auth bind mounts under api-key mode (default)', () => {
+    const args = buildDockerArgs(base);
     const mounts = args.flatMap((a, i) => (args[i - 1] === '-v' ? [a] : []));
     expect(mounts).toEqual(['/home/u/.conduit/runs/r1:/home/u/.conduit/runs/r1:rw']);
   });
@@ -105,20 +113,22 @@ describe('buildDockerArgs', () => {
     expect(envs).toContain('CONDUIT_STUB_SCRIPT=/tmp/s.json');
   });
 
-  it('adds the codex auth.json mount and HOME under oauth-mount mode', () => {
+  it('mounts the host codex auth.json under the in-container HOME under oauth-mount mode', () => {
     // Claude is intentionally absent — its OAuth path is the
     // `CLAUDE_CODE_OAUTH_TOKEN` env var carried in `RunnerRequest`, not a
-    // bind mount. Only Codex still needs its on-disk auth.json.
+    // bind mount. Only Codex still needs its on-disk auth.json. The mount
+    // target is rewritten under `/home/runner/.codex/` so the SDK finds it
+    // via `os.homedir()` while the host path stays private to the host.
     const args = buildDockerArgs({
       ...base,
-      authMounts: ['/home/u/.codex/auth.json'],
-      homeOverride: '/home/u',
+      authMounts: [
+        { source: '/home/u/.codex/auth.json', target: '/home/runner/.codex/auth.json' },
+      ],
     });
     const mounts = args.flatMap((a, i) => (args[i - 1] === '-v' ? [a] : []));
-    expect(mounts).toContain('/home/u/.codex/auth.json:/home/u/.codex/auth.json:rw');
+    expect(mounts).toContain('/home/u/.codex/auth.json:/home/runner/.codex/auth.json:rw');
     expect(mounts.some((m) => m.includes('.claude'))).toBe(false);
-    const envIdx = args.indexOf('-e');
-    expect(envIdx).toBeGreaterThan(-1);
-    expect(args[envIdx + 1]).toBe('HOME=/home/u');
+    const envs = args.flatMap((a, i) => (args[i - 1] === '-e' ? [a] : []));
+    expect(envs).toContain('HOME=/home/runner');
   });
 });
