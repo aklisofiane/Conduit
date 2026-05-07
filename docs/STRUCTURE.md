@@ -5,7 +5,7 @@ Where things live. Read [ARCHITECTURE.md](./ARCHITECTURE.md) for *why* first; th
 ## Top-level
 
 ```
-apps/            runnable services (api, web, worker)
+apps/            runnable services (api, web, worker, agent-runner)
 packages/        libraries (shared, database, agent)
 docs/            spec — INDEX.md for read order
 templates/       bundled workflow templates (JSON) — see docs/design-docs/templates.md
@@ -79,9 +79,42 @@ src/
                                        `CONDUIT_TEST_REMOTE_BASE` for E2E local bare repos — and
                                        `ticket-branch-store.ts`, the Prisma-backed `TicketBranchStore`
                                        adapter that owns slug derivation on first upsert)
+  runtime/runner/                      runner-spawn primitive used by `runAgentNode` —
+                                       `local-docker.ts` (LocalDockerSpawner: builds the
+                                       `docker run` argv, pumps stdout via `json-line-iterator`,
+                                       enforces a stdout-liveness timeout, kills via
+                                       `docker kill <name>` so the container is reaped before the
+                                       call returns), `docker-admin.ts` (`dockerPreflight` +
+                                       `sweepOrphans` — both invoked from `main.ts`),
+                                       `auth-mode.ts` (`CONDUIT_AGENT_AUTH` parser),
+                                       `json-line-iterator.ts` (line-buffered RunnerEvent stream
+                                       with an 8 MiB per-line cap), `resolve.ts`
+                                       (image-tag picker + `setRunnerSpawnerForTest` hook),
+                                       `spawner.ts` (RunnerSpawner / RunnerHandle interface)
 ```
 
 If it touches I/O, it belongs under `activities/` or `runtime/`, never `workflows/`.
+
+## apps/agent-runner (per-run sandbox container)
+
+```
+Dockerfile                             two-stage image — builder runs `tsc` for shared+agent+runner
+                                       and `npm prune --omit=dev`; runtime layers `git`, `gh`, `jq`,
+                                       `ripgrep`, `fd-find`, plus `make`/`python3`/`g++`/`pkg-config`
+                                       for native module builds during agent-driven `npm install`.
+                                       MCP packages and user project deps are NOT baked in — fetched
+                                       at run time
+src/
+  main.ts                              one process per agent node — reads a `RunnerRequest` JSON
+                                       object on stdin, drives turn 1 (main) → optional 2a (issue
+                                       writeback) → 2b (final summary), forwards each `AgentEvent`
+                                       as `{ kind: 'agent', event }` on stdout, then emits a terminal
+                                       `exit` carrying head/changedFiles/conduitSummary. Heartbeats
+                                       every 30s independent of agent flow
+  protocol.test.ts                     guards the JSON-line wire format
+```
+
+Image tag resolution: `CONDUIT_RUNNER_IMAGE` (CI sets a git-sha tag), defaults to `agent-runner:dev`. The workspace `build` script chains `tsc` + `docker build` so any monorepo build keeps `agent-runner:dev` current; `npm run docker:agent-runner:build` forces a clean rebuild from the repo root. `pretest:e2e` builds `@conduit/agent-runner` alongside api+worker so e2e exercises the real image.
 
 ## apps/web (React + Vite)
 
@@ -155,6 +188,11 @@ src/
   webhook/    HMAC signature verify + GitHub event normalizer  backend-only subpath
               (handles issues.opened / pull_request.opened / issue_comment.created /
               projects_v2_item.edited → board.column.changed)
+  runner/     Worker ↔ agent-runner JSON-line protocol — `RunnerRequest` (stdin payload:
+              run identity, provider creds, fully-resolved `AgentRequest`, pre-rendered prompts
+              for the three turns) and `RunnerEvent` (stdout: `agent` / `system` / `heartbeat`
+              / terminal `exit ok|err`). Transport-agnostic; both apps/worker and apps/agent-runner
+              import from this subpath. See [agent-execution.md](./design-docs/agent-execution.md#runner-container-model)
 ```
 
 `crypto` and `webhook` pull `node:crypto` — they're exposed as subpath exports only (not re-exported from the root barrel) so Vite can tree-shake them out of the web bundle.

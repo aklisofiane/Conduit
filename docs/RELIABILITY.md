@@ -6,7 +6,10 @@ Temporal carries most of the load. This doc covers what Conduit does on top of i
 
 | Failure | Behavior |
 |---|---|
-| Worker process crash mid-run | Temporal re-schedules in-flight activities on another worker. Agent node activity re-runs from scratch for the crashed node; completed nodes don't re-run. |
+| Worker process crash mid-run | Temporal re-schedules in-flight activities on another worker. Agent node activity re-runs from scratch for the crashed node; completed nodes don't re-run. The replacement worker's startup `sweepOrphans` kills any `agent-runner` containers labelled with runs already in a terminal state. |
+| `agent-runner` container crash / OOM kill / image error | Runner exits without emitting a terminal `exit` event. The orchestrator's stdout-liveness check (default 60s) or the docker process's exit fires a synthetic `exit ok=false` carrying the container's stderr tail; the activity fails with that message. Temporal retries per the policy below — a fresh container is spawned. |
+| Runner stdout silent past liveness threshold | `LocalDockerSpawner` runs `docker kill <name>` and surfaces a synthetic exit event. Belt and suspenders against a wedged SDK iterator. |
+| Docker daemon unreachable at worker boot | `dockerPreflight()` throws with a clear remediation message; the worker exits before joining the task queue, so no run is silently stuck. |
 | Agent provider API error (rate limit, 5xx) | Activity retries with exponential backoff (Temporal retry policy). Max 3 attempts for transient, 0 for invalid-request errors. |
 | MCP server crash | Activity fails, Temporal retries. On retry, MCP servers are re-spawned fresh. |
 | MCP tool call fails (e.g. GitHub 422) | Returned to the agent as a tool result with error. The agent decides whether to retry, adapt, or give up. We do **not** retry tool calls at the runtime level — that's the agent's judgment call. |
@@ -39,7 +42,7 @@ Temporal activity retry defaults:
 
 ## Heartbeats
 
-Every `AgentEvent` emitted by a provider triggers a Temporal heartbeat. This:
+The orchestrator activity runs a 30s heartbeat interval *and* heartbeats on every `AgentEvent` forwarded from the runner. Independent of agent flow so a slow tool call doesn't trip Temporal's liveness check, while the per-event ticks keep the live-update stream tight. The heartbeat:
 - Prevents `startToCloseTimeout` from killing long agent sessions mid-thought.
 - Gives Temporal recent progress info for retries (resume hints, though we don't currently use them).
 - Doubles as the live-update stream publish.
@@ -73,7 +76,7 @@ Future upgrade path: archive old logs to cold storage (S3/file) before deletion 
 
 - **Workflow-level**: Temporal guarantees the workflow function runs to completion (or failure/cancellation) across worker crashes.
 - **Node-level**: completed nodes persist `NodeRun.status = COMPLETED`. On workflow resume after a crash, the workflow code re-runs, but completed activities short-circuit via Temporal's event history.
-- **Mid-agent crash**: the current in-flight node re-runs from the start. Agent providers are not resumable — we don't try to recover partial agent sessions. MCP servers are re-spawned fresh on retry.
+- **Mid-agent crash**: the current in-flight node re-runs from the start. Agent providers are not resumable — we don't try to recover partial agent sessions. The retry spawns a fresh `agent-runner` container; the previous container is gone (`docker run --rm`) or swept by `sweepOrphans` on worker boot. MCP servers come up fresh inside the new container.
 
 ## Observability
 

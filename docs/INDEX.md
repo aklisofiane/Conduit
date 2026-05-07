@@ -8,7 +8,7 @@ Agent-first workflow automation for dev teams. Board-driven orchestration, atomi
 2. [ARCHITECTURE.md](./ARCHITECTURE.md) — system overview, apps, data flow
 3. [STRUCTURE.md](./STRUCTURE.md) — repo map: where each responsibility lives
 4. [design-docs/node-system.md](./design-docs/node-system.md) — the 2 node types (trigger, agent)
-5. [design-docs/agent-execution.md](./design-docs/agent-execution.md) — how agents run (Temporal + providers + workspaces)
+5. [design-docs/agent-execution.md](./design-docs/agent-execution.md) — how agents run (Temporal orchestrator + per-run agent-runner container + providers + workspaces)
 6. [design-docs/mcp-servers.md](./design-docs/mcp-servers.md) — MCP servers as the tool layer
 7. [design-docs/agent-context.md](./design-docs/agent-context.md) — inter-agent context via `.conduit/` folder
 8. [design-docs/branch-management.md](./design-docs/branch-management.md) — `ticket-branch` workspaces for iterative board loops

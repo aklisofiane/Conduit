@@ -3,21 +3,23 @@
 ## High-level
 
 ```
-┌──────────────┐   webhook    ┌──────────────┐   Temporal    ┌──────────────┐
-│ GitHub/etc.  │─────────────▶│   API (Nest) │──────────────▶│  Worker (TS) │
-└──────────────┘              └──────┬───────┘  start run    └──────┬───────┘
-                                     │                              │
-                                     │ WS /runs                     │ invoke agent
-                                     ▼                              ▼
-                              ┌──────────────┐              ┌──────────────┐
-                              │  Web (React) │◀── Redis ────│@conduit/agent│
-                              │    canvas    │   pub/sub    │  providers   │
-                              └──────────────┘              └──────┬───────┘
-                                                                   │
-                                                         ┌─────────┴────────┐
-                                                         │  Claude / Codex  │
-                                                         │  + MCP servers   │
-                                                         └──────────────────┘
+┌──────────────┐   webhook    ┌──────────────┐   Temporal    ┌────────────────┐
+│ GitHub/etc.  │─────────────▶│   API (Nest) │──────────────▶│  Worker (TS)   │
+└──────────────┘              └──────┬───────┘  start run    │  orchestrator  │
+                                     │                       └──────┬─────────┘
+                                     │ WS /runs                     │ docker run --rm
+                                     ▼                              ▼  (per agent node)
+                              ┌──────────────┐              ┌──────────────────┐
+                              │  Web (React) │◀── Redis ────│  agent-runner    │
+                              │    canvas    │   pub/sub    │  container       │
+                              └──────────────┘     ▲        │  @conduit/agent  │
+                                                   │        │  + Claude/Codex  │
+                                                   │stdout  │  + MCP servers   │
+                                                   │JSON-lines───────┬─────────┘
+                                                   │                 │
+                                                   └── worker forwards each
+                                                       RunnerEvent into
+                                                       Prisma + Redis
 ```
 
 ## Tech stack
@@ -35,7 +37,8 @@
 |---|---|---|
 | `apps/api` | NestJS 11, Socket.IO, Prisma | Webhook ingestion + signature verify, workflow CRUD, trigger matching, Temporal client, WS gateway for live run updates. Owns polling-trigger `Schedule` lifecycle (create / update / delete on workflow save + boot-time reconcile) via `TemporalService.upsertPollSchedule` |
 | `apps/web` | React 19, Vite 8, `@xyflow/react`, TanStack Query, Zustand, Tailwind v4 + shadcn/ui (New York/Zinc), react-hook-form + Zod | Canvas editor (design only), agent config UI, trigger config UI (webhook / polling mode toggle, `BoardRef` fieldset, filter builder), run history + dedicated run detail page with streaming logs |
-| `apps/worker` | Temporal TS SDK, `@anthropic-ai/claude-agent-sdk`, `@openai/codex-sdk` | Executes `agentWorkflow` — loads nodes, topo sorts, invokes agent activity per node, streams updates to Redis. Also executes `pollWorkflow` → `pollBoardActivity` when a Temporal Schedule fires, which diffs the GitHub Projects v2 board against `PollSnapshot` and starts `agentWorkflow`s for new matches |
+| `apps/worker` | Temporal TS SDK | Executes `agentWorkflow` — loads nodes, topo sorts, invokes the orchestrator activity per node. The activity spawns a fresh `agent-runner` container, writes a `RunnerRequest` to its stdin, and translates each returned `RunnerEvent` back into Prisma writes + Redis publishes + Temporal heartbeats. Also executes `pollWorkflow` → `pollBoardActivity` when a Temporal Schedule fires, which diffs the GitHub Projects v2 board against `PollSnapshot` and starts `agentWorkflow`s for new matches. **Provider SDKs no longer live here** — they're baked into the runner image |
+| `apps/agent-runner` | `@anthropic-ai/claude-agent-sdk`, `@openai/codex-sdk`, `@conduit/agent` | One short-lived container per agent node. Reads `RunnerRequest` on stdin, drives the provider session (main → optional issue-writeback → final summary turn), streams `AgentEvent`s as JSON lines on stdout, emits a terminal `exit` carrying head/changedFiles/`.conduit/<NodeName>.md`. No DB, no Redis, no master KEK, no other runs' credentials. See [design-docs/agent-execution.md > Runner container model](./design-docs/agent-execution.md#runner-container-model) |
 
 **Infrastructure (via Docker Compose)**
 - Postgres 18 (port 5434)
@@ -67,7 +70,7 @@
 3. **Trigger match** → `WebhooksService.matchesTrigger()` compares event against the workflow's trigger config.
 4. **Run created** → `WorkflowRun` row in Postgres → Temporal workflow `agentWorkflow` started with `{ workflowId, runId, triggerEvent }`.
 5. **Workflow executes** → loads node graph, topo sorts, for each node invokes `runAgentNode` activity. Parallel groups run via `Promise.all`.
-6. **Agent activity** → resolves MCP configs (decrypt credentials, substitute `{{credential}}`), invokes the provider with the resolved configs — the SDK spawns/connects the MCP servers. Tool calls, text chunks, and token counts are streamed via heartbeat + Redis pub/sub on `conduit:run-updates`.
+6. **Agent activity** → resolves the workspace and MCP configs (decrypt credentials, substitute `{{credential}}`), packs everything into a `RunnerRequest`, and `docker run --rm`s a fresh `agent-runner` container. The runner — not the worker — invokes the provider SDK; the SDK spawns/connects MCP servers inside the container. The runner streams `RunnerEvent` lines back to the worker on stdout; the worker translates each `agent` event into a heartbeat + Redis publish on `conduit:run-updates` + Prisma write, exactly the same way it did before the split.
 7. **API gateway** (`RunsGateway`) subscribes to Redis, re-emits on Socket.IO `runs` namespace.
 8. **Frontend run detail page** (`useRunUpdates`) updates TanStack Query cache; timeline renders live text, tool calls, and usage.
 

@@ -29,7 +29,7 @@ Not in scope for v1: supply-chain attacks, side-channel attacks, compromised wor
 - **Never written to**: logs, `ExecutionLog`, agent prompts, Temporal workflow history, Redis channels.
 - **Remote URL hygiene**: the workspace manager clones repos with a tokenized URL, then rewrites the remote URL to strip the token. `git remote -v` shows the clean URL, and `.git/config` never contains credentials.
 - **Push credentials for `ticket-branch` workspaces**: iterative board-loop workflows need the agent to push. The workspace manager sets the platform token (e.g. `GITHUB_TOKEN`) in the agent process env and configures a git credential helper that reads from env. Token is scoped to the agent activity lifetime — never written to `.git/config`, never persisted on disk, never in the remote URL. The agent *can* read it from its own env; this is an accepted trust-surface expansion, justified by the fact that an agent with a `ticket-branch` workspace already holds platform write access via its MCP servers (post comment, open PR, move column). Push is equivalent in blast radius. See [branch-management.md](./design-docs/branch-management.md).
-- **Stdio MCP servers spawned as children of the agent process inherit that env**, including the push token. For built-in presets like GitHub MCP this is usually the same credential the server would receive via explicit injection anyway, so it changes nothing. For **custom MCP servers added to a `ticket-branch` workflow**, this is an additional trust expansion beyond the one above — the custom server sees push creds whether or not the user bound them to it. V1 accepts this; scoped env injection (token set only at the git-shell-invocation boundary, not process-wide) is the future mitigation.
+- **Stdio MCP servers spawned as children of the agent process** (inside the runner container) inherit that env, including the push token. For built-in presets like GitHub MCP this is usually the same credential the server would receive via explicit injection anyway. For **custom MCP servers added to a `ticket-branch` workflow**, the custom server sees push creds whether or not the user bound them to it. V1 accepts this; scoped env injection (token set only at the git-shell-invocation boundary) is the future mitigation. The container boundary keeps any leak local — no DB, Redis, or other-run state is reachable.
 - **Synthetic GitHub MCP for issue writeback**: agents with `issueWriteback` configured but no user-defined GitHub MCP get one auto-attached at activity time, bound to the workflow's GitHub trigger connection. This avoids a second PAT prompt but means the writeback-enabled agent gets a GitHub MCP it didn't explicitly add to its tool list. The token is the same one the trigger already uses; lifetime is the activity. Auto-attach is skipped when the user already wired a GitHub MCP, regardless of which connection it uses, so the user-configured server always wins. See [agent-execution.md > Issue writeback](./design-docs/agent-execution.md#issue-writeback).
 
 ## Sandboxing
@@ -38,19 +38,25 @@ Not in scope for v1: supply-chain attacks, side-channel attacks, compromised wor
 
 - Each run gets its own tmpdir (under `~/.conduit/runs/<runId>/`), cleaned on completion.
 - SDK built-in filesystem/shell tools (Claude: `Read`/`Write`/`Edit`/`Bash`/`Glob`/`Grep`; Codex: equivalent) are always enabled, constrained to the workspace cwd.
-- **Network access during shell**: on by default (needed for `npm install` etc.). No chroot/containerization in v1 — we're trusting the worker host.
-- **Resource limits**: `ulimit`-style caps on shell processes (CPU time, memory, output size). Timeout enforced by the activity.
+- **Network access during shell**: on by default (needed for `npm install` etc.). The runner container uses default bridge networking, which constrains what's reachable but doesn't block egress. A worker host with strict outbound rules carries that constraint into the runner.
+- **Resource limits**: `ulimit`-style caps on shell processes (CPU time, memory, output size). Timeout enforced by the activity *and* by a self-imposed runner-side wall clock.
 
 ### MCP servers
 
-- **stdio servers** run as child processes of the worker. They inherit the worker's permissions minus any explicit restrictions. No further sandboxing in v1.
+- **stdio servers** run as child processes of the **runner container** (not the worker). They inherit the runner's permissions and live for the lifetime of that one container — same blast radius as the agent itself, no broader.
 - **Remote servers** (SSE/HTTP) are external — Conduit trusts them as much as the user who configured them. Credentials are sent in headers.
-- **Custom MCP servers** from untrusted sources are a risk. v1 mitigation: document clearly that adding an MCP server is equivalent to running arbitrary code on the worker host. v1.1+: consider running stdio servers in a container.
-- Servers are **per-activity** — killed when the agent node finishes. No long-running server processes.
+- **Custom MCP servers** from untrusted sources are still a risk inside the runner: a stdio server running there can read the workspace, exhaust the container's CPU/RAM, and (modulo network policy on the host) reach the network. The container scope means it cannot reach the worker's DB / Redis / master KEK / other runs' credentials, which was the v0 risk. v1.1+: per-server scoped credential injection (token set only at the git-shell-invocation boundary, not process-wide).
+- Servers are **per-activity** — torn down when the agent node finishes and the container is `docker rm`d. No long-running server processes.
 
 ### Agent providers
 
-- Providers run inside Temporal activities on the worker process — no further isolation. (Future: per-run container.)
+Providers run inside a per-run **`agent-runner` container** — a fresh `docker run --rm` per agent node — not on the worker process. See [agent-execution.md > Runner container model](./design-docs/agent-execution.md#runner-container-model) for the mechanism. The properties this gains us:
+
+- **Nothing the run doesn't need crosses the boundary.** No DB, Redis, master KEK, or other-run credentials. The `RunnerRequest` carries only this run's provider creds, the `{{credential}}`-substituted `AgentRequest`, and the three prompts.
+- **The container can't widen its mount surface.** Same-path bind mounts of the run dir + (when applicable) the single bare clone backing this workspace, no docker.sock, no `--network=host`, no `--privileged`, non-root UID — all enforced by `LocalDockerSpawner`, not user-configurable.
+- **The protocol seam is policed.** Runner stdout is Zod-validated; malformed lines are dropped and any single line is capped at 8 MiB so a runaway runner can't OOM the worker.
+
+`CONDUIT_AGENT_AUTH=oauth-mount` deliberately weakens the boundary by bind-mounting `~/.codex/auth.json` — a compromised agent can read or rewrite the host file. Codex-only, because Codex has no `setup-token` flow yet; Claude OAuth flows through `CLAUDE_CODE_OAUTH_TOKEN` over the protocol with no mount, so the strong boundary holds. Local dev only; deployment runbooks must keep the default `api-key`.
 
 ## Prompt injection
 

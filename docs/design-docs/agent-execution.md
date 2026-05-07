@@ -27,7 +27,7 @@ Failure handling: per-activity retry policy. Workflow-level `try/catch` marks ru
 | Activity | Responsibility |
 |---|---|
 | `loadGraphActivity(workflowId)` | Read workflow + nodes + edges from Postgres, return plain object |
-| `runAgentNode(node, context)` | Create workspace, spin up MCP servers, invoke provider, stream updates, final prompts (`.conduit/` summary + merge-back), tear down MCP |
+| `runAgentNode(node, context)` | **Orchestrator only.** Resolves workspace + MCP configs, packs a `RunnerRequest`, spawns an `agent-runner` container, and translates the returned `RunnerEvent` stream into Prisma + Redis + heartbeat writes. The provider SDK runs inside the runner, not here. See [Runner container model](#runner-container-model). |
 | `mergeWorktreeActivity(node, targetBranch)` | Spins up a lightweight agent session to merge a parallel agent's worktree back to the target branch — resolves conflicts via LLM if needed. See "Merge-back agent" below. |
 | `copyConduitFilesActivity(group)` | Copy `.conduit/` files from each parallel worktree into the target workspace after merge |
 | `cleanupRunActivity(runId)` | Best-effort cleanup after run ends — deletes workspace tmpdirs, prunes git worktrees, deletes `.conduit/` folder. `ticket-branch` workspaces have extra semantics; see [Cleanup for `ticket-branch` workspaces](#cleanup-for-ticket-branch-workspaces) below. |
@@ -36,6 +36,8 @@ Failure handling: per-activity retry policy. Workflow-level `try/catch` marks ru
 Activities use Temporal **heartbeats** so long-running agent sessions don't get killed for inactivity. Heartbeat payload carries current tool call + token count — doubles as the live update stream.
 
 ## `runAgentNode` lifecycle
+
+The activity is now an **orchestrator** — it never imports a provider SDK. All LLM and tool I/O happens inside a per-run `agent-runner` container; see [Runner container model](#runner-container-model) for the protocol.
 
 ```
 1. Build AgentContext from triggerEvent (slim: { trigger, workflow, run })
@@ -50,31 +52,22 @@ Activities use Temporal **heartbeats** so long-running agent sessions don't get 
                         Check-then-create is serialized by a local file lock on the base clone (handles retry and cross-workflow races on the same host).
                         Connection is read from the workflow's single trigger configuration. Inject platform token into agent process env and configure a git credential helper reading from env — token never written to `.git/config` or remote URL. See [SECURITY.md](../SECURITY.md).
                         Must be idempotent under Temporal activity retries.
-3. Enable workspace tools:
-     - Configure provider's SDK built-in tools (file read/write/edit, shell, glob, grep)
-     - Set workspace path as CWD — scopes all file operations to workspace root
-     - Both Claude Agent SDK and Codex SDK have native filesystem tools
-3b. Copy selected skills into workspace:
-     - For each skill in node.skills, copy the skill directory into the workspace
-     - Claude: .claude/skills/<skillName>/SKILL.md
-     - Codex: .agents/skills/<skillName>/SKILL.md
-     - SDK discovers them automatically from the filesystem
-4. Resolve MCP server configs:
-     - For each server in node.mcpServers, load from workflow definition
-     - Decrypt linked WorkflowConnection secrets and substitute `{{credential}}` in env/headers
-     - Pass the resolved configs + allowedTools filtering to the provider
-     - SDK handles spawning, connecting, tool invocation, and teardown
-5. Start a provider session and drive turns on it:
-     a. `session.run(serializeAgentContext(ctx))` — main work. Events stream out: text chunk, tool call start, tool call result, token delta. Each is heartbeated + published to Redis `conduit:run-updates`.
-     b. `session.run(issueWritebackPrompt(...))` — **only when the agent has `issueWriteback` configured and the run was fired by a GitHub issue trigger.** Soft-allowlist directive landing as the freshest user message before the summary turn. See [Issue writeback](#issue-writeback) below.
-     c. `session.run(finalSummaryPrompt(nodeName))` — reuses the same session so conversation state is retained. The agent writes `.conduit/<NodeName>.md` via its file tools. A placeholder is dropped in by the runtime if the file is missing at the end.
-     Dispose the session in a `finally` (closes SDK thread / streaming-input queue).
-7. On finish:
-     - Capture changed files (git diff vs. workspace base)
-     - Return NodeOutput { files?, workspacePath }
-8. Always (finally):
-     - On error/cancel: abort provider (AbortController), mark NodeRun FAILED/CANCELLED
-     - SDK tears down its own MCP servers on abort
+3. Install selected `node.skills` into the workspace (`.claude/skills/<id>/SKILL.md`
+   or `.agents/skills/<id>/SKILL.md`); the runner's SDK discovers them from the filesystem.
+4. Resolve MCP configs orchestrator-side: decrypt + substitute `{{credential}}`
+   in env/headers (placeholders never reach the runner), and auto-attach a
+   synthetic GitHub MCP if the agent has `issueWriteback` but no GitHub MCP
+   of its own (see [Issue writeback](#issue-writeback)).
+5. Pre-render the three turn prompts: `main` (serialized AgentContext),
+   optional `issueWriteback`, `summary` (writes `.conduit/<NodeName>.md`).
+6. Spawn the runner via `resolveRunnerSpawner().spawn(req, signal)` and forward
+   each `RunnerEvent` into the existing onAgentEvent / system-log / heartbeat
+   paths until a terminal `exit` arrives.
+7. On `exit ok=true` persist NodeRun COMPLETED with output (files, head,
+   workspaceKind, branchName) and the runner-returned `.conduit/<NodeName>.md`.
+   On `exit ok=false` or missing terminal event, throw — Temporal flips to FAILED.
+8. On cancel: the abort signal flows through `RunnerHandle.cancel()` → `docker kill`,
+   the container is reaped, and the activity returns CANCELLED.
 ```
 
 ## Provider abstraction
@@ -132,6 +125,40 @@ Both providers are **dumb adapters** — they translate `AgentRequest`/`AgentEve
 | Stub | ignored | ignored |
 
 Codex emits `web_search` items with no `status` field; the provider adapter translates `item.started` → `tool_call` (carrying the query) and `item.completed` → `tool_result`, so searches show up in the run timeline alongside other tool calls.
+
+## Runner container model
+
+Provider SDKs and MCP servers run inside a dedicated `agent-runner` container — one short-lived `docker run --rm` per agent node — not on the worker process. The split:
+
+| Worker process (orchestrator) | Runner container (agent-runner) |
+|---|---|
+| Postgres, Redis, master KEK, all credentials | Provider SDKs, pre-resolved MCP configs, system toolchain |
+| Workspace + MCP resolution, prompt rendering, RunnerEvent translation | Provider session, three turns (main / writeback / summary), `.conduit/<NodeName>.md` placeholder, post-run `git status` |
+| Idempotent under Temporal retries | One process per run; on retry the worker spawns a fresh container |
+
+The orchestrator activity calls `resolveRunnerSpawner().spawn(req, signal)`. Phase 1 ships `LocalDockerSpawner`; the `RunnerSpawner` interface is the seam future phases (k8s Job, runner pool) plug into without touching the activity above.
+
+**Wire protocol** lives in `@conduit/shared/runner` (Zod-validated on both ends): the orchestrator writes one `RunnerRequest` to stdin, the runner streams `RunnerEvent` lines back. Three non-obvious bits:
+
+- The orchestrator stops reading after the first `exit` event and calls `RunnerHandle.cancel()` so `docker kill` reaps the container before the activity returns.
+- If the runner dies without emitting `exit`, or stdout goes silent past the liveness threshold (default 60s), the spawner synthesizes an `exit ok=false` carrying a tail of stderr — so the failure surfaces in the run timeline instead of a bare exit code.
+- `heartbeat` events are independent of agent flow, so a slow tool call doesn't look like a dead runner.
+
+**Container invariants** — enforced by `LocalDockerSpawner`, not user-configurable:
+
+- **Same-path bind mounts.** Run dir mounted at its host absolute path, so `.git` worktree pointer files resolve identically. The bare clone backing this workspace is mounted similarly when applicable; **only that one bare clone**, never the whole `~/.conduit/base-clones/` tree.
+- **Non-root UID/GID** equal to the host worker's.
+- **Default bridge networking** — no `--privileged`, no `--network=host`, no docker.sock mount.
+- **Labels** `conduit.runId=<id>` and `conduit.nodeName=<name>` so `sweepOrphans` (worker boot) can reap containers whose runs are already terminal.
+
+**Authentication** is selected by `CONDUIT_AGENT_AUTH`:
+
+| Mode | What it does | When |
+|---|---|---|
+| `api-key` *(default)* | Credentials travel only through `RunnerRequest.provider`. No host credential files mounted. | Production / shared environments |
+| `oauth-mount` | Additionally bind-mounts **only** `~/.codex/auth.json` (Codex has no `setup-token` flow yet) at the same absolute path; sets `HOME` so the SDK finds it. Worker logs a boot warning. A compromised agent can read or rewrite the host file. | Local dev only |
+
+Claude OAuth uses `CLAUDE_CODE_OAUTH_TOKEN` forwarded through the protocol — no mount needed, regardless of mode.
 
 ## Workspace manager
 
@@ -217,10 +244,10 @@ Trust surface: the auto-attached server inherits the same trigger token the rest
 
 ## Streaming & live updates
 
-Every `AgentEvent` produced by the provider:
-1. Is appended to `ExecutionLog` (Postgres) for durability.
-2. Is published to Redis `conduit:run-updates` channel with `{ runId, nodeName, event }`.
-3. Triggers a Temporal heartbeat with a compact summary (current tool + token count).
+Every `AgentEvent` produced by the provider is wrapped by the runner as `{ kind: 'agent', event }` and written to stdout. The orchestrator activity reads each line and:
+1. Appends it to `ExecutionLog` (Postgres) for durability.
+2. Publishes to Redis `conduit:run-updates` channel with `{ runId, nodeName, event }`.
+3. Triggers a Temporal heartbeat with a compact summary (current tool + token count). The heartbeat runs on its own 30s interval driven by the orchestrator and by the runner's `heartbeat` event, so a slow tool call never trips Temporal's liveness check.
 
 Frontend flow:
 - `RunsGateway` (NestJS) subscribes to Redis, re-emits on Socket.IO `runs/<runId>` room.
@@ -231,9 +258,9 @@ Frontend flow:
 
 - User clicks "Cancel run" → API sends Temporal `cancelWorkflow`.
 - Workflow cancellation propagates to in-flight activities.
-- Activity's `CancelledFailure` handler calls `abortController.abort()` on the provider.
-- Provider aborts SDK call, flushes partial events, throws.
-- SDK tears down its MCP servers on abort. Workspace manager runs cleanup in `finally`.
+- Activity's `CancelledFailure` handler triggers the orchestrator's `AbortController`.
+- The abort signal flows to `RunnerHandle.cancel()`, which runs `docker kill <containerName>`. The runner process exits; the provider SDK tears down its MCP servers on the way out. Workspace manager runs cleanup in `finally` on the orchestrator side.
+- `docker kill` is idempotent — safe to call after the runner has already exited on its own — and waits for the container to be reaped, so the next run with the same name doesn't race.
 
 ## Per-ticket concurrency
 
