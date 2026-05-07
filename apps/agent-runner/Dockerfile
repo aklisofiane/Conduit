@@ -76,6 +76,8 @@ RUN apt-get update \
       > /etc/apt/sources.list.d/github-cli.list \
  && apt-get update && apt-get install -y --no-install-recommends \
       git make python3 g++ pkg-config jq ripgrep fd-find gh \
+ && git config --system user.email conduit@local \
+ && git config --system user.name Conduit \
  && rm -rf /var/lib/apt/lists/* \
  && ln -s /usr/bin/fdfind /usr/local/bin/fd
 

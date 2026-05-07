@@ -18,40 +18,36 @@ export interface MergeWorktreeInput {
  * parallel sibling, sequentially, in definition order — each merge sees the
  * cumulative result of its predecessors (deterministic across re-runs).
  *
- * Uncommitted changes in the source are folded into a single commit first so
- * `git merge --no-edit --no-ff` has something to operate on. `.conduit/` is
- * excluded from that commit via pathspec — it's gitignored by design, but
- * we don't assume the user's repo carries that rule.
+ * Uncommitted source work is snapshotted into a single commit so the
+ * squash-merge in `mergeBranchedWorktree` has something to operate on.
+ * `.conduit/` is stripped on the target side — see merge.ts.
  */
 export async function mergeWorktreeActivity(input: MergeWorktreeInput): Promise<void> {
   const { runId, sourceWorkspacePath, targetWorkspacePath, sourceNodeName, targetNodeName } = input;
   const log = (body: string, level?: 'WARN' | 'ERROR') =>
     writeSystemLog(runId, targetNodeName, `merge ${sourceNodeName} → ${targetNodeName}: ${body}`, level);
 
-  // `git status --porcelain` errors on a non-git workspace (e.g. fresh-tmpdir):
-  // bail cleanly. Empty output = clean tree; non-empty = dirty before staging.
-  let dirtyBeforeAdd: boolean;
+  // Bail cleanly if source isn't a git tree (e.g. fresh tmpdir).
   try {
-    const porcelain = (await git(['status', '--porcelain'], { cwd: sourceWorkspacePath })).trim();
-    dirtyBeforeAdd = porcelain.length > 0;
+    await git(['rev-parse', '--is-inside-work-tree'], { cwd: sourceWorkspacePath });
   } catch (err) {
     if (err instanceof GitError) return;
     throw err;
   }
 
+  // Plain `git add -A` (no pathspec) silently respects the source repo's
+  // .gitignore. We can't pathspec-exclude `.conduit/` because git errors
+  // when an explicit pathspec names an ignored path. If the source repo
+  // doesn't gitignore `.conduit/`, the snapshot will briefly contain it —
+  // the target-side squash strips it before committing.
   try {
-    await git(['add', '-A', '--', '.', ':(exclude).conduit'], { cwd: sourceWorkspacePath });
+    await git(['add', '-A'], { cwd: sourceWorkspacePath });
   } catch (err) {
     if (err instanceof GitError) await log(`git add -A failed: ${err.stderr.trim()}`, 'ERROR');
     throw err;
   }
 
   const hasStaged = await stagedChangesExist(sourceWorkspacePath);
-  if (!hasStaged && dirtyBeforeAdd) {
-    // Dirty tree but nothing staged usually means a too-broad `.gitignore`
-    // swallowed the edits. Surface it so the run shows why nothing got merged.
-    await log('working tree was dirty but nothing staged — check .gitignore', 'WARN');
-  }
   if (hasStaged) {
     await git(
       [
@@ -61,7 +57,7 @@ export async function mergeWorktreeActivity(input: MergeWorktreeInput): Promise<
         'user.name=Conduit',
         'commit',
         '-m',
-        `Conduit: ${sourceNodeName} changes`,
+        `Conduit: ${sourceNodeName} snapshot`,
       ],
       { cwd: sourceWorkspacePath },
     );
