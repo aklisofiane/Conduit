@@ -1,12 +1,12 @@
 {
   "id": "develop",
   "name": "Develop",
-  "description": "Multi-agent development pipeline: Dev + Tests + Docs fan out in parallel, QA merges and opens a draft PR. Triggered on status = \"Dev\".",
+  "description": "Multi-agent development pipeline: Planner dispatches Dev + Tests in parallel, Docs documents the result, QA merges and opens a draft PR. Triggered on status = \"Dev\".",
   "category": "develop",
   "workflows": [
     {
       "name": "Develop",
-      "description": "Polling on status=Dev. Dev + Tests + Docs work in parallel branched worktrees; QA consumes the merged workspace and opens a draft PR.",
+      "description": "Polling on status=Dev. Planner reads the ticket and dispatches scoped work to Dev and Tests (parallel branched worktrees). Docs runs once both finish so it documents what was actually shipped. QA consumes the merged workspace and opens a draft PR.",
       "definition": {
         "triggers": [
           {
@@ -21,17 +21,17 @@
         ],
         "nodes": [
           {
-            "id": "agent-seed",
-            "name": "Seed",
-            "presetId": "research",
-            "instructionsAppend": "Your final summary is the plan Dev / Tests / Docs will read in parallel — list the files, the intended change per file, and anything downstream agents need to know.",
+            "id": "agent-planner",
+            "name": "Planner",
+            "presetId": "planner",
+            "instructionsAppend": "Convention for this workflow: Dev owns production code only, Tests owns test files only. (Docs and QA run after the parallel group and are not part of your dispatch.)",
             "mcpServers": [{ "serverId": "github-mcp" }],
             "skills": []          },
           {
             "id": "agent-dev",
             "name": "Dev",
             "presetId": "developer",
-            "instructionsAppend": "Sibling agents Tests and Docs run in parallel — do not touch test files or user-facing documentation. Focus only on production code.",
+            "instructionsAppend": "Sibling agent Tests runs in parallel — do not touch test files. Docs runs after you finish — do not touch user-facing documentation. Focus only on production code.",
             "mcpServers": [],
             "skills": []          },
           {
@@ -44,6 +44,7 @@
             "id": "agent-docs",
             "name": "Docs",
             "presetId": "docs",
+            "instructionsAppend": "Your workspace already contains the merged output of Dev and Tests. Document only what was actually implemented — read the diff and `.conduit/` summaries from upstream agents before writing.",
             "mcpServers": [],
             "skills": []          },
           {
@@ -55,34 +56,28 @@
             "skills": []          }
         ],
         "edges": [
-          { "from": "DevelopTrigger", "to": "Seed" },
-          { "from": "Seed", "to": "Dev" },
-          { "from": "Seed", "to": "Tests" },
-          { "from": "Seed", "to": "Docs" },
-          { "from": "Dev", "to": "QA" },
-          { "from": "Tests", "to": "QA" },
+          { "from": "DevelopTrigger", "to": "Planner" },
+          { "from": "Planner", "to": "Dev" },
+          { "from": "Planner", "to": "Tests" },
+          { "from": "Dev", "to": "Docs" },
+          { "from": "Tests", "to": "Docs" },
           { "from": "Docs", "to": "QA" }
         ],
         "mcpServers": [
           {
             "id": "github-mcp",
-            "name": "GitHub",
-            "transport": {
-              "kind": "streamable-http",
-              "url": "https://api.githubcopilot.com/mcp/",
-              "headers": { "Authorization": "Bearer {{credential}}" }
-            },
+            "presetId": "github",
             "connectionId": "<github>"
           }
         ],
         "ui": {
           "nodePositions": {
             "DevelopTrigger": { "x": 60, "y": 60 },
-            "Seed": { "x": 240, "y": 60 },
-            "Dev": { "x": 80, "y": 240 },
-            "Tests": { "x": 240, "y": 240 },
-            "Docs": { "x": 400, "y": 240 },
-            "QA": { "x": 240, "y": 420 }
+            "Planner": { "x": 240, "y": 60 },
+            "Dev": { "x": 140, "y": 240 },
+            "Tests": { "x": 340, "y": 240 },
+            "Docs": { "x": 240, "y": 420 },
+            "QA": { "x": 240, "y": 600 }
           },
           "viewport": { "x": 0, "y": 0, "zoom": 1 }
         }

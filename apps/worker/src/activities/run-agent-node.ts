@@ -6,6 +6,7 @@ import {
   clearConduitFolder,
   discoverSkills,
   finalSummaryPrompt,
+  formatParallelDownstreamBlock,
   installPushCredentials,
   installSkillsIntoWorkspace,
   issueWritebackPrompt,
@@ -62,6 +63,15 @@ export interface RunAgentNodeInput {
    * through.
    */
   parallelBranch?: boolean;
+  /**
+   * Names of the node's *immediate* downstream siblings when this node fans
+   * out (>1 outgoing edge). Empty/undefined for leaf or single-downstream
+   * nodes. The activity formats this into a small "Parallel downstream"
+   * section appended to the agent's system prompt so a planner-style agent
+   * can dispatch responsibilities by sibling name without us having to
+   * hardcode the DAG into every preset.
+   */
+  parallelDownstream?: string[];
 }
 
 /**
@@ -83,6 +93,7 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
     upstreamWorkspacePath,
     upstreamHead,
     parallelBranch,
+    parallelDownstream,
   } = input;
   const ctx = Context.current();
   const workspaceManager = new WorkspaceManager();
@@ -171,9 +182,18 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
       run: { id: runId, startedAt: nodeRun.startedAt ?? new Date() },
     });
 
+    // Auto-injected suffix only fires for fan-out nodes (>1 immediate
+    // downstream); empty string otherwise so non-fan-out agents see no
+    // extra context. Concat — don't replace `node.instructions` — so the
+    // user's preset + instructionsAppend still own the bulk of the prompt.
+    const dagBlock = formatParallelDownstreamBlock(parallelDownstream ?? []);
+    const fullSystemPrompt = dagBlock
+      ? `${node.instructions}\n\n${dagBlock}`
+      : node.instructions;
+
     const agentRequest: AgentRequest = {
       model: node.model,
-      systemPrompt: node.instructions,
+      systemPrompt: fullSystemPrompt,
       mcpServers: resolvedMcp,
       workspacePath: workspace.path,
       // Per-run scratch root — siblings + .credential-helpers/ live here.

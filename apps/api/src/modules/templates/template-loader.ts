@@ -3,8 +3,10 @@ import { Logger } from '@nestjs/common';
 import {
   collectTemplatePlaceholders,
   expandTemplate,
+  findMcpPreset,
   templateInputFileSchema,
   templateFileSchema,
+  UnknownMcpPresetError,
   UnknownPresetError,
   type AgentPreset,
   type TemplateFile,
@@ -54,12 +56,17 @@ function parseTemplate(
 
   let expanded: TemplateFile;
   try {
-    expanded = expandTemplate(inputParse.data, resolvePreset);
+    expanded = expandTemplate(inputParse.data, {
+      agent: resolvePreset,
+      mcp: findMcpPreset,
+    });
   } catch (err) {
     if (err instanceof UnknownPresetError) {
       logger.warn(
         `Template ${entry} skipped — ${err.message} (preset not loaded or missing on disk)`,
       );
+    } else if (err instanceof UnknownMcpPresetError) {
+      logger.warn(`Template ${entry} skipped — ${err.message}`);
     } else {
       logger.warn(
         `Template ${entry} skipped — failed preset expansion (${String(err)})`,

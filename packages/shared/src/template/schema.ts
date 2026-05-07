@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { workflowDefinitionSchema } from '../workflow/definition';
 import { agentConfigSchema } from '../agent/index';
 import { agentProviderIdSchema } from '../agent/provider';
+import { workflowMcpServerSchema } from '../mcp/server';
 
 /**
  * One workflow inside a template bundle. `definition` is the same shape as
@@ -88,10 +89,48 @@ export const templateAgentInputSchema = agentConfigSchema
   });
 export type TemplateAgentInput = z.infer<typeof templateAgentInputSchema>;
 
+/**
+ * On-disk MCP server shape: either `presetId` references an entry in
+ * `MCP_PRESETS` (transport + name come from the preset), or `transport` is
+ * inlined for one-off servers without a corresponding preset. Loader
+ * expansion turns either into the runtime `workflowMcpServerSchema` shape
+ * before caching, so consumers of `TemplateFile` never see preset
+ * references.
+ */
+export const templateMcpServerInputSchema = workflowMcpServerSchema
+  .partial({ name: true, transport: true })
+  .extend({
+    presetId: z
+      .string()
+      .regex(/^[a-z][a-z0-9-]*$/, 'presetId must be kebab-case')
+      .optional(),
+  })
+  .superRefine((v, ctx) => {
+    if (v.presetId) return;
+    if (!v.transport) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['transport'],
+        message: 'mcp server without presetId must specify transport',
+      });
+    }
+    if (!v.name) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['name'],
+        message: 'mcp server without presetId must specify name',
+      });
+    }
+  });
+export type TemplateMcpServerInput = z.infer<typeof templateMcpServerInputSchema>;
+
 export const templateInputWorkflowDefinitionSchema = workflowDefinitionSchema
   .innerType()
-  .omit({ nodes: true })
-  .extend({ nodes: z.array(templateAgentInputSchema) });
+  .omit({ nodes: true, mcpServers: true })
+  .extend({
+    nodes: z.array(templateAgentInputSchema),
+    mcpServers: z.array(templateMcpServerInputSchema),
+  });
 export type TemplateInputWorkflowDefinition = z.infer<
   typeof templateInputWorkflowDefinitionSchema
 >;

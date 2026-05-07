@@ -54,6 +54,11 @@ export const MCP_PRESETS: readonly McpPreset[] = [
       url: 'https://api.githubcopilot.com/mcp/',
       headers: {
         Authorization: `Bearer ${CREDENTIAL_PLACEHOLDER_VALUE}`,
+        // Opt in to projects on top of the server's default toolset — without
+        // this, project-status / project-item tools aren't exposed and agents
+        // can't move issues between board columns. Additive: the default
+        // toolset (issues, PRs, repos, etc.) stays enabled.
+        'X-MCP-Toolsets': 'default,projects',
       },
     },
   },

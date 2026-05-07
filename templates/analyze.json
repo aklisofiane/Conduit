@@ -49,12 +49,7 @@
         "mcpServers": [
           {
             "id": "github-mcp",
-            "name": "GitHub",
-            "transport": {
-              "kind": "streamable-http",
-              "url": "https://api.githubcopilot.com/mcp/",
-              "headers": { "Authorization": "Bearer {{credential}}" }
-            },
+            "presetId": "github",
             "connectionId": "<github>"
           }
         ],

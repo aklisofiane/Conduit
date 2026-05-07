@@ -1,15 +1,24 @@
 import type { AgentPreset } from '../agent-preset/index';
 import type { AgentConfig } from '../agent/index';
+import type { McpPreset } from '../mcp/presets';
+import type { WorkflowMcpServer } from '../mcp/server';
 import type { WorkflowDefinition } from '../workflow/definition';
 import type {
   TemplateAgentInput,
   TemplateInputFile,
   TemplateInputWorkflow,
   TemplateFile,
+  TemplateMcpServerInput,
   TemplateWorkflow,
 } from './schema';
 
 export type PresetResolver = (id: string) => AgentPreset | undefined;
+export type McpPresetResolver = (id: string) => McpPreset | undefined;
+
+export interface TemplateResolvers {
+  agent: PresetResolver;
+  mcp: McpPresetResolver;
+}
 
 export class UnknownPresetError extends Error {
   constructor(
@@ -24,41 +33,96 @@ export class UnknownPresetError extends Error {
   }
 }
 
+export class UnknownMcpPresetError extends Error {
+  constructor(
+    public readonly presetId: string,
+    public readonly templateId: string,
+    public readonly serverId: string,
+  ) {
+    super(
+      `Template "${templateId}" mcp server "${serverId}" references unknown mcp preset "${presetId}"`,
+    );
+    this.name = 'UnknownMcpPresetError';
+  }
+}
+
 /**
- * Expand `presetId` references on every agent in a template input file.
- * Throws `UnknownPresetError` so callers can choose between log+skip
- * (loader) and surface (test/CLI).
+ * Expand `presetId` references — both agent presets on nodes and MCP presets
+ * on `mcpServers` — into the runtime workflow shape. Throws
+ * `UnknownPresetError` / `UnknownMcpPresetError` so callers can choose
+ * between log+skip (loader) and surface (test/CLI).
+ *
+ * Accepts either a single agent resolver (legacy single-arg form, no MCP
+ * preset support) or a `{ agent, mcp }` resolver pair (current form).
  */
 export function expandTemplate(
   input: TemplateInputFile,
-  resolvePreset: PresetResolver,
+  resolvers: PresetResolver | TemplateResolvers,
 ): TemplateFile {
+  const r = normalizeResolvers(resolvers);
   return {
     id: input.id,
     name: input.name,
     description: input.description,
     category: input.category,
-    workflows: input.workflows.map((wf) =>
-      expandWorkflow(wf, resolvePreset, input.id),
-    ),
+    workflows: input.workflows.map((wf) => expandWorkflow(wf, r, input.id)),
   };
+}
+
+function normalizeResolvers(
+  resolvers: PresetResolver | TemplateResolvers,
+): TemplateResolvers {
+  if (typeof resolvers === 'function') {
+    return { agent: resolvers, mcp: () => undefined };
+  }
+  return resolvers;
 }
 
 function expandWorkflow(
   wf: TemplateInputWorkflow,
-  resolvePreset: PresetResolver,
+  resolvers: TemplateResolvers,
   templateId: string,
 ): TemplateWorkflow {
   const definition: WorkflowDefinition = {
     triggers: wf.definition.triggers,
     edges: wf.definition.edges,
-    mcpServers: wf.definition.mcpServers,
+    mcpServers: wf.definition.mcpServers.map((s) =>
+      expandMcpServer(s, resolvers.mcp, templateId),
+    ),
     ui: wf.definition.ui,
     nodes: wf.definition.nodes.map((n) =>
-      expandAgent(n, resolvePreset, templateId),
+      expandAgent(n, resolvers.agent, templateId),
     ),
   };
   return { name: wf.name, description: wf.description, definition };
+}
+
+function expandMcpServer(
+  server: TemplateMcpServerInput,
+  resolveMcpPreset: McpPresetResolver,
+  templateId: string,
+): WorkflowMcpServer {
+  if (!server.presetId) {
+    // Schema enforces transport + name when presetId is absent.
+    return {
+      id: server.id,
+      name: server.name!,
+      transport: server.transport!,
+      connectionId: server.connectionId,
+      discoveredTools: server.discoveredTools,
+    };
+  }
+  const preset = resolveMcpPreset(server.presetId);
+  if (!preset) {
+    throw new UnknownMcpPresetError(server.presetId, templateId, server.id);
+  }
+  return {
+    id: server.id,
+    name: server.name ?? preset.name,
+    transport: server.transport ?? preset.transport,
+    connectionId: server.connectionId,
+    discoveredTools: server.discoveredTools,
+  };
 }
 
 function expandAgent(

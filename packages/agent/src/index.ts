@@ -7,5 +7,6 @@ export {
   buildAgentContext,
   serializeAgentContext,
   finalSummaryPrompt,
+  formatParallelDownstreamBlock,
   issueWritebackPrompt,
 } from './context';

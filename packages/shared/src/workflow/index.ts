@@ -5,4 +5,5 @@ export * from './enums';
 export * from './definition';
 export * from './derive-workspace';
 export * from './identity';
+export * from './parallel-downstream';
 export * from './validate';

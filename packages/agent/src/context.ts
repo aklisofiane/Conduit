@@ -21,6 +21,29 @@ export function serializeAgentContext(ctx: AgentContext): string {
 }
 
 /**
+ * Auto-injected suffix on the system prompt of any node that fans out into
+ * parallel siblings. Empty string when the node has 0 or 1 immediate
+ * downstream node — the runtime concats this onto `node.instructions` and a
+ * `+ ''` is a no-op, so the rest of the agent's prompt stays clean.
+ *
+ * Only the *immediate* fan-out is surfaced — the agent doesn't need
+ * transitive DAG visibility to make a dispatch decision, and keeping the
+ * block tight avoids polluting context for agents that don't care.
+ */
+export function formatParallelDownstreamBlock(siblings: readonly string[]): string {
+  if (siblings.length < 2) return '';
+  const bullets = siblings.map((name) => `- ${name}`).join('\n');
+  return [
+    '## Parallel downstream',
+    '',
+    'This node fans out to siblings that run concurrently in branched worktrees:',
+    bullets,
+    '',
+    'Each sibling gets its own copy of your workspace. Files you write to `.conduit/` are shared across them. Scope responsibilities so they do not stomp each other\'s files.',
+  ].join('\n');
+}
+
+/**
  * Second-turn user message that asks the agent to record a summary for
  * downstream nodes. Written to `.conduit/<NodeName>.md` — the folder is
  * gitignored, ephemeral, and copied across parallel worktrees by the

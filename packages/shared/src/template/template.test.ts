@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AgentPreset } from '../agent-preset/index';
+import { MCP_PRESETS, findMcpPreset } from '../mcp/presets';
 import {
   collectTemplatePlaceholders,
   expandTemplate,
@@ -8,6 +9,7 @@ import {
   resolveTemplate,
   templateFileSchema,
   templateInputFileSchema,
+  UnknownMcpPresetError,
   UnknownPresetError,
   type TemplateFile,
   type TemplateInputFile,
@@ -205,5 +207,103 @@ describe('templateInputFileSchema + expandTemplate', () => {
     expect(() => expandTemplate(PRESET_TEMPLATE, () => undefined)).toThrow(
       UnknownPresetError,
     );
+  });
+});
+
+describe('mcp preset expansion', () => {
+  const githubPreset = findMcpPreset('github')!;
+  const baseInput: TemplateInputFile = {
+    id: 'demo-mcp-presets',
+    name: 'Demo (mcp presets)',
+    description: 'demo using mcp presetId',
+    category: 'triage',
+    workflows: [
+      {
+        name: 'A',
+        definition: {
+          triggers: [
+            {
+              id: 'trigger-1',
+              name: 'Trigger1',
+              platform: 'github',
+              connectionId: '<github>',
+              mode: { kind: 'webhook', event: 'issues.opened' },
+              filters: [],
+            },
+          ],
+          nodes: [
+            {
+              id: 'agent-a',
+              name: 'A',
+              presetId: 'research',
+              mcpServers: [{ serverId: 'github-mcp' }],
+              skills: [],
+              webSearch: false,
+            },
+          ],
+          edges: [],
+          mcpServers: [
+            { id: 'github-mcp', presetId: 'github', connectionId: '<github>' },
+          ],
+          ui: { nodePositions: {}, viewport: { x: 0, y: 0, zoom: 1 } },
+        },
+      },
+    ],
+  };
+
+  it('parses an mcp server with presetId only (no transport inlined)', () => {
+    expect(templateInputFileSchema.safeParse(baseInput).success).toBe(true);
+  });
+
+  it('expandTemplate copies transport + name from the mcp preset', () => {
+    const expanded = expandTemplate(baseInput, {
+      agent: () => RESEARCH_PRESET,
+      mcp: findMcpPreset,
+    });
+    const server = expanded.workflows[0]!.definition.mcpServers[0]!;
+    expect(server.name).toBe(githubPreset.name);
+    expect(server.transport).toEqual(githubPreset.transport);
+    expect(server.connectionId).toBe('<github>');
+    expect(templateFileSchema.safeParse(expanded).success).toBe(true);
+  });
+
+  it('expandTemplate throws UnknownMcpPresetError when the mcp preset is missing', () => {
+    expect(() =>
+      expandTemplate(baseInput, {
+        agent: () => RESEARCH_PRESET,
+        mcp: () => undefined,
+      }),
+    ).toThrow(UnknownMcpPresetError);
+  });
+
+  it('rejects an mcp server missing both presetId and transport', () => {
+    const bad = structuredClone(baseInput);
+    bad.workflows[0]!.definition.mcpServers[0] = {
+      id: 'github-mcp',
+      connectionId: '<github>',
+    } as (typeof bad)['workflows'][0]['definition']['mcpServers'][0];
+    expect(templateInputFileSchema.safeParse(bad).success).toBe(false);
+  });
+
+  it('every shipped MCP preset round-trips through expansion', () => {
+    for (const p of MCP_PRESETS) {
+      const t: TemplateInputFile = {
+        ...baseInput,
+        workflows: [
+          {
+            ...baseInput.workflows[0]!,
+            definition: {
+              ...baseInput.workflows[0]!.definition,
+              mcpServers: [{ id: `${p.id}-mcp`, presetId: p.id }],
+            },
+          },
+        ],
+      };
+      const expanded = expandTemplate(t, {
+        agent: () => RESEARCH_PRESET,
+        mcp: findMcpPreset,
+      });
+      expect(templateFileSchema.safeParse(expanded).success).toBe(true);
+    }
   });
 });
