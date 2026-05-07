@@ -188,11 +188,8 @@ export function buildDockerArgs(input: BuildArgsInput): string[] {
   for (const p of input.testMounts) {
     args.push('-v', `${p}:${p}:rw`);
   }
-  // HOME is always set to the writable directory baked into the image.
-  // Without this, codex aborts trying to write to `$HOME/.codex/` on
-  // startup. The image's `ENV HOME=...` already covers the empty-env case;
-  // setting it explicitly here keeps the contract visible at the call site
-  // and unaffected by future base-image changes.
+  // Pinned at the call site so the image's `ENV HOME` can change without
+  // silently breaking codex's `~/.codex/` writes.
   args.push('-e', `HOME=${HOME_IN_CONTAINER}`);
   for (const [k, v] of Object.entries(input.forwardedEnv)) {
     args.push('-e', `${k}=${v}`);

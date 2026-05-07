@@ -51,31 +51,18 @@ export class UnknownMcpPresetError extends Error {
  * on `mcpServers` — into the runtime workflow shape. Throws
  * `UnknownPresetError` / `UnknownMcpPresetError` so callers can choose
  * between log+skip (loader) and surface (test/CLI).
- *
- * Accepts either a single agent resolver (legacy single-arg form, no MCP
- * preset support) or a `{ agent, mcp }` resolver pair (current form).
  */
 export function expandTemplate(
   input: TemplateInputFile,
-  resolvers: PresetResolver | TemplateResolvers,
+  resolvers: TemplateResolvers,
 ): TemplateFile {
-  const r = normalizeResolvers(resolvers);
   return {
     id: input.id,
     name: input.name,
     description: input.description,
     category: input.category,
-    workflows: input.workflows.map((wf) => expandWorkflow(wf, r, input.id)),
+    workflows: input.workflows.map((wf) => expandWorkflow(wf, resolvers, input.id)),
   };
-}
-
-function normalizeResolvers(
-  resolvers: PresetResolver | TemplateResolvers,
-): TemplateResolvers {
-  if (typeof resolvers === 'function') {
-    return { agent: resolvers, mcp: () => undefined };
-  }
-  return resolvers;
 }
 
 function expandWorkflow(

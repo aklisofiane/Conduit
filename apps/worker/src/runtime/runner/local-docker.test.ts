@@ -76,10 +76,6 @@ describe('buildDockerArgs', () => {
   });
 
   it('always sets HOME to the in-container writable dir, even under api-key mode', () => {
-    // codex aborts on startup if `$HOME` is unset or unwritable (it tries to
-    // touch `~/.codex/`). The image bakes `/home/runner` mode 1777; the
-    // spawner pins `HOME` to it explicitly so the contract survives base-
-    // image changes.
     const args = buildDockerArgs(base);
     const envs = args.flatMap((a, i) => (args[i - 1] === '-e' ? [a] : []));
     expect(envs).toContain('HOME=/home/runner');
@@ -116,9 +112,7 @@ describe('buildDockerArgs', () => {
   it('mounts the host codex auth.json under the in-container HOME under oauth-mount mode', () => {
     // Claude is intentionally absent — its OAuth path is the
     // `CLAUDE_CODE_OAUTH_TOKEN` env var carried in `RunnerRequest`, not a
-    // bind mount. Only Codex still needs its on-disk auth.json. The mount
-    // target is rewritten under `/home/runner/.codex/` so the SDK finds it
-    // via `os.homedir()` while the host path stays private to the host.
+    // bind mount. Only Codex still needs its on-disk auth.json.
     const args = buildDockerArgs({
       ...base,
       authMounts: [

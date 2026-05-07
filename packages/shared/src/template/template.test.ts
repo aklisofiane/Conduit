@@ -120,7 +120,10 @@ const RESEARCH_PRESET: AgentPreset = {
 const PRESET_MAP = new Map<string, AgentPreset>([
   [RESEARCH_PRESET.id, RESEARCH_PRESET],
 ]);
-const resolveFromMap = (id: string) => PRESET_MAP.get(id);
+const resolveFromMap = {
+  agent: (id: string) => PRESET_MAP.get(id),
+  mcp: () => undefined,
+};
 
 const PRESET_TEMPLATE: TemplateInputFile = {
   id: 'demo-presets',
@@ -204,9 +207,9 @@ describe('templateInputFileSchema + expandTemplate', () => {
   });
 
   it('expandTemplate throws UnknownPresetError when the preset is missing', () => {
-    expect(() => expandTemplate(PRESET_TEMPLATE, () => undefined)).toThrow(
-      UnknownPresetError,
-    );
+    expect(() =>
+      expandTemplate(PRESET_TEMPLATE, { agent: () => undefined, mcp: () => undefined }),
+    ).toThrow(UnknownPresetError);
   });
 });
 

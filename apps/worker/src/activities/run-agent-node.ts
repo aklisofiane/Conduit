@@ -182,10 +182,8 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
       run: { id: runId, startedAt: nodeRun.startedAt ?? new Date() },
     });
 
-    // Auto-injected suffix only fires for fan-out nodes (>1 immediate
-    // downstream); empty string otherwise so non-fan-out agents see no
-    // extra context. Concat — don't replace `node.instructions` — so the
-    // user's preset + instructionsAppend still own the bulk of the prompt.
+    // Concat — don't replace — so the user's preset + instructionsAppend
+    // still own the bulk of the prompt.
     const dagBlock = formatParallelDownstreamBlock(parallelDownstream ?? []);
     const fullSystemPrompt = dagBlock
       ? `${node.instructions}\n\n${dagBlock}`

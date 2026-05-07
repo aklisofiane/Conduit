@@ -22,13 +22,12 @@ export function serializeAgentContext(ctx: AgentContext): string {
 
 /**
  * Auto-injected suffix on the system prompt of any node that fans out into
- * parallel siblings. Empty string when the node has 0 or 1 immediate
- * downstream node — the runtime concats this onto `node.instructions` and a
- * `+ ''` is a no-op, so the rest of the agent's prompt stays clean.
+ * parallel siblings. Returns empty string when the node has <2 immediate
+ * downstreams.
  *
- * Only the *immediate* fan-out is surfaced — the agent doesn't need
- * transitive DAG visibility to make a dispatch decision, and keeping the
- * block tight avoids polluting context for agents that don't care.
+ * Only *immediate* fan-out is surfaced — the agent doesn't need transitive
+ * DAG visibility to make a dispatch decision, and keeping the block tight
+ * avoids polluting context for agents that don't care.
  */
 export function formatParallelDownstreamBlock(siblings: readonly string[]): string {
   if (siblings.length < 2) return '';

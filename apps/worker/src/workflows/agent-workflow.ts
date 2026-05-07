@@ -99,13 +99,7 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<void> {
             upstreamWorkspacePath: upstreamOutput?.workspacePath,
             upstreamHead: upstreamOutput?.head,
             parallelBranch,
-            // Empty array unless the node has >1 immediate downstream — the
-            // worker uses this to inject a small dispatch block into the
-            // system prompt of fan-out planners. Computed against
-            // `graph.edges` (which still includes trigger→node edges) since
-            // the helper filters by `from === node.name` and node names
-            // can't collide with trigger names.
-            parallelDownstream: parallelDownstreamOf(node.name, graph.edges),
+            parallelDownstream: parallelDownstreamOf(node.name, agentEdges),
           });
           return [node.name, output];
         }),

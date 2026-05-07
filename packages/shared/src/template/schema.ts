@@ -4,6 +4,9 @@ import { agentConfigSchema } from '../agent/index';
 import { agentProviderIdSchema } from '../agent/provider';
 import { workflowMcpServerSchema } from '../mcp/server';
 
+const kebabIdSchema = (label: string) =>
+  z.string().regex(/^[a-z][a-z0-9-]*$/, `${label} must be kebab-case`);
+
 /**
  * One workflow inside a template bundle. `definition` is the same shape as
  * `Workflow.definition` in the DB, with one exception: `connectionId` fields
@@ -27,9 +30,7 @@ export const templateCategorySchema = z.enum([
 export type TemplateCategory = z.infer<typeof templateCategorySchema>;
 
 export const templateFileSchema = z.object({
-  id: z
-    .string()
-    .regex(/^[a-z][a-z0-9-]*$/, 'template id must be kebab-case'),
+  id: kebabIdSchema('template id'),
   name: z.string().min(1),
   description: z.string().min(1),
   category: templateCategorySchema,
@@ -47,10 +48,7 @@ export type TemplateFile = z.infer<typeof templateFileSchema>;
  */
 export const templateAgentInputSchema = agentConfigSchema
   .extend({
-    presetId: z
-      .string()
-      .regex(/^[a-z][a-z0-9-]*$/, 'presetId must be kebab-case')
-      .optional(),
+    presetId: kebabIdSchema('presetId').optional(),
     instructionsAppend: z.string().optional(),
     provider: agentProviderIdSchema.optional(),
     model: z.string().min(1).optional(),
@@ -100,10 +98,7 @@ export type TemplateAgentInput = z.infer<typeof templateAgentInputSchema>;
 export const templateMcpServerInputSchema = workflowMcpServerSchema
   .partial({ name: true, transport: true })
   .extend({
-    presetId: z
-      .string()
-      .regex(/^[a-z][a-z0-9-]*$/, 'presetId must be kebab-case')
-      .optional(),
+    presetId: kebabIdSchema('presetId').optional(),
   })
   .superRefine((v, ctx) => {
     if (v.presetId) return;
@@ -143,9 +138,7 @@ export const templateInputWorkflowSchema = z.object({
 export type TemplateInputWorkflow = z.infer<typeof templateInputWorkflowSchema>;
 
 export const templateInputFileSchema = z.object({
-  id: z
-    .string()
-    .regex(/^[a-z][a-z0-9-]*$/, 'template id must be kebab-case'),
+  id: kebabIdSchema('template id'),
   name: z.string().min(1),
   description: z.string().min(1),
   category: templateCategorySchema,
