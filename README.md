@@ -31,9 +31,17 @@ Prerequisites: Node.js 22 (`nvm use`), npm 10+, Docker.
 nvm use
 npm install
 cp .env.example .env
-npm run infra:up           # Postgres (5434), Temporal (7233 / UI 8080), Redis (6379)
-npm run db:push            # apply Prisma schema
+npm run infra:up                # Postgres (5434), Temporal (7233 / UI 8080), Redis (6379)
+npm run db:push                 # apply Prisma schema
+npm run build                   # builds TS dist + the agent-runner Docker image
 ```
+
+`apps/agent-runner` is the per-run container the worker spawns for every agent execution. Its `build` script chains `tsc` and `docker build -t agent-runner:dev`, so any workspace build keeps the image current. CI tags via `CONDUIT_RUNNER_IMAGE`. Force a clean image rebuild with `npm run docker:agent-runner:build`.
+
+If you authenticate via OAuth instead of API keys:
+
+- **Claude:** run `claude setup-token`, paste the result into `CLAUDE_CODE_OAUTH_TOKEN` in `.env`. The worker forwards it to the runner via the protocol; no bind mount needed.
+- **Codex:** set `CONDUIT_AGENT_AUTH=oauth-mount` in `.env`. The worker then bind-mounts only `~/.codex/auth.json` into each runner container at the same absolute path (Codex has no equivalent setup-token flow). **Local-dev only** — it weakens the runner's trust boundary by exposing your `~/.codex/auth.json` to the agent process; leave the default (`api-key`) in any shared environment.
 
 Common scripts (all run through Turborepo where applicable):
 

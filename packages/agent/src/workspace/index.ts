@@ -1,4 +1,4 @@
-export { WorkspaceManager } from './manager';
+export { WorkspaceManager, bareCloneOf } from './manager';
 export type {
   ConnectionContext,
   PrContext,

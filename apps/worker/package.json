@@ -13,11 +13,9 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.2.131",
     "@conduit/agent": "0.0.0",
     "@conduit/database": "0.0.0",
     "@conduit/shared": "0.0.0",
-    "@openai/codex-sdk": "^0.128.0",
     "@temporalio/activity": "^1.11.6",
     "@temporalio/worker": "^1.11.6",
     "@temporalio/workflow": "^1.11.6",

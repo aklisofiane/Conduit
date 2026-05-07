@@ -62,6 +62,10 @@
     "./webhook": {
       "types": "./dist/webhook/index.d.ts",
       "default": "./dist/webhook/index.js"
+    },
+    "./runner": {
+      "types": "./dist/runner/index.d.ts",
+      "default": "./dist/runner/index.js"
     }
   },
   "files": [

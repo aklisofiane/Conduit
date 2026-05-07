@@ -1,5 +1,3 @@
-import fs from 'node:fs/promises';
-import path from 'node:path';
 import { Context } from '@temporalio/activity';
 import {
   WorkspaceManager,
@@ -8,13 +6,10 @@ import {
   clearConduitFolder,
   discoverSkills,
   finalSummaryPrompt,
-  git,
   installPushCredentials,
   installSkillsIntoWorkspace,
   issueWritebackPrompt,
-  readConduitSummary,
   resolveMcpServers,
-  resolveProvider,
   runDir,
   serializeAgentContext,
 } from '@conduit/agent';
@@ -23,12 +18,14 @@ import {
   type AgentConfig,
   type AgentConfigWithWorkspace,
   type AgentEvent,
+  type AgentRequest,
   type McpServerRef,
   type NodeOutput,
   type TriggerConfig,
   type TriggerEvent,
   type WorkflowMcpServer,
 } from '@conduit/shared';
+import type { RunnerEvent, RunnerRequest } from '@conduit/shared/runner';
 import type {
   ConnectionContext,
   PrContext,
@@ -41,6 +38,7 @@ import { makeCredentialLookup } from '../runtime/credential-lookup';
 import { publishRunUpdate } from '../runtime/event-bus';
 import { writeAgentEventLog, writeSystemLog } from '../runtime/log-writer';
 import { prisma } from '../runtime/prisma';
+import { resolveRunnerSpawner } from '../runtime/runner';
 import { makeTicketBranchStore } from '../runtime/ticket-branch-store';
 
 export interface RunAgentNodeInput {
@@ -67,17 +65,17 @@ export interface RunAgentNodeInput {
 }
 
 /**
- * The workhorse activity. One invocation per agent node. Orchestrates:
- *   1. Create `NodeRun` row, flip to RUNNING.
- *   2. Resolve workspace (repo-clone / inherit / fresh-tmpdir). Parallel
- *      `inherit` siblings get a branched worktree so they don't stomp.
- *   3. Copy selected skills into the workspace.
- *   4. Resolve MCP configs (credentials substituted in-memory).
- *   5. Start a provider session; drive turn 1 (`AgentContext`) and turn 2
- *      (write `.conduit/<NodeName>.md` summary) through the same session
- *      so the agent keeps conversation state across the summary step.
- *   6. Capture workspace path + head + `.conduit/` summary for downstream.
- *   7. On error/cancel: flip `NodeRun` to FAILED/CANCELLED, propagate.
+ * The workhorse activity. One invocation per agent node. Trusted-orchestrator
+ * side: everything up to the provider session boundary stays here —
+ * `NodeRun` upsert, workspace resolve, push-cred install, skills install,
+ * MCP credential substitution, writeback resolution, agent context build.
+ *
+ * The provider session itself runs in a per-run agent-runner container —
+ * see docs spec: `docker-runner.md`. The orchestrator hands the runner a
+ * `RunnerRequest` over stdin and consumes a stream of `RunnerEvent`s on
+ * stdout, translating each `agent` event back into the existing
+ * `onAgentEvent` flow (counters, log-write, event-bus publish, NodeRun
+ * updates) without changing those downstream paths.
  *
  * The activity is idempotent up to the workspace step — Temporal retries
  * re-enter from the top. Real agent runs are not resumable mid-session.
@@ -173,10 +171,6 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
       makeCredentialLookup(),
     );
 
-    const provider = resolveProvider(node.provider, {
-      anthropicApiKey: config.anthropicApiKey,
-    });
-
     const abortController = new AbortController();
     ctx.cancellationSignal.addEventListener('abort', () => abortController.abort());
 
@@ -186,78 +180,96 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
       run: { id: runId, startedAt: nodeRun.startedAt ?? new Date() },
     });
 
-    const usage = { inputTokens: 0, outputTokens: 0, toolCalls: 0, turns: 0 };
-    const session = provider.startSession(
-      {
-        model: node.model,
-        systemPrompt: node.instructions,
-        mcpServers: resolvedMcp,
-        workspacePath: workspace.path,
-        // Per-run scratch root — siblings + .credential-helpers/ live here.
-        // Without this, Claude Code blocks any tool call that touches the
-        // run dir (the workspace's parent), which contradicts the design
-        // assumption noted in push-auth.ts.
-        // `baseClonesRoot()` covers the bare clones that back every worktree:
-        // a `.git` pointer file inside the workspace dereferences to
-        // `<baseClones>/.../<repo>.git/worktrees/<name>/`, so committing or
-        // pushing from the agent requires that path to be writable too.
-        additionalDirectories: [runDir(runId), baseClonesRoot()],
-        webSearch: node.webSearch,
-        constraints: node.constraints ?? {},
+    const agentRequest: AgentRequest = {
+      model: node.model,
+      systemPrompt: node.instructions,
+      mcpServers: resolvedMcp,
+      workspacePath: workspace.path,
+      // Per-run scratch root — siblings + .credential-helpers/ live here.
+      // Without this, Claude Code blocks any tool call that touches the
+      // run dir (the workspace's parent), which contradicts the design
+      // assumption noted in push-auth.ts.
+      // `baseClonesRoot()` covers the bare clones that back every worktree:
+      // a `.git` pointer file inside the workspace dereferences to
+      // `<baseClones>/.../<repo>.git/worktrees/<name>/`, so committing or
+      // pushing from the agent requires that path to be writable too.
+      additionalDirectories: [runDir(runId), baseClonesRoot()],
+      webSearch: node.webSearch,
+      constraints: node.constraints ?? {},
+    };
+
+    const runnerRequest: RunnerRequest = {
+      protocolVersion: 1,
+      run: {
+        runId,
+        workflowId,
+        workflowName,
+        nodeName: node.name,
       },
-      abortController.signal,
-    );
+      provider: {
+        id: node.provider,
+        anthropicApiKey: config.anthropicApiKey,
+        openaiApiKey: config.openaiApiKey,
+        claudeCodeOauthToken: config.claudeCodeOauthToken,
+      },
+      agent: agentRequest,
+      prompts: {
+        main: serializeAgentContext(agentCtx),
+        issueWriteback: writebackContext
+          ? issueWritebackPrompt({
+              owner: writebackContext.repoOwner,
+              repo: writebackContext.repoName,
+              issueNumber: writebackContext.issueNumber,
+              allowedStatuses: writebackContext.allowedStatuses,
+              allowedLabels: writebackContext.allowedLabels,
+            })
+          : undefined,
+        summary: finalSummaryPrompt(node.name),
+      },
+    };
 
-    // Per-event heartbeats stall whenever a tool call blocks the SDK iterator
-    // (a slow Bash, a slow MCP tool). A timer at half the heartbeatTimeout
-    // (60s → 30s) keeps Temporal's liveness check happy regardless of tool
-    // duration, with one missed-heartbeat of slack.
-    let phase: 'main' | 'summary' = 'main';
+    const usage = { inputTokens: 0, outputTokens: 0, toolCalls: 0, turns: 0 };
+    // Per-event heartbeats stall whenever a tool call blocks the runner
+    // iterator. A timer at half the heartbeatTimeout (60s → 30s) keeps
+    // Temporal's liveness check happy regardless of tool duration, with one
+    // missed-heartbeat of slack.
     const heartbeater = setInterval(() => {
-      ctx.heartbeat({ nodeName: node.name, usage, phase });
+      ctx.heartbeat({ nodeName: node.name, usage });
     }, 30_000);
+
+    const spawner = resolveRunnerSpawner();
+    const handle = await spawner.spawn(runnerRequest, abortController.signal);
+    let terminal: RunnerEvent | null = null;
     try {
-      // Turn 1 — main work. The agent reads upstream `.conduit/*.md` on its
-      // own via file tools; only the trigger/workflow/run shell is injected.
-      for await (const event of session.run(serializeAgentContext(agentCtx))) {
-        await onAgentEvent(runId, node.name, event, usage);
-      }
-
-      // Turn 2a — issue writeback. Soft-allowlist directive interpolated
-      // into a user message; agent uses the GitHub MCP to apply the change.
-      // Skipped silently when not configured or when the run had no GitHub
-      // issue trigger (manual runs, future non-GitHub triggers).
-      if (writebackContext) {
-        for await (const event of session.run(
-          issueWritebackPrompt({
-            owner: writebackContext.repoOwner,
-            repo: writebackContext.repoName,
-            issueNumber: writebackContext.issueNumber,
-            allowedStatuses: writebackContext.allowedStatuses,
-            allowedLabels: writebackContext.allowedLabels,
-          }),
-        )) {
-          await onAgentEvent(runId, node.name, event, usage);
+      for await (const event of handle.events) {
+        if (event.kind === 'agent') {
+          await onAgentEvent(runId, node.name, event.event, usage);
+        } else if (event.kind === 'system') {
+          await Promise.all([
+            publishSystemEvent(runId, node.name, event.message),
+            writeSystemLog(runId, node.name, event.message),
+          ]);
+        } else if (event.kind === 'exit') {
+          terminal = event;
+          break;
         }
-      }
-
-      // Turn 2b — final summary. Same session, so conversation state is
-      // retained. The agent is expected to write `.conduit/<NodeName>.md`.
-      phase = 'summary';
-      for await (const event of session.run(finalSummaryPrompt(node.name))) {
-        await onAgentEvent(runId, node.name, event, usage);
+        // heartbeats are advisory — the orchestrator-side liveness check
+        // sits inside the spawner; we just observe them flow through.
       }
     } finally {
       clearInterval(heartbeater);
-      await session.dispose();
+      await handle.cancel();
     }
 
-    await ensureConduitSummaryPlaceholder(workspace.path, node);
-    const conduitSummary = await readConduitSummary(workspace.path, node.name);
-    const files = await listChangedFiles(workspace.path);
+    if (!terminal) {
+      throw new Error(`agent-runner exited without a terminal event for node "${node.name}"`);
+    }
+    if (!terminal.ok) {
+      throw new Error(terminal.error.message);
+    }
 
     const output: NodeOutput = {
-      files,
+      files: terminal.changedFiles,
       workspacePath: workspace.path,
       head: workspace.head,
       workspaceKind: workspace.kind,
@@ -273,7 +285,7 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
         output: output as unknown as object,
         usage: usage as unknown as object,
         workspacePath: workspace.path,
-        conduitSummary: conduitSummary ?? undefined,
+        conduitSummary: terminal.conduitSummary ?? undefined,
       },
     });
 
@@ -336,48 +348,6 @@ function systemMessage(
 ): string {
   const branchHint = parallelBranch ? ' · branched-worktree' : '';
   return `workspace ${node.workspace.kind}${branchHint} · ${node.provider}/${node.model} · ${workspacePath}`;
-}
-
-/**
- * Write a minimal `.conduit/<NodeName>.md` placeholder if the agent didn't
- * produce one during the summary turn. The workflow/UI always expect a file
- * to exist; downstream agents fall back to the placeholder gracefully.
- */
-async function ensureConduitSummaryPlaceholder(
-  workspacePath: string,
-  node: AgentConfig,
-): Promise<void> {
-  const file = path.join(workspacePath, '.conduit', `${node.name}.md`);
-  await fs.mkdir(path.dirname(file), { recursive: true });
-  try {
-    await fs.writeFile(
-      file,
-      `# ${node.name}\n\n(Agent did not write a summary for this run.)\n`,
-      { encoding: 'utf8', flag: 'wx' },
-    );
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
-    // Agent already wrote a summary — leave it intact.
-  }
-}
-
-/**
- * Compare the workspace against its baseline commit. Returns an empty list
- * if the workspace isn't a git repo (fresh-tmpdir).
- */
-async function listChangedFiles(workspacePath: string): Promise<string[]> {
-  // `--untracked-files=all` recurses into untracked directories — the default
-  // `-unormal` collapses a fresh dir into its top-level path, which is useless
-  // for the "changed files" view.
-  const stdout = await git(['status', '--porcelain', '--untracked-files=all'], {
-    cwd: workspacePath,
-  }).catch(() => '');
-  return stdout
-    .split('\n')
-    .filter(Boolean)
-    .map((line) => line.slice(3).trim())
-    .filter(Boolean)
-    .filter((file) => file !== '.conduit' && !file.startsWith('.conduit/'));
 }
 
 export async function cleanupConduitFolder(workspacePath: string): Promise<void> {
@@ -507,3 +477,4 @@ function buildSyntheticGithubMcp(connectionId: string): {
   const ref: McpServerRef = { serverId: WRITEBACK_GITHUB_MCP_ID };
   return { server, ref };
 }
+

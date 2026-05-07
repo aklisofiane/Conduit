@@ -9,9 +9,23 @@ import * as activities from './activities/index';
 import { config } from './config';
 import { closeEventBus } from './runtime/event-bus';
 import { closePrisma } from './runtime/prisma';
+import { dockerPreflight, sweepOrphans } from './runtime/runner';
 import { closeTemporalClient } from './runtime/temporal-client';
 
 async function run(): Promise<void> {
+  // Docker is a hard requirement — agent execution happens inside per-run
+  // agent-runner containers spawned by the worker. Fail fast if Docker
+  // isn't reachable, with a message clearer than a silent task-queue stall.
+  await dockerPreflight();
+  // Catch containers from a previous worker process whose run already
+  // settled to a terminal state. Best-effort; never blocks startup.
+  await sweepOrphans().catch((err: unknown) => {
+    console.warn(
+      'Orphan sweep failed:',
+      err instanceof Error ? err.message : String(err),
+    );
+  });
+
   const connection = await NativeConnection.connect({ address: config.temporal.address });
 
   const worker = await Worker.create({

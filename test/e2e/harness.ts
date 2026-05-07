@@ -104,6 +104,12 @@ export async function startHarness(opts: HarnessOptions = {}): Promise<Harness> 
     CONDUIT_HOME: path.join(workspaceRoot, 'conduit-home'),
     CONDUIT_TEST_REMOTE_BASE: remoteBase,
     TEMPORAL_TASK_QUEUE: taskQueue,
+    // Make the per-test scaffold (test remote bare repos under
+    // `<workspaceRoot>/test-remotes`, seed working clones under
+    // `<workspaceRoot>/seed-repos`, conduit_home under `<workspaceRoot>/
+    // conduit-home`) visible inside the agent-runner container at the same
+    // absolute path. Production never sets this.
+    CONDUIT_RUNNER_TEST_MOUNTS: workspaceRoot,
     ...opts.extraEnv,
   };
 

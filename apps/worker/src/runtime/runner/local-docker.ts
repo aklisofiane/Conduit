@@ -1,0 +1,346 @@
+import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { bareCloneOf, runDir } from '@conduit/agent';
+import type { RunnerEvent, RunnerRequest } from '@conduit/shared/runner';
+import { resolveAgentAuthMode, type AgentAuthMode } from './auth-mode';
+import { readRunnerEvents } from './json-line-iterator';
+import type { RunnerHandle, RunnerSpawner } from './spawner';
+
+/**
+ * Phase-1 implementation of `RunnerSpawner`. Shells out to `docker run --rm`
+ * with bind mounts wired so the agent inside the container reads/writes the
+ * exact host paths the orchestrator already resolved.
+ *
+ * Hard invariants — not user-configurable:
+ *   - run dir mounted at the same absolute path inside the container
+ *     (anything else breaks `.git` pointer files in worktrees)
+ *   - bare clone (when applicable) mounted at the same absolute path —
+ *     and *only* the one bare clone backing this workspace, never the whole
+ *     `~/.conduit/base-clones/` tree
+ *   - container UID = host worker UID (never root)
+ *   - default bridge networking (no `--privileged`, no docker.sock,
+ *     no `--network=host`)
+ *
+ * No env-var or caller-supplied option can widen the mount surface or
+ * change the network mode.
+ */
+export interface LocalDockerSpawnerOptions {
+  /** Image tag to run, e.g. `agent-runner:dev` or `agent-runner:<git-sha>`. */
+  image: string;
+  /**
+   * Liveness threshold: kill the container if no events or heartbeats arrive
+   * for this many ms. Default 60s — twice the runner's heartbeat interval.
+   */
+  livenessTimeoutMs?: number;
+}
+
+const DEFAULT_LIVENESS_TIMEOUT_MS = 60_000;
+
+export class LocalDockerSpawner implements RunnerSpawner {
+  constructor(private readonly opts: LocalDockerSpawnerOptions) {}
+
+  async spawn(req: RunnerRequest, signal: AbortSignal): Promise<RunnerHandle> {
+    const livenessMs = this.opts.livenessTimeoutMs ?? DEFAULT_LIVENESS_TIMEOUT_MS;
+    const runDirPath = runDir(req.run.runId);
+    const bareClone = await bareCloneOf(req.agent.workspacePath);
+    const uid = os.userInfo().uid;
+    const gid = os.userInfo().gid;
+    const containerName = makeContainerName(req.run.runId, req.run.nodeName);
+    const authMode = resolveAgentAuthMode();
+    const authMounts = authMode === 'oauth-mount' ? await resolveOauthMounts() : [];
+    const testMounts = resolveTestMounts();
+    const args = buildDockerArgs({
+      image: this.opts.image,
+      containerName,
+      runId: req.run.runId,
+      nodeName: req.run.nodeName,
+      runDirPath,
+      bareClone,
+      uid,
+      gid,
+      authMounts,
+      // The bind mounts use the host's absolute paths; setting HOME inside
+      // the container so `os.homedir()` (which the SDKs call) resolves to
+      // the same path is what makes them findable. No-op when there are no
+      // mounts to find.
+      homeOverride: authMode === 'oauth-mount' ? os.homedir() : undefined,
+      testMounts,
+      // Test-mode env passthrough is gated on `testMounts` being non-empty
+      // — the same signal that says "this run has the trust boundary
+      // widened on purpose." Forwards just the StubProvider selection so
+      // the e2e harness can drive scripted runs against the real image
+      // without a protocol-level test field.
+      forwardedEnv: testMounts.length > 0 ? testModeForwardedEnv() : {},
+    });
+
+    const child = spawn('docker', args, { stdio: ['pipe', 'pipe', 'pipe'] });
+    child.stdin.setDefaultEncoding('utf8');
+    child.stdin.write(JSON.stringify(req));
+    child.stdin.end();
+
+    const stderr: Buffer[] = [];
+    child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk));
+
+    let cancelled = false;
+    const cancel = async (): Promise<void> => {
+      if (cancelled) return;
+      cancelled = true;
+      // `docker kill` is idempotent — no-op if the container has already
+      // exited. We use it (not `child.kill`) so the container is removed
+      // before we return; otherwise the next run with the same name races.
+      await new Promise<void>((resolve) => {
+        const k = spawn('docker', ['kill', containerName], { stdio: 'ignore' });
+        k.on('exit', () => resolve());
+        k.on('error', () => resolve());
+      });
+      // Give the docker run process a beat to notice the kill, then make
+      // sure it's gone.
+      if (!child.killed) child.kill('SIGTERM');
+    };
+
+    if (signal.aborted) {
+      await cancel();
+    } else {
+      signal.addEventListener('abort', () => void cancel());
+    }
+
+    const events = pumpEvents(child, livenessMs, cancel, () =>
+      stderr.map((b) => b.toString('utf8')).join(''),
+    );
+
+    return { events, cancel };
+  }
+}
+
+export interface BuildArgsInput {
+  image: string;
+  containerName: string;
+  runId: string;
+  nodeName: string;
+  runDirPath: string;
+  bareClone: string | null;
+  uid: number;
+  gid: number;
+  /**
+   * Extra read-write bind mounts (host paths) for OAuth credential files
+   * when `CONDUIT_AGENT_AUTH=oauth-mount`. Same-path mounts only — host
+   * path == container path so the SDK finds them via `os.homedir()` after
+   * `homeOverride` aligns the in-container HOME with the host's. Empty
+   * under `api-key` mode.
+   */
+  authMounts: string[];
+  /**
+   * Sets the container's HOME env var. Required when `authMounts` is
+   * non-empty so `os.homedir()` inside the runner returns the same
+   * absolute path as the bind mount source. Undefined when not needed.
+   */
+  homeOverride: string | undefined;
+  /**
+   * Test-only same-path mounts driven by `CONDUIT_RUNNER_TEST_MOUNTS`. The
+   * e2e harness uses this to make per-test scaffolding (test remote bare
+   * repos, seed working clones, stub script file location) visible inside
+   * the runner. Empty in production. The variable must never be set in any
+   * shared environment — it widens the trust boundary by definition.
+   */
+  testMounts: string[];
+  /**
+   * Test-only env vars forwarded into the container as `-e KEY=VALUE`. Gated
+   * on `testMounts` being non-empty in `LocalDockerSpawner.spawn` — same
+   * "test mode is on" signal. Empty in production runs.
+   */
+  forwardedEnv: Record<string, string>;
+}
+
+/**
+ * Pure docker-argv builder, exported for unit tests so the security-
+ * critical invariants from `.specs/docker-runner.md` (same-path mounts,
+ * non-root UID, no `--privileged`, no host networking, no docker.sock)
+ * can be asserted without spawning a child process.
+ */
+export function buildDockerArgs(input: BuildArgsInput): string[] {
+  const args: string[] = [
+    'run',
+    '--rm',
+    '-i',
+    '--name',
+    input.containerName,
+    '--user',
+    `${input.uid}:${input.gid}`,
+    '--label',
+    `conduit.runId=${input.runId}`,
+    '--label',
+    `conduit.nodeName=${input.nodeName}`,
+    // Same-path bind mount so absolute paths on the host (workspace path,
+    // git worktree pointers) resolve identically inside the container.
+    '-v',
+    `${input.runDirPath}:${input.runDirPath}:rw`,
+  ];
+  if (input.bareClone) {
+    args.push('-v', `${input.bareClone}:${input.bareClone}:rw`);
+  }
+  for (const p of input.authMounts) {
+    args.push('-v', `${p}:${p}:rw`);
+  }
+  for (const p of input.testMounts) {
+    args.push('-v', `${p}:${p}:rw`);
+  }
+  if (input.homeOverride !== undefined) {
+    args.push('-e', `HOME=${input.homeOverride}`);
+  }
+  for (const [k, v] of Object.entries(input.forwardedEnv)) {
+    args.push('-e', `${k}=${v}`);
+  }
+  args.push(input.image);
+  return args;
+}
+
+/**
+ * Read `CONDUIT_RUNNER_TEST_MOUNTS` — a colon-delimited list of host paths
+ * that the e2e harness needs visible inside the runner (test remotes, seed
+ * roots, etc.). Each path is bind-mounted at the same absolute path. Empty
+ * unless the env var is set; production never sets it.
+ */
+function resolveTestMounts(): string[] {
+  const v = process.env.CONDUIT_RUNNER_TEST_MOUNTS;
+  if (!v) return [];
+  return v
+    .split(':')
+    .map((p) => p.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Env vars the e2e harness needs inside the runner once the stub-script
+ * file is reachable via test mounts. Hardcoded allowlist — only
+ * `StubProvider`-related signals — so this never accidentally forwards
+ * something larger (DB URLs, the master KEK, etc.).
+ */
+function testModeForwardedEnv(): Record<string, string> {
+  const out: Record<string, string> = {};
+  const allow = ['CONDUIT_PROVIDER', 'CONDUIT_STUB_SCRIPT'];
+  for (const key of allow) {
+    const value = process.env[key];
+    if (value !== undefined) out[key] = value;
+  }
+  return out;
+}
+
+/**
+ * Codex-only — Claude has a clean env-var path (`CLAUDE_CODE_OAUTH_TOKEN`
+ * from `claude setup-token`) which is plumbed through `RunnerRequest`,
+ * not via a bind mount. Codex doesn't (yet) expose an equivalent token,
+ * so its OAuth flow still requires its on-disk `auth.json`.
+ *
+ * Returns `~/.codex/auth.json` if it exists on the host, else nothing.
+ * Skipping a missing file means a user who hasn't logged into Codex can
+ * still run Claude; the SDK will 401 if Codex is then invoked, which is
+ * the same failure mode as the api-key path.
+ */
+async function resolveOauthMounts(): Promise<string[]> {
+  const codexAuth = path.join(os.homedir(), '.codex', 'auth.json');
+  try {
+    await fs.stat(codexAuth);
+    return [codexAuth];
+  } catch {
+    return [];
+  }
+}
+
+export type { AgentAuthMode };
+
+/**
+ * Liveness-aware event pump. Watches the runner's stdout for either an
+ * event or a heartbeat; if `livenessMs` elapses with neither, kills the
+ * container and surfaces a synthetic `exit` error so the orchestrator's
+ * existing failure path picks it up.
+ *
+ * Forwards the runner's stderr verbatim to the worker process's stderr —
+ * useful for diagnosing image-level failures (e.g. native build errors,
+ * missing system tools) that the agent never gets to report.
+ */
+async function* pumpEvents(
+  child: ChildProcessWithoutNullStreams,
+  livenessMs: number,
+  cancel: () => Promise<void>,
+  collectedStderr: () => string,
+): AsyncIterable<RunnerEvent> {
+  let lastTouch = Date.now();
+  let liveness: NodeJS.Timeout | null = null;
+  let livenessFired = false;
+
+  const startLiveness = (): void => {
+    liveness = setInterval(() => {
+      if (Date.now() - lastTouch > livenessMs) {
+        livenessFired = true;
+        if (liveness) clearInterval(liveness);
+        void cancel();
+      }
+    }, Math.max(1_000, Math.floor(livenessMs / 4)));
+  };
+
+  startLiveness();
+  const onMalformed = (line: string, err: unknown): void => {
+    process.stderr.write(
+      `[runner] malformed event line dropped: ${truncate(line, 200)} (${err instanceof Error ? err.message : String(err)})\n`,
+    );
+  };
+
+  child.stderr.on('data', (chunk: Buffer) => {
+    process.stderr.write(chunk);
+  });
+
+  let sawTerminalExit = false;
+  try {
+    for await (const event of readRunnerEvents(child.stdout, onMalformed)) {
+      lastTouch = Date.now();
+      if (event.kind === 'exit') sawTerminalExit = true;
+      yield event;
+    }
+  } finally {
+    if (liveness) clearInterval(liveness);
+  }
+
+  // Wait for the docker process to actually exit so cancel() returns
+  // when callers expect it to.
+  const exit = await new Promise<{ code: number | null; signal: NodeJS.Signals | null }>(
+    (resolve) => {
+      if (child.exitCode !== null || child.signalCode !== null) {
+        resolve({ code: child.exitCode, signal: child.signalCode });
+        return;
+      }
+      child.on('exit', (code, sig) => resolve({ code, signal: sig }));
+    },
+  );
+
+  if (!sawTerminalExit) {
+    yield {
+      kind: 'exit',
+      ok: false,
+      error: {
+        message: livenessFired
+          ? `runner went silent for >${livenessMs}ms (no events or heartbeats); killed`
+          : `runner exited (code=${exit.code ?? '?'}, signal=${exit.signal ?? '-'}) before emitting a terminal event${appendStderr(collectedStderr())}`,
+      },
+    };
+  }
+}
+
+function appendStderr(stderr: string): string {
+  const trimmed = stderr.trim();
+  if (!trimmed) return '';
+  return ` — stderr: ${truncate(trimmed, 500)}`;
+}
+
+function truncate(s: string, max: number): string {
+  return s.length <= max ? s : `${s.slice(0, max - 1)}…`;
+}
+
+function makeContainerName(runId: string, nodeName: string): string {
+  // Docker container names accept [a-zA-Z0-9_.-]. Node names are already
+  // restricted by `nodeNameSchema`; sanitize defensively for the runId.
+  const safeRun = runId.replace(/[^a-zA-Z0-9_.-]/g, '-');
+  const safeNode = nodeName.replace(/[^a-zA-Z0-9_.-]/g, '-');
+  return `conduit-runner-${safeRun}-${safeNode}`.slice(0, 200);
+}

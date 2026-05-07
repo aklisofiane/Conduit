@@ -164,8 +164,11 @@ async function unregisterRunWorktrees(root: string): Promise<void> {
  *   `gitdir: <bare>/worktrees/<name>`
  * Returns null for non-worktree dirs (no `.git` pointer, `.git` is a dir,
  * or no `/worktrees/` segment).
+ *
+ * Exported so the worker's runner-spawner can derive the bare-clone bind
+ * mount for each run without duplicating the pointer-file parsing.
  */
-async function bareCloneOf(workspacePath: string): Promise<string | null> {
+export async function bareCloneOf(workspacePath: string): Promise<string | null> {
   const pointer = await fs
     .readFile(path.join(workspacePath, '.git'), 'utf8')
     .catch(() => null);

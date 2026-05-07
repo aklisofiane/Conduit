@@ -10,16 +10,12 @@
     "declarationMap": false,
     "baseUrl": ".",
     "paths": {
-      "@conduit/shared/crypto": ["../../packages/shared/src/crypto/index.ts"],
-      "@conduit/shared/platform": ["../../packages/shared/src/platform/index.ts"],
-      "@conduit/shared/runner": ["../../packages/shared/src/runner/index.ts"],
-      "@conduit/shared/webhook": ["../../packages/shared/src/webhook/index.ts"]
+      "@conduit/shared/runner": ["../../packages/shared/src/runner/index.ts"]
     }
   },
   "include": ["src"],
   "references": [
     { "path": "../../packages/shared" },
-    { "path": "../../packages/database" },
     { "path": "../../packages/agent" }
   ]
 }

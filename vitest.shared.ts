@@ -14,6 +14,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const sharedVitestConfig = defineConfig({
   resolve: {
     alias: {
+      // Subpath aliases must precede the bare-module alias — otherwise
+      // `@conduit/shared/runner` matches the bare prefix and resolves
+      // to `packages/shared/src/index.ts/runner` (i.e., nothing).
+      '@conduit/shared/runner': path.resolve(__dirname, 'packages/shared/src/runner/index.ts'),
       '@conduit/shared': path.resolve(__dirname, 'packages/shared/src/index.ts'),
       '@conduit/agent': path.resolve(__dirname, 'packages/agent/src/index.ts'),
       '@conduit/database': path.resolve(__dirname, 'packages/database/src/index.ts'),
