@@ -25,7 +25,15 @@ COPY package.json package-lock.json tsconfig.base.json ./
 COPY packages/shared/package.json packages/shared/
 COPY packages/agent/package.json packages/agent/
 COPY apps/agent-runner/package.json apps/agent-runner/
-RUN npm ci --include=dev --ignore-scripts
+# Scoped to just the workspaces the runner needs. Without `--workspace` filters
+# `npm ci` would resolve the whole workspace (api, web, worker, database) from
+# the root lockfile and drag their prod deps (React, Vite, Fastify, Temporal,
+# Prisma, etc.) into the runtime image — easily hundreds of MB of dead weight.
+RUN npm ci --include=dev --ignore-scripts \
+      --workspace=@conduit/agent-runner \
+      --workspace=@conduit/agent \
+      --workspace=@conduit/shared \
+      --include-workspace-root
 
 COPY packages/shared/ packages/shared/
 COPY packages/agent/ packages/agent/
@@ -42,7 +50,15 @@ RUN npm run build --workspace @conduit/shared \
  && npm run build:ts --workspace @conduit/agent-runner
 
 # Drop devDependencies for the runtime image.
-RUN npm prune --omit=dev
+# `npm prune` reconciles `node_modules` against the lockfile, so the rm of
+# the musl native binary has to happen *after* prune — otherwise prune
+# re-installs it from the lockfile's optional-deps list. `claude-agent-sdk`
+# ships glibc and musl variants as `optionalDependencies`; npm 10's `--libc`
+# flag is documented but not enforced. We run on debian-slim/glibc and
+# never load the musl variant — drop it to save ~233 MB. If the base image
+# ever switches to alpine, swap which variant is removed.
+RUN npm prune --omit=dev \
+ && rm -rf node_modules/@anthropic-ai/claude-agent-sdk-linux-x64-musl
 
 # ---- runtime ---------------------------------------------------------------
 FROM node:22-slim AS runtime
@@ -72,6 +88,22 @@ COPY --from=builder /build/packages/agent/dist ./node_modules/@conduit/agent/dis
 COPY --from=builder /build/packages/agent/package.json ./node_modules/@conduit/agent/package.json
 COPY --from=builder /build/apps/agent-runner/dist ./dist
 COPY --from=builder /build/apps/agent-runner/package.json ./package.json
+
+# `@anthropic-ai/claude-agent-sdk` and `zod@4` refuse to hoist to the root
+# `node_modules` — claude-agent-sdk's platform-binary `optionalDependencies`
+# (`-linux-x64`, `-linux-x64-musl`) block dedupe, and zod conflicts with
+# `@anthropic-ai/sdk`'s zod@3 already at root. npm installs both per-workspace.
+#
+# `claude-provider.js` (the only consumer) lives at
+# `packages/agent/dist/provider/`, so dropping the SDK and a v4 zod into
+# `packages/agent/node_modules/` is enough — Node walks up from the consumer.
+# Bulk-copying the workspace `node_modules` would also drag the platform
+# binaries (~470 MB) that are *already hoisted to the root* — paying twice
+# in image layers.
+COPY --from=builder /build/packages/agent/node_modules/@anthropic-ai/claude-agent-sdk \
+     ./node_modules/@conduit/agent/node_modules/@anthropic-ai/claude-agent-sdk
+COPY --from=builder /build/packages/agent/node_modules/zod \
+     ./node_modules/@conduit/agent/node_modules/zod
 
 # A writable HOME for the runner. The container runs as the host worker UID
 # (set per-spawn, not at image build time), so we cannot pre-chown to a
