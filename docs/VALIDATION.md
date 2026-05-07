@@ -17,6 +17,7 @@ How we prove the system works. The goal: every exit criterion in [PLANS.md](./PL
 Per-package, fast, no I/O.
 - `@conduit/shared`: schema validation, type guards.
 - `@conduit/agent`: workspace path derivation, branch name slugging, MCP config resolution with credential substitution, provider interface contract.
+- `apps/web`: component tests (jsdom, `@testing-library/react`) - colocated as `*.test.ts` next to the component under test.
 - `@conduit/database`: none — Prisma is tested via integration.
 
 ### 2. Integration tests (`vitest` + testcontainers or dockerized test env)

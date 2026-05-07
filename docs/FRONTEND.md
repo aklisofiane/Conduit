@@ -6,7 +6,7 @@ React 19 + Vite 8 + `@xyflow/react` + TanStack Query + Zustand + Tailwind v4 + s
 
 | Screen | Purpose |
 |---|---|
-| `/` | Workflow list (name, last run, status, active toggle) + "new workflow" + "from template" entry points |
+| `/` | Landing page - heading "Workflow state", workflow list (name, last run, status, active toggle) + "new workflow" + "from template" entry points |
 | `/workflows/:id` | Edit — canvas + config side panel (design only, no runtime data) |
 | `/workflows/:id/connections` | Manage the workflow's `WorkflowConnection`s — alias → credential + owner/repo + optional webhook signing secret |
 | `/workflows/:id/runs` | Run history list (status, trigger, duration, started at) |
