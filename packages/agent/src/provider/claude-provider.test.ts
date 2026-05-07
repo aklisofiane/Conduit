@@ -11,16 +11,18 @@ interface CapturedOptions {
   disallowedTools?: string[];
 }
 
-function installStub(): { capturedOptions: CapturedOptions | undefined } {
+function installStub(events: unknown[] = [{ type: 'result' }]): {
+  capturedOptions: CapturedOptions | undefined;
+} {
   const out: { capturedOptions: CapturedOptions | undefined } = { capturedOptions: undefined };
   const sdk = {
     query(args: unknown) {
       const a = args as { options: CapturedOptions };
       out.capturedOptions = a.options;
-      async function* events() {
-        yield { type: 'result' };
+      async function* stream() {
+        for (const event of events) yield event;
       }
-      return events();
+      return stream();
     },
   };
   __setClaudeSdkLoaderForTests(async () => sdk);
@@ -133,5 +135,35 @@ describe('ClaudeProvider', () => {
     for await (const _ of session.run('hi')) void _;
 
     expect(captured.capturedOptions?.disallowedTools).toBeUndefined();
+  });
+
+  it('throws when the Claude SDK returns an error result', async () => {
+    installStub([
+      {
+        type: 'result',
+        subtype: 'success',
+        is_error: true,
+        api_error_status: 401,
+        result: 'Failed to authenticate. API Error: 401 Invalid bearer token',
+      },
+    ]);
+    const p = new ClaudeProvider();
+    const session = p.startSession(
+      {
+        model: 'claude-sonnet-4-6',
+        systemPrompt: 'sys',
+        mcpServers: [],
+        workspacePath: '/tmp/x',
+        webSearch: false,
+        constraints: {},
+      },
+      new AbortController().signal,
+    );
+
+    await expect(async () => {
+      for await (const _ of session.run('hi')) void _;
+    }).rejects.toThrow(
+      'Claude Code failed: API 401: Failed to authenticate. API Error: 401 Invalid bearer token',
+    );
   });
 });

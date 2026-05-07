@@ -205,7 +205,16 @@ function abortControllerFromSignal(signal: AbortSignal): AbortController {
  */
 function translate(raw: unknown): AgentEvent[] {
   if (!raw || typeof raw !== 'object') return [];
-  const m = raw as { type?: string; message?: unknown; event?: unknown; subtype?: string };
+  const m = raw as {
+    type?: string;
+    message?: unknown;
+    event?: unknown;
+    subtype?: string;
+    is_error?: boolean;
+    result?: unknown;
+    errors?: unknown;
+    api_error_status?: unknown;
+  };
 
   if (m.type === 'stream_event' && m.event && typeof m.event === 'object') {
     const ev = m.event as { type?: string; delta?: { type?: string; text?: string } };
@@ -265,10 +274,31 @@ function translate(raw: unknown): AgentEvent[] {
   }
 
   if (m.type === 'result') {
+    if (m.is_error) {
+      throw new Error(formatClaudeResultError(m));
+    }
     return [{ type: 'done' }];
   }
 
   return [];
+}
+
+function formatClaudeResultError(result: {
+  result?: unknown;
+  errors?: unknown;
+  api_error_status?: unknown;
+}): string {
+  const status =
+    typeof result.api_error_status === 'number' || typeof result.api_error_status === 'string'
+      ? `API ${result.api_error_status}: `
+      : '';
+  if (typeof result.result === 'string' && result.result.trim()) {
+    return `Claude Code failed: ${status}${result.result.trim()}`;
+  }
+  if (Array.isArray(result.errors) && result.errors.length > 0) {
+    return `Claude Code failed: ${status}${result.errors.map(stringifyOutput).join('; ')}`;
+  }
+  return `Claude Code failed: ${status}SDK returned an error result`;
 }
 
 function stringifyOutput(c: unknown): string {
