@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { resolveProvider, git } from '@conduit/agent';
+import { readConduitSummary, resolveProvider, git } from '@conduit/agent';
 import { runnerRequestSchema, type RunnerEvent } from '@conduit/shared/runner';
 import type { AgentEvent, AgentRequest } from '@conduit/shared';
 
@@ -146,14 +146,6 @@ async function listChangedFiles(workspacePath: string): Promise<string[]> {
     .map((line) => line.slice(3).trim())
     .filter(Boolean)
     .filter((file) => file !== '.conduit' && !file.startsWith('.conduit/'));
-}
-
-async function readConduitSummary(
-  workspacePath: string,
-  nodeName: string,
-): Promise<string | null> {
-  const file = path.join(workspacePath, '.conduit', `${nodeName}.md`);
-  return fs.readFile(file, 'utf8').catch(() => null);
 }
 
 main().catch((err: unknown) => {

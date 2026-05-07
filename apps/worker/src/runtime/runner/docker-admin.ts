@@ -27,11 +27,8 @@ export async function dockerPreflight(): Promise<void> {
  * Best-effort: a docker error or a missing run row never fails startup.
  */
 export async function sweepOrphans(): Promise<void> {
-  const ids = await listConduitContainers();
-  if (ids.length === 0) return;
-
-  const inspections = await Promise.all(ids.map(inspectContainer));
-  const live = inspections.filter((i): i is ContainerInfo => i !== null);
+  const live = await listConduitContainers();
+  if (live.length === 0) return;
 
   const runIds = [...new Set(live.map((c) => c.runId))];
   const rows = await prisma()
@@ -42,16 +39,19 @@ export async function sweepOrphans(): Promise<void> {
     .catch(() => [] as Array<{ id: string; status: string }>);
   const statusByRun = new Map(rows.map((r) => [r.id, r.status]));
 
-  for (const c of live) {
+  const orphans = live.filter((c) => {
     const status = statusByRun.get(c.runId);
-    const isOrphan =
+    return (
       status === 'COMPLETED' ||
       status === 'FAILED' ||
       status === 'CANCELLED' ||
-      status === undefined;
-    if (!isOrphan) continue;
-    await runCommand('docker', ['kill', c.id]).catch(() => undefined);
-  }
+      status === undefined
+    );
+  });
+  if (orphans.length === 0) return;
+  await Promise.all(
+    orphans.map((c) => runCommand('docker', ['kill', c.id]).catch(() => undefined)),
+  );
 }
 
 interface ContainerInfo {
@@ -59,32 +59,24 @@ interface ContainerInfo {
   runId: string;
 }
 
-async function listConduitContainers(): Promise<string[]> {
+async function listConduitContainers(): Promise<ContainerInfo[]> {
+  // `docker ps --format` with a literal `\t` between fields lets us read the
+  // runId label in the same call — saves an `inspect` per container at
+  // worker boot.
   const result = await runCommand('docker', [
     'ps',
     '--filter',
     'label=conduit.runId',
     '--format',
-    '{{.ID}}',
+    '{{.ID}}\t{{ index .Labels "conduit.runId" }}',
   ]);
   if (result.code !== 0) return [];
-  return result.stdout
-    .split('\n')
-    .map((l) => l.trim())
-    .filter(Boolean);
-}
-
-async function inspectContainer(id: string): Promise<ContainerInfo | null> {
-  const result = await runCommand('docker', [
-    'inspect',
-    '--format',
-    '{{ index .Config.Labels "conduit.runId" }}',
-    id,
-  ]);
-  if (result.code !== 0) return null;
-  const runId = result.stdout.trim();
-  if (!runId) return null;
-  return { id, runId };
+  const out: ContainerInfo[] = [];
+  for (const line of result.stdout.split('\n')) {
+    const [id, runId] = line.split('\t');
+    if (id && runId) out.push({ id: id.trim(), runId: runId.trim() });
+  }
+  return out;
 }
 
 interface CmdResult {

@@ -9,7 +9,7 @@ import * as activities from './activities/index';
 import { config } from './config';
 import { closeEventBus } from './runtime/event-bus';
 import { closePrisma } from './runtime/prisma';
-import { dockerPreflight, sweepOrphans } from './runtime/runner';
+import { dockerPreflight, resolveAgentAuthMode, sweepOrphans } from './runtime/runner';
 import { closeTemporalClient } from './runtime/temporal-client';
 
 async function run(): Promise<void> {
@@ -17,6 +17,11 @@ async function run(): Promise<void> {
   // agent-runner containers spawned by the worker. Fail fast if Docker
   // isn't reachable, with a message clearer than a silent task-queue stall.
   await dockerPreflight();
+  if (resolveAgentAuthMode() === 'oauth-mount') {
+    console.warn(
+      '[runner] CONDUIT_AGENT_AUTH=oauth-mount active — host ~/.codex/auth.json is bind-mounted into agent containers; do not use in shared/production environments.',
+    );
+  }
   // Catch containers from a previous worker process whose run already
   // settled to a terminal state. Best-effort; never blocks startup.
   await sweepOrphans().catch((err: unknown) => {

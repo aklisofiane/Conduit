@@ -52,14 +52,14 @@ FROM node:22-slim AS runtime
 # `gh` is fetched from the official deb repo so the agent can call the
 # GitHub CLI in writeback turns.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends \
-      ca-certificates curl git make python3 g++ pkg-config jq ripgrep fd-find \
+ && apt-get install -y --no-install-recommends ca-certificates curl \
  && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
       | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
  && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
  && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
       > /etc/apt/sources.list.d/github-cli.list \
- && apt-get update && apt-get install -y --no-install-recommends gh \
+ && apt-get update && apt-get install -y --no-install-recommends \
+      git make python3 g++ pkg-config jq ripgrep fd-find gh \
  && rm -rf /var/lib/apt/lists/* \
  && ln -s /usr/bin/fdfind /usr/local/bin/fd
 

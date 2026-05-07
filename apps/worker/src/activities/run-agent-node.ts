@@ -65,20 +65,11 @@ export interface RunAgentNodeInput {
 }
 
 /**
- * The workhorse activity. One invocation per agent node. Trusted-orchestrator
- * side: everything up to the provider session boundary stays here —
- * `NodeRun` upsert, workspace resolve, push-cred install, skills install,
- * MCP credential substitution, writeback resolution, agent context build.
- *
- * The provider session itself runs in a per-run agent-runner container —
- * see docs spec: `docker-runner.md`. The orchestrator hands the runner a
- * `RunnerRequest` over stdin and consumes a stream of `RunnerEvent`s on
- * stdout, translating each `agent` event back into the existing
- * `onAgentEvent` flow (counters, log-write, event-bus publish, NodeRun
- * updates) without changing those downstream paths.
- *
- * The activity is idempotent up to the workspace step — Temporal retries
- * re-enter from the top. Real agent runs are not resumable mid-session.
+ * The workhorse activity. One invocation per agent node. Resolves workspace
+ * and run inputs, hands a `RunnerRequest` to the spawner, and translates
+ * each returned `RunnerEvent` back into the existing log/event-bus/NodeRun
+ * flow. Idempotent up to the workspace step — Temporal retries re-enter
+ * from the top; real agent runs are not resumable mid-session.
  */
 export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput> {
   const {
@@ -229,10 +220,8 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
     };
 
     const usage = { inputTokens: 0, outputTokens: 0, toolCalls: 0, turns: 0 };
-    // Per-event heartbeats stall whenever a tool call blocks the runner
-    // iterator. A timer at half the heartbeatTimeout (60s → 30s) keeps
-    // Temporal's liveness check happy regardless of tool duration, with one
-    // missed-heartbeat of slack.
+    // Independent of the runner's event flow so a long-blocking tool call
+    // doesn't trip Temporal's liveness check.
     const heartbeater = setInterval(() => {
       ctx.heartbeat({ nodeName: node.name, usage });
     }, 30_000);
@@ -253,8 +242,6 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
           terminal = event;
           break;
         }
-        // heartbeats are advisory — the orchestrator-side liveness check
-        // sits inside the spawner; we just observe them flow through.
       }
     } finally {
       clearInterval(heartbeater);
