@@ -30,10 +30,10 @@ export function HomePage() {
     <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-8 px-6 pb-16 pt-10">
       <section className="flex flex-col gap-2">
         <h1
-          className="text-[44px] font-semibold leading-none tracking-tight text-[var(--color-text)]"
-          style={{ fontFamily: 'var(--font-serif)', fontVariantLigatures: 'none' }}
+          className="text-[56px] font-semibold leading-none tracking-tight text-[var(--color-text)]"
+          style={{ fontFamily: 'var(--font-sans)', fontVariantLigatures: 'none' }}
         >
-          Workflows
+          Workflow state
         </h1>
         <div className="font-mono text-[12px] text-[var(--color-text-2)]">
           <b className="text-[var(--color-text)]">{activeCount} active</b> ·{' '}
