@@ -13,16 +13,17 @@ export interface RateLimitConfig {
  *
  * | endpoint                                       | local (per IP) | hosted (per IP) |
  * | ---------------------------------------------- | -------------- | --------------- |
- * | `/sign-up/email`                               | 100 / hr       | 5 / hr          |
- * | `/sign-in/email`                               | 100 / hr       | 10 / 5min       |
- * | `/request-password-reset`                      | 100 / hr       | 5 / hr          |
- * | `/organization/accept-invitation`              | 100 / hr       | 10 / hr         |
+ * | `/sign-up/email`                               | 100 / min      | 5 / hr          |
+ * | `/sign-in/email`                               | 100 / min      | 10 / 5min       |
+ * | `/request-password-reset`                      | 100 / min      | 5 / hr          |
+ * | `/organization/accept-invitation`              | 100 / min      | 10 / hr         |
  * | default for any other `/api/auth/*`            | 100 / min      | 100 / min       |
  *
- * `local` is *not* "off" — it's lenient enough to not punish dev iteration
- * but still prevents an accidental infinite loop from silently DOS'ing
- * Postgres. `hosted` numbers are conservative-but-usable: a real user won't
- * trip them; a script will.
+ * `local` mode keeps the default 100/min for every endpoint (no custom rules)
+ * — lenient enough to not punish dev iteration, but the default still
+ * prevents an accidental infinite loop from silently DOS'ing Postgres.
+ * `hosted` numbers are conservative-but-usable: a real user won't trip them;
+ * a script will.
  */
 export function rateLimitConfig(deployment: Deployment): RateLimitConfig {
   const isHosted = deployment === 'hosted';
@@ -38,11 +39,6 @@ export function rateLimitConfig(deployment: Deployment): RateLimitConfig {
           '/request-password-reset': { window: 60 * 60, max: 5 },
           '/organization/accept-invitation': { window: 60 * 60, max: 10 },
         }
-      : {
-          '/sign-up/email': { window: 60 * 60, max: 100 },
-          '/sign-in/email': { window: 60 * 60, max: 100 },
-          '/request-password-reset': { window: 60 * 60, max: 100 },
-          '/organization/accept-invitation': { window: 60 * 60, max: 100 },
-        },
+      : {},
   };
 }

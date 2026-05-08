@@ -24,7 +24,11 @@ export const oauthProviders: readonly string[] = githubOAuth ? ['github'] : [];
  */
 function personalOrgFor(email: string): { name: string; slug: string } {
   const localpart = email.split('@')[0] ?? 'user';
-  const cleanLocal = localpart.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'user';
+  // Cap matches the web's `slugify` (48) minus the 7-char `-${suffix}` we
+  // append below, leaving headroom under any practical org-slug constraint
+  // for long email localparts.
+  const cleanLocal =
+    (localpart.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'user').slice(0, 41);
   const suffix = Math.random().toString(36).slice(2, 8);
   return {
     name: `${localpart}'s workspace`,
@@ -40,19 +44,25 @@ function personalOrgFor(email: string): { name: string; slug: string } {
  * Re-entrant on subsequent sessions for the same user (login again on a
  * second device) — the early-return on existing membership keeps the
  * shim from creating duplicate personal orgs.
+ *
+ * The user's email is fetched in the same query as the membership check
+ * (one round-trip instead of two on the first-session path).
  */
 async function ensurePersonalOrgFor(userId: string): Promise<string> {
-  const existing = await prisma.member.findFirst({
-    where: { userId },
-    orderBy: { createdAt: 'asc' },
-    select: { organizationId: true },
-  });
-  if (existing) return existing.organizationId;
-  const user = await prisma.user.findUniqueOrThrow({
+  const userRow = await prisma.user.findUniqueOrThrow({
     where: { id: userId },
-    select: { email: true },
+    select: {
+      email: true,
+      members: {
+        orderBy: { createdAt: 'asc' },
+        take: 1,
+        select: { organizationId: true },
+      },
+    },
   });
-  const { name, slug } = personalOrgFor(user.email);
+  const existing = userRow.members[0];
+  if (existing) return existing.organizationId;
+  const { name, slug } = personalOrgFor(userRow.email);
   // `auth.api.createOrganization` accepts a `userId` for system invocations
   // (no session yet), creates the org, and adds the user as `creatorRole`
   // (default "owner") in one server call.
@@ -86,12 +96,11 @@ const betterAuthRedis = new Redis(config.redis.url, {
 
 // Audit log + abuse signals run against the singleton Prisma client. Better
 // Auth's hooks fire from the Express middleware (mounted before Nest's
-// controllers run), so a Nest-DI'd `AuditLogService` provider is for tests;
-// the production write path uses these direct instances. Both reach the same
-// Prisma connection pool — `PrismaService` re-uses `PrismaClient` and Prisma
-// keeps a single connection per `DATABASE_URL`.
-const auditLogService = new AuditLogService(prisma);
-const abuseSignalsService = new AbuseSignalsService(prisma);
+// controllers run), so DI isn't available at write time. We export these
+// instances so `AuthModule` can re-register them as `useValue` providers —
+// any code reaching them via DI sees the same instance the hooks use.
+export const auditLogService = new AuditLogService(prisma);
+export const abuseSignalsService = new AbuseSignalsService(prisma);
 const auditHookDeps = { auditLog: auditLogService, abuseSignals: abuseSignalsService };
 const auditAfterMiddleware = createAuditAfterMiddleware(auditHookDeps);
 const organizationAuditHooks = createOrganizationAuditHooks(auditHookDeps);

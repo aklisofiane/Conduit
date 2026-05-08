@@ -1,7 +1,10 @@
 import { createAuthMiddleware, getIp, isAPIError } from 'better-auth/api';
 import type { BetterAuthOptions } from 'better-auth';
+import type { OrganizationOptions } from 'better-auth/plugins';
 import type { AbuseSignalsService } from './abuse-signals';
 import type { AuditLogService } from './audit-log.service';
+
+type OrganizationHooks = NonNullable<OrganizationOptions['organizationHooks']>;
 
 interface AuditHookDeps {
   auditLog: AuditLogService;
@@ -73,6 +76,21 @@ function returnedSucceeded(returned: unknown): boolean {
   return true;
 }
 
+// Wraps an async handler so a write failure cannot break the auth or org
+// mutation it trails. Failures are observable via Nest's default error
+// logging — we never let audit failures cascade into the response.
+function safe<T extends unknown[]>(
+  fn: (...args: T) => Promise<void>,
+): (...args: T) => Promise<void> {
+  return async (...args) => {
+    try {
+      await fn(...args);
+    } catch {
+      // swallow
+    }
+  };
+}
+
 /**
  * Single `hooks.after` middleware. Path-dispatches to per-event handlers.
  * Each handler is `async () => void` — never throws into Better Auth's
@@ -87,14 +105,9 @@ function returnedSucceeded(returned: unknown): boolean {
 export function createAuditAfterMiddleware(
   deps: AuditHookDeps,
 ): ReturnType<typeof createAuthMiddleware> {
+  const dispatchSafe = safe(dispatch);
   return createAuthMiddleware(async (rawCtx) => {
-    const ctx = rawCtx as unknown as AuditHookCtx;
-    try {
-      await dispatch(ctx, deps);
-    } catch {
-      // Swallow — never let audit failures cascade into the auth response.
-      // Service-level errors are already logged by Nest's default handler.
-    }
+    await dispatchSafe(rawCtx as unknown as AuditHookCtx, deps);
   });
 }
 
@@ -118,13 +131,17 @@ async function dispatch(ctx: AuditHookCtx, deps: AuditHookDeps): Promise<void> {
     if (isUnauthorizedShape(returned)) {
       const email = emailFromBody(ctx);
       if (email) {
-        await deps.auditLog.record({
-          event: 'auth.signIn.failed',
-          actorEmail: email,
-          actorIp: ip,
-          metadata: { provider: 'email' },
-        });
-        await deps.abuseSignals.checkFailedLoginSpike({ actorEmail: email });
+        // Independent reads/writes — fan out so the second DB query doesn't
+        // serialize behind the audit-row insert in the failed-login hot path.
+        await Promise.all([
+          deps.auditLog.record({
+            event: 'auth.signIn.failed',
+            actorEmail: email,
+            actorIp: ip,
+            metadata: { provider: 'email' },
+          }),
+          deps.abuseSignals.checkFailedLoginSpike({ actorEmail: email }),
+        ]);
       }
     }
     return;
@@ -197,66 +214,7 @@ async function dispatch(ctx: AuditHookCtx, deps: AuditHookDeps): Promise<void> {
  * dispatch, the plugin hooks expose typed `member`/`previousRole`/`organization`
  * payloads that would otherwise require a roundtrip to extract.
  */
-export function createOrganizationAuditHooks(deps: AuditHookDeps): {
-  afterCreateOrganization: (data: {
-    organization: { id: string; name: string };
-    user: { id: string; email: string };
-  }) => Promise<void>;
-  afterDeleteOrganization: (data: {
-    organization: { id: string; name: string };
-    user: { id: string; email: string };
-  }) => Promise<void>;
-  afterUpdateOrganization: (data: {
-    organization: { id: string; name: string } | null;
-    user: { id: string; email: string };
-    member: { role: string };
-  }) => Promise<void>;
-  afterCreateInvitation: (data: {
-    invitation: { id: string; email: string; role: string; organizationId: string };
-    inviter: { id: string; email: string };
-    organization: { id: string };
-  }) => Promise<void>;
-  afterAcceptInvitation: (data: {
-    invitation: { id: string; email: string; organizationId: string };
-    user: { id: string; email: string };
-    organization: { id: string };
-  }) => Promise<void>;
-  afterRejectInvitation: (data: {
-    invitation: { id: string; email: string; organizationId: string };
-    user: { id: string; email: string };
-    organization: { id: string };
-  }) => Promise<void>;
-  afterCancelInvitation: (data: {
-    invitation: { id: string; email: string; organizationId: string };
-    cancelledBy: { id: string; email: string };
-    organization: { id: string };
-  }) => Promise<void>;
-  afterRemoveMember: (data: {
-    member: { userId: string; role: string };
-    user: { id: string; email: string };
-    organization: { id: string };
-  }) => Promise<void>;
-  afterUpdateMemberRole: (data: {
-    member: { userId: string; role: string };
-    previousRole: string;
-    user: { id: string; email: string };
-    organization: { id: string };
-  }) => Promise<void>;
-} {
-  // Wraps each handler so a write failure cannot break the org mutation it
-  // trails. Audit failures are observable via Nest's default error logging.
-  function safe<T extends unknown[]>(
-    fn: (...args: T) => Promise<void>,
-  ): (...args: T) => Promise<void> {
-    return async (...args) => {
-      try {
-        await fn(...args);
-      } catch {
-        // swallow
-      }
-    };
-  }
-
+export function createOrganizationAuditHooks(deps: AuditHookDeps): OrganizationHooks {
   return {
     afterCreateOrganization: safe(async ({ organization, user }) => {
       await deps.auditLog.record({
