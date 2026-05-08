@@ -52,7 +52,7 @@ type TriggerFilter =
 
 **Webhook mode**: platform sends an event to `POST /api/hooks/:workflowId`. Conduit verifies the signature, normalizes the event, checks filters, and triggers a run if matched. GitHub webhooks currently normalize four events: `issues.opened`, `pull_request.opened`, `issue_comment.created` (PR-scoped), and `board.column.changed` (from `projects_v2_item.edited` single-select field moves). The `board.column.changed` webhook carries only the Projects v2 item's `content_node_id` — no issue number — so it can't drive a workflow on its own; polling is the supported mode for board-driven flows.
 
-**Polling mode**: a Temporal Schedule fires `pollWorkflow` every `intervalSec` seconds. The activity queries the platform API (GitHub Projects v2 GraphQL for v1 — the `TriggerConfig.board` reference picks which project), filters on the returned items, and triggers a run for each matching item that hasn't been processed for this specific transition yet. Polling mode **requires** `TriggerConfig.board` — the poller has nothing to query without it. See [agent-execution.md](./agent-execution.md#polling-pipeline) for the activity lifecycle.
+**Polling mode**: a Temporal Schedule fires `pollWorkflow` every `intervalSec` seconds. The activity queries the platform API (GitHub GraphQL for v1), filters on the returned items, and triggers a run for each matching item that hasn't been processed for this specific transition yet. The query target is picked by `mode.scope` and `mode.source` (see below); only `scope: 'issues'` + `source: 'board'` reads `TriggerConfig.board` — repo-sourced issue polling and PR-scope polling derive the repo from the connection. See [agent-execution.md](./agent-execution.md#polling-pipeline) for the activity lifecycle.
 
 `mode.scope` and `mode.source` together pick *what* to watch and *where* to query:
 
@@ -187,7 +187,7 @@ Rule: `inherit` always points at the trigger-connected entry node or another `in
 The sole entry kind. Two arms inside the resolver, dispatched by the trigger event:
 
 - **Issue trigger** (`issues.opened` webhook, polling on board status): persists a branch `conduit/<ticket-id>-<slug>` across runs on the same ticket. The slug is derived from the issue title on first create and cached in the `TicketBranch` row, so iteration N+1 reads the same branch name. Each run adds a worktree from the current remote branch state, so iteration N+1 sees iteration N's commits.
-- **PR trigger** (`pull_request.opened` webhook): lands directly on `pr.headRef`. No row is created — the head ref is the canonical name. For Conduit-internal flows where a Worker pushed and opened a PR, this naturally lands the Reviewer on the same `conduit/<id>-<slug>` branch the Worker built; for external/human-opened PRs, on whatever branch the contributor opened from.
+- **PR trigger** (`pull_request.opened` webhook or `pull_request.detected` from PR-scope polling): lands directly on `pr.headRef`. No row is created — the head ref is the canonical name. For Conduit-internal flows where a Worker pushed and opened a PR, this naturally lands the Reviewer on the same `conduit/<id>-<slug>` branch the Worker built; for external/human-opened PRs, on whatever branch the contributor opened from.
 
 The agent commits and pushes via normal git; runtime sets up the push auth in-env at activity start. See [branch-management.md](./branch-management.md) for ownership, lifecycle, and concurrency.
 
@@ -287,7 +287,7 @@ type NodeOutput = {
 7. All triggers in a workflow share the same `connectionId`. v1 has a single trigger today; multi-trigger workflows must still target a single repo connection.
 8. Every `mcpServers[].serverId` references a server defined at the workflow level.
 9. MCP servers with a `connectionId` must reference a valid `WorkflowConnection`.
-10. Polling-mode triggers require `TriggerConfig.board` to be populated. Webhook-mode triggers may omit it unless `event === 'board.column.changed'` (which is rejected by rule 6 anyway in v1).
+10. Polling-mode triggers require `TriggerConfig.board` only under `scope: 'issues'` + `source: 'board'`; the `pollBoardActivity` throws at tick time if it's missing under that combination. PR-scope and `source: 'repo'` polling derive the repo from the connection and ignore `board`. Webhook-mode triggers may omit it unless `event === 'board.column.changed'` (which is rejected by rule 6 anyway in v1).
 
 ## Cross-run iteration
 
