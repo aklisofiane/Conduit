@@ -197,12 +197,20 @@ This keeps parallel execution fast (agents work concurrently) while making merge
 
 ### What ships in Phase 3
 
-`mergeWorktreeActivity` does a raw `git merge --no-edit --no-ff` in the upstream worktree, targeting the parallel sibling's HEAD:
+`mergeWorktreeActivity` is a `git merge --squash` from the parallel sibling's HEAD into the upstream worktree — source's per-commit history never enters target, and `.conduit/` is scrubbed before commit so neither target's tip nor target's history carries any `.conduit/` paths the agent committed during its session.
 
-1. Any uncommitted changes in the sibling's worktree are first staged and folded into a single `Conduit: <Node> changes` commit (`.conduit/` is explicitly unstaged — it's gitignored by design and copied via `copyConduitFilesActivity` instead).
-2. If the sibling HEAD equals the target HEAD, the merge is skipped (nothing to do).
-3. On clean merge: a merge commit lands in the upstream and the activity returns.
-4. On conflict: `git merge --abort` runs, and the activity throws `MergeConflictError` carrying the conflicted file list. `MergeConflictError` is in the workflow's `nonRetryableErrorTypes` so the run fails cleanly instead of spinning on retries.
+Source side (`apps/worker/src/activities/merge-worktree.ts`):
+
+1. `git add -A` in the sibling worktree, then commit any staged changes as `Conduit: <sourceNodeName> snapshot`. `add -A` silently honors the source repo's `.gitignore` — usually excluding `.conduit/`. If the repo doesn't gitignore it, the snapshot briefly carries `.conduit/`; the target-side strip handles that.
+2. If the sibling HEAD equals the target HEAD, the activity returns (nothing to merge).
+
+Target side (`packages/agent/src/workspace/merge.ts`):
+
+3. **Snapshot then clear target's `.conduit/`.** Read the basenames target had under `.conduit/` (e.g. the upstream summary copied in by `cloneConduitFolder`) into `existedBefore`, then `clearConduitFolder` so the squash doesn't trip git's untracked-overwrite preflight when source's snapshot writes to the same paths.
+4. `git merge --squash <sourceRef>`.
+5. List `.conduit/*` paths the squash staged, `git rm --cached --ignore-unmatch -- .conduit` to drop them from the index, then `fs.rm` each on the working tree — **except** any whose basename was in `existedBefore`. Those are target's own and downstream nodes still need them on the WT.
+6. If the index is empty after scrubbing (the only diff was `.conduit/`), return without committing — target's HEAD doesn't churn for runtime-only state. Otherwise commit `Conduit: merge <sourceNodeName>`.
+7. On `GitError` from the squash: collect conflicted files via `git diff --name-only --diff-filter=U`, then `git reset --hard HEAD` (since `--squash` leaves no `MERGE_HEAD`, `git merge --abort` doesn't apply). Throw `MergeConflictError` carrying the file list — it's in the workflow's `nonRetryableErrorTypes` so the run fails cleanly instead of spinning on retries.
 
 No LLM is involved. In practice parallel agents typically touch different files, so most merges are clean; the conflict path is the exception and aborts the run today.
 
