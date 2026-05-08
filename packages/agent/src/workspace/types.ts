@@ -46,6 +46,14 @@ export interface WorkspaceResolveInput {
   runId: string;
   nodeName: string;
   spec: WorkspaceSpec;
+  /**
+   * Tenant scope — the workspace manager forwards this onto the
+   * `TicketBranchStore.upsert` call so the row's unique key is
+   * `(orgId, platform, owner, repo, ticketId)`. Required when
+   * `spec.kind === 'ticket-branch'` and the run is issue-anchored
+   * (PR-anchored runs skip the row entirely).
+   */
+  orgId?: string;
   connection?: ConnectionContext;
   /** Populated for `inherit` — the upstream node's resolved workspace path. */
   upstreamPath?: string;
@@ -123,6 +131,13 @@ export interface TicketBranchRow {
  */
 export interface TicketBranchStore {
   upsert(input: {
+    /**
+     * Tenant scope — the Prisma row's unique key is
+     * `(orgId, platform, owner, repo, ticketId)`, so two orgs with
+     * overlapping Github coords stay isolated. Within an org, Worker +
+     * Critic on the same ticket still converge on one row.
+     */
+    orgId: string;
     platform: ConnectionContext['platform'];
     owner: string;
     repo: string;

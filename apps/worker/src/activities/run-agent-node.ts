@@ -45,6 +45,9 @@ import { makeTicketBranchStore } from '../runtime/ticket-branch-store';
 export interface RunAgentNodeInput {
   workflowId: string;
   workflowName: string;
+  /** Tenant scope — chained through from `loadGraphActivity` so derived rows
+   *  (NodeRun, ExecutionLog) carry the same orgId as the parent run. */
+  orgId: string;
   runId: string;
   /** Workspace populated by `deriveWorkspaces` upstream of this activity. */
   node: AgentConfigWithWorkspace;
@@ -84,6 +87,7 @@ export interface RunAgentNodeInput {
 export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput> {
   const {
     runId,
+    orgId,
     node,
     workflowId,
     workflowName,
@@ -103,6 +107,7 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
     update: { status: 'RUNNING', startedAt: new Date() },
     create: {
       runId,
+      orgId,
       nodeName: node.name,
       nodeType: 'AGENT',
       status: 'RUNNING',
@@ -117,6 +122,7 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
       runId,
       nodeName: node.name,
       spec: node.workspace,
+      orgId,
       connection: ticketBranch?.connection,
       upstreamPath: upstreamWorkspacePath,
       upstreamHead,
@@ -144,7 +150,7 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
     const startupMessage = systemMessage(node, workspace.path, parallelBranch);
     await Promise.all([
       publishSystemEvent(runId, node.name, startupMessage),
-      writeSystemLog(runId, node.name, startupMessage),
+      writeSystemLog(runId, orgId, node.name, startupMessage),
     ]);
 
     const skills = node.skills.length > 0 ? await discoverSkills({ cwd: workspace.path }) : [];
@@ -250,11 +256,11 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
     try {
       for await (const event of handle.events) {
         if (event.kind === 'agent') {
-          await onAgentEvent(runId, node.name, event.event, usage);
+          await onAgentEvent(runId, orgId, node.name, event.event, usage);
         } else if (event.kind === 'system') {
           await Promise.all([
             publishSystemEvent(runId, node.name, event.message),
-            writeSystemLog(runId, node.name, event.message),
+            writeSystemLog(runId, orgId, node.name, event.message),
           ]);
         } else if (event.kind === 'exit') {
           terminal = event;
@@ -305,13 +311,14 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
         finishedAt: new Date(),
       },
     });
-    await writeSystemLog(runId, node.name, `Node ${node.name} failed: ${message}`, 'ERROR');
+    await writeSystemLog(runId, orgId, node.name, `Node ${node.name} failed: ${message}`, 'ERROR');
     throw err;
   }
 }
 
 async function onAgentEvent(
   runId: string,
+  orgId: string,
   nodeName: string,
   event: AgentEvent,
   usage: { inputTokens: number; outputTokens: number; toolCalls: number; turns: number },
@@ -323,7 +330,7 @@ async function onAgentEvent(
     usage.turns += 1;
   }
   await Promise.all([
-    event.type === 'usage' ? Promise.resolve() : writeAgentEventLog(runId, nodeName, event),
+    event.type === 'usage' ? Promise.resolve() : writeAgentEventLog(runId, orgId, nodeName, event),
     publishRunUpdate({
       runId,
       nodeName,

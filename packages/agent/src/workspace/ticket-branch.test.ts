@@ -18,6 +18,9 @@ import type { ConnectionContext, TicketBranchRow, TicketBranchStore } from './ty
  *   - baseRef override on first create sticks on the row.
  */
 
+const ORG_A = 'org_a';
+const ORG_B = 'org_b';
+
 describe('resolveTicketBranchWorkspace', () => {
   let conduitHome: string;
   let originalHome: string | undefined;
@@ -59,6 +62,7 @@ describe('resolveTicketBranchWorkspace', () => {
     const first = await resolveTicketBranchWorkspace({
       runId: 'run_1',
       nodeName: 'Worker',
+      orgId: ORG_A,
       connection,
       ticket: { id: '42', title: 'Fix crash in checkout!' },
       store,
@@ -80,6 +84,7 @@ describe('resolveTicketBranchWorkspace', () => {
     const second = await resolveTicketBranchWorkspace({
       runId: 'run_2',
       nodeName: 'Worker',
+      orgId: ORG_A,
       connection,
       ticket: { id: '42', title: 'Fix crash in checkout!' },
       store,
@@ -97,6 +102,7 @@ describe('resolveTicketBranchWorkspace', () => {
     const first = await resolveTicketBranchWorkspace({
       runId: 'run_1',
       nodeName: 'Worker',
+      orgId: ORG_A,
       connection,
       ticket: { id: '7', title: 'Initial title' },
       store,
@@ -105,6 +111,7 @@ describe('resolveTicketBranchWorkspace', () => {
     const second = await resolveTicketBranchWorkspace({
       runId: 'run_2',
       nodeName: 'Worker',
+      orgId: ORG_A,
       connection,
       ticket: { id: '7', title: 'Completely different title now' },
       store,
@@ -127,6 +134,7 @@ describe('resolveTicketBranchWorkspace', () => {
     const resolved = await resolveTicketBranchWorkspace({
       runId: 'run_pr',
       nodeName: 'Reviewer',
+      orgId: ORG_A,
       connection,
       // Issue context still passed through (GitHub conflates issues/PRs by
       // number) — the resolver must prefer pr.headRef and skip the row.
@@ -145,6 +153,61 @@ describe('resolveTicketBranchWorkspace', () => {
     expect(onDisk).toBe('export const feature = 1;\n');
   });
 
+  it('two orgs targeting the same repo + ticket get distinct rows (no cross-org collision)', async () => {
+    const store = makeFakeStore();
+
+    const orgA = await resolveTicketBranchWorkspace({
+      runId: 'run_org_a',
+      nodeName: 'Worker',
+      orgId: ORG_A,
+      connection,
+      ticket: { id: '99', title: 'Shared ticket id' },
+      store,
+    });
+
+    const orgB = await resolveTicketBranchWorkspace({
+      runId: 'run_org_b',
+      nodeName: 'Worker',
+      orgId: ORG_B,
+      connection,
+      ticket: { id: '99', title: 'Shared ticket id' },
+      store,
+    });
+
+    expect(store._rows()).toHaveLength(2);
+    // The branch name derives from ticketId + slug, so within the same repo
+    // the two orgs end up with the *same* branch name on disk — but they
+    // were upserted into independent rows, which is what isolation means
+    // for this layer. Cross-org workspace collisions on the same git remote
+    // are out of scope (they're a Github-side concern).
+    expect(orgA.branchName).toBe(orgB.branchName);
+  });
+
+  it('Worker + Critic in the same org converge on one row (within-org sharing preserved)', async () => {
+    const store = makeFakeStore();
+
+    const worker = await resolveTicketBranchWorkspace({
+      runId: 'run_worker',
+      nodeName: 'Worker',
+      orgId: ORG_A,
+      connection,
+      ticket: { id: '101', title: 'Same ticket, two workflows' },
+      store,
+    });
+    const critic = await resolveTicketBranchWorkspace({
+      runId: 'run_critic',
+      nodeName: 'Critic',
+      orgId: ORG_A,
+      connection,
+      ticket: { id: '101', title: 'Same ticket, two workflows' },
+      store,
+    });
+
+    expect(store._rows()).toHaveLength(1);
+    expect(worker.branchName).toBe(critic.branchName);
+    expect(worker.ticketBranchId).toBe(critic.ticketBranchId);
+  });
+
   it('lands on pr.headRef with no store/ticket needed (external PR)', async () => {
     await git(['checkout', '-q', '-b', 'patch-1'], { cwd: remote });
     await fs.writeFile(path.join(remote, 'patch.ts'), 'export const x = 2;\n');
@@ -155,6 +218,7 @@ describe('resolveTicketBranchWorkspace', () => {
     const resolved = await resolveTicketBranchWorkspace({
       runId: 'run_ext_pr',
       nodeName: 'Reviewer',
+      // No orgId / store / ticket — PR-anchored runs skip the row entirely.
       connection,
       pr: { headRef: 'patch-1', baseRef: 'main' },
     });
@@ -168,10 +232,11 @@ describe('resolveTicketBranchWorkspace', () => {
 
 function makeFakeStore(): TicketBranchStore & { _rows(): TicketBranchRow[] } {
   const rows = new Map<string, TicketBranchRow>();
-  const key = (p: string, o: string, r: string, t: string) => `${p}:${o}/${r}:${t}`;
+  const key = (org: string, p: string, o: string, r: string, t: string) =>
+    `${org}::${p}:${o}/${r}:${t}`;
   return {
     async upsert(input) {
-      const k = key(input.platform, input.owner, input.repo, input.ticketId);
+      const k = key(input.orgId, input.platform, input.owner, input.repo, input.ticketId);
       const existing = rows.get(k);
       if (existing) return existing;
       const slug = deriveSlug(input.ticketTitle);

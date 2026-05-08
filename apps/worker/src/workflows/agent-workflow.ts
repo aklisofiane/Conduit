@@ -91,6 +91,7 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<void> {
           const output = await runAgentNode({
             workflowId: graph.workflowId,
             workflowName: graph.workflowName,
+            orgId: graph.orgId,
             runId,
             node,
             mcpServers: graph.mcpServers,
@@ -121,6 +122,7 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<void> {
           if (!sibling?.isBranchedWorktree) continue;
           await mergeWorktreeActivity({
             runId,
+            orgId: graph.orgId,
             sourceWorkspacePath: sibling.workspacePath,
             targetWorkspacePath: upstreamOutput.workspacePath,
             sourceNodeName: siblingName,
@@ -131,6 +133,7 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<void> {
         if (copySources.length > 0) {
           await copyConduitFilesActivity({
             runId,
+            orgId: graph.orgId,
             sources: copySources,
             targetWorkspacePath: upstreamOutput.workspacePath,
             targetNodeName: upstreamName,

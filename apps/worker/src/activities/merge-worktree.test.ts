@@ -106,6 +106,7 @@ describe('mergeWorktreeActivity', () => {
     expect(targetHead).toBe(sourceHead);
     expect(writeSystemLog).toHaveBeenCalledWith(
       'run-1',
+      'org-test',
       'Triage',
       'merge Fix → Triage: no new commits, skipping',
       undefined,
@@ -185,6 +186,7 @@ describe('mergeWorktreeActivity', () => {
   function input() {
     return {
       runId: 'run-1',
+      orgId: 'org-test',
       sourceWorkspacePath: source,
       targetWorkspacePath: target,
       sourceNodeName: 'Fix',
@@ -227,6 +229,7 @@ describe('mergeWorktreeActivity — repo without a .gitignore', () => {
 
     await mergeWorktreeActivity({
       runId: 'run-1',
+      orgId: 'org-test',
       sourceWorkspacePath: source,
       targetWorkspacePath: target,
       sourceNodeName: 'Fix',

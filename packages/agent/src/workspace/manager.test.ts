@@ -11,6 +11,8 @@ import type {
   TicketBranchStore,
 } from './types';
 
+const ORG_ID = 'org_manager_test';
+
 /**
  * Idempotency test for `inheritBranched` under simulated Temporal retries:
  * the second `resolve()` call against the same (runId, nodeName) must
@@ -66,6 +68,7 @@ describe('WorkspaceManager retry idempotency', () => {
       runId,
       nodeName: 'Seed',
       spec: { kind: 'ticket-branch' },
+      orgId: ORG_ID,
       connection,
       ticket: { id: '7', title: 'Seed work' },
       ticketBranchStore: store,
@@ -107,6 +110,7 @@ describe('WorkspaceManager retry idempotency', () => {
       runId,
       nodeName: 'Seed',
       spec: { kind: 'ticket-branch' },
+      orgId: ORG_ID,
       connection,
       ticket: { id: '13', title: 'Conduit propagation' },
       ticketBranchStore: store,
@@ -140,6 +144,7 @@ describe('WorkspaceManager retry idempotency', () => {
       runId,
       nodeName: 'Dev',
       spec: { kind: 'ticket-branch' },
+      orgId: ORG_ID,
       connection,
       ticket: { id: '11', title: 'Cleanup probe' },
       ticketBranchStore: store,
@@ -169,6 +174,7 @@ describe('WorkspaceManager retry idempotency', () => {
       runId: runA,
       nodeName: 'Dev',
       spec: { kind: 'ticket-branch' },
+      orgId: ORG_ID,
       connection,
       ticket: { id: '42', title: 'Stale orphan' },
       ticketBranchStore: store,
@@ -189,6 +195,7 @@ describe('WorkspaceManager retry idempotency', () => {
       runId: runB,
       nodeName: 'Dev',
       spec: { kind: 'ticket-branch' },
+      orgId: ORG_ID,
       connection,
       ticket: { id: '42', title: 'Stale orphan' },
       ticketBranchStore: store,
@@ -212,10 +219,11 @@ async function listBareWorktreeNames(bare: string): Promise<string[]> {
 
 function makeFakeStore(): TicketBranchStore {
   const rows = new Map<string, TicketBranchRow>();
-  const key = (p: string, o: string, r: string, t: string) => `${p}:${o}/${r}:${t}`;
+  const key = (org: string, p: string, o: string, r: string, t: string) =>
+    `${org}::${p}:${o}/${r}:${t}`;
   return {
     async upsert(input) {
-      const k = key(input.platform, input.owner, input.repo, input.ticketId);
+      const k = key(input.orgId, input.platform, input.owner, input.repo, input.ticketId);
       const existing = rows.get(k);
       if (existing) return existing;
       const slug = deriveSlug(input.ticketTitle);

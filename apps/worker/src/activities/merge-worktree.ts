@@ -3,6 +3,8 @@ import { writeSystemLog } from '../runtime/log-writer';
 
 export interface MergeWorktreeInput {
   runId: string;
+  /** Tenant scope — copied from the loaded graph onto every log row this activity writes. */
+  orgId: string;
   /** Parallel-branched worktree path (source of the merge). */
   sourceWorkspacePath: string;
   /** Upstream worktree path (target of the merge). */
@@ -23,9 +25,9 @@ export interface MergeWorktreeInput {
  * `.conduit/` is stripped on the target side — see merge.ts.
  */
 export async function mergeWorktreeActivity(input: MergeWorktreeInput): Promise<void> {
-  const { runId, sourceWorkspacePath, targetWorkspacePath, sourceNodeName, targetNodeName } = input;
+  const { runId, orgId, sourceWorkspacePath, targetWorkspacePath, sourceNodeName, targetNodeName } = input;
   const log = (body: string, level?: 'WARN' | 'ERROR') =>
-    writeSystemLog(runId, targetNodeName, `merge ${sourceNodeName} → ${targetNodeName}: ${body}`, level);
+    writeSystemLog(runId, orgId, targetNodeName, `merge ${sourceNodeName} → ${targetNodeName}: ${body}`, level);
 
   // Bail cleanly if source isn't a git tree (e.g. fresh tmpdir).
   try {
@@ -80,6 +82,7 @@ export async function mergeWorktreeActivity(input: MergeWorktreeInput): Promise<
     });
     await writeSystemLog(
       runId,
+      orgId,
       targetNodeName,
       `merged ${sourceNodeName} (${sourceHead.slice(0, 7)}) into ${targetNodeName}`,
     );
@@ -87,6 +90,7 @@ export async function mergeWorktreeActivity(input: MergeWorktreeInput): Promise<
     if (err instanceof MergeConflictError) {
       await writeSystemLog(
         runId,
+        orgId,
         targetNodeName,
         `merge conflict: ${sourceNodeName} → ${targetNodeName}: ${err.conflicts.join(', ')}`,
         'ERROR',

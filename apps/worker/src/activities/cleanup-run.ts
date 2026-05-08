@@ -25,18 +25,30 @@ export async function cleanupRunActivity(input: {
   error?: string;
 }): Promise<void> {
   const { runId, status, error } = input;
-  await warnOnUnpushedTicketBranchCommits(runId);
+  // Read orgId off the run row we already control — every log/update we
+  // write below stays inside the same tenant.
+  const run = await prisma().workflowRun.findUnique({
+    where: { id: runId },
+    select: { orgId: true },
+  });
+  const orgId = run?.orgId;
+  if (orgId) {
+    await warnOnUnpushedTicketBranchCommits(runId, orgId);
+  }
 
   const manager = new WorkspaceManager();
   try {
     await manager.cleanupRun(runId);
   } catch (err) {
-    await writeSystemLog(
-      runId,
-      null,
-      `cleanupRun failed: ${err instanceof Error ? err.message : String(err)}`,
-      'WARN',
-    );
+    if (orgId) {
+      await writeSystemLog(
+        runId,
+        orgId,
+        null,
+        `cleanupRun failed: ${err instanceof Error ? err.message : String(err)}`,
+        'WARN',
+      );
+    }
   }
   await prisma().workflowRun.update({
     where: { id: runId },
@@ -58,7 +70,7 @@ export async function cleanupRunActivity(input: {
  * docs/design-docs/agent-execution.md: the goal is catching the
  * "nobody ran git push" footgun, not perfectly accounting for every commit.
  */
-async function warnOnUnpushedTicketBranchCommits(runId: string): Promise<void> {
+async function warnOnUnpushedTicketBranchCommits(runId: string, orgId: string): Promise<void> {
   const nodes = await prisma().nodeRun.findMany({
     where: { runId, nodeType: 'AGENT' },
     select: {
@@ -81,6 +93,7 @@ async function warnOnUnpushedTicketBranchCommits(runId: string): Promise<void> {
     if (unpushed === null || unpushed === 0) continue;
     await writeSystemLog(
       runId,
+      orgId,
       node.nodeName,
       `ticket-branch: ${unpushed} commit${unpushed === 1 ? '' : 's'} on ${output.branchName} ` +
         `past the resolved base — if no agent ran \`git push\`, this work is lost on the next iteration.`,

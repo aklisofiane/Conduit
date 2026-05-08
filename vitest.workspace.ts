@@ -38,6 +38,13 @@ export default defineWorkspace([
       exclude: SHARED_TEST_EXCLUDE,
       testTimeout: 30_000,
       hookTimeout: 60_000,
+      // Contract specs share one Postgres test DB; running files in
+      // parallel races on `clearTenantData` between fixtures. One fork,
+      // sequential execution — plenty fast at the current spec count.
+      pool: 'forks',
+      poolOptions: { forks: { singleFork: true } },
+      sequence: { concurrent: false },
+      globalSetup: ['apps/api/test/contract/global-setup.ts'],
     },
   },
   {

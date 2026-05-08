@@ -17,6 +17,12 @@ export interface TicketBranchResolveInput {
   runId: string;
   nodeName: string;
   connection: ConnectionContext;
+  /**
+   * Tenant scope used for the `TicketBranch` row's unique key
+   * `(orgId, platform, owner, repo, ticketId)`. Required for issue-anchored
+   * runs; absent on PR-anchored runs (no row gets written).
+   */
+  orgId?: string;
   /** Required for issue-anchored runs; absent on PR-anchored runs. */
   ticket?: TicketContext;
   /** Required for issue-anchored runs; absent on PR-anchored runs. */
@@ -53,15 +59,15 @@ export interface TicketBranchResolveInput {
 export async function resolveTicketBranchWorkspace(
   input: TicketBranchResolveInput,
 ): Promise<ResolvedWorkspace> {
-  const { runId, nodeName, connection, ticket, store, pr } = input;
+  const { runId, nodeName, connection, orgId, ticket, store, pr } = input;
   const bare = baseClonePath(connection.platform, connection.owner, connection.repo);
   const target = nodeWorkspacePath(runId, nodeName);
 
-  if (!pr && (!ticket || !store)) {
+  if (!pr && (!ticket || !store || !orgId)) {
     // Defensive — `WorkspaceManager` validates this earlier, but the resolver
     // is exported and might be called from another path.
     throw new WorkspaceError(
-      `resolveTicketBranchWorkspace requires either a PR context or both a ticket and a TicketBranchStore (node "${nodeName}")`,
+      `resolveTicketBranchWorkspace requires either a PR context or an orgId + ticket + TicketBranchStore (node "${nodeName}")`,
     );
   }
 
@@ -100,6 +106,7 @@ export async function resolveTicketBranchWorkspace(
     // create-or-track the branch off the repo's default branch.
     const baseRef = await defaultBranch(bare);
     const row = await store!.upsert({
+      orgId: orgId!,
       platform: connection.platform,
       owner: connection.owner,
       repo: connection.repo,

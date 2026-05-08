@@ -16,9 +16,9 @@ export class RunsService {
     private readonly temporal: TemporalService,
   ) {}
 
-  async listForWorkflow(workflowId: string, limit = 50) {
+  async listForWorkflow(orgId: string, workflowId: string, limit = 50) {
     return this.prisma.workflowRun.findMany({
-      where: { workflowId },
+      where: { workflowId, orgId },
       orderBy: { startedAt: 'desc' },
       take: limit,
       include: {
@@ -27,9 +27,9 @@ export class RunsService {
     });
   }
 
-  async get(runId: string) {
-    const run = await this.prisma.workflowRun.findUnique({
-      where: { id: runId },
+  async get(orgId: string, runId: string) {
+    const run = await this.prisma.workflowRun.findFirst({
+      where: { id: runId, orgId },
       include: {
         workflow: { select: { id: true, name: true, definition: true } },
         nodes: true,
@@ -39,10 +39,10 @@ export class RunsService {
     return run;
   }
 
-  async cancel(runId: string) {
-    const run = await this.prisma.workflowRun.findUnique({
-      where: { id: runId },
-      select: { temporalWorkflowId: true },
+  async cancel(orgId: string, runId: string) {
+    const run = await this.prisma.workflowRun.findFirst({
+      where: { id: runId, orgId },
+      select: { id: true, temporalWorkflowId: true },
     });
     if (!run) throw new NotFoundException(`Run ${runId} not found`);
     if (!run.temporalWorkflowId) {
@@ -55,11 +55,12 @@ export class RunsService {
     });
   }
 
-  async logs(runId: string, query: LogsQuery) {
+  async logs(orgId: string, runId: string, query: LogsQuery) {
     const take = Math.min(Math.max(query.limit ?? 500, 1), 5000);
     return this.prisma.executionLog.findMany({
       where: {
         runId,
+        orgId,
         nodeName: query.nodeName,
         kind: query.kind as ExecutionLogKind | undefined,
       },

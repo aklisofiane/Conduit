@@ -10,6 +10,9 @@ import { prisma } from '../runtime/prisma';
 export interface LoadedGraph {
   workflowId: string;
   workflowName: string;
+  /** Tenant scope — copied onto every derived row (NodeRun, ExecutionLog) the
+   *  workflow's activities subsequently write. */
+  orgId: string;
   triggers: TriggerConfig[];
   /** Workspaces are derived from edges before the workflow sees the graph. */
   nodes: AgentConfigWithWorkspace[];
@@ -31,6 +34,7 @@ export async function loadGraphActivity(workflowId: string): Promise<LoadedGraph
   return {
     workflowId: wf.id,
     workflowName: wf.name,
+    orgId: wf.orgId,
     triggers: derived.triggers,
     nodes: derived.nodes,
     edges: derived.edges,

@@ -54,11 +54,17 @@ export class WorkspaceManager {
               `ticket-branch workspace on node "${nodeName}" requires a TicketBranchStore`,
             );
           }
+          if (!input.orgId) {
+            throw new WorkspaceError(
+              `ticket-branch workspace on node "${nodeName}" requires an orgId for issue-anchored runs`,
+            );
+          }
         }
         return resolveTicketBranchWorkspace({
           runId,
           nodeName,
           connection: input.connection,
+          orgId: input.orgId,
           ticket: input.ticket,
           store: input.ticketBranchStore,
           pr: input.pr,

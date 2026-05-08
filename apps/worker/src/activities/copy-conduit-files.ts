@@ -3,6 +3,8 @@ import { writeSystemLog } from '../runtime/log-writer';
 
 export interface CopyConduitFilesInput {
   runId: string;
+  /** Tenant scope — stamped onto the system log row this activity writes. */
+  orgId: string;
   /** Source workspaces — one per parallel sibling that wrote a summary. */
   sources: Array<{ nodeName: string; workspacePath: string }>;
   /** Target workspace — the merged upstream workspace downstream nodes will see. */
@@ -22,11 +24,12 @@ export interface CopyConduitFilesInput {
  * exactly why this activity exists.
  */
 export async function copyConduitFilesActivity(input: CopyConduitFilesInput): Promise<void> {
-  const { runId, sources, targetWorkspacePath, targetNodeName } = input;
+  const { runId, orgId, sources, targetWorkspacePath, targetNodeName } = input;
   if (sources.length === 0) return;
   const copied = await copyConduitSummaries(sources, targetWorkspacePath);
   await writeSystemLog(
     runId,
+    orgId,
     targetNodeName,
     `copied .conduit/ summaries: ${copied.join(', ') || '(none)'}`,
   );
