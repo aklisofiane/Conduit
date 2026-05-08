@@ -23,9 +23,10 @@ type TriggerConfig = {
 
 type TriggerMode =
   | { kind: 'webhook'; event: string }        // platform pushes events (e.g. 'issues.opened', 'board.column.changed')
-  | { kind: 'polling';                        // Conduit polls the board API on an interval (default 60s)
+  | { kind: 'polling';                        // Conduit polls the platform API on an interval (default 60s)
       intervalSec: number;
-      scope: 'issues' | 'pull_requests';      // what the poller pulls from the board (default 'issues')
+      scope: 'issues' | 'pull_requests';      // what to watch (default 'issues')
+      source: 'board' | 'repo';               // where to query — default 'board' (issue scope only; PR scope always repo)
     };
 
 type BoardRef = {
@@ -53,12 +54,13 @@ type TriggerFilter =
 
 **Polling mode**: a Temporal Schedule fires `pollWorkflow` every `intervalSec` seconds. The activity queries the platform API (GitHub Projects v2 GraphQL for v1 — the `TriggerConfig.board` reference picks which project), filters on the returned items, and triggers a run for each matching item that hasn't been processed for this specific transition yet. Polling mode **requires** `TriggerConfig.board` — the poller has nothing to query without it. See [agent-execution.md](./agent-execution.md#polling-pipeline) for the activity lifecycle.
 
-`mode.scope` splits polling into two non-overlapping sub-modes:
+`mode.scope` and `mode.source` together pick *what* to watch and *where* to query:
 
-- `'issues'` (default) — the poller keeps board items whose `contentType === 'Issue'` and emits `event === 'board.column.changed'` on each new match. Drafts (`DraftIssue`) are filtered out for free, fixing a long-standing footgun where they reached the agent without an issue number.
-- `'pull_requests'` — the poller keeps PR items, populates the `TriggerEvent.pr` head/base refs (so the workspace manager lands on the PR's branch instead of `conduit/<id>-<slug>`), and emits `event === 'pull_request.detected'`. The new event name is polling-only — webhook PR events keep `pull_request.opened` so consumers can distinguish "GitHub pushed us at PR open" from "the polling tick saw the PR enter the matching set."
+- `scope: 'issues'` + `source: 'board'` (default) — query the configured Projects v2 board. The poller keeps items whose `contentType === 'Issue'` and emits `event === 'board.column.changed'` on each new match. Drafts (`DraftIssue`) and PRs that happen to live on the board are filtered out for free. The `status` filter works against the board's Status column.
+- `scope: 'issues'` + `source: 'repo'` — query the connection's `repository.issues(states: OPEN)`. No board ref needed. Same `event === 'board.column.changed'` for downstream consistency, but `singleSelectValues` is empty (no Status column off-board); the UI hides the `status` filter accordingly.
+- `scope: 'pull_requests'` — always repo-sourced. Query the connection's `repository.pullRequests(states: OPEN)`. The poller populates `TriggerEvent.pr` head/base refs (so the workspace manager lands on the PR's branch instead of `conduit/<id>-<slug>`) and emits `event === 'pull_request.detected'`. The new event name is polling-only — webhook PR events keep `pull_request.opened` so consumers can distinguish "GitHub pushed us at PR open" from "the polling tick saw the PR enter the matching set." The `source` field is allowed but ignored under PR scope.
 
-`scope` defaults to `'issues'` via the Zod default, so triggers persisted before this field round-trip to the existing behavior.
+`scope` and `source` both default via Zod (`'issues'`, `'board'`) so triggers persisted before either field existed round-trip to the prior board-issue behavior.
 
 #### Dedup for polling
 

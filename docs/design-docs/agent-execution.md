@@ -305,8 +305,11 @@ Lifecycle:
 3. **Tick.** The Schedule fires `pollWorkflow(workflowId)` — a sandboxed shell that just calls `pollBoardActivity`.
 4. **Poll cycle (`pollBoardActivity`):**
    - Re-read the workflow + trigger config from Postgres (schedule definitions carry only the workflow id, so config edits take effect on the next tick).
-   - Decrypt the connection's platform token; query GitHub Projects v2 via the GraphQL client in `apps/worker/src/runtime/github-projects.ts`. Paginates via `endCursor` up to a hard cap.
-   - Filter items by `mode.scope` against `contentType` — `'issues'` keeps `Issue` items (drafts dropped for free), `'pull_requests'` keeps `PullRequest` items.
+   - Decrypt the connection's platform token; dispatch on `mode.scope` and (for issue scope) `mode.source`:
+     - `scope: 'pull_requests'` — query the connection's `repository.pullRequests(states: OPEN)` via `fetchRepositoryPullRequests`. `source` is ignored.
+     - `scope: 'issues'` + `source: 'board'` — query the configured Projects v2 board via `fetchProjectBoardItems`, paginating via `endCursor` up to a hard cap. Items are filtered to `contentType === 'Issue'` (drafts and PRs that happen to live on the board are dropped).
+     - `scope: 'issues'` + `source: 'repo'` — query the connection's `repository.issues(states: OPEN)` via `fetchRepositoryIssues`. No board ref needed.
+   - All three paths return the same `ProjectBoardItem` shape so the rest of the pipeline (filter, dedup, event-build) is source-agnostic. Repo-source items have empty `singleSelectValues` (no board, no Status column).
    - Apply the trigger's filters against a small `FilterView` built from the polled item: `status` (from `singleSelectValues.Status`), `labels` (from the issue/PR's labels, fetched in the same GraphQL query), and `prState` (from the PR's draft flag, only set when the item is a PR). The webhook flattener builds the same shape from the inbound payload, so one filter set works in either mode.
    - Build the `TriggerEvent`: `event === 'board.column.changed'` for issue scope, `event === 'pull_request.detected'` for PR scope. PR scope additionally populates `TriggerEvent.pr` (head/base refs, plus `headRepo` for fork PRs) and writes `payload.prState` so the matcher can flatten it back into the `FilterView`.
    - Diff the matching `itemNodeId` set against `PollSnapshot.matchingIds`. **New → start an `agentWorkflow`**; still-matching items do *not* re-fire. Re-entry (item leaves the matching set, comes back) is treated as new — this is the board-cycle primitive that makes Dev → Review → Dev loops work, and it extends transparently to draft↔ready PR transitions under `pr_state` filters.

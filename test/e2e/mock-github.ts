@@ -61,15 +61,6 @@ export interface MockBoardItem {
   title?: string;
   status: string;
   labels?: string[];
-  /**
-   * Set to `'pull_request'` to return a PullRequest content node instead of an
-   * Issue. PR-only fields (`isDraft`, `headRefName`, `baseRefName`) are read
-   * from this object too.
-   */
-  contentType?: 'issue' | 'pull_request';
-  isDraft?: boolean;
-  headRefName?: string;
-  baseRefName?: string;
 }
 
 export function projectBoardResponse(items: MockBoardItem[]): unknown {
@@ -79,14 +70,20 @@ export function projectBoardResponse(items: MockBoardItem[]): unknown {
         projectV2: {
           items: {
             pageInfo: { hasNextPage: false, endCursor: null },
-            nodes: items.map((it) => {
-              const number = it.number ?? 1;
-              const title = it.title ?? `Item ${it.itemId}`;
-              const repository = { name: 'shop', owner: { login: 'acme' } };
-              const labels = {
-                nodes: (it.labels ?? []).map((name) => ({ name })),
-              };
-              const fieldValues = {
+            nodes: items.map((it) => ({
+              id: it.itemId,
+              content: {
+                __typename: 'Issue',
+                id: `I_${it.itemId}`,
+                number: it.number ?? 1,
+                title: it.title ?? `Item ${it.itemId}`,
+                url: `https://github.com/acme/shop/issues/${it.number ?? 1}`,
+                repository: { name: 'shop', owner: { login: 'acme' } },
+                labels: {
+                  nodes: (it.labels ?? []).map((name) => ({ name })),
+                },
+              },
+              fieldValues: {
                 nodes: [
                   {
                     __typename: 'ProjectV2ItemFieldSingleSelectValue',
@@ -94,40 +91,8 @@ export function projectBoardResponse(items: MockBoardItem[]): unknown {
                     field: { __typename: 'ProjectV2SingleSelectField', name: 'Status' },
                   },
                 ],
-              };
-              if (it.contentType === 'pull_request') {
-                return {
-                  id: it.itemId,
-                  content: {
-                    __typename: 'PullRequest',
-                    id: `PR_${it.itemId}`,
-                    number,
-                    title,
-                    url: `https://github.com/acme/shop/pull/${number}`,
-                    repository,
-                    labels,
-                    isDraft: it.isDraft ?? false,
-                    headRefName: it.headRefName ?? `feature-${number}`,
-                    baseRefName: it.baseRefName ?? 'main',
-                    headRepository: repository,
-                  },
-                  fieldValues,
-                };
-              }
-              return {
-                id: it.itemId,
-                content: {
-                  __typename: 'Issue',
-                  id: `I_${it.itemId}`,
-                  number,
-                  title,
-                  url: `https://github.com/acme/shop/issues/${number}`,
-                  repository,
-                  labels,
-                },
-                fieldValues,
-              };
-            }),
+              },
+            })),
           },
         },
       },
@@ -141,6 +106,46 @@ function emptyResponse(): unknown {
       owner: {
         projectV2: {
           items: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] },
+        },
+      },
+    },
+  };
+}
+
+export interface MockRepoPullRequest {
+  /** PR node id — used as the dedup key (same as `itemNodeId` from the activity's view). */
+  nodeId: string;
+  number: number;
+  title?: string;
+  isDraft: boolean;
+  headRefName?: string;
+  baseRefName?: string;
+  labels?: string[];
+}
+
+/**
+ * Shape returned by `fetchRepositoryPullRequests` — mocks the
+ * `repository.pullRequests(states: OPEN)` GraphQL query. Used by the
+ * Phase 4 PR-scope E2E to drive the poller without hitting GitHub.
+ */
+export function repositoryPullRequestsResponse(prs: MockRepoPullRequest[]): unknown {
+  return {
+    data: {
+      repository: {
+        pullRequests: {
+          pageInfo: { hasNextPage: false, endCursor: null },
+          nodes: prs.map((pr) => ({
+            id: pr.nodeId,
+            number: pr.number,
+            title: pr.title ?? `PR ${pr.number}`,
+            url: `https://github.com/acme/shop/pull/${pr.number}`,
+            isDraft: pr.isDraft,
+            headRefName: pr.headRefName ?? `feature-${pr.number}`,
+            baseRefName: pr.baseRefName ?? 'main',
+            repository: { name: 'shop', owner: { login: 'acme' } },
+            headRepository: { name: 'shop', owner: { login: 'acme' } },
+            labels: { nodes: (pr.labels ?? []).map((name) => ({ name })) },
+          })),
         },
       },
     },

@@ -59,6 +59,13 @@ export interface Harness {
     repo: string,
     seedFiles?: Record<string, string>,
   ): Promise<string>;
+  /**
+   * Push an extra branch onto the bare remote created by `seedTicketBranchRepo`.
+   * The branch starts from `main` HEAD with one synthetic commit. Used by PR
+   * polling tests so the workspace resolver can find `pr.headRef` on first
+   * checkout. Idempotent — pushing twice is fine.
+   */
+  seedRemoteBranch(owner: string, repo: string, branch: string): Promise<void>;
   stop(): Promise<void>;
 }
 
@@ -173,6 +180,9 @@ export async function startHarness(opts: HarnessOptions = {}): Promise<Harness> 
     },
     async seedTicketBranchRepo(owner, repo, seedFiles = {}) {
       return seedTicketBranchRemote(conduitHome, remoteBase, owner, repo, seedFiles);
+    },
+    async seedRemoteBranch(owner, repo, branch) {
+      return seedRemoteBranch(conduitHome, remoteBase, owner, repo, branch);
     },
     async stop() {
       api.kill('SIGTERM');
@@ -394,6 +404,53 @@ async function seedTicketBranchRemote(
   await gitCmd(baseBareDir, ['remote', 'set-url', 'origin', bareRemote]);
 
   return bareRemote;
+}
+
+/**
+ * Push `branch` onto the bare remote with one synthetic commit on top of
+ * `main`. The PR-polling E2E uses this to make `pr.headRef` resolvable so
+ * `ticket-branch`'s PR arm can land on it without timing out on a fetch.
+ */
+async function seedRemoteBranch(
+  conduitHome: string,
+  remoteBase: string,
+  owner: string,
+  repo: string,
+  branch: string,
+): Promise<void> {
+  const bareRemote = path.join(remoteBase, owner, `${repo}.git`);
+  const baseBareDir = path.join(conduitHome, 'base-clones', 'github', owner, `${repo}.git`);
+  // Skip if the branch already exists on the bare remote (idempotent).
+  try {
+    await gitCmd(bareRemote, ['rev-parse', '--verify', `refs/heads/${branch}`]);
+    return;
+  } catch {
+    // Branch missing — keep going.
+  }
+
+  const scratch = path.join(
+    conduitHome,
+    '.seed-scratch-branches',
+    owner,
+    `${repo}-${branch.replace(/[^A-Za-z0-9._-]/g, '_')}`,
+  );
+  await fs.rm(scratch, { recursive: true, force: true });
+  await fs.mkdir(scratch, { recursive: true });
+  await gitCmd(scratch, ['clone', '-q', bareRemote, '.']);
+  await gitCmd(scratch, ['config', 'user.email', 'seed@conduit.test']);
+  await gitCmd(scratch, ['config', 'user.name', 'Seed']);
+  await gitCmd(scratch, ['checkout', '-q', '-b', branch]);
+  await fs.writeFile(
+    path.join(scratch, `.seed-${branch.replace(/[^A-Za-z0-9._-]/g, '_')}`),
+    `seed branch ${branch}\n`,
+  );
+  await gitCmd(scratch, ['add', '-A']);
+  await gitCmd(scratch, ['commit', '-q', '-m', `seed: branch ${branch}`]);
+  await gitCmd(scratch, ['push', '-q', 'origin', branch]);
+
+  // Refresh the base-clone mirror so the worker's local clone sees the new
+  // ref without a network fetch on first resolve.
+  await gitCmd(baseBareDir, ['fetch', '-q', 'origin', `+refs/heads/${branch}:refs/heads/${branch}`]);
 }
 
 function gitCmd(cwd: string, args: string[]): Promise<void> {

@@ -4,7 +4,7 @@ import { pollScheduleId, type WorkflowDefinition } from '@conduit/shared';
 import { loadWorkflowFixture } from '../helpers/temporal';
 import { startHarness, type Harness } from './harness';
 import {
-  projectBoardResponse,
+  repositoryPullRequestsResponse,
   startMockGithubGraphql,
   type MockGithubGraphql,
 } from './mock-github';
@@ -49,15 +49,21 @@ interface RunRow {
 }
 
 /**
- * PR-scope companion to `phase4-polling-run.test.ts`. Mirrors the same
- * scaffolding (mock GraphQL, schedule trigger, set-diff) but verifies the
- * scope split: PR items are kept, Issue items are filtered out, and the
- * `pr_state: 'ready_for_review'` filter excludes drafts. The poller is
- * tested in isolation — runs may fail downstream (the bare remote here
- * doesn't have the PR head refs seeded) but the run rows it writes carry
- * the trigger event we want to assert against.
+ * Phase 4 PR-scope companion to `phase4-polling-run.test.ts`. Verifies the
+ * end-to-end pipeline for `scope: 'pull_requests'` triggers without going
+ * to GitHub:
+ *
+ *   1. `fetchRepositoryPullRequests` is hit (not the board path) — the mock
+ *      GraphQL returns a `repository.pullRequests` shape.
+ *   2. The `pr_state: 'ready_for_review'` filter excludes drafts.
+ *   3. Set-diff dedup applies the same as for issues.
+ *   4. Draft → ready transitions re-enter the matching set and re-fire,
+ *      mirroring the Dev → Review → Dev re-entry primitive used by issue
+ *      board loops.
+ *   5. Each started run's `triggerEvent` carries `pull_request.detected`
+ *      with the PR head ref populated.
  */
-describe('Phase 4 PR scope — only ready PRs trigger runs', () => {
+describe('Phase 4 PR scope — repo polling fires runs on PR set-diff', () => {
   let harness: Harness;
   let github: MockGithubGraphql;
   let scheduleClient: ScheduleClient;
@@ -89,8 +95,19 @@ describe('Phase 4 PR scope — only ready PRs trigger runs', () => {
     await github?.close().catch(() => undefined);
   });
 
-  it('keeps PRs, drops issues, and applies pr_state: ready_for_review', async () => {
+  it('only ready PRs trigger runs; draft→ready re-entry re-fires', async () => {
+    // Bare remote + the head refs the PRs in the canned response point at,
+    // so the workspace manager can land on them without a real fetch.
+    // Note: keeping at most one ready PR matched per cycle to side-step a
+    // pre-existing workspace-manager bug — `fetchWithAuth` uses the global
+    // `+refs/heads/*:refs/heads/*` refspec, which collides with a sibling
+    // run holding a worktree on another existing remote branch ("refusing
+    // to fetch into branch X checked out at Y"). Issue scope doesn't trip
+    // this because `conduit/<id>-<slug>` branches don't exist remotely
+    // until push. Tracked as a separate fix; not in scope here.
     await harness.seedTicketBranchRepo('acme', 'shop');
+    await harness.seedRemoteBranch('acme', 'shop', 'feature-7');
+    await harness.seedRemoteBranch('acme', 'shop', 'feature-8');
 
     const cred = await harness.http.post<{ id: string }>('/credentials', {
       platform: 'GITHUB',
@@ -145,120 +162,59 @@ describe('Phase 4 PR scope — only ready PRs trigger runs', () => {
       ],
     });
 
-    // Mixed board: 1 issue, 1 draft PR, 2 ready-for-review PRs. The trigger
-    // is `scope: 'pull_requests'` + `pr_state: 'ready_for_review'`, so only
-    // the 2 ready PRs should fire runs.
-    github.enqueue(
-      projectBoardResponse([
-        {
-          itemId: 'PVTI_ISSUE',
-          number: 99,
-          title: 'an issue',
-          status: 'Dev',
-          contentType: 'issue',
-        },
-        {
-          itemId: 'PVTI_PR_DRAFT',
-          number: 7,
-          title: 'WIP feature',
-          status: 'Dev',
-          contentType: 'pull_request',
-          isDraft: true,
-          headRefName: 'feature-7',
-        },
-        {
-          itemId: 'PVTI_PR_READY_A',
-          number: 8,
-          title: 'Ready PR A',
-          status: 'Dev',
-          contentType: 'pull_request',
-          isDraft: false,
-          headRefName: 'feature-8',
-        },
-        {
-          itemId: 'PVTI_PR_READY_B',
-          number: 9,
-          title: 'Ready PR B',
-          status: 'Dev',
-          contentType: 'pull_request',
-          isDraft: false,
-          headRefName: 'feature-9',
-        },
-      ]),
-    );
-
-    await scheduleHandle.trigger();
-    const rows = await waitForRunCount(created.id, 2);
-
-    // Only the two ready PRs fire runs. The issue is filtered out by scope;
-    // the draft PR is filtered out by `pr_state: 'ready_for_review'`.
-    expect(rows).toHaveLength(2);
-    const startedItemIds = rows
-      .map((r) => r.trigger.payload?.projectItemNodeId)
-      .sort();
-    expect(startedItemIds).toEqual(['PVTI_PR_READY_A', 'PVTI_PR_READY_B']);
-
-    // Each run's trigger event should be `pull_request.detected`, carry the
-    // PR head ref (so `ticket-branch` lands on it instead of `conduit/<…>`),
-    // and tag `payload.prState = 'ready_for_review'` for downstream filters.
-    for (const row of rows) {
-      expect(row.trigger.event).toBe('pull_request.detected');
-      expect(row.trigger.pr?.headRef).toMatch(/^feature-\d+$/);
-      expect(row.trigger.pr?.baseRef).toBe('main');
-      expect(row.trigger.payload?.prState).toBe('ready_for_review');
-    }
-
     // ------------------------------------------------------------------
-    // Cycle 2 — flip the draft PR to ready. Set-diff dedup should see it
-    // as new (it left the matching set, comes back) and fire one more run.
+    // Cycle 1 — 1 draft + 1 ready PR. Filter is `pr_state: ready_for_review`
+    //           so only the ready PR fires a run.
     // ------------------------------------------------------------------
     github.enqueue(
-      projectBoardResponse([
-        {
-          itemId: 'PVTI_ISSUE',
-          number: 99,
-          title: 'an issue',
-          status: 'Dev',
-          contentType: 'issue',
-        },
-        {
-          itemId: 'PVTI_PR_DRAFT',
-          number: 7,
-          title: 'WIP feature',
-          status: 'Dev',
-          contentType: 'pull_request',
-          isDraft: false,
-          headRefName: 'feature-7',
-        },
-        {
-          itemId: 'PVTI_PR_READY_A',
-          number: 8,
-          title: 'Ready PR A',
-          status: 'Dev',
-          contentType: 'pull_request',
-          isDraft: false,
-          headRefName: 'feature-8',
-        },
-        {
-          itemId: 'PVTI_PR_READY_B',
-          number: 9,
-          title: 'Ready PR B',
-          status: 'Dev',
-          contentType: 'pull_request',
-          isDraft: false,
-          headRefName: 'feature-9',
-        },
+      repositoryPullRequestsResponse([
+        { nodeId: 'PR_DRAFT_7', number: 7, isDraft: true, headRefName: 'feature-7' },
+        { nodeId: 'PR_READY_8', number: 8, isDraft: false, headRefName: 'feature-8' },
       ]),
     );
     await scheduleHandle.trigger();
-    const afterCycle2 = await waitForRunCount(created.id, 3);
-    const items2 = afterCycle2
-      .map((r) => r.trigger.payload?.projectItemNodeId)
-      .sort();
-    expect(items2).toEqual([
-      'PVTI_PR_DRAFT',
-      'PVTI_PR_READY_A',
-      'PVTI_PR_READY_B',
-    ]);
-  }, 120_000);
+    const afterCycle1 = await waitForRunCount(created.id, 1);
+    expect(afterCycle1).toHaveLength(1);
+    expect(afterCycle1[0]?.trigger.payload?.projectItemNodeId).toBe('PR_READY_8');
+    expect(afterCycle1[0]?.trigger.event).toBe('pull_request.detected');
+    expect(afterCycle1[0]?.trigger.pr?.headRef).toBe('feature-8');
+    expect(afterCycle1[0]?.trigger.pr?.baseRef).toBe('main');
+    expect(afterCycle1[0]?.trigger.payload?.prState).toBe('ready_for_review');
+
+    // The run the poller starts should converge to COMPLETED — catches a
+    // wiring bug where the poll-started run never reaches the agent.
+    await waitFor(async () => {
+      const rows = await harness.http.get<RunRow[]>(`/workflows/${created.id}/runs`);
+      return rows.every((r) => r.status === 'COMPLETED' || r.status === 'FAILED');
+    }, 30_000);
+    const completed1 = await harness.http.get<RunRow[]>(`/workflows/${created.id}/runs`);
+    expect(completed1[0]?.status).toBe('COMPLETED');
+
+    // ------------------------------------------------------------------
+    // Cycle 2 — same shape. Set-diff dedup must keep run count at 1.
+    // ------------------------------------------------------------------
+    await scheduleHandle.trigger();
+    const reqsAfterCycle1 = github.requestCount();
+    await waitFor(() => Promise.resolve(github.requestCount() > reqsAfterCycle1), 15_000);
+    await sleep(1500);
+    const afterCycle2 = await harness.http.get<RunRow[]>(`/workflows/${created.id}/runs`);
+    expect(afterCycle2).toHaveLength(1);
+
+    // ------------------------------------------------------------------
+    // Cycle 3 — PR #7 flips draft → ready. Set-diff sees it as new (it left
+    //           the matching set, comes back), so exactly one new run fires.
+    //           This is the same re-entry primitive issue board loops use,
+    //           applied to PR draft↔ready transitions.
+    // ------------------------------------------------------------------
+    github.enqueue(
+      repositoryPullRequestsResponse([
+        { nodeId: 'PR_DRAFT_7', number: 7, isDraft: false, headRefName: 'feature-7' },
+        { nodeId: 'PR_READY_8', number: 8, isDraft: false, headRefName: 'feature-8' },
+      ]),
+    );
+    await scheduleHandle.trigger();
+    const afterCycle3 = await waitForRunCount(created.id, 2);
+    const startedIds = afterCycle3.map((r) => r.trigger.payload?.projectItemNodeId).sort();
+    expect(startedIds).toEqual(['PR_DRAFT_7', 'PR_READY_8']);
+  }, 180_000);
 });

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { fetchProjectBoardItems, listProjectBoards } from './projects';
+import {
+  fetchProjectBoardItems,
+  fetchRepositoryIssues,
+  fetchRepositoryPullRequests,
+  listProjectBoards,
+} from './projects';
 
 /**
  * Mapper tests — we stub `fetch` with a canned GraphQL response so the
@@ -370,6 +375,138 @@ describe('listProjectBoards', () => {
         fakeFetch,
       ),
     ).rejects.toThrow(/Bad credentials/);
+  });
+});
+
+describe('fetchRepositoryPullRequests', () => {
+  it('flattens repo PRs into ProjectBoardItem shape with pr block + draft state', async () => {
+    const canned = {
+      data: {
+        repository: {
+          pullRequests: {
+            pageInfo: { hasNextPage: false, endCursor: null },
+            nodes: [
+              {
+                id: 'PR_node_1',
+                number: 7,
+                title: 'WIP feature',
+                url: 'https://github.com/acme/shop/pull/7',
+                isDraft: true,
+                headRefName: 'feature-7',
+                baseRefName: 'main',
+                repository: { name: 'shop', owner: { login: 'acme' } },
+                headRepository: { name: 'shop', owner: { login: 'acme' } },
+                labels: { nodes: [{ name: 'enhancement' }] },
+              },
+              {
+                id: 'PR_node_2',
+                number: 8,
+                title: 'Fork PR',
+                url: 'https://github.com/acme/shop/pull/8',
+                isDraft: false,
+                headRefName: 'patch-1',
+                baseRefName: 'main',
+                repository: { name: 'shop', owner: { login: 'acme' } },
+                headRepository: { name: 'shop', owner: { login: 'contributor' } },
+                labels: { nodes: [] },
+              },
+            ],
+          },
+        },
+      },
+    };
+    const fakeFetch = makeFetch([canned]);
+    const items = await fetchRepositoryPullRequests(
+      { owner: 'acme', name: 'shop', token: 't' },
+      fakeFetch,
+    );
+    expect(items).toHaveLength(2);
+    expect(items[0]).toMatchObject({
+      itemNodeId: 'PR_node_1',
+      contentNodeId: 'PR_node_1',
+      contentType: 'PullRequest',
+      contentKey: '7',
+      labels: ['enhancement'],
+      // No project board → no Status. Other filters (label, pr_state) work
+      // unchanged.
+      singleSelectValues: {},
+      pr: { headRef: 'feature-7', baseRef: 'main', state: 'draft' },
+    });
+    // Same-repo PR keeps headRepo undefined (fork-PR signal).
+    expect(items[0]?.pr?.headRepo).toBeUndefined();
+    // Cross-repo (fork) PR surfaces headRepo.
+    expect(items[1]?.pr).toEqual({
+      headRef: 'patch-1',
+      baseRef: 'main',
+      state: 'ready_for_review',
+      headRepo: { owner: 'contributor', name: 'shop' },
+    });
+  });
+
+  it('throws when the repo cannot be resolved', async () => {
+    const canned = { data: { repository: null } };
+    const fakeFetch = makeFetch([canned]);
+    await expect(
+      fetchRepositoryPullRequests({ owner: 'acme', name: 'missing', token: 't' }, fakeFetch),
+    ).rejects.toThrow(/Repository acme\/missing not found/);
+  });
+
+  it('surfaces GraphQL errors', async () => {
+    const canned = { errors: [{ message: 'Bad credentials', type: 'UNAUTHORIZED' }] };
+    const fakeFetch = makeFetch([canned]);
+    await expect(
+      fetchRepositoryPullRequests({ owner: 'acme', name: 'shop', token: 'bad' }, fakeFetch),
+    ).rejects.toThrow(/Bad credentials/);
+  });
+});
+
+describe('fetchRepositoryIssues', () => {
+  it('flattens repo issues into ProjectBoardItem shape (no pr block, empty singleSelectValues)', async () => {
+    const canned = {
+      data: {
+        repository: {
+          issues: {
+            pageInfo: { hasNextPage: false, endCursor: null },
+            nodes: [
+              {
+                id: 'I_1',
+                number: 42,
+                title: 'Crash on save',
+                url: 'https://github.com/acme/shop/issues/42',
+                repository: { name: 'shop', owner: { login: 'acme' } },
+                labels: { nodes: [{ name: 'bug' }, { name: 'p0' }] },
+              },
+            ],
+          },
+        },
+      },
+    };
+    const fakeFetch = makeFetch([canned]);
+    const items = await fetchRepositoryIssues(
+      { owner: 'acme', name: 'shop', token: 't' },
+      fakeFetch,
+    );
+    expect(items).toEqual([
+      {
+        itemNodeId: 'I_1',
+        contentNodeId: 'I_1',
+        contentType: 'Issue',
+        contentKey: '42',
+        contentTitle: 'Crash on save',
+        contentUrl: 'https://github.com/acme/shop/issues/42',
+        repo: { owner: 'acme', name: 'shop' },
+        singleSelectValues: {},
+        labels: ['bug', 'p0'],
+      },
+    ]);
+  });
+
+  it('throws when the repo cannot be resolved', async () => {
+    const canned = { data: { repository: null } };
+    const fakeFetch = makeFetch([canned]);
+    await expect(
+      fetchRepositoryIssues({ owner: 'acme', name: 'missing', token: 't' }, fakeFetch),
+    ).rejects.toThrow(/Repository acme\/missing not found/);
   });
 });
 

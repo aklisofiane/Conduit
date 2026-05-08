@@ -1,6 +1,6 @@
 {
   "name": "Phase 4 polling — PR scope, ready_for_review",
-  "description": "Polls a GitHub Projects v2 board with `scope: pull_requests`, only firing on PRs that are marked ready for review.",
+  "description": "Polls open PRs in the connection's repo with `scope: pull_requests`, only firing on PRs that are marked ready for review.",
   "definition": {
     "triggers": [
       {
@@ -9,8 +9,7 @@
         "platform": "github",
         "connectionId": "__placeholder__",
         "mode": { "kind": "polling", "intervalSec": 3600, "scope": "pull_requests" },
-        "filters": [{ "field": "pr_state", "value": "ready_for_review" }],
-        "board": { "ownerType": "org", "owner": "acme", "number": 5 }
+        "filters": [{ "field": "pr_state", "value": "ready_for_review" }]
       }
     ],
     "nodes": [

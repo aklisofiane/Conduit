@@ -396,3 +396,275 @@ function toItem(raw: RawProjectItem): ProjectBoardItem {
   }
   return item;
 }
+
+export interface RepoPullRequestQuery {
+  owner: string;
+  name: string;
+  token: string;
+}
+
+interface RawRepoPullRequest {
+  id: string;
+  number: number;
+  title: string;
+  url: string;
+  isDraft: boolean;
+  headRefName: string;
+  baseRefName: string;
+  repository: { name: string; owner: { login: string } };
+  headRepository?: { name: string; owner: { login: string } } | null;
+  labels?: { nodes: Array<{ name?: string } | null> };
+}
+
+interface RepoPullRequestsResponse {
+  repository?: {
+    pullRequests: {
+      pageInfo: { hasNextPage: boolean; endCursor: string | null };
+      nodes: Array<RawRepoPullRequest | null>;
+    };
+  } | null;
+}
+
+const REPO_PULL_REQUESTS_QUERY = /* GraphQL */ `
+  query ConduitRepoPullRequests(
+    $owner: String!
+    $name: String!
+    $first: Int!
+    $after: String
+  ) {
+    repository(owner: $owner, name: $name) {
+      pullRequests(
+        first: $first
+        after: $after
+        states: [OPEN]
+        orderBy: { field: UPDATED_AT, direction: DESC }
+      ) {
+        pageInfo { hasNextPage endCursor }
+        nodes {
+          id
+          number
+          title
+          url
+          isDraft
+          headRefName
+          baseRefName
+          repository { name owner { login } }
+          headRepository { name owner { login } }
+          labels(first: 20) { nodes { name } }
+        }
+      }
+    }
+  }
+`;
+
+/**
+ * Fetch open pull requests in a repository, returning the same
+ * `ProjectBoardItem` shape `fetchProjectBoardItems` produces. Lets the
+ * polling activity reuse the existing matcher / event-builder pipeline:
+ * `itemNodeId` is the PR's own node id (stable, dedup-safe), `contentType`
+ * is always `'PullRequest'`, `singleSelectValues` is empty (no board, no
+ * Status column), and `pr` carries head/base refs + draft state.
+ */
+export async function fetchRepositoryPullRequests(
+  q: RepoPullRequestQuery,
+  fetchImpl: typeof fetch = fetch,
+): Promise<ProjectBoardItem[]> {
+  const items: ProjectBoardItem[] = [];
+  let cursor: string | null = null;
+
+  for (let page = 0; page < MAX_PAGES; page += 1) {
+    const payload: GraphQLResponse<RepoPullRequestsResponse> = await callGraphQL(
+      {
+        query: REPO_PULL_REQUESTS_QUERY,
+        variables: {
+          owner: q.owner,
+          name: q.name,
+          first: PAGE_SIZE,
+          after: cursor,
+        },
+      },
+      q.token,
+      fetchImpl,
+    );
+
+    if (payload.errors?.length) {
+      throw new Error(
+        `GitHub GraphQL error: ${payload.errors.map((e) => e.message).join('; ')}`,
+      );
+    }
+
+    const repo = payload.data?.repository;
+    if (!repo) {
+      throw new Error(
+        `Repository ${q.owner}/${q.name} not found (token may lack repo scope)`,
+      );
+    }
+
+    for (const raw of repo.pullRequests.nodes) {
+      if (!raw) continue;
+      items.push(repoPullRequestToItem(raw));
+    }
+
+    if (!repo.pullRequests.pageInfo.hasNextPage) return items;
+    cursor = repo.pullRequests.pageInfo.endCursor;
+  }
+
+  return items;
+}
+
+function repoPullRequestToItem(raw: RawRepoPullRequest): ProjectBoardItem {
+  const item: ProjectBoardItem = {
+    // No project item wraps a repo-source PR — use the PR node id as the
+    // dedup key. Stable across draft↔ready transitions.
+    itemNodeId: raw.id,
+    contentNodeId: raw.id,
+    contentType: 'PullRequest',
+    contentKey: String(raw.number),
+    contentTitle: raw.title,
+    contentUrl: raw.url,
+    repo: { owner: raw.repository.owner.login, name: raw.repository.name },
+    singleSelectValues: {},
+    labels: [],
+    pr: {
+      headRef: raw.headRefName,
+      baseRef: raw.baseRefName,
+      state: raw.isDraft ? 'draft' : 'ready_for_review',
+    },
+  };
+  for (const node of raw.labels?.nodes ?? []) {
+    if (node?.name) item.labels.push(node.name);
+  }
+  const headOwner = raw.headRepository?.owner?.login;
+  const headName = raw.headRepository?.name;
+  if (
+    headOwner &&
+    headName &&
+    (headOwner !== raw.repository.owner.login || headName !== raw.repository.name)
+  ) {
+    item.pr!.headRepo = { owner: headOwner, name: headName };
+  }
+  return item;
+}
+
+export interface RepoIssueQuery {
+  owner: string;
+  name: string;
+  token: string;
+}
+
+interface RawRepoIssue {
+  id: string;
+  number: number;
+  title: string;
+  url: string;
+  repository: { name: string; owner: { login: string } };
+  labels?: { nodes: Array<{ name?: string } | null> };
+}
+
+interface RepoIssuesResponse {
+  repository?: {
+    issues: {
+      pageInfo: { hasNextPage: boolean; endCursor: string | null };
+      nodes: Array<RawRepoIssue | null>;
+    };
+  } | null;
+}
+
+const REPO_ISSUES_QUERY = /* GraphQL */ `
+  query ConduitRepoIssues(
+    $owner: String!
+    $name: String!
+    $first: Int!
+    $after: String
+  ) {
+    repository(owner: $owner, name: $name) {
+      issues(
+        first: $first
+        after: $after
+        states: [OPEN]
+        orderBy: { field: UPDATED_AT, direction: DESC }
+      ) {
+        pageInfo { hasNextPage endCursor }
+        nodes {
+          id
+          number
+          title
+          url
+          repository { name owner { login } }
+          labels(first: 20) { nodes { name } }
+        }
+      }
+    }
+  }
+`;
+
+/**
+ * Fetch open issues in a repository, returning the same `ProjectBoardItem`
+ * shape `fetchProjectBoardItems` produces. Mirror of
+ * `fetchRepositoryPullRequests` for issue scope; `singleSelectValues` is
+ * empty (no board, no Status column) and `pr` is undefined.
+ */
+export async function fetchRepositoryIssues(
+  q: RepoIssueQuery,
+  fetchImpl: typeof fetch = fetch,
+): Promise<ProjectBoardItem[]> {
+  const items: ProjectBoardItem[] = [];
+  let cursor: string | null = null;
+
+  for (let page = 0; page < MAX_PAGES; page += 1) {
+    const payload: GraphQLResponse<RepoIssuesResponse> = await callGraphQL(
+      {
+        query: REPO_ISSUES_QUERY,
+        variables: {
+          owner: q.owner,
+          name: q.name,
+          first: PAGE_SIZE,
+          after: cursor,
+        },
+      },
+      q.token,
+      fetchImpl,
+    );
+
+    if (payload.errors?.length) {
+      throw new Error(
+        `GitHub GraphQL error: ${payload.errors.map((e) => e.message).join('; ')}`,
+      );
+    }
+
+    const repo = payload.data?.repository;
+    if (!repo) {
+      throw new Error(
+        `Repository ${q.owner}/${q.name} not found (token may lack repo scope)`,
+      );
+    }
+
+    for (const raw of repo.issues.nodes) {
+      if (!raw) continue;
+      items.push(repoIssueToItem(raw));
+    }
+
+    if (!repo.issues.pageInfo.hasNextPage) return items;
+    cursor = repo.issues.pageInfo.endCursor;
+  }
+
+  return items;
+}
+
+function repoIssueToItem(raw: RawRepoIssue): ProjectBoardItem {
+  const item: ProjectBoardItem = {
+    itemNodeId: raw.id,
+    contentNodeId: raw.id,
+    contentType: 'Issue',
+    contentKey: String(raw.number),
+    contentTitle: raw.title,
+    contentUrl: raw.url,
+    repo: { owner: raw.repository.owner.login, name: raw.repository.name },
+    singleSelectValues: {},
+    labels: [],
+  };
+  for (const node of raw.labels?.nodes ?? []) {
+    if (node?.name) item.labels.push(node.name);
+  }
+  return item;
+}

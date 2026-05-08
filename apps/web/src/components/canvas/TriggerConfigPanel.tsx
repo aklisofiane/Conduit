@@ -42,13 +42,17 @@ export function TriggerConfigPanel({
 
   const owner = trigger.board?.owner?.trim() ?? '';
   const ownerType = trigger.board?.ownerType ?? 'org';
-  const needsBoard =
-    trigger.mode.kind === 'polling' ||
-    (trigger.mode.kind === 'webhook' &&
-      trigger.mode.event === 'board.column.changed');
-
   const pollingScope =
     trigger.mode.kind === 'polling' ? trigger.mode.scope : undefined;
+  const pollingSource =
+    trigger.mode.kind === 'polling' ? trigger.mode.source : undefined;
+  const showsBoardPicker =
+    (trigger.mode.kind === 'polling' &&
+      pollingScope === 'issues' &&
+      pollingSource === 'board') ||
+    (trigger.mode.kind === 'webhook' &&
+      trigger.mode.event === 'board.column.changed');
+  const needsBoard = showsBoardPicker;
 
   // One-shot notice for filters dropped on scope flip. Cleared after a few
   // seconds so it doesn't persist across unrelated edits.
@@ -95,12 +99,18 @@ export function TriggerConfigPanel({
           kind: 'webhook',
           event: trigger.platform === 'github' ? 'issues.opened' : '',
         },
-        filters: dropFiltersForScope(trigger.filters, 'webhook', null, setFilterNotice),
+        filters: dropFiltersForScope(trigger.filters, 'webhook', null, null, setFilterNotice),
       });
     } else {
       onChange({
-        mode: { kind: 'polling', intervalSec: 60, scope: 'issues' },
-        filters: dropFiltersForScope(trigger.filters, 'polling', 'issues', setFilterNotice),
+        mode: { kind: 'polling', intervalSec: 60, scope: 'issues', source: 'board' },
+        filters: dropFiltersForScope(
+          trigger.filters,
+          'polling',
+          'issues',
+          'board',
+          setFilterNotice,
+        ),
       });
     }
   };
@@ -110,7 +120,28 @@ export function TriggerConfigPanel({
     if (trigger.mode.scope === scope) return;
     onChange({
       mode: { ...trigger.mode, scope },
-      filters: dropFiltersForScope(trigger.filters, 'polling', scope, setFilterNotice),
+      filters: dropFiltersForScope(
+        trigger.filters,
+        'polling',
+        scope,
+        trigger.mode.source,
+        setFilterNotice,
+      ),
+    });
+  };
+
+  const setSource = (source: 'board' | 'repo') => {
+    if (trigger.mode.kind !== 'polling') return;
+    if (trigger.mode.source === source) return;
+    onChange({
+      mode: { ...trigger.mode, source },
+      filters: dropFiltersForScope(
+        trigger.filters,
+        'polling',
+        trigger.mode.scope,
+        source,
+        setFilterNotice,
+      ),
     });
   };
 
@@ -229,22 +260,44 @@ export function TriggerConfigPanel({
 
           {trigger.mode.kind === 'polling' && (
             <>
-              <Field label="Scope" hint="what the poller pulls from the board">
+              <Field label="Scope" hint="what the poller watches">
                 <div className="grid grid-cols-2 gap-2">
                   <ModeButton
                     active={trigger.mode.scope === 'issues'}
                     onClick={() => setScope('issues')}
                     label="Issues"
-                    hint="board issues only"
+                    hint={
+                      trigger.mode.source === 'repo'
+                        ? 'open issues in the repo'
+                        : 'from a project board'
+                    }
                   />
                   <ModeButton
                     active={trigger.mode.scope === 'pull_requests'}
                     onClick={() => setScope('pull_requests')}
                     label="Pull requests"
-                    hint="board PRs only"
+                    hint="open PRs in the repo"
                   />
                 </div>
               </Field>
+              {trigger.mode.scope === 'issues' && (
+                <Field label="Source" hint="where issues come from">
+                  <div className="grid grid-cols-2 gap-2">
+                    <ModeButton
+                      active={trigger.mode.source === 'board'}
+                      onClick={() => setSource('board')}
+                      label="Project V2"
+                      hint="status-driven workflows"
+                    />
+                    <ModeButton
+                      active={trigger.mode.source === 'repo'}
+                      onClick={() => setSource('repo')}
+                      label="Repo issues"
+                      hint="every open issue"
+                    />
+                  </div>
+                </Field>
+              )}
               <Field label="Interval" hint="seconds between poll cycles">
                 <input
                   className="field-input"
@@ -266,9 +319,7 @@ export function TriggerConfigPanel({
             </>
           )}
 
-          {(trigger.mode.kind === 'polling' ||
-            (trigger.mode.kind === 'webhook' &&
-              trigger.mode.event === 'board.column.changed')) && (
+          {showsBoardPicker && (
             <Field
               label="Project board"
               hint="GitHub Projects v2 — Conduit watches this board"
@@ -322,6 +373,7 @@ export function TriggerConfigPanel({
             <FilterEditor
               filters={trigger.filters}
               scope={pollingScope ?? null}
+              source={pollingSource ?? null}
               statusOptions={statusOptions}
               labelOptions={labelOptions}
               onChange={(filters) => onChange({ filters })}
@@ -347,11 +399,17 @@ export function TriggerConfigPanel({
   );
 }
 
-/** Filter fields offered for a given trigger context. */
+/**
+ * Filter fields offered for a given trigger context. `status` requires a
+ * Projects v2 board to filter against; under repo-source issue polling
+ * there's no Status column, so the field is hidden.
+ */
 function fieldsForContext(
   scope: 'issues' | 'pull_requests' | null,
+  source: 'board' | 'repo' | null,
 ): Array<TriggerFilter['field']> {
   if (scope === 'pull_requests') return ['pr_state', 'label'];
+  if (scope === 'issues' && source === 'repo') return ['label'];
   return ['status', 'label'];
 }
 
@@ -367,18 +425,19 @@ function emptyFilter(field: TriggerFilter['field']): TriggerFilter {
 }
 
 /**
- * Drop filters whose `field` isn't offered under the new scope. Surfaces a
- * one-shot notice via `setNotice` so users see what happened. `scope` is
- * null for webhook mode (where pr_state isn't offered either).
+ * Drop filters whose `field` isn't offered under the new (scope, source)
+ * combo. Surfaces a one-shot notice via `setNotice` so users see what
+ * happened. `scope` and `source` are null for webhook mode.
  */
 function dropFiltersForScope(
   filters: TriggerFilter[],
   modeKind: 'polling' | 'webhook',
   scope: 'issues' | 'pull_requests' | null,
+  source: 'board' | 'repo' | null,
   setNotice: (message: string) => void,
 ): TriggerFilter[] {
   const offered = new Set<TriggerFilter['field']>(
-    modeKind === 'webhook' ? ['status', 'label'] : fieldsForContext(scope),
+    modeKind === 'webhook' ? ['status', 'label'] : fieldsForContext(scope, source),
   );
   const kept: TriggerFilter[] = [];
   const dropped: TriggerFilter[] = [];
@@ -388,7 +447,9 @@ function dropFiltersForScope(
   }
   if (dropped.length > 0) {
     const labels = dropped.map((f) => FIELD_LABELS[f.field]).join(', ');
-    setNotice(`Dropped ${dropped.length} filter${dropped.length === 1 ? '' : 's'} not available in this scope: ${labels}.`);
+    setNotice(
+      `Dropped ${dropped.length} filter${dropped.length === 1 ? '' : 's'} not available here: ${labels}.`,
+    );
   }
   return kept;
 }
@@ -396,12 +457,14 @@ function dropFiltersForScope(
 function FilterEditor({
   filters,
   scope,
+  source,
   statusOptions,
   labelOptions,
   onChange,
 }: {
   filters: TriggerFilter[];
   scope: 'issues' | 'pull_requests' | null;
+  source: 'board' | 'repo' | null;
   statusOptions: string[];
   labelOptions: string[];
   onChange: (filters: TriggerFilter[]) => void;
@@ -409,7 +472,7 @@ function FilterEditor({
   const replaceAt = (i: number, next: TriggerFilter) =>
     onChange(filters.map((f, idx) => (idx === i ? next : f)));
   const removeAt = (i: number) => onChange(filters.filter((_, idx) => idx !== i));
-  const offeredFields = fieldsForContext(scope);
+  const offeredFields = fieldsForContext(scope, source);
   const add = () => onChange([...filters, emptyFilter(offeredFields[0]!)]);
 
   return (

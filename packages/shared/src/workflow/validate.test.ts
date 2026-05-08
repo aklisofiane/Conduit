@@ -46,7 +46,7 @@ describe('validateWorkflowDefinition', () => {
       nodes: [agentNode()],
       triggers: [
         trigger({
-          mode: { kind: 'polling', intervalSec: 60, scope: 'issues' },
+          mode: { kind: 'polling', intervalSec: 60, scope: 'issues', source: 'board' },
           filters: [{ field: 'status', value: 'Dev' }],
           board: { ownerType: 'org', owner: 'acme', number: 1 },
         }),
@@ -92,6 +92,19 @@ describe('validateWorkflowDefinition', () => {
     const issues = validateWorkflowDefinition(def);
     expect(issues).toHaveLength(1);
     expect(issues[0]!.code).toBe('trigger-requires-issue-or-pr');
+  });
+
+  it('passes a polling PR trigger (board ref omitted — repo is implicit)', () => {
+    const def = baseDefinition({
+      nodes: [agentNode()],
+      triggers: [
+        trigger({
+          mode: { kind: 'polling', intervalSec: 60, scope: 'pull_requests', source: 'board' },
+          filters: [{ field: 'pr_state', value: 'draft' }],
+        }),
+      ],
+    });
+    expect(validateWorkflowDefinition(def)).toEqual([]);
   });
 
   it('rejects a workflow whose triggers reference different connections', () => {

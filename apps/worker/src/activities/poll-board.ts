@@ -14,7 +14,11 @@ import { decryptSecret, loadEncryptionKey } from '@conduit/shared/crypto';
 import { config } from '../config';
 import { prisma } from '../runtime/prisma';
 import { writeSystemLog } from '../runtime/log-writer';
-import { fetchProjectBoardItems } from '@conduit/shared/platform';
+import {
+  fetchProjectBoardItems,
+  fetchRepositoryIssues,
+  fetchRepositoryPullRequests,
+} from '@conduit/shared/platform';
 import { getTemporalClient } from '../runtime/temporal-client';
 import { itemPassesFilters, toTriggerEvent } from './poll-board-helpers';
 
@@ -53,9 +57,6 @@ export async function pollBoardActivity(
   if (trigger.platform !== 'github') {
     throw new Error(`Polling for platform "${trigger.platform}" not implemented`);
   }
-  if (!trigger.board) {
-    throw new Error(`Workflow ${workflowId} polling trigger has no board reference`);
-  }
 
   const connection = await prisma().workflowConnection.findUnique({
     where: { id: trigger.connectionId },
@@ -68,22 +69,53 @@ export async function pollBoardActivity(
   }
   const token = decryptSecret(connection.credential.secret, loadEncryptionKey());
 
-  const items = await fetchProjectBoardItems({
-    ownerType: trigger.board.ownerType,
-    owner: trigger.board.owner,
-    projectNumber: trigger.board.number,
-    token,
-  });
+  const scope = trigger.mode.scope;
+  const source = trigger.mode.source;
+
+  // PR scope is always repo-sourced (a board adds nothing). Issue scope
+  // dispatches on `source`: 'board' (default) hits Projects v2; 'repo' hits
+  // the repo's open-issues list directly. The activity returns the same
+  // `ProjectBoardItem` shape from any of the three paths so the rest of the
+  // pipeline (filter, dedup, event-build) doesn't care which one fired.
+  let items;
+  if (scope === 'pull_requests') {
+    if (!connection.owner || !connection.repo) {
+      throw new Error(
+        `Workflow ${workflowId} polling PR trigger requires connection owner/repo`,
+      );
+    }
+    items = await fetchRepositoryPullRequests({
+      owner: connection.owner,
+      name: connection.repo,
+      token,
+    });
+  } else if (source === 'repo') {
+    if (!connection.owner || !connection.repo) {
+      throw new Error(
+        `Workflow ${workflowId} polling issue trigger (source: repo) requires connection owner/repo`,
+      );
+    }
+    items = await fetchRepositoryIssues({
+      owner: connection.owner,
+      name: connection.repo,
+      token,
+    });
+  } else {
+    if (!trigger.board) {
+      throw new Error(`Workflow ${workflowId} polling issue trigger has no board reference`);
+    }
+    const boardItems = await fetchProjectBoardItems({
+      ownerType: trigger.board.ownerType,
+      owner: trigger.board.owner,
+      projectNumber: trigger.board.number,
+      token,
+    });
+    // Drop PRs and DraftIssues so issue triggers only see real issues.
+    items = boardItems.filter((item) => item.contentType === 'Issue');
+  }
   const fetchedCount = items.length;
 
-  // Scope-filter against contentType so issue triggers never see PRs (and
-  // drafts) and PR triggers never see issues. Defaults to 'issues' via the
-  // Zod default for triggers persisted before scope existed.
-  const scope = trigger.mode.scope;
-  const wantedContentType = scope === 'pull_requests' ? 'PullRequest' : 'Issue';
-  const inScopeItems = items.filter((item) => item.contentType === wantedContentType);
-
-  const matching = inScopeItems.filter((item) => itemPassesFilters(item, trigger.filters));
+  const matching = items.filter((item) => itemPassesFilters(item, trigger.filters));
   const matchingIds = matching.map((item) => item.itemNodeId).sort();
 
   const previousIds = readPreviousIds(wf.pollSnapshot?.matchingIds);

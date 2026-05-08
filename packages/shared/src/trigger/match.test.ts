@@ -50,7 +50,7 @@ describe('matchesTrigger', () => {
         { ...BASE_EVENT, mode: 'polling', event: 'status.changed' },
         {
           ...BASE_TRIGGER,
-          mode: { kind: 'polling', intervalSec: 60, scope: 'issues' },
+          mode: { kind: 'polling', intervalSec: 60, scope: 'issues', source: 'board' },
         },
       ),
     ).toBe(true);
@@ -154,7 +154,7 @@ describe('matchesTrigger', () => {
     };
     const trigger: TriggerConfig = {
       ...BASE_TRIGGER,
-      mode: { kind: 'polling', intervalSec: 60, scope: 'issues' },
+      mode: { kind: 'polling', intervalSec: 60, scope: 'issues', source: 'board' },
       filters: [{ field: 'status', value: 'Dev' }],
     };
     expect(matchesTrigger(pollingEvent, trigger)).toBe(true);
@@ -171,7 +171,7 @@ describe('matchesTrigger', () => {
     };
     const trigger: TriggerConfig = {
       ...BASE_TRIGGER,
-      mode: { kind: 'polling', intervalSec: 60, scope: 'pull_requests' },
+      mode: { kind: 'polling', intervalSec: 60, scope: 'pull_requests', source: 'board' },
       filters: [{ field: 'pr_state', value: 'ready_for_review' }],
     };
     expect(matchesTrigger(event, trigger)).toBe(true);
@@ -187,7 +187,7 @@ describe('matchesTrigger', () => {
     };
     const trigger: TriggerConfig = {
       ...BASE_TRIGGER,
-      mode: { kind: 'polling', intervalSec: 60, scope: 'pull_requests' },
+      mode: { kind: 'polling', intervalSec: 60, scope: 'pull_requests', source: 'board' },
       filters: [{ field: 'pr_state', value: 'ready_for_review' }],
     };
     expect(matchesTrigger(draftEvent, trigger)).toBe(false);
@@ -206,7 +206,7 @@ describe('matchesTrigger', () => {
     };
     const trigger: TriggerConfig = {
       ...BASE_TRIGGER,
-      mode: { kind: 'polling', intervalSec: 60, scope: 'pull_requests' },
+      mode: { kind: 'polling', intervalSec: 60, scope: 'pull_requests', source: 'board' },
       filters: [{ field: 'pr_state', value: 'any' }],
     };
     expect(matchesTrigger(draftEvent, trigger)).toBe(true);
