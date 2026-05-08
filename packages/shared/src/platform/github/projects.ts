@@ -378,26 +378,30 @@ function toItem(raw: RawProjectItem): ProjectBoardItem {
       baseRef: content.baseRefName,
       state: content.isDraft ? 'draft' : 'ready_for_review',
     };
-    // Match the webhook-side `extractPr` semantic: only surface `headRepo`
-    // when the head lives in a different repo than the base (fork PR), so
-    // consumers can treat presence as the fork signal.
-    const headOwner = content.headRepository?.owner?.login;
-    const headName = content.headRepository?.name;
-    const baseOwner = content.repository?.owner?.login;
-    const baseName = content.repository?.name;
-    if (
-      headOwner &&
-      headName &&
-      (headOwner !== baseOwner || headName !== baseName)
-    ) {
-      pr.headRepo = { owner: headOwner, name: headName };
-    }
+    const fork = forkHeadRepo(content.repository, content.headRepository);
+    if (fork) pr.headRepo = fork;
     item.pr = pr;
   }
   return item;
 }
 
-export interface RepoPullRequestQuery {
+/**
+ * Match the webhook-side `extractPr` semantic: only surface `headRepo` when
+ * the head lives in a different repo than the base (fork PR), so consumers
+ * can treat presence as the fork signal.
+ */
+function forkHeadRepo(
+  base: { name: string; owner: { login: string } } | undefined,
+  head: { name: string; owner: { login: string } } | null | undefined,
+): { owner: string; name: string } | undefined {
+  const headOwner = head?.owner?.login;
+  const headName = head?.name;
+  if (!headOwner || !headName) return undefined;
+  if (headOwner === base?.owner?.login && headName === base?.name) return undefined;
+  return { owner: headOwner, name: headName };
+}
+
+export interface RepoQuery {
   owner: string;
   name: string;
   token: string;
@@ -416,13 +420,18 @@ interface RawRepoPullRequest {
   labels?: { nodes: Array<{ name?: string } | null> };
 }
 
-interface RepoPullRequestsResponse {
-  repository?: {
-    pullRequests: {
-      pageInfo: { hasNextPage: boolean; endCursor: string | null };
-      nodes: Array<RawRepoPullRequest | null>;
-    };
-  } | null;
+interface RawRepoIssue {
+  id: string;
+  number: number;
+  title: string;
+  url: string;
+  repository: { name: string; owner: { login: string } };
+  labels?: { nodes: Array<{ name?: string } | null> };
+}
+
+interface RepoConnectionPage<N> {
+  pageInfo: { hasNextPage: boolean; endCursor: string | null };
+  nodes: Array<N | null>;
 }
 
 const REPO_PULL_REQUESTS_QUERY = /* GraphQL */ `
@@ -457,119 +466,6 @@ const REPO_PULL_REQUESTS_QUERY = /* GraphQL */ `
   }
 `;
 
-/**
- * Fetch open pull requests in a repository, returning the same
- * `ProjectBoardItem` shape `fetchProjectBoardItems` produces. Lets the
- * polling activity reuse the existing matcher / event-builder pipeline:
- * `itemNodeId` is the PR's own node id (stable, dedup-safe), `contentType`
- * is always `'PullRequest'`, `singleSelectValues` is empty (no board, no
- * Status column), and `pr` carries head/base refs + draft state.
- */
-export async function fetchRepositoryPullRequests(
-  q: RepoPullRequestQuery,
-  fetchImpl: typeof fetch = fetch,
-): Promise<ProjectBoardItem[]> {
-  const items: ProjectBoardItem[] = [];
-  let cursor: string | null = null;
-
-  for (let page = 0; page < MAX_PAGES; page += 1) {
-    const payload: GraphQLResponse<RepoPullRequestsResponse> = await callGraphQL(
-      {
-        query: REPO_PULL_REQUESTS_QUERY,
-        variables: {
-          owner: q.owner,
-          name: q.name,
-          first: PAGE_SIZE,
-          after: cursor,
-        },
-      },
-      q.token,
-      fetchImpl,
-    );
-
-    if (payload.errors?.length) {
-      throw new Error(
-        `GitHub GraphQL error: ${payload.errors.map((e) => e.message).join('; ')}`,
-      );
-    }
-
-    const repo = payload.data?.repository;
-    if (!repo) {
-      throw new Error(
-        `Repository ${q.owner}/${q.name} not found (token may lack repo scope)`,
-      );
-    }
-
-    for (const raw of repo.pullRequests.nodes) {
-      if (!raw) continue;
-      items.push(repoPullRequestToItem(raw));
-    }
-
-    if (!repo.pullRequests.pageInfo.hasNextPage) return items;
-    cursor = repo.pullRequests.pageInfo.endCursor;
-  }
-
-  return items;
-}
-
-function repoPullRequestToItem(raw: RawRepoPullRequest): ProjectBoardItem {
-  const item: ProjectBoardItem = {
-    // No project item wraps a repo-source PR — use the PR node id as the
-    // dedup key. Stable across draft↔ready transitions.
-    itemNodeId: raw.id,
-    contentNodeId: raw.id,
-    contentType: 'PullRequest',
-    contentKey: String(raw.number),
-    contentTitle: raw.title,
-    contentUrl: raw.url,
-    repo: { owner: raw.repository.owner.login, name: raw.repository.name },
-    singleSelectValues: {},
-    labels: [],
-    pr: {
-      headRef: raw.headRefName,
-      baseRef: raw.baseRefName,
-      state: raw.isDraft ? 'draft' : 'ready_for_review',
-    },
-  };
-  for (const node of raw.labels?.nodes ?? []) {
-    if (node?.name) item.labels.push(node.name);
-  }
-  const headOwner = raw.headRepository?.owner?.login;
-  const headName = raw.headRepository?.name;
-  if (
-    headOwner &&
-    headName &&
-    (headOwner !== raw.repository.owner.login || headName !== raw.repository.name)
-  ) {
-    item.pr!.headRepo = { owner: headOwner, name: headName };
-  }
-  return item;
-}
-
-export interface RepoIssueQuery {
-  owner: string;
-  name: string;
-  token: string;
-}
-
-interface RawRepoIssue {
-  id: string;
-  number: number;
-  title: string;
-  url: string;
-  repository: { name: string; owner: { login: string } };
-  labels?: { nodes: Array<{ name?: string } | null> };
-}
-
-interface RepoIssuesResponse {
-  repository?: {
-    issues: {
-      pageInfo: { hasNextPage: boolean; endCursor: string | null };
-      nodes: Array<RawRepoIssue | null>;
-    };
-  } | null;
-}
-
 const REPO_ISSUES_QUERY = /* GraphQL */ `
   query ConduitRepoIssues(
     $owner: String!
@@ -599,28 +495,54 @@ const REPO_ISSUES_QUERY = /* GraphQL */ `
 `;
 
 /**
+ * Fetch open pull requests in a repository, returning the same
+ * `ProjectBoardItem` shape `fetchProjectBoardItems` produces. Lets the
+ * polling activity reuse the existing matcher / event-builder pipeline:
+ * `itemNodeId` is the PR's own node id (stable, dedup-safe), `contentType`
+ * is always `'PullRequest'`, `singleSelectValues` is empty (no board, no
+ * Status column), and `pr` carries head/base refs + draft state.
+ */
+export function fetchRepositoryPullRequests(
+  q: RepoQuery,
+  fetchImpl: typeof fetch = fetch,
+): Promise<ProjectBoardItem[]> {
+  return paginateRepoConnection<
+    { pullRequests: RepoConnectionPage<RawRepoPullRequest> },
+    RawRepoPullRequest
+  >(q, REPO_PULL_REQUESTS_QUERY, (repo) => repo.pullRequests, repoPullRequestToItem, fetchImpl);
+}
+
+/**
  * Fetch open issues in a repository, returning the same `ProjectBoardItem`
  * shape `fetchProjectBoardItems` produces. Mirror of
  * `fetchRepositoryPullRequests` for issue scope; `singleSelectValues` is
  * empty (no board, no Status column) and `pr` is undefined.
  */
-export async function fetchRepositoryIssues(
-  q: RepoIssueQuery,
+export function fetchRepositoryIssues(
+  q: RepoQuery,
   fetchImpl: typeof fetch = fetch,
+): Promise<ProjectBoardItem[]> {
+  return paginateRepoConnection<
+    { issues: RepoConnectionPage<RawRepoIssue> },
+    RawRepoIssue
+  >(q, REPO_ISSUES_QUERY, (repo) => repo.issues, repoIssueToItem, fetchImpl);
+}
+
+async function paginateRepoConnection<R, N>(
+  q: RepoQuery,
+  query: string,
+  selectPage: (repo: R) => RepoConnectionPage<N>,
+  toItem: (raw: N) => ProjectBoardItem,
+  fetchImpl: typeof fetch,
 ): Promise<ProjectBoardItem[]> {
   const items: ProjectBoardItem[] = [];
   let cursor: string | null = null;
 
   for (let page = 0; page < MAX_PAGES; page += 1) {
-    const payload: GraphQLResponse<RepoIssuesResponse> = await callGraphQL(
+    const payload: GraphQLResponse<{ repository?: R | null }> = await callGraphQL(
       {
-        query: REPO_ISSUES_QUERY,
-        variables: {
-          owner: q.owner,
-          name: q.name,
-          first: PAGE_SIZE,
-          after: cursor,
-        },
+        query,
+        variables: { owner: q.owner, name: q.name, first: PAGE_SIZE, after: cursor },
       },
       q.token,
       fetchImpl,
@@ -639,16 +561,43 @@ export async function fetchRepositoryIssues(
       );
     }
 
-    for (const raw of repo.issues.nodes) {
+    const conn = selectPage(repo);
+    for (const raw of conn.nodes) {
       if (!raw) continue;
-      items.push(repoIssueToItem(raw));
+      items.push(toItem(raw));
     }
-
-    if (!repo.issues.pageInfo.hasNextPage) return items;
-    cursor = repo.issues.pageInfo.endCursor;
+    if (!conn.pageInfo.hasNextPage) return items;
+    cursor = conn.pageInfo.endCursor;
   }
 
   return items;
+}
+
+function repoPullRequestToItem(raw: RawRepoPullRequest): ProjectBoardItem {
+  const item: ProjectBoardItem = {
+    // No project item wraps a repo-source PR — use the PR node id as the
+    // dedup key. Stable across draft↔ready transitions.
+    itemNodeId: raw.id,
+    contentNodeId: raw.id,
+    contentType: 'PullRequest',
+    contentKey: String(raw.number),
+    contentTitle: raw.title,
+    contentUrl: raw.url,
+    repo: { owner: raw.repository.owner.login, name: raw.repository.name },
+    singleSelectValues: {},
+    labels: [],
+    pr: {
+      headRef: raw.headRefName,
+      baseRef: raw.baseRefName,
+      state: raw.isDraft ? 'draft' : 'ready_for_review',
+    },
+  };
+  for (const node of raw.labels?.nodes ?? []) {
+    if (node?.name) item.labels.push(node.name);
+  }
+  const fork = forkHeadRepo(raw.repository, raw.headRepository);
+  if (fork) item.pr!.headRepo = fork;
+  return item;
 }
 
 function repoIssueToItem(raw: RawRepoIssue): ProjectBoardItem {

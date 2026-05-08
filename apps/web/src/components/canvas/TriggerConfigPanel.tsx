@@ -52,7 +52,6 @@ export function TriggerConfigPanel({
       pollingSource === 'board') ||
     (trigger.mode.kind === 'webhook' &&
       trigger.mode.event === 'board.column.changed');
-  const needsBoard = showsBoardPicker;
 
   // One-shot notice for filters dropped on scope flip. Cleared after a few
   // seconds so it doesn't persist across unrelated edits.
@@ -75,7 +74,7 @@ export function TriggerConfigPanel({
     connectionId: trigger.connectionId,
     ownerType,
     owner: debouncedOwner,
-    enabled: needsBoard,
+    enabled: showsBoardPicker,
   });
 
   const selectedBoard =

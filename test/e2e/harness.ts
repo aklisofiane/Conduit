@@ -425,7 +425,7 @@ async function seedRemoteBranch(
     await gitCmd(bareRemote, ['rev-parse', '--verify', `refs/heads/${branch}`]);
     return;
   } catch {
-    // Branch missing — keep going.
+    // not present — fall through and seed
   }
 
   const scratch = path.join(
