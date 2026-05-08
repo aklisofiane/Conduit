@@ -5,8 +5,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useSession } from '../lib/auth-client.js';
 import { relativeFromNow } from '../lib/time.js';
+import { InlineRename } from '../components/common/InlineRename.js';
 import {
   buildInviteUrl,
+  ORG_ROLES,
   useActiveOrganization,
   useCancelInvitation,
   useDeleteOrganization,
@@ -18,11 +20,12 @@ import {
   useUpdateMemberRole,
   useUpdateOrganization,
   type OrganizationMember,
+  type OrgRole,
 } from '../api/organization.js';
 
 const inviteSchema = z.object({
   email: z.string().email('Enter a valid email'),
-  role: z.enum(['member', 'admin', 'owner']),
+  role: z.enum(ORG_ROLES),
 });
 
 export type InviteValues = z.infer<typeof inviteSchema>;
@@ -33,10 +36,6 @@ interface InviteDeps {
   onSuccess: (invitationId: string) => void;
 }
 
-/**
- * Calls the org-plugin's `inviteMember` and routes 4xx errors to the
- * form root. Pure helper so it can be unit-tested without jsdom.
- */
 export async function submitInvite(values: InviteValues, deps: InviteDeps): Promise<void> {
   try {
     const res = await deps.inviteMember(values);
@@ -65,7 +64,7 @@ export function isSoleOwner(args: { members: OrganizationMember[]; userId: strin
   return owners.length === 1 && owners[0]?.userId === userId;
 }
 
-export function canManageMember(actorRole: string | undefined, targetRole: string): boolean {
+export function canManageMember(actorRole: OrgRole | undefined, targetRole: OrgRole): boolean {
   if (actorRole === 'owner') return true;
   if (actorRole === 'admin' && targetRole !== 'owner') return true;
   return false;
@@ -138,23 +137,16 @@ function OrganizationHeader({
   name: string;
   createdAt: string | Date;
   memberCount: number;
-  myRole: string | undefined;
+  myRole: OrgRole | undefined;
   canRename: boolean;
   organizationId: string;
 }) {
   const [renaming, setRenaming] = useState(false);
-  const [draft, setDraft] = useState(name);
   const [error, setError] = useState<string | null>(null);
   const update = useUpdateOrganization(organizationId);
 
-  const startRename = () => {
-    setDraft(name);
-    setError(null);
-    setRenaming(true);
-  };
-
-  const handleSave = async () => {
-    const trimmed = draft.trim();
+  const handleCommit = async (next: string) => {
+    const trimmed = next.trim();
     if (!trimmed || trimmed === name) {
       setRenaming(false);
       return;
@@ -173,22 +165,12 @@ function OrganizationHeader({
       <div className="flex items-start justify-between gap-4 border-b border-[var(--color-line)] px-5 py-4">
         <div className="min-w-0 flex-1">
           {renaming ? (
-            <input
-              className="w-full max-w-[420px] rounded-[var(--radius-sm)] border border-[var(--color-divider)] bg-[var(--color-bg)] px-2 py-1 text-[24px] font-semibold text-[var(--color-text)] outline-none focus:border-[var(--color-text-muted)]"
-              style={{ fontFamily: 'var(--font-serif)' }}
-              autoFocus
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onBlur={handleSave}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  void handleSave();
-                } else if (e.key === 'Escape') {
-                  e.preventDefault();
-                  setRenaming(false);
-                }
-              }}
+            <InlineRename
+              initial={name}
+              saving={update.isPending}
+              onCommit={handleCommit}
+              onCancel={() => setRenaming(false)}
+              className="w-full max-w-[420px] rounded-[var(--radius-sm)] border border-[var(--color-divider)] bg-[var(--color-bg)] px-2 py-1 text-[24px] font-semibold text-[var(--color-text)] outline-none [font-family:var(--font-serif)] focus:border-[var(--color-text-muted)]"
             />
           ) : (
             <h1
@@ -214,7 +196,13 @@ function OrganizationHeader({
             </span>
           )}
           {canRename && !renaming && (
-            <button className="btn" onClick={startRename}>
+            <button
+              className="btn"
+              onClick={() => {
+                setError(null);
+                setRenaming(true);
+              }}
+            >
               Rename
             </button>
           )}
@@ -233,7 +221,7 @@ function MembersSection({
   members: OrganizationMember[];
   loading: boolean;
   myUserId: string | undefined;
-  myRole: string | undefined;
+  myRole: OrgRole | undefined;
 }) {
   return (
     <section className="rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-1)]">
@@ -287,7 +275,7 @@ function MemberRow({
     }
   };
 
-  const handleRoleChange = async (next: 'owner' | 'admin' | 'member') => {
+  const handleRoleChange = async (next: OrgRole) => {
     setError(null);
     try {
       await updateRole.mutateAsync({ memberId: member.id, role: next });
@@ -327,12 +315,14 @@ function MemberRow({
           <select
             value={member.role}
             disabled={updateRole.isPending}
-            onChange={(e) => handleRoleChange(e.target.value as 'owner' | 'admin' | 'member')}
+            onChange={(e) => handleRoleChange(e.target.value as OrgRole)}
             className="rounded-[var(--radius-sm)] border border-[var(--color-divider)] bg-[var(--color-bg)] px-2 py-1 font-mono text-[11px] text-[var(--color-text)]"
           >
-            <option value="owner">owner</option>
-            <option value="admin">admin</option>
-            <option value="member">member</option>
+            {ORG_ROLES.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
           </select>
         ) : (
           <span className="font-mono text-[11px] text-[var(--color-text-2)]">{member.role}</span>
@@ -359,7 +349,7 @@ function PendingInvitationsSection({
   invitations: ReadonlyArray<{
     id: string;
     email: string;
-    role: string;
+    role: OrgRole;
     expiresAt: string | Date;
   }>;
   canManage: boolean;
@@ -388,7 +378,7 @@ function InvitationRow({
   invitation,
   canManage,
 }: {
-  invitation: { id: string; email: string; role: string; expiresAt: string | Date };
+  invitation: { id: string; email: string; role: OrgRole; expiresAt: string | Date };
   canManage: boolean;
 }) {
   const cancel = useCancelInvitation();
@@ -508,13 +498,12 @@ function InviteMemberSection() {
           </label>
           <label className="flex flex-col">
             <span className="field-label">Role</span>
-            <select
-              className="field-input"
-              {...form.register('role')}
-            >
-              <option value="member">member</option>
-              <option value="admin">admin</option>
-              <option value="owner">owner</option>
+            <select className="field-input" {...form.register('role')}>
+              {ORG_ROLES.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
             </select>
           </label>
           <button
@@ -574,7 +563,7 @@ function DangerZoneSection({
 }: {
   members: OrganizationMember[];
   myUserId: string | undefined;
-  myRole: string | undefined;
+  myRole: OrgRole | undefined;
   organizationId: string;
   organizationName: string;
 }) {

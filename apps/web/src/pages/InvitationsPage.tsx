@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { relativeFromNow } from '../lib/time.js';
 import {
+  performInvitationAction,
   useAcceptInvitation,
   useRejectInvitation,
   useUserInvitations,
@@ -14,32 +15,8 @@ export function filterPendingInvitations(
   return invitations.filter((i) => i.status === 'pending');
 }
 
-interface InvitationActionDeps {
-  invitationId: string;
-  mutate: (id: string) => Promise<unknown>;
-  setError: (msg: string | null) => void;
-  onSettled?: () => void;
-}
-
-export async function performInvitationAction(deps: InvitationActionDeps): Promise<boolean> {
-  deps.setError(null);
-  try {
-    await deps.mutate(deps.invitationId);
-    deps.onSettled?.();
-    return true;
-  } catch (e) {
-    deps.setError(e instanceof Error ? e.message : 'Action failed');
-    return false;
-  }
-}
-
-/**
- * `/account/invitations` — incoming pending invitations for the current user.
- * Accept lands on `/account/organization`; reject removes the row. v1 does
- * NOT auto-switch the active org on accept (see spec).
- */
 export function InvitationsPage() {
-  const { data: invitations = [], isLoading, refetch } = useUserInvitations();
+  const { data: invitations = [], isLoading } = useUserInvitations();
 
   const pending = filterPendingInvitations(invitations);
 
@@ -70,7 +47,7 @@ export function InvitationsPage() {
         ) : (
           <ul className="divide-y divide-[var(--color-line)]">
             {pending.map((inv) => (
-              <InvitationRow key={inv.id} invitation={inv} onChange={() => void refetch()} />
+              <InvitationRow key={inv.id} invitation={inv} />
             ))}
           </ul>
         )}
@@ -79,13 +56,7 @@ export function InvitationsPage() {
   );
 }
 
-function InvitationRow({
-  invitation,
-  onChange,
-}: {
-  invitation: UserInvitation;
-  onChange: () => void;
-}) {
+function InvitationRow({ invitation }: { invitation: UserInvitation }) {
   const accept = useAcceptInvitation();
   const reject = useRejectInvitation();
   const navigate = useNavigate();
@@ -97,20 +68,15 @@ function InvitationRow({
       mutate: (id) => accept.mutateAsync(id),
       setError,
     });
-    if (ok) {
-      onChange();
-      navigate('/account/organization');
-    }
+    if (ok) navigate('/account/organization');
   };
 
-  const handleReject = async () => {
-    const ok = await performInvitationAction({
+  const handleReject = () =>
+    performInvitationAction({
       invitationId: invitation.id,
       mutate: (id) => reject.mutateAsync(id),
       setError,
     });
-    if (ok) onChange();
-  };
 
   const orgLabel = invitation.organizationName ?? `Organization ${invitation.organizationId.slice(0, 8)}`;
 

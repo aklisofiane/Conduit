@@ -18,6 +18,7 @@ import {
   useSetActiveOrganization,
   useUserInvitations,
   type OrganizationSummary,
+  type OrgRole,
 } from '../../api/organization.js';
 import { useSession, signOut } from '../../lib/auth-client.js';
 import { cn } from '../../lib/cn.js';
@@ -33,11 +34,9 @@ interface SwitchOrgDeps {
 }
 
 /**
- * Switch the active organization, invalidate org-scoped query keys (the
- * `useSetActiveOrganization` mutation handles invalidation in its onSuccess),
- * close the popover, and navigate home. The home page is the safe landing
- * because every URL the user is on may now reference rows in the previous
- * org's tenant and would 404.
+ * Navigate home rather than staying on the current screen: every URL the
+ * user is on may now reference rows in the previous org's tenant and would
+ * 404. Cache invalidation is handled by useSetActiveOrganization.onSuccess.
  */
 export async function switchOrganization(
   organizationId: string,
@@ -63,11 +62,6 @@ interface CreateOrgDeps {
   setError: (msg: string | null) => void;
 }
 
-/**
- * Create a new organization, switch to it, and navigate home. Trims and
- * validates the name; an empty name is a no-op so the popover doesn't
- * close on accidental submit.
- */
 export async function createAndSwitchOrganization(
   rawName: string,
   deps: CreateOrgDeps,
@@ -98,13 +92,6 @@ export function filterOtherOrgs(
     .filter((o) => !q || o.name.toLowerCase().includes(q));
 }
 
-/**
- * Default `actionsSlot` content — pill for the signed-in user. The label
- * (status dot + name/email) is intentionally short and unchanged from the
- * minimal `web-auth-ui` shape; the popover gains an Organizations section
- * (active-org line, switch sub-list, create-org inline form) above the
- * existing Account-settings + Sign-out items.
- */
 export function UserMenuPill() {
   const { data } = useSession();
   const [open, setOpen] = useState(false);
@@ -217,19 +204,9 @@ function UserMenuPopover({ anchorEl, name, email, onClose }: UserMenuPopoverProp
     }
   };
 
-  const handleAccount = () => {
+  const goTo = (path: string) => () => {
     onClose();
-    navigate('/account');
-  };
-
-  const handleOrgSettings = () => {
-    onClose();
-    navigate('/account/organization');
-  };
-
-  const handleInvitations = () => {
-    onClose();
-    navigate('/account/invitations');
+    navigate(path);
   };
 
   return createPortal(
@@ -273,9 +250,9 @@ function UserMenuPopover({ anchorEl, name, email, onClose }: UserMenuPopoverProp
       />
 
       <div className="flex flex-col border-t border-[var(--color-divider)] py-1">
-        <MenuItem onClick={handleAccount}>Account settings</MenuItem>
-        <MenuItem onClick={handleOrgSettings}>Organization settings</MenuItem>
-        <MenuItem onClick={handleInvitations}>
+        <MenuItem onClick={goTo('/account')}>Account settings</MenuItem>
+        <MenuItem onClick={goTo('/account/organization')}>Organization settings</MenuItem>
+        <MenuItem onClick={goTo('/account/invitations')}>
           <span className="flex w-full items-center justify-between gap-2">
             <span>Pending invitations</span>
             {pendingInvitationCount > 0 && (
@@ -308,24 +285,16 @@ function OrganizationSection({
 }: {
   orgs: OrganizationSummary[];
   activeOrg: OrganizationSummary | null;
-  myRole: string | undefined;
+  myRole: OrgRole | undefined;
   onAfterSwitch: () => void;
 }) {
   const navigate = useNavigate();
   const setActive = useSetActiveOrganization();
   const create = useCreateOrganization();
 
-  const [filter, setFilter] = useState('');
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
   const [error, setError] = useState<string | null>(null);
-
-  const others = useMemo(
-    () => filterOtherOrgs(orgs, activeOrg?.id, filter),
-    [orgs, activeOrg, filter],
-  );
-
-  const showFilter = orgs.length > FILTER_THRESHOLD;
 
   const handleSwitch = (id: string) =>
     switchOrganization(id, {
@@ -365,38 +334,12 @@ function OrganizationSection({
       </div>
 
       {orgs.length > 1 && (
-        <div className="mt-1 flex flex-col gap-1">
-          {showFilter && (
-            <input
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              placeholder="Filter orgs…"
-              aria-label="Filter organizations"
-              className="w-full rounded-[var(--radius-sm)] border border-[var(--color-divider)] bg-[var(--color-bg)] px-2 py-1 font-mono text-[10.5px] text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-text-muted)]"
-            />
-          )}
-          <div className="max-h-[140px] overflow-y-auto" role="listbox" aria-label="Switch organization">
-            {others.length === 0 ? (
-              <div className="px-1 py-1 font-mono text-[10.5px] text-[var(--color-text-muted)]">
-                {filter ? 'No matches' : 'No other organizations'}
-              </div>
-            ) : (
-              others.map((o) => (
-                <button
-                  key={o.id}
-                  type="button"
-                  role="option"
-                  onClick={() => void handleSwitch(o.id)}
-                  disabled={setActive.isPending}
-                  className="flex w-full items-center gap-2 rounded-[var(--radius-sm)] px-2 py-1 text-left font-mono text-[11px] text-[var(--color-text-2)] transition-colors hover:bg-[var(--color-pill-bg)] hover:text-[var(--color-text)] disabled:opacity-60"
-                  title={o.name}
-                >
-                  <span className="min-w-0 flex-1 truncate">{o.name}</span>
-                </button>
-              ))
-            )}
-          </div>
-        </div>
+        <SwitchOrgList
+          orgs={orgs}
+          activeOrgId={activeOrg?.id}
+          onSwitch={handleSwitch}
+          isSwitching={setActive.isPending}
+        />
       )}
 
       {creating ? (
@@ -440,6 +383,60 @@ function OrganizationSection({
           {error}
         </div>
       )}
+    </div>
+  );
+}
+
+function SwitchOrgList({
+  orgs,
+  activeOrgId,
+  onSwitch,
+  isSwitching,
+}: {
+  orgs: OrganizationSummary[];
+  activeOrgId: string | undefined;
+  onSwitch: (id: string) => unknown;
+  isSwitching: boolean;
+}) {
+  const showFilter = orgs.length > FILTER_THRESHOLD;
+  const [filter, setFilter] = useState('');
+  const others = useMemo(
+    () => filterOtherOrgs(orgs, activeOrgId, showFilter ? filter : ''),
+    [orgs, activeOrgId, filter, showFilter],
+  );
+
+  return (
+    <div className="mt-1 flex flex-col gap-1">
+      {showFilter && (
+        <input
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          placeholder="Filter orgs…"
+          aria-label="Filter organizations"
+          className="w-full rounded-[var(--radius-sm)] border border-[var(--color-divider)] bg-[var(--color-bg)] px-2 py-1 font-mono text-[10.5px] text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-text-muted)]"
+        />
+      )}
+      <div className="max-h-[140px] overflow-y-auto" role="listbox" aria-label="Switch organization">
+        {others.length === 0 ? (
+          <div className="px-1 py-1 font-mono text-[10.5px] text-[var(--color-text-muted)]">
+            {filter ? 'No matches' : 'No other organizations'}
+          </div>
+        ) : (
+          others.map((o) => (
+            <button
+              key={o.id}
+              type="button"
+              role="option"
+              onClick={() => void onSwitch(o.id)}
+              disabled={isSwitching}
+              className="flex w-full items-center gap-2 rounded-[var(--radius-sm)] px-2 py-1 text-left font-mono text-[11px] text-[var(--color-text-2)] transition-colors hover:bg-[var(--color-pill-bg)] hover:text-[var(--color-text)] disabled:opacity-60"
+              title={o.name}
+            >
+              <span className="min-w-0 flex-1 truncate">{o.name}</span>
+            </button>
+          ))
+        )}
+      </div>
     </div>
   );
 }

@@ -1,13 +1,10 @@
-/**
- * TanStack Query hooks over Better Auth's `organization` plugin client.
- *
- * Centralizes the cache-key shape so the user-menu's switch flow can
- * invalidate every org-scoped key in one call. The plugin endpoints live
- * under `/api/auth/organization/*` and are wrapped by `authClient.organization.*`
- * — no Conduit-side API surface here.
- */
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { authClient } from '../lib/auth-client.js';
+
+export const ORG_ROLES = ['owner', 'admin', 'member'] as const;
+export type OrgRole = (typeof ORG_ROLES)[number];
+
+const FIVE_MINUTES = 5 * 60 * 1000;
 
 export interface OrganizationSummary {
   id: string;
@@ -22,7 +19,7 @@ export interface OrganizationMember {
   id: string;
   organizationId: string;
   userId: string;
-  role: string;
+  role: OrgRole;
   createdAt: string | Date;
   user: {
     id: string;
@@ -36,7 +33,7 @@ export interface OrganizationInvitation {
   id: string;
   organizationId: string;
   email: string;
-  role: string;
+  role: OrgRole;
   status: 'pending' | 'accepted' | 'rejected' | 'canceled' | 'expired';
   inviterId: string;
   expiresAt: string | Date;
@@ -61,8 +58,7 @@ export const USER_INVITATIONS_KEY = ['user', 'invitations'] as const;
 
 /**
  * Top-level cache keys whose values become stale the moment the user
- * switches active org. The switcher hands this list to TanStack Query's
- * `invalidateQueries`. Keep it in sync with hooks in `apps/web/src/api/hooks.ts`.
+ * switches active org. Keep in sync with hooks in `apps/web/src/api/hooks.ts`.
  */
 export const ORG_SCOPED_QUERY_KEYS: readonly (readonly unknown[])[] = [
   ['workflows'],
@@ -78,10 +74,6 @@ export const ORG_SCOPED_QUERY_KEYS: readonly (readonly unknown[])[] = [
   ['labels'],
 ];
 
-/**
- * Invalidate every org-scoped TanStack Query cache key plus the org-plugin
- * caches so the next render reflects the new active org.
- */
 export function invalidateOrgScopedQueries(qc: QueryClient): Promise<unknown> {
   return Promise.all([
     ...ORG_SCOPED_QUERY_KEYS.map((key) => qc.invalidateQueries({ queryKey: key })),
@@ -92,7 +84,9 @@ export function invalidateOrgScopedQueries(qc: QueryClient): Promise<unknown> {
   ]);
 }
 
-function unwrap<T>(res: { data: T | null; error: { message?: string; status?: number } | null }): T {
+type AuthRes<T> = { data: T | null; error: { message?: string; status?: number } | null };
+
+function unwrap<T>(res: AuthRes<T>): T {
   if (res.error) {
     const err = new Error(res.error.message ?? 'Request failed') as Error & { status?: number };
     err.status = res.error.status;
@@ -104,9 +98,18 @@ function unwrap<T>(res: { data: T | null; error: { message?: string; status?: nu
   return res.data;
 }
 
+function unwrapVoid(res: { error: { message?: string; status?: number } | null }, fallback: string): void {
+  if (res.error) {
+    const err = new Error(res.error.message ?? fallback) as Error & { status?: number };
+    err.status = res.error.status;
+    throw err;
+  }
+}
+
 export function useOrganizations() {
   return useQuery({
     queryKey: ORGANIZATIONS_KEY,
+    staleTime: FIVE_MINUTES,
     queryFn: async () =>
       unwrap(await authClient.organization.list()) as OrganizationSummary[],
   });
@@ -115,6 +118,7 @@ export function useOrganizations() {
 export function useActiveOrganization() {
   return useQuery({
     queryKey: ACTIVE_ORG_KEY,
+    staleTime: FIVE_MINUTES,
     queryFn: async () =>
       unwrap(await authClient.organization.getFullOrganization()) as ActiveOrganization,
   });
@@ -199,12 +203,7 @@ export function useDeleteOrganization() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (organizationId: string) => {
-      const res = await authClient.organization.delete({ organizationId });
-      if (res.error) {
-        const err = new Error(res.error.message ?? 'Could not delete') as Error & { status?: number };
-        err.status = res.error.status;
-        throw err;
-      }
+      unwrapVoid(await authClient.organization.delete({ organizationId }), 'Could not delete');
     },
     onSuccess: async () => {
       await invalidateOrgScopedQueries(qc);
@@ -215,7 +214,7 @@ export function useDeleteOrganization() {
 export function useInviteMember() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (args: { email: string; role: 'owner' | 'admin' | 'member' }) =>
+    mutationFn: async (args: { email: string; role: OrgRole }) =>
       unwrap(
         await authClient.organization.inviteMember({
           email: args.email,
@@ -245,12 +244,10 @@ export function useRemoveMember() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (memberIdOrEmail: string) => {
-      const res = await authClient.organization.removeMember({ memberIdOrEmail });
-      if (res.error) {
-        const err = new Error(res.error.message ?? 'Could not remove') as Error & { status?: number };
-        err.status = res.error.status;
-        throw err;
-      }
+      unwrapVoid(
+        await authClient.organization.removeMember({ memberIdOrEmail }),
+        'Could not remove',
+      );
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ORG_MEMBERS_KEY });
@@ -262,7 +259,7 @@ export function useRemoveMember() {
 export function useUpdateMemberRole() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (args: { memberId: string; role: 'owner' | 'admin' | 'member' }) =>
+    mutationFn: async (args: { memberId: string; role: OrgRole }) =>
       unwrap(
         await authClient.organization.updateMemberRole({
           memberId: args.memberId,
@@ -279,12 +276,10 @@ export function useLeaveOrganization() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (organizationId: string) => {
-      const res = await authClient.organization.leave({ organizationId });
-      if (res.error) {
-        const err = new Error(res.error.message ?? 'Could not leave') as Error & { status?: number };
-        err.status = res.error.status;
-        throw err;
-      }
+      unwrapVoid(
+        await authClient.organization.leave({ organizationId }),
+        'Could not leave',
+      );
     },
     onSuccess: async () => {
       await invalidateOrgScopedQueries(qc);
@@ -326,6 +321,7 @@ export function useInvitation(invitationId: string | undefined) {
     queryKey: ['invitation', invitationId] as const,
     queryFn: () => fetchInvitation(invitationId!),
     enabled: !!invitationId,
+    staleTime: 10 * 60 * 1000,
     retry: false,
   });
 }
@@ -335,13 +331,7 @@ export function useAcceptInvitation() {
   return useMutation({
     mutationFn: async (invitationId: string) => {
       const res = await authClient.organization.acceptInvitation({ invitationId });
-      if (res.error) {
-        const err = new Error(res.error.message ?? 'Could not accept') as Error & {
-          status?: number;
-        };
-        err.status = res.error.status;
-        throw err;
-      }
+      unwrapVoid(res, 'Could not accept');
       return res.data;
     },
     onSuccess: () => {
@@ -356,13 +346,7 @@ export function useRejectInvitation() {
   return useMutation({
     mutationFn: async (invitationId: string) => {
       const res = await authClient.organization.rejectInvitation({ invitationId });
-      if (res.error) {
-        const err = new Error(res.error.message ?? 'Could not reject') as Error & {
-          status?: number;
-        };
-        err.status = res.error.status;
-        throw err;
-      }
+      unwrapVoid(res, 'Could not reject');
       return res.data;
     },
     onSuccess: () => {
@@ -371,7 +355,25 @@ export function useRejectInvitation() {
   });
 }
 
-/** Build the invite-acceptance URL the operator copies and shares. */
+export interface InvitationActionDeps {
+  invitationId: string;
+  mutate: (id: string) => Promise<unknown>;
+  setError: (msg: string | null) => void;
+  onSettled?: () => void;
+}
+
+export async function performInvitationAction(deps: InvitationActionDeps): Promise<boolean> {
+  deps.setError(null);
+  try {
+    await deps.mutate(deps.invitationId);
+    deps.onSettled?.();
+    return true;
+  } catch (e) {
+    deps.setError(e instanceof Error ? e.message : 'Action failed');
+    return false;
+  }
+}
+
 export function buildInviteUrl(invitationId: string, origin?: string): string {
   const base =
     origin ?? (typeof window !== 'undefined' ? window.location.origin : '');

@@ -1,9 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import {
-  filterPendingInvitations,
-  performInvitationAction,
-} from './InvitationsPage.js';
-import type { UserInvitation } from '../api/organization.js';
+import { filterPendingInvitations } from './InvitationsPage.js';
+import { performInvitationAction, type UserInvitation } from '../api/organization.js';
 
 function inv(overrides: Partial<UserInvitation> = {}): UserInvitation {
   return {

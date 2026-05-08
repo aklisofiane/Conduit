@@ -1,45 +1,46 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
+  performInvitationAction,
   useAcceptInvitation,
   useInvitation,
   useRejectInvitation,
 } from '../api/organization.js';
 
-interface InvitationActionDeps {
+interface AcceptDeps {
   acceptInvitation: (id: string) => Promise<unknown>;
+  navigate: (to: string, opts?: { replace?: boolean }) => void;
+  setError: (msg: string | null) => void;
+}
+
+interface RejectDeps {
+  rejectInvitation: (id: string) => Promise<unknown>;
   navigate: (to: string, opts?: { replace?: boolean }) => void;
   setError: (msg: string | null) => void;
 }
 
 export async function handleAcceptInvitation(
   invitationId: string,
-  deps: InvitationActionDeps,
+  deps: AcceptDeps,
 ): Promise<void> {
-  deps.setError(null);
-  try {
-    await deps.acceptInvitation(invitationId);
-    deps.navigate('/account/organization', { replace: true });
-  } catch (e) {
-    deps.setError(e instanceof Error ? e.message : 'Could not accept');
-  }
+  const ok = await performInvitationAction({
+    invitationId,
+    mutate: deps.acceptInvitation,
+    setError: deps.setError,
+  });
+  if (ok) deps.navigate('/account/organization', { replace: true });
 }
 
 export async function handleRejectInvitation(
   invitationId: string,
-  deps: {
-    rejectInvitation: (id: string) => Promise<unknown>;
-    navigate: (to: string, opts?: { replace?: boolean }) => void;
-    setError: (msg: string | null) => void;
-  },
+  deps: RejectDeps,
 ): Promise<void> {
-  deps.setError(null);
-  try {
-    await deps.rejectInvitation(invitationId);
-    deps.navigate('/account/invitations', { replace: true });
-  } catch (e) {
-    deps.setError(e instanceof Error ? e.message : 'Could not reject');
-  }
+  const ok = await performInvitationAction({
+    invitationId,
+    mutate: deps.rejectInvitation,
+    setError: deps.setError,
+  });
+  if (ok) deps.navigate('/account/invitations', { replace: true });
 }
 
 export function describeInvitationError(error: unknown): string {
@@ -47,16 +48,6 @@ export function describeInvitationError(error: unknown): string {
   return 'It may have expired or been revoked.';
 }
 
-/**
- * `/accept-invitation/:invitationId` — deep-link target shared via the
- * copyable invite URL fallback (see `OrganizationSettingsPage`'s invite
- * form). Lives inside `RequireAuth` so unauthed visitors are redirected
- * to `/sign-in?next=…` and land back here after sign-in.
- *
- * Per spec: accepting does NOT auto-switch the active org. The user
- * navigates to `/account/organization` and picks their context via the
- * user menu if they want to switch.
- */
 export function AcceptInvitationPage() {
   const { invitationId } = useParams<{ invitationId: string }>();
   const navigate = useNavigate();
