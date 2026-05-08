@@ -1,4 +1,5 @@
 import { Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { executionLogKindSchema, type ExecutionLogKind } from '@conduit/shared';
 import { OrgId } from '../../auth/org-id.decorator';
 import { SessionGuard } from '../../auth/session.guard';
 import { RunsService } from './runs.service';
@@ -14,11 +15,7 @@ export class RunsController {
     @Param('workflowId') workflowId: string,
     @Query('limit') limit?: string,
   ) {
-    return this.svc.listForWorkflow(
-      orgId,
-      workflowId,
-      limit ? Number.parseInt(limit, 10) : undefined,
-    );
+    return this.svc.listForWorkflow(orgId, workflowId, parseLimit(limit));
   }
 
   @Get('runs/:runId')
@@ -41,8 +38,8 @@ export class RunsController {
   ) {
     return this.svc.logs(orgId, runId, {
       nodeName,
-      kind,
-      limit: limit ? Number.parseInt(limit, 10) : undefined,
+      kind: parseKind(kind),
+      limit: parseLimit(limit),
     });
   }
 
@@ -54,10 +51,16 @@ export class RunsController {
     @Query('kind') kind?: string,
     @Query('limit') limit?: string,
   ) {
-    return this.svc.logs(orgId, runId, {
-      nodeName,
-      kind,
-      limit: limit ? Number.parseInt(limit, 10) : undefined,
-    });
+    return this.logs(orgId, runId, nodeName, kind, limit);
   }
+}
+
+function parseLimit(s?: string): number | undefined {
+  return s ? Number.parseInt(s, 10) : undefined;
+}
+
+function parseKind(s?: string): ExecutionLogKind | undefined {
+  if (!s) return undefined;
+  const r = executionLogKindSchema.safeParse(s);
+  return r.success ? r.data : undefined;
 }

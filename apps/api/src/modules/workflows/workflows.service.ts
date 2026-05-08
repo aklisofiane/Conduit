@@ -12,6 +12,7 @@ import {
 } from '@conduit/shared';
 import { PrismaService } from '../../common/prisma.service';
 import { assertDefinitionValid } from '../../common/assert-definition-valid';
+import { errMessage } from '../../common/err-message';
 import { DuplicateRunError, TemporalService } from '../../temporal/temporal.service';
 import { encrypt } from '../credentials/crypto';
 import type { CreateWorkflowDto, UpdateWorkflowDto } from './dto';
@@ -35,7 +36,9 @@ export class WorkflowsService implements OnModuleInit {
   }
 
   private async reconcilePollSchedules(): Promise<void> {
-    const workflows = await this.prisma.workflow.findMany();
+    const workflows = await this.prisma.workflow.findMany({
+      select: { id: true, definition: true, isActive: true },
+    });
     const polling = workflows.filter((wf) => {
       const trigger = (wf.definition as Partial<WorkflowDefinition> | null)
         ?.triggers?.[0];
@@ -275,8 +278,4 @@ export class WorkflowsService implements OnModuleInit {
       throw err;
     }
   }
-}
-
-function errMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }

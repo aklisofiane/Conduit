@@ -1,9 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { expectScopeKind } from '@conduit/shared';
 import {
   listProjectBoards,
@@ -11,7 +6,8 @@ import {
   type ProjectBoardSummary,
   type RepoLabel,
 } from '@conduit/shared/platform';
-import { PrismaService } from '../../common/prisma.service';
+import { errMessage } from '../../common/err-message';
+import { ConnectionsService } from '../connections/connections.service';
 import { CredentialsService } from '../credentials/credentials.service';
 import type { ListLabelsDto, ListProjectsDto } from './dto';
 
@@ -28,13 +24,15 @@ export class TriggerService {
   private readonly logger = new Logger(TriggerService.name);
 
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly connections: ConnectionsService,
     private readonly credentials: CredentialsService,
   ) {}
 
   async listProjects(orgId: string, dto: ListProjectsDto): Promise<ProjectBoardSummary[]> {
-    await this.assertConnectionInOrg(orgId, dto.connectionId);
-    const { token } = await this.credentials.getConnectionBinding(dto.connectionId);
+    const [, { token }] = await Promise.all([
+      this.connections.assertInOrg(orgId, dto.connectionId),
+      this.credentials.getConnectionBinding(dto.connectionId),
+    ]);
 
     try {
       return await listProjectBoards({
@@ -43,7 +41,7 @@ export class TriggerService {
         token,
       });
     } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : String(e);
+      const message = errMessage(e);
       this.logger.warn(
         `List Projects v2 failed (${dto.ownerType}/${dto.owner}): ${message}`,
       );
@@ -52,8 +50,10 @@ export class TriggerService {
   }
 
   async listLabels(orgId: string, dto: ListLabelsDto): Promise<RepoLabel[]> {
-    await this.assertConnectionInOrg(orgId, dto.connectionId);
-    const binding = await this.credentials.getConnectionBinding(dto.connectionId);
+    const [, binding] = await Promise.all([
+      this.connections.assertInOrg(orgId, dto.connectionId),
+      this.credentials.getConnectionBinding(dto.connectionId),
+    ]);
     let repoScope;
     try {
       repoScope = expectScopeKind(binding.scope, 'github_repo');
@@ -69,19 +69,11 @@ export class TriggerService {
         token: binding.token,
       });
     } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : String(e);
+      const message = errMessage(e);
       this.logger.warn(
         `List labels failed (${repoScope.owner}/${repoScope.repo}): ${message}`,
       );
       throw new BadRequestException({ message });
     }
-  }
-
-  private async assertConnectionInOrg(orgId: string, connectionId: string): Promise<void> {
-    const conn = await this.prisma.connection.findFirst({
-      where: { id: connectionId, orgId },
-      select: { id: true },
-    });
-    if (!conn) throw new NotFoundException(`Connection ${connectionId} not found`);
   }
 }

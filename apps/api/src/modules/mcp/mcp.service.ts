@@ -5,24 +5,31 @@ import {
   McpIntrospectionError,
   substituteCredentialInTransport,
 } from '@conduit/agent';
+import { ConnectionsService } from '../connections/connections.service';
 import { CredentialsService } from '../credentials/credentials.service';
 import type { IntrospectMcpDto } from './dto';
 
 /**
  * MCP introspection. Resolves the `{{credential}}` placeholder when the
- * caller passes a workflow + connection (the runtime resolver does the same
+ * caller passes a connection (the runtime resolver does the same
  * substitution at run time), then calls `tools/list` on the MCP server.
  * Errors surface as 400 so the user who just typed a bad command / URL /
  * credential sees the message inline.
+ *
+ * Org-scoped: any `connectionId` must belong to the active org, otherwise
+ * we 404 before touching credentials — same contract as TriggerService.
  */
 @Injectable()
 export class McpService {
   private readonly logger = new Logger(McpService.name);
 
-  constructor(private readonly credentials: CredentialsService) {}
+  constructor(
+    private readonly connections: ConnectionsService,
+    private readonly credentials: CredentialsService,
+  ) {}
 
-  async introspect(dto: IntrospectMcpDto): Promise<DiscoveredTool[]> {
-    const transport = await this.resolveTransport(dto);
+  async introspect(orgId: string, dto: IntrospectMcpDto): Promise<DiscoveredTool[]> {
+    const transport = await this.resolveTransport(orgId, dto);
     try {
       return await introspectMcpServer(transport);
     } catch (e: unknown) {
@@ -34,8 +41,9 @@ export class McpService {
     }
   }
 
-  private async resolveTransport(dto: IntrospectMcpDto): Promise<McpTransport> {
+  private async resolveTransport(orgId: string, dto: IntrospectMcpDto): Promise<McpTransport> {
     if (!dto.connectionId) return dto.transport;
+    await this.connections.assertInOrg(orgId, dto.connectionId);
     const { token } = await this.credentials.getConnectionBinding(dto.connectionId);
     return substituteCredentialInTransport(dto.transport, token);
   }

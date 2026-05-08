@@ -62,6 +62,15 @@ export class ConnectionsService {
     return toRow(row);
   }
 
+  /**
+   * Lightweight existence + org-scope check. Throws 404 (not 403) when the
+   * connection isn't visible to this org so we never confirm the existence
+   * of a sibling org's row by id.
+   */
+  async assertInOrg(orgId: string, id: string): Promise<void> {
+    return this.findOrThrow(orgId, id);
+  }
+
   async create(orgId: string, dto: CreateConnectionDto): Promise<ConnectionRow> {
     await this.ensureCredential(orgId, dto.credentialId);
     const created = await this.prisma.connection.create({
@@ -77,18 +86,21 @@ export class ConnectionsService {
   }
 
   async update(orgId: string, id: string, dto: UpdateConnectionDto): Promise<ConnectionRow> {
-    await this.findOrThrow(orgId, id);
     if (dto.credentialId) await this.ensureCredential(orgId, dto.credentialId);
-    const updated = await this.prisma.connection.update({
-      where: { id },
+    // updateMany scopes the write by orgId so a cross-org id returns 404
+    // without leaking existence (same contract as WorkflowsService.update).
+    const result = await this.prisma.connection.updateMany({
+      where: { id, orgId },
       data: {
         credentialId: dto.credentialId,
         name: dto.name,
         scope: dto.scope ? (dto.scope as unknown as object) : undefined,
       },
-      include: { credential: { select: { id: true, name: true, platform: true } } },
     });
-    return toRow(updated);
+    if (result.count === 0) {
+      throw new NotFoundException(`Connection ${id} not found`);
+    }
+    return this.get(orgId, id);
   }
 
   async delete(orgId: string, id: string): Promise<void> {

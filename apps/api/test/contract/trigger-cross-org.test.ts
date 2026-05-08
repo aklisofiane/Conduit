@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { NotFoundException } from '@nestjs/common';
 import type { PrismaClient } from '@conduit/database';
 import { TriggerService } from '../../src/modules/trigger/trigger.service';
+import { ConnectionsService } from '../../src/modules/connections/connections.service';
 import { CredentialsService } from '../../src/modules/credentials/credentials.service';
 import { PrismaService } from '../../src/common/prisma.service';
 import { seedTwoOrgs, type TwoOrgFixture } from '../../../../test/fixtures/orgs/two-orgs';
@@ -22,8 +23,9 @@ describe('TriggerService cross-org isolation', () => {
     prisma = makePrisma();
     await clearTenantData(prisma);
     fixture = await seedTwoOrgs(prisma);
+    const connections = new ConnectionsService(prisma as unknown as PrismaService);
     const creds = new CredentialsService(prisma as unknown as PrismaService);
-    svc = new TriggerService(prisma as unknown as PrismaService, creds);
+    svc = new TriggerService(connections, creds);
   });
 
   afterEach(async () => {

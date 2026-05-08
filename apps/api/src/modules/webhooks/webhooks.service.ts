@@ -36,6 +36,13 @@ export class WebhooksService {
   async handleGithub(workflowId: string, req: RawBodyRequest): Promise<WebhookResult> {
     const workflow = await this.prisma.workflow.findUnique({
       where: { id: workflowId },
+      select: {
+        id: true,
+        orgId: true,
+        isActive: true,
+        webhookSecret: true,
+        definition: true,
+      },
     });
     if (!workflow) throw new NotFoundException(`Workflow ${workflowId} not found`);
 

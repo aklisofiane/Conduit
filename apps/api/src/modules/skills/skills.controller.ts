@@ -1,17 +1,19 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
-import { discoverSkills } from '@conduit/agent';
 import { SessionGuard } from '../../auth/session.guard';
+import { SkillsService } from './skills.service';
 
 @UseGuards(SessionGuard)
 @Controller('skills')
 export class SkillsController {
+  constructor(private readonly svc: SkillsService) {}
+
   /**
-   * Scans repo + worker locations for `SKILL.md` files. See
-   * docs/design-docs/node-system.md — "Skills". The UI calls this to
-   * populate the agent config panel's skill picker.
+   * Returns the boot-time skill scan. See docs/design-docs/node-system.md
+   * — "Skills". The UI calls this to populate the agent config panel's
+   * skill picker.
    */
   @Get()
-  async list() {
-    return discoverSkills();
+  list() {
+    return this.svc.list();
   }
 }

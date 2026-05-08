@@ -10,7 +10,12 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import type { ConnectionScopeKind, Platform } from '@conduit/shared';
+import {
+  connectionScopeSchema,
+  platformSchema,
+  type ConnectionScopeKind,
+  type Platform,
+} from '@conduit/shared';
 import { OrgId } from '../../auth/org-id.decorator';
 import { SessionGuard } from '../../auth/session.guard';
 import { ZodBodyPipe } from '../../common/zod-body.pipe';
@@ -22,19 +27,9 @@ import {
   updateConnectionDtoSchema,
 } from './dto';
 
-const VALID_PLATFORMS = new Set<Platform>([
-  'GITHUB',
-  'GITLAB',
-  'JIRA',
-  'SLACK',
-  'DISCORD',
-]);
-
-const VALID_SCOPE_KINDS = new Set<ConnectionScopeKind>([
-  'github_repo',
-  'github_projects_v2',
-  'none',
-]);
+const VALID_SCOPE_KINDS: ReadonlySet<ConnectionScopeKind> = new Set(
+  connectionScopeSchema.options.map((o) => o.shape.kind.value),
+);
 
 /**
  * Global Connection CRUD. Connections aren't per-workflow anymore —
@@ -52,13 +47,8 @@ export class ConnectionsController {
     @Query('scopeKind') scopeKind?: string,
   ) {
     return this.svc.list(orgId, {
-      platform: platform && VALID_PLATFORMS.has(platform as Platform)
-        ? (platform as Platform)
-        : undefined,
-      scopeKind:
-        scopeKind && VALID_SCOPE_KINDS.has(scopeKind as ConnectionScopeKind)
-          ? (scopeKind as ConnectionScopeKind)
-          : undefined,
+      platform: parsePlatform(platform),
+      scopeKind: parseScopeKind(scopeKind),
     });
   }
 
@@ -89,4 +79,17 @@ export class ConnectionsController {
   async delete(@OrgId() orgId: string, @Param('id') id: string) {
     await this.svc.delete(orgId, id);
   }
+}
+
+function parsePlatform(s?: string): Platform | undefined {
+  if (!s) return undefined;
+  const r = platformSchema.safeParse(s);
+  return r.success ? r.data : undefined;
+}
+
+function parseScopeKind(s?: string): ConnectionScopeKind | undefined {
+  if (s && VALID_SCOPE_KINDS.has(s as ConnectionScopeKind)) {
+    return s as ConnectionScopeKind;
+  }
+  return undefined;
 }

@@ -15,6 +15,7 @@ import {
 } from '@conduit/shared';
 import { PrismaService } from '../../common/prisma.service';
 import { assertDefinitionValid } from '../../common/assert-definition-valid';
+import { errMessage } from '../../common/err-message';
 import { TemporalService } from '../../temporal/temporal.service';
 import { AgentPresetsService } from '../agent-presets/agent-presets.service';
 import { loadTemplates, type LoadedTemplate } from './template-loader';
@@ -133,7 +134,7 @@ export class TemplatesService implements OnModuleInit {
           });
         } catch (err) {
           this.logger.warn(
-            `Upserting poll schedule for ${id} failed: ${String(err)}`,
+            `Upserting poll schedule for ${id} failed: ${errMessage(err)}`,
           );
         }
       }),

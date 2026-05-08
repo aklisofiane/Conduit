@@ -42,14 +42,22 @@ export class CredentialsService {
   }
 
   async update(orgId: string, id: string, dto: UpdateCredentialDto) {
-    await this.findOrThrow(orgId, id);
-    return this.prisma.credential.update({
-      where: { id },
+    // updateMany lets us scope the write by orgId in one round-trip; a
+    // cross-org id returns 404 with no row leak (matches the contract used
+    // in WorkflowsService.update).
+    const result = await this.prisma.credential.updateMany({
+      where: { id, orgId },
       data: {
         name: dto.name,
         secret: dto.secret !== undefined ? encrypt(dto.secret) : undefined,
         metadata: dto.metadata as unknown as object | undefined,
       },
+    });
+    if (result.count === 0) {
+      throw new NotFoundException(`Credential ${id} not found`);
+    }
+    return this.prisma.credential.findUniqueOrThrow({
+      where: { id },
       select: { id: true, name: true, platform: true, updatedAt: true },
     });
   }

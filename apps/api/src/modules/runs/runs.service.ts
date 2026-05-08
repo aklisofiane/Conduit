@@ -5,7 +5,7 @@ import { TemporalService } from '../../temporal/temporal.service';
 
 export interface LogsQuery {
   nodeName?: string;
-  kind?: string;
+  kind?: ExecutionLogKind;
   limit?: number;
 }
 
@@ -62,7 +62,7 @@ export class RunsService {
         runId,
         orgId,
         nodeName: query.nodeName,
-        kind: query.kind as ExecutionLogKind | undefined,
+        kind: query.kind,
       },
       orderBy: { ts: 'asc' },
       take,
