@@ -23,6 +23,7 @@ async function bootstrap(): Promise<void> {
     logger: ['log', 'warn', 'error', 'debug'],
     bodyParser: false,
   });
+  app.enableCors({ origin: config.corsOrigin, credentials: true });
   // Better Auth needs the raw request stream — mount its handler BEFORE
   // express.json() runs. Routes outside `/api/auth/*` fall through.
   app.use('/api/auth', betterAuthMiddleware);
@@ -39,7 +40,6 @@ async function bootstrap(): Promise<void> {
   );
   app.use(express.urlencoded({ extended: true }));
   app.setGlobalPrefix('api');
-  app.enableCors({ origin: config.corsOrigin, credentials: true });
   app.useWebSocketAdapter(new IoAdapter(app));
   app.enableShutdownHooks();
 
