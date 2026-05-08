@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { CONDUIT_DIR, clearConduitFolder, isNotFound } from './conduit-folder';
 import { git, GitError } from './git';
 
 export class MergeConflictError extends Error {
@@ -29,8 +30,7 @@ export class MergeConflictError extends Error {
  * copy of the upstream's own summary) are preserved on the working tree so
  * downstream nodes can still read them. Target's `.conduit/` is briefly
  * cleared so the squash doesn't trip git's untracked-overwrite preflight
- * when the same path appears in source's snapshot — see Option B' in the
- * phase 3 e2e fix.
+ * when the same path appears in source's snapshot.
  *
  * Phase 3 ships the clean-merge path only. Conflict resolution via a
  * lightweight agent session (see docs/design-docs/agent-execution.md
@@ -50,22 +50,14 @@ export async function mergeBranchedWorktree(args: {
   // squash can write through without hitting the untracked-overwrite
   // preflight. On a real conflict we lose target's `.conduit/`, but the
   // run fails and the workspace is torn down anyway.
-  const conduitDir = path.join(targetWorkspacePath, '.conduit');
+  const conduitDir = path.join(targetWorkspacePath, CONDUIT_DIR);
   const existedBefore = new Set<string>(
     await fs.readdir(conduitDir).catch((err: unknown) => {
-      if (
-        typeof err === 'object' &&
-        err !== null &&
-        (err as { code?: string }).code === 'ENOENT'
-      ) {
-        return [] as string[];
-      }
+      if (isNotFound(err)) return [] as string[];
       throw err;
     }),
   );
-  if (existedBefore.size > 0) {
-    await fs.rm(conduitDir, { recursive: true, force: true });
-  }
+  await clearConduitFolder(targetWorkspacePath);
 
   try {
     await git(['merge', '--squash', sourceRef], { cwd: targetWorkspacePath });
@@ -76,24 +68,23 @@ export async function mergeBranchedWorktree(args: {
     // target's own (typically the upstream's summary copied in by
     // cloneConduitFolder) and downstream nodes still need them.
     const stagedConduit = (
-      await git(['diff', '--cached', '--name-only', '--', '.conduit'], {
+      await git(['diff', '--cached', '--name-only', '--', CONDUIT_DIR], {
         cwd: targetWorkspacePath,
       })
     )
       .split('\n')
       .map((s) => s.trim())
       .filter(Boolean);
-    await git(['rm', '-rf', '--cached', '--ignore-unmatch', '--', '.conduit'], {
+    await git(['rm', '-rf', '--cached', '--ignore-unmatch', '--', CONDUIT_DIR], {
       cwd: targetWorkspacePath,
     });
     for (const relPath of stagedConduit) {
       if (existedBefore.has(path.basename(relPath))) continue;
       await fs.rm(path.join(targetWorkspacePath, relPath), { force: true });
     }
-    // Drop the `.conduit/` directory itself if removing the staged files
-    // emptied it; rmdir silently no-ops when target had its own files there.
+    // rmdir throws ENOTEMPTY if target's preserved files remain — swallowed.
     if (stagedConduit.length > 0) {
-      await fs.rmdir(path.join(targetWorkspacePath, '.conduit')).catch(() => undefined);
+      await fs.rmdir(conduitDir).catch(() => undefined);
     }
 
     // If the only diff was `.conduit/`, scrubbing leaves the index clean;

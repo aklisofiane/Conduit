@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-const CONDUIT_DIR = '.conduit';
+export const CONDUIT_DIR = '.conduit';
 
 /**
  * Read every `.conduit/*.md` summary from `workspacePath` as `{ NodeName, body }`.
@@ -87,7 +87,7 @@ export async function cloneConduitFolder(
   }
 }
 
-function isNotFound(err: unknown): boolean {
+export function isNotFound(err: unknown): boolean {
   return (
     typeof err === 'object' && err !== null && 'code' in err && (err as { code?: string }).code === 'ENOENT'
   );
