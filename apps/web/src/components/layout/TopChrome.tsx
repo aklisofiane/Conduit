@@ -2,6 +2,7 @@ import { NavLink } from 'react-router-dom';
 import { cn } from '../../lib/cn.js';
 import { Icon } from '../canvas/Icon.js';
 import { useTopbarSlotsStore } from '../../state/topbar-slots.js';
+import { UserMenuPill } from './UserMenuPill.js';
 
 export function TopChrome() {
   const centerSlot = useTopbarSlotsStore((s) => s.centerSlot);
@@ -31,15 +32,7 @@ export function TopChrome() {
 
         <div className="flex items-center justify-center">{centerSlot}</div>
 
-        <div className="flex items-center justify-end">
-          {actionsSlot ?? (
-            <div className="pill">
-              <span className="dot" />
-              <span className="text-[var(--color-text-muted)]">services</span>
-              <span className="text-[var(--color-text)]">healthy</span>
-            </div>
-          )}
-        </div>
+        <div className="flex items-center justify-end">{actionsSlot ?? <UserMenuPill />}</div>
       </div>
     </header>
   );

@@ -8,18 +8,28 @@ React 19 + Vite 8 + `@xyflow/react` + TanStack Query + Zustand + Tailwind v4 + s
 |---|---|
 | `/` | Workflow list (name, last run, status, active toggle) + "new workflow" + "from template" entry points |
 | `/workflows/:id` | Edit — canvas + config side panel (design only, no runtime data) |
-| `/workflows/:id/connections` | Manage the workflow's `WorkflowConnection`s — alias → credential + owner/repo + optional webhook signing secret |
 | `/workflows/:id/runs` | Run history list (status, trigger, duration, started at) |
 | `/runs/:runId` | Run detail — dedicated observation page with live logs (not on the canvas) |
-| `/credentials` | Manage `PlatformCredential`s (global — reused across workflows via connections) |
-| `/settings` | User / org settings (minimal v1) |
+| `/connections` | Global `Connection` rows — typed scope picker (`github_repo` `{owner, repo}` / `github_projects_v2` `{ownerType, owner, number}` / `none`) on top of a `Credential`. Workflows reference connections by id from the canvas. |
+| `/credentials` | Manage `Credential` rows (global — one credential can back many connections; rotation propagates) |
+| `/account` | Profile readout + change-password + sign-out (see [design-docs/web-auth-ui.md](./design-docs/web-auth-ui.md)) |
+| `/account/organization` | Active org's members, pending invitations (with copyable invite URL), invite form, danger zone (see [design-docs/org-switching.md](./design-docs/org-switching.md)) |
+| `/account/invitations` | Incoming pending invitations for the current user (accept/reject) |
+| `/accept-invitation/:invitationId` | Deep-link target for shared invite URLs — displays org + inviter + role; accept lands on `/account/organization` (no auto-switch of active org) |
+| `/sign-in`, `/sign-up`, `/forgot-password`, `/reset-password` | Unauthenticated auth shell (centered card, no `TopChrome`) — see [design-docs/web-auth-ui.md](./design-docs/web-auth-ui.md) |
+
+## Auth shell
+
+`apps/web/src/routes/router.tsx` splits into two top-level branches: an `AuthLayout` branch (centered card, no `TopChrome`) wrapped in `<RedirectIfAuthed />` for the four auth routes, and the existing `AppLayout` branch wrapped in `<RequireAuth />` for everything else. `RequireAuth` redirects to `/sign-in?next=<encoded-current-path>` when `useSession()` resolves with no user, and shows a small loader while it's pending. `RedirectIfAuthed` is the inverse — sends a logged-in user to `?next` (path-prefixed only) or `/` so they don't see the login form.
+
+Form pages use `react-hook-form` + `@hookform/resolvers/zod` + Conduit's design primitives (`.btn`, `.btn.primary`, `.field-input`, `.field-label`, the `--color-claude` accent dot, `font-serif` headings). Each page exports a pure `submit*` helper so the submit logic can be unit-tested in plain `.test.ts` without jsdom or testing-library — see [design-docs/web-auth-ui.md](./design-docs/web-auth-ui.md) for the full surface, the cookie wiring, and the Better Auth client API names (notably `requestPasswordReset`, not `forgetPassword`, in 1.6.9).
 
 ## Create from template
 
 The workflow list's header row has a **"From template"** button next to **"New workflow"**. Clicking it opens `TemplatePickerDialog` (`apps/web/src/components/templates/TemplatePickerDialog.tsx`), a two-step modal:
 
 1. **Pick** — grid of template cards (name, category, workflow count, description) sourced from `useTemplates()` → `GET /api/templates`.
-2. **Bind** — one row per unique `<alias>` placeholder in the picked template. Each row toggles between **New** (alias + credential picker + optional owner/repo) and **Existing** (paste an existing `WorkflowConnection` id). Submit calls `useCreateFromTemplate()` → `POST /api/workflows/from-template/:id` and navigates to the first created workflow.
+2. **Bind** — one row per unique `<alias>` placeholder in the picked template. Each row toggles between **New** (name + credential picker + scope-kind-specific fields — `owner/repo` for `<github-repo>`, `ownerType/owner/number` for `<github-board>`) and **Existing** (pick from connections whose `scope.kind` matches the placeholder's expected slot kind). Submit calls `useCreateFromTemplate()` → `POST /api/workflows/from-template/:id` and navigates to the first created workflow.
 
 Created workflows are paused — the user reviews the generated canvas before activating. See [design-docs/templates.md](./design-docs/templates.md) for the full flow.
 
@@ -55,7 +65,7 @@ Visual tokens (palette, per-provider color/font/label, radii, the `providerStyle
 
 Opens on node click. Form driven by Zod schema from `@conduit/shared`.
 
-- **Trigger panel**: platform picker → connection picker → mode toggle (webhook / polling) → for polling, **Scope** (Issues · Pull requests) and — under issue scope only — **Source** (Project V2 · Repo issues); webhook mode shows an event picker → interval (polling) → `BoardRef` fieldset (only when polling is issue-scope + board-source, and for the webhook `board.column.changed` event) → filter builder. The filter row's left-side dropdown is **scope-aware**: issue triggers offer `Status | Label`, PR triggers offer `PR state | Label`, and issue triggers under repo source drop `Status` (no board, no Status column). Switching scope or source drops any filter rows whose field isn't offered in the new context, with a one-shot inline notice listing what was removed. Right-side values stay live-sourced — Status from the selected board's Status column, Label from the connection's repo via `useListLabels`, and PR state from a fixed `draft / ready_for_review / any` enum. Status/Label rows share one `OptionsValueInput` component: a `<select>` of available options, a free-text fallback when the list hasn't loaded, and a stale-cache `(not found)` synthetic entry so a renamed value still surfaces what's stored. The board list is fetched via `useListProjectBoards` (TanStack Query, keyed on `(connectionId, ownerType, owner)`, 30s `staleTime`); typing the owner is debounced 400ms before keying the query so quick keystrokes don't fan out. `<FilterEditor>`, `<FilterRow>`, `<OptionsValueInput>`, and `<BoardPicker>` all live next to `TriggerConfigPanel` in `apps/web/src/components/canvas/TriggerConfigPanel.tsx`.
+- **Trigger panel**: platform picker → **Connections** group with stacked sub-rows (always **Repo**, plus **Board** when the mode targets a board — `polling { source: 'board' }` or webhook `event: 'board.column.changed'`); each sub-row's picker filters by scope kind (`github_repo` for Repo, `github_projects_v2` for Board) → mode toggle (webhook / polling) → for polling, **Scope** (Issues · Pull requests) and — under issue scope only — **Source** (Project V2 · Repo issues); webhook mode shows an event picker → interval (polling) → readout for the resolved board's title/url/Status fields → filter builder. The filter row's left-side dropdown is **scope-aware**: issue triggers offer `Status | Label`, PR triggers offer `PR state | Label`, and issue triggers under repo source drop `Status` (no board, no Status column). Switching scope or source drops any filter rows whose field isn't offered in the new context, with a one-shot inline notice listing what was removed. Right-side values stay live-sourced — Status from the selected board's Status column, Label from the source connection's repo via `useListLabels`, and PR state from a fixed `draft / ready_for_review / any` enum. The board list is fetched via `useListProjectBoards` (TanStack Query, keyed on `(connectionId, ownerType, owner)`, 30s `staleTime`); `ownerType` and `owner` come from the selected board connection's parsed `scope`, not user input. `<FilterEditor>`, `<FilterRow>`, `<OptionsValueInput>`, and `<ConnectionSubRow>` all live next to `TriggerConfigPanel` in `apps/web/src/components/canvas/TriggerConfigPanel.tsx`.
 - **Agent panel**: name field (identifier validation), preset picker (see below), provider + model dropdown, instructions textarea (monospace, generous height), **Web search** checkbox (off by default — toggles the provider's built-in web search/fetch; see [agent-execution.md](./design-docs/agent-execution.md#web-search)), **Issue writeback** control (opt-in checkbox + pill-toggle groups for allowed statuses + labels — see below), MCP server picker (presets with one-click add + custom server config), skill picker (see below), constraints (collapsible). No workspace picker — workspace is derived from graph position (see [node-system.md](./design-docs/node-system.md#workspace-inheritance)).
 
 ### Agent preset picker
@@ -88,7 +98,7 @@ The agent config panel includes an MCP server section:
 - **Presets** shown as clickable cards (GitHub, Slack, Filesystem, etc.) — one click to add with sensible defaults.
 - **Custom** button opens a form for transport config (stdio command / SSE URL).
 - Each added server shows its tool list (discovered via `POST /api/mcp/introspect` at config time, cached in `WorkflowMcpServer.discoveredTools`) with per-tool allow/deny checkboxes. A "Refresh tools" button re-introspects.
-- Credential binding: dropdown to link a `WorkflowConnection` for auth.
+- Credential binding: dropdown to link a `Connection` for auth.
 
 ### State
 
@@ -111,7 +121,7 @@ Clickable → opens the run detail page.
 
 Dedicated observation page, independent of the canvas. Layout:
 
-- **Top bar**: run metadata (workflow name link, trigger summary, started at, duration, status badge, Cancel button for in-flight runs). The top bar itself is the global `TopChrome` shell — pages publish a `center` and `actions` ReactNode into it via `useTopbarSlots()` (`apps/web/src/state/topbar-slots.ts`). The store identity-checks before setting and uses split per-slot effects so an unchanged slot doesn't churn when the other one changes; memoize the published nodes on the producer side or you defeat both.
+- **Top bar**: run metadata (workflow name link, trigger summary, started at, duration, status badge, Cancel button for in-flight runs). The top bar itself is the global `TopChrome` shell — pages publish a `center` and `actions` ReactNode into it via `useTopbarSlots()` (`apps/web/src/state/topbar-slots.ts`). The store identity-checks before setting and uses split per-slot effects so an unchanged slot doesn't churn when the other one changes; memoize the published nodes on the producer side or you defeat both. When `actionsSlot === null`, `TopChrome` renders `<UserMenuPill />` as the default — pill label is the user's name/email, popover contains the active-org line + Switch sub-list + inline Create-organization form, plus Account-settings / Organization-settings / Pending-invitations links and Sign-out (see [design-docs/org-switching.md](./design-docs/org-switching.md)). The old "services healthy" indicator is gone. Pages that override `actionsSlot` (canvas, run detail) keep their override unchanged.
 - **Left rail**: list of nodes in execution order, each with a status dot, name, and elapsed time. The selected node highlights.
 - **Main area** (tabs for the selected node):
   - **Timeline** — live stream of `ExecutionLog` entries (text chunks, tool calls with expandable input/output, token usage). Auto-scrolls while running.
