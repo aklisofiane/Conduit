@@ -26,6 +26,7 @@ export function useRunUpdates(runId: string | undefined): RunUpdateFrame | undef
       query: { runId },
       transports: ['websocket'],
       reconnection: true,
+      withCredentials: true,
     });
     socketRef.current = socket;
 

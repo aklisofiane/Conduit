@@ -2,16 +2,17 @@
 
 ## Threat model (v1)
 
-Single-tenant, self-hosted or small-team deployment. Trust boundary is the API — anyone with API access can run any workflow. Multi-tenant + org RBAC is explicitly out of scope for v1.
+Multi-tenant via per-org partitioning. The auth umbrella moved Conduit from "shared API key, one tenant" to "session-cookie auth, every tenant-scoped row tagged with `orgId`, every API surface refusing cross-org access." Self-hosted single-instance and hosted multi-tenant share the same posture; the difference is operational (DNS, TLS, cookie domain), not architectural.
 
 Primary risks:
-1. **Credential exfiltration** — stored platform tokens leaked via logs, agent prompts, MCP server env, or compromised workspaces.
-2. **Webhook forgery** — attacker triggers runs by sending fake GitHub events.
-3. **Agent sandbox escape** — agent tools touching files outside the workspace.
-4. **Prompt injection via trigger payloads** — an attacker opens a GitHub issue with instructions embedded in the title/body, causing the agent to misbehave.
-5. **Malicious MCP servers** — a custom MCP server exfiltrating data or executing arbitrary code on the worker host.
+1. **Cross-tenant data leakage** — a member of Org A reading or mutating Org B's workflows, runs, credentials, or connections through any API surface (REST, WS, webhook).
+2. **Credential exfiltration** — stored platform tokens leaked via logs, agent prompts, MCP server env, or compromised workspaces.
+3. **Webhook forgery** — attacker triggers runs by sending fake GitHub events.
+4. **Agent sandbox escape** — agent tools touching files outside the workspace.
+5. **Prompt injection via trigger payloads** — an attacker opens a GitHub issue with instructions embedded in the title/body, causing the agent to misbehave.
+6. **Malicious MCP servers** — a custom MCP server exfiltrating data or executing arbitrary code on the worker host.
 
-Not in scope for v1: supply-chain attacks, side-channel attacks, compromised worker hosts.
+Not in scope for v1: supply-chain attacks, side-channel attacks, compromised worker hosts. Intra-org misuse (e.g. one admin abusing their privileges to delete another admin's workflow) is not separately mitigated — the v1 RBAC model is flat within an org; see *API auth (v1)* below.
 
 ## Webhook authentication
 
@@ -80,4 +81,82 @@ v1.1+: add a "trust level" flag on triggers; auto-disable write tools on untrust
 
 ## API auth (v1)
 
-Single API key in env, checked on every non-webhook route via a `@UseGuards(ApiKeyGuard)`. Web app ships the key via a local-only session. Deliberately minimal — revisit when multi-user lands.
+Authentication, authorization, and tenant isolation are organized around three surfaces — REST, Socket.IO, and webhooks — each with its own trust contract. The auth umbrella ([`docs/design-docs/auth-integration.md`](./design-docs/auth-integration.md), [`tenant-partitioning.md`](./design-docs/tenant-partitioning.md), [`web-auth-ui.md`](./design-docs/web-auth-ui.md)) replaces the v0 single-API-key model end-to-end.
+
+### REST: session-cookie auth + `@OrgId()` injection
+
+- Better Auth is mounted as Express middleware at `/api/auth/*` (`apps/api/src/auth/better-auth.middleware.ts`) and owns sign-up, sign-in, sign-out, password reset, and the `organization` plugin's CRUD endpoints (`/api/auth/organization/*`).
+- Every non-webhook controller is decorated with `@UseGuards(SessionGuard)` (`apps/api/src/auth/session.guard.ts`), which resolves the Better Auth session from the request cookies on each call. No session → `401 Unauthorized`. The guard attaches `req.user` and `req.session` for downstream code.
+- Tenant scoping is provided by the `@OrgId()` parameter decorator (`apps/api/src/auth/org-id.decorator.ts`), which reads `req.session.activeOrganizationId` and throws `403 Forbidden` when missing. Every tenant-scoped service method takes `orgId: string` as its first business argument and chains it into every Prisma `where` / `data` clause.
+- The `activeOrganizationId` value is trusted end-to-end without per-request membership re-checks: Better Auth's `organization` plugin only accepts `setActiveOrganization` for orgs the caller is a member of, so the column on the session row is authoritative. The single accepted trade-off is the **membership-staleness window** below.
+- Cookies follow the deployment: `lax` SameSite + `Secure` in hosted-prod, `lax` + non-Secure in local self-host. **Cookie domain configuration for hosted-prod (`.example.com` rather than the literal API origin) is deferred** — set when the production DNS plan lands. The web SDK calls `fetch` with `credentials: 'include'` so the cookie crosses the dev `:5173` → `:3001` origin gap.
+
+### Socket.IO: same cookie, same org check
+
+- `RunsGateway` (`apps/api/src/modules/runs/runs.gateway.ts`) authenticates `/runs` handshakes against the same Better Auth session cookie that REST routes use. The `resolveWsSession` helper (`apps/api/src/auth/ws-session.ts`) wraps the Node-IM `handshake.headers` and calls `auth.api.getSession`, mirroring the REST `SessionGuard`.
+- After session resolution, the gateway loads the requested run by `runId` filtered by `orgId === session.activeOrganizationId`. Any failure — missing cookie, no active org, run not found, or run belongs to a different org — results in a single `client.disconnect(true)` with no error payload. The shape is intentionally identical so an attacker probing run ids cannot distinguish "wrong org" from "does not exist."
+- Reconnects re-run `handleConnection`, so the org check is re-applied on every reconnect; there is no long-lived trust on a socket that survives a session change.
+- The web client (`apps/web/src/hooks/use-run-updates.ts`) passes `withCredentials: true` to `io()` so the dev cross-origin cookie reaches the gateway. Production same-origin works without the flag, but the option is harmless there and we keep it on.
+
+### Webhooks: HMAC-only + workflow-stamped `orgId`
+
+- `POST /api/hooks/:workflowId` is **deliberately unguarded** by `SessionGuard` — it accepts unauthenticated requests by design. Authenticity comes from the HMAC over the raw body (see [Webhook authentication](#webhook-authentication) above) which is verified against the workflow-row-scoped `webhookSecret`.
+- Tenant attribution flows from the workflow row, not from the caller: when the webhook handler dispatches a run, `WorkflowsService.startRun` reads `workflow.orgId` and writes it onto the new `WorkflowRun` (and every `ExecutionLog` / `NodeRun` derived from it). **There is no caller-controlled org input on the webhook path.** A webhook for an Org A workflow can only ever produce an Org A run.
+- Because the webhook URL identifies the workflow row, leaking a webhook URL is equivalent to disclosing that a workflow with that id exists in some org — the URL itself does not authenticate, but the HMAC does. The same shape that hides cross-org existence in REST/WS holds for the dispatch surface: a delivery to a non-existent workflow id and a delivery to an existing workflow with a wrong signature both 404 (we never confirm "this workflow exists, your signature is wrong" separately).
+
+### Cross-org responses are 404, not 403 (project-wide convention)
+
+- Every tenant-scoped service method filters by `orgId` in its `findFirst` / `findMany` clause and throws `NotFoundException` when the row resolves to nothing. The controller never sees "exists but not authorized," so the API never returns 403 for cross-org access — it returns 404.
+- The Socket.IO equivalent is the single-shape disconnect described above — no error payload that confirms run existence cross-org.
+- 403 is reserved for the structural case "your session has no active org" (`@OrgId()` precondition failure). 401 is reserved for "no session at all" (`SessionGuard`). 404 is the cross-tenant outcome.
+- Defense in depth: even if a future controller forgot to forward `@OrgId()` to the service, the `where` clauses on every model would still reject the access at the DB layer. The service layer is the second line; the cross-org rejection is enforced there even if the controller layer regresses.
+
+### RBAC: flat within an org for v1
+
+- Any member of an org — `owner`, `admin`, or `member` per Better Auth's role defaults — can read and write any tenant-scoped row in that org: workflows, credentials, connections, runs, including delete and cancel.
+- The only role-distinguishing operations in v1 are member-management ones (invite, remove member, update role, delete org), and those are owned end-to-end by Better Auth's `organization` plugin under `/api/auth/organization/*`. The plugin enforces role gates internally per its defaults (`owner` = everything, `admin` = invite + remove non-owners + role-change non-owners, `member` = leave only). Conduit does **not** layer its own RBAC on top of those endpoints in v1.
+- Reasoning: the v1 threat model is *cross-tenant leakage*, not *intra-tenant misuse*. Per-action RBAC (e.g. "only admins can delete workflows") is straightforward to add later; retracting per-action rules already shipped is messier.
+
+### Membership-staleness window (accepted trade-off)
+
+- Better Auth sessions are cookie-bound and live ~7 days by default. Revoking a user's membership in Org X does **not** automatically invalidate any sessions that already carry `activeOrganizationId = X`.
+- An admin who has just removed a member can manually revoke that user's outstanding sessions via Better Auth's existing session-management endpoints if it matters in the moment. v1 does not auto-revoke on member removal, and does not re-check membership on every request.
+- The trade-off: a stale session can read/write its old org for up to the cookie lifetime. We accept this because (a) per-request membership re-check would double the DB cost of every authenticated call and (b) the threat model prioritizes cross-org leakage over delayed access revocation. Operators with stricter requirements should call the Better Auth admin endpoint to revoke sessions when they remove members.
+
+### Future work (operational hardening)
+
+- **Cookie domain** for hosted-prod multi-subdomain deployments — set when the production DNS plan lands.
+- **Per-action RBAC inside an org** — re-open when a real customer ask shows up.
+- **Auto-revoke-on-member-removal** — re-open when the staleness window becomes a real problem.
+
+## Operational hardening (v1)
+
+The `operational-hardening` sub-feature ships rate-limiting on the abuse-prone Better Auth endpoints, an append-only `AuditLog` model for security-relevant events, and one inline abuse signal (failed-login spike). All three are scoped to the auth umbrella's surface — webhook rate-limits, per-org rate-limits, and credential-read auditing remain out of scope (see [data-model.md](./data-model.md) for the AuditLog row shape).
+
+### Rate limits
+
+Configured via Better Auth's built-in `rateLimit` middleware (`apps/api/src/auth/auth.config.ts` + `rate-limit-config.ts`); no Conduit-side rate-limit code. Counters live in Redis via Better Auth's `secondaryStorage` adapter (`RedisService.betterAuthSecondaryStorage()`), so a horizontally-scaled API tier shares one rate-limit budget across processes. If Redis is unreachable at API startup the process fails to boot — same posture as `RedisService` for the Socket.IO gateway. **No silent fallback to memory:** silently degrading rate-limit storage to per-process counters is the kind of failure mode that becomes a security incident later.
+
+Numbers are mode-tuned per `CONDUIT_DEPLOYMENT`:
+
+| Endpoint                                       | `local` (per IP) | `hosted` (per IP) |
+| ---------------------------------------------- | ---------------- | ----------------- |
+| `/api/auth/sign-up/email`                      | 100 / hr         | 5 / hr            |
+| `/api/auth/sign-in/email`                      | 100 / hr         | 10 / 5 min        |
+| `/api/auth/request-password-reset`             | 100 / hr         | 5 / hr            |
+| `/api/auth/organization/accept-invitation`     | 100 / hr         | 10 / hr           |
+| Default for any other `/api/auth/*`            | 100 / min        | 100 / min         |
+
+`local` is *not* "off" — it's lenient enough to never punish dev iteration but still cap an accidental infinite loop. `hosted` numbers are conservative-but-usable: a real user won't trip them; a script will. Per-IP is the only correlation axis; per-org / per-user rate-limits are deferred to v2.
+
+### Audit log + abuse signals
+
+`AuditLog` (one Prisma table, `apps/api/src/auth/audit-log.service.ts`) writes one row per security-relevant event. The taxonomy is a closed `AuditEvent` union in `audit-events.ts` — out-of-list strings are a type error at the writer. Events covered: `auth.signIn`, `auth.signIn.failed`, `auth.signUp`, `auth.signOut`, `auth.passwordReset.requested`, `auth.passwordReset.completed`, `org.created`, `org.deleted`, `org.renamed`, `org.member.invited`, `org.member.invitationAccepted`, `org.member.invitationRejected`, `org.member.invitationRevoked`, `org.member.removed`, `org.member.roleChanged`, `org.member.left`.
+
+Hooks live in two places: a single `hooks.after` middleware in `apps/api/src/auth/audit-hooks.ts` (path-dispatching for the auth events — sign-in success/failure split, sign-up, sign-out, password reset) and the `organization` plugin's typed `organizationHooks` (org / member / invitation events, where the typed payload exposes `previousRole`, `member`, and `organization` directly). Both surfaces fire only on operation success; failed sign-in writes a row only when the response is the known `UNAUTHORIZED` shape (other errors — 5xx, validation — are not security-relevant and stay in operator logs).
+
+The `AuditLog` row uses **plain string columns for `actorUserId` / `orgId` / `targetUserId`** — deliberately not foreign keys. Audit rows are not operational data; their value is "this was true at write time and nothing can change that," which is exactly what FK relations + cascade rules undermine. The trade-off is no DB-level integrity check on the linkage and joins via raw SQL rather than Prisma relations — acceptable for a write-mostly table queried from operator tooling, not from the app's hot paths. The contract test suite locks the no-FK guarantee against future schema drift by deleting a referenced user and asserting the audit row's `actorUserId` column is unchanged.
+
+The one inline abuse signal is **failed-login spike detection** in `abuse-signals.ts`: after writing each `auth.signIn.failed` row, the writer counts rows for the same `actorEmail` in the last 5 minutes; if the count exceeds 10, it emits one `logger.warn` line with event `abuse.failedLoginSpike` plus the email, count, and window. The threshold sits *just above* the per-IP rate-limit cap on the same endpoint (10 / 5 min in hosted) — tripping it implies the attacker is rotating IPs against a single email, the case rate-limit alone can't surface. Threshold and window are constants in code, not env-tunable.
+
+**Explicit non-goals for v1.** v1 detects, doesn't react. There is no auto-block, no account lock, no IP throttle escalation, and no external alerting (PagerDuty, Slack, email). Audit rows for cross-org rejections (404s) are also out — capturing them cleanly would require instrumenting every service `where: { orgId }` site, deferred to v2. There is no audit-log UI or admin endpoint; operators query the table directly. There is no retention policy — audit rows are kept forever in v1, and the no-FK shape makes future redaction (null specific columns) safer than a cascade-delete model would have been.
