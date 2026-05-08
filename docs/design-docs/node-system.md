@@ -17,7 +17,7 @@ type TriggerConfig = {
   platform: 'github' | 'gitlab' | 'jira';
   connectionId: string;
   mode: TriggerMode;
-  filters: TriggerFilter[];              // e.g. [{ field: 'status', op: 'eq', value: 'Dev' }]
+  filters: TriggerFilter[];              // e.g. [{ field: 'status', value: 'Dev' }, { field: 'label', value: 'bug' }]
   board?: BoardRef;                      // required for polling mode + `board.column.changed` webhook
 };
 
@@ -31,17 +31,13 @@ type BoardRef = {
   number: number;             // Projects v2 project number (scoped to owner)
 };
 
-type TriggerFilter = {
-  field: string;       // e.g. 'status', 'label', 'assignee'
-  op: 'eq' | 'neq' | 'in' | 'contains';
-  value: string | string[];
-};
+type TriggerFilter =
+  | { field: 'status'; value: string }   // exact match against the issue/PR's Status column
+  | { field: 'label'; value: string };   // membership: row matches if `value` is in the issue's labels
 
-// Operator semantics:
-// - 'eq' / 'neq': value is string, exact match (case-sensitive).
-// - 'in':         value is string[], field must equal any entry.
-// - 'contains':   value is string, substring match on field (case-sensitive).
-// Multiple filters on the same trigger combine with AND.
+// Both shapes are single-valued strings. Multiple filters on the same trigger combine with AND;
+// to require multiple labels, add multiple label rows. The matcher safe-fails on empty `value` so
+// in-progress UI rows are persistable without ever matching.
 ```
 
 **Webhook mode**: platform sends an event to `POST /api/hooks/:workflowId`. Conduit verifies the signature, normalizes the event, checks filters, and triggers a run if matched. GitHub webhooks currently normalize four events: `issues.opened`, `pull_request.opened`, `issue_comment.created` (PR-scoped), and `board.column.changed` (from `projects_v2_item.edited` single-select field moves). The `board.column.changed` webhook carries only the Projects v2 item's `content_node_id` — no issue number — so it can't drive a workflow on its own; polling is the supported mode for board-driven flows.

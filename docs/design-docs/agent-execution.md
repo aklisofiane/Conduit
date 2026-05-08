@@ -306,7 +306,7 @@ Lifecycle:
 4. **Poll cycle (`pollBoardActivity`):**
    - Re-read the workflow + trigger config from Postgres (schedule definitions carry only the workflow id, so config edits take effect on the next tick).
    - Decrypt the connection's platform token; query GitHub Projects v2 via the GraphQL client in `apps/worker/src/runtime/github-projects.ts`. Paginates via `endCursor` up to a hard cap.
-   - Apply the trigger's filters against the flattened single-select field view (`status = X`, etc.). The `status` field is surfaced from `singleSelectValues.Status` so one filter works for both modes.
+   - Apply the trigger's filters against a small `FilterView` built from the polled item: `status` (from `singleSelectValues.Status`) and `labels` (from the issue/PR's labels, fetched in the same GraphQL query). The webhook flattener builds the same shape from the inbound payload, so one filter set works in either mode.
    - Diff the matching `itemNodeId` set against `PollSnapshot.matchingIds`. **New → start an `agentWorkflow`**; still-matching items do *not* re-fire. Re-entry (item leaves the matching set, comes back) is treated as new — this is the board-cycle primitive that makes Dev → Review → Dev loops work.
    - Upsert `PollSnapshot` with the current matching set.
 5. **Run start from inside an activity.** `pollBoardActivity` starts `agentWorkflow`s directly via a worker-side `@temporalio/client` singleton (`apps/worker/src/runtime/temporal-client.ts`) — separate from the `NativeConnection` used to poll the worker task queue. Each new match gets a fresh `WorkflowRun` row and a per-run workflow id (`run-<runId>`).
