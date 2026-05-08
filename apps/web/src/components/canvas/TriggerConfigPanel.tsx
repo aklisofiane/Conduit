@@ -406,8 +406,6 @@ function OptionsValueInput({
   emptyHint: string;
   onChange: (next: string) => void;
 }) {
-  // No options loaded yet → fall back to free-text input so the row stays
-  // usable. Saving an unmatchable value is the user's call.
   if (options.length === 0) {
     return (
       <input
@@ -418,9 +416,9 @@ function OptionsValueInput({
       />
     );
   }
-  // Stale-cache safety: if the saved value isn't in the live options list
-  // (e.g. label was renamed since save), show it as a synthetic option so
-  // the user sees the truth of what's stored, not a silent reset to ''.
+  // If the saved value isn't in the live options list (e.g. label was
+  // renamed since save), surface it as a synthetic option so the user sees
+  // what's stored rather than a silent reset to ''.
   const showStaleOption = value !== '' && !options.includes(value);
   return (
     <select

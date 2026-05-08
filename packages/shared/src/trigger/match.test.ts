@@ -75,7 +75,6 @@ describe('matchesTrigger', () => {
       },
     };
     expect(matchesTrigger(event, trigger)).toBe(true);
-    // Same status, but the issue lacks the required label.
     expect(
       matchesTrigger(
         {
@@ -94,7 +93,6 @@ describe('matchesTrigger', () => {
         filters: [{ field: 'label', value: 'bug' }],
       }),
     ).toBe(true);
-    // Multi-label issues used to fail eq-on-comma-string; membership fixes it.
     expect(
       matchesTrigger(BASE_EVENT, {
         ...BASE_TRIGGER,
@@ -173,6 +171,10 @@ describe('applyFilter', () => {
 
   it('status — undefined view value fails', () => {
     expect(applyFilter({ labels: [] }, { field: 'status', value: 'Dev' })).toBe(false);
+  });
+
+  it('status — empty value never matches (in-progress UI row)', () => {
+    expect(applyFilter(view, { field: 'status', value: '' })).toBe(false);
   });
 
   it('label — exact membership', () => {

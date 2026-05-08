@@ -4,24 +4,18 @@ import type { TriggerFilter } from './filter';
 
 /**
  * Flat per-event view that the matcher reads. Webhook and polling each
- * produce one of these from their native shape; the matcher itself stays
+ * produce one of these from their native shape, keeping the matcher
  * platform-agnostic.
  */
 export interface FilterView {
-  /** Project board Status column value, when present. */
   status?: string;
-  /** Issue/PR label names. Empty array when there are none — never undefined. */
   labels: string[];
 }
 
-/**
- * Returns true if the event matches the trigger configuration — event-name
- * check first (webhook mode only; polling doesn't carry a specific event
- * name), then all filters (AND).
- */
 export function matchesTrigger(event: TriggerEvent, trigger: TriggerConfig): boolean {
   if (event.source !== trigger.platform) return false;
 
+  // Polling-mode events don't carry a specific event name, so skip the check.
   if (trigger.mode.kind === 'webhook' && event.mode === 'webhook') {
     if (event.event !== trigger.mode.event) return false;
   }
@@ -30,16 +24,15 @@ export function matchesTrigger(event: TriggerEvent, trigger: TriggerConfig): boo
   return trigger.filters.every((f) => applyFilter(view, f));
 }
 
-/**
- * Public for tests and reuse by the polling activity, which builds its own
- * `FilterView` from a `ProjectBoardItem`.
- */
 export function applyFilter(view: FilterView, filter: TriggerFilter): boolean {
+  // Empty value never matches — lets in-progress UI rows safe-fail without
+  // hitting whatever the data happens to be.
+  if (filter.value === '') return false;
   switch (filter.field) {
     case 'status':
-      return view.status !== undefined && view.status === filter.value;
+      return view.status === filter.value;
     case 'label':
-      return filter.value !== '' && view.labels.includes(filter.value);
+      return view.labels.includes(filter.value);
     default: {
       const _exhaustive: never = filter;
       return _exhaustive;
@@ -47,10 +40,6 @@ export function applyFilter(view: FilterView, filter: TriggerFilter): boolean {
   }
 }
 
-/**
- * Build a `FilterView` from a webhook-side `TriggerEvent`. Polling builds
- * its own view directly from the GraphQL response (see `poll-board.ts`).
- */
 function flattenEventForFilters(event: TriggerEvent): FilterView {
   return {
     status: getStatus(event.payload),
