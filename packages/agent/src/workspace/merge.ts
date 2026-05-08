@@ -25,6 +25,13 @@ export class MergeConflictError extends Error {
  * target's tip nor target's history carries any `.conduit/` paths the agent
  * may have committed during its session.
  *
+ * `.conduit/` files target had *before* the merge (e.g. cloneConduitFolder's
+ * copy of the upstream's own summary) are preserved on the working tree so
+ * downstream nodes can still read them. Target's `.conduit/` is briefly
+ * cleared so the squash doesn't trip git's untracked-overwrite preflight
+ * when the same path appears in source's snapshot — see Option B' in the
+ * phase 3 e2e fix.
+ *
  * Phase 3 ships the clean-merge path only. Conflict resolution via a
  * lightweight agent session (see docs/design-docs/agent-execution.md
  * "Merge-back agent") lands in a later phase — the exception is shaped so
@@ -37,14 +44,37 @@ export async function mergeBranchedWorktree(args: {
 }): Promise<void> {
   const { targetWorkspacePath, sourceRef, sourceNodeName } = args;
   const message = `Conduit: merge ${sourceNodeName}`;
+
+  // Snapshot the basenames target had under `.conduit/` so the post-strip
+  // step can preserve them on the WT. Then clear the directory so the
+  // squash can write through without hitting the untracked-overwrite
+  // preflight. On a real conflict we lose target's `.conduit/`, but the
+  // run fails and the workspace is torn down anyway.
+  const conduitDir = path.join(targetWorkspacePath, '.conduit');
+  const existedBefore = new Set<string>(
+    await fs.readdir(conduitDir).catch((err: unknown) => {
+      if (
+        typeof err === 'object' &&
+        err !== null &&
+        (err as { code?: string }).code === 'ENOENT'
+      ) {
+        return [] as string[];
+      }
+      throw err;
+    }),
+  );
+  if (existedBefore.size > 0) {
+    await fs.rm(conduitDir, { recursive: true, force: true });
+  }
+
   try {
     await git(['merge', '--squash', sourceRef], { cwd: targetWorkspacePath });
 
     // Capture `.conduit/*` paths the squash staged so we can drop them from
-    // both the index and the working tree. Target's pre-existing `.conduit/`
-    // files (e.g. summaries from earlier copy-conduit-files runs) are
-    // untracked & gitignored and won't appear in `--cached`, so they're
-    // preserved.
+    // both the index and the working tree. Files whose basenames were in
+    // target's pre-merge `.conduit/` are spared on the WT side — they're
+    // target's own (typically the upstream's summary copied in by
+    // cloneConduitFolder) and downstream nodes still need them.
     const stagedConduit = (
       await git(['diff', '--cached', '--name-only', '--', '.conduit'], {
         cwd: targetWorkspacePath,
@@ -57,6 +87,7 @@ export async function mergeBranchedWorktree(args: {
       cwd: targetWorkspacePath,
     });
     for (const relPath of stagedConduit) {
+      if (existedBefore.has(path.basename(relPath))) continue;
       await fs.rm(path.join(targetWorkspacePath, relPath), { force: true });
     }
     // Drop the `.conduit/` directory itself if removing the staged files

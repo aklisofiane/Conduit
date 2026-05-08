@@ -170,3 +170,84 @@ describe('mergeWorktreeActivity', () => {
     };
   }
 });
+
+describe('mergeWorktreeActivity — repo without a .gitignore', () => {
+  // Mirrors the phase 3 e2e seed: no .gitignore at HEAD. `git add -A` in
+  // source happily stages anything written, including .conduit/. Combined
+  // with cloneConduitFolder, target ends up with the same .conduit/<Upstream>.md
+  // as untracked while source's snapshot commit also contains it — a naive
+  // squash trips the untracked-overwrite preflight. The merge-back has to
+  // keep the upstream's own summary while still scrubbing source-side
+  // .conduit/ leaks from target's tree and history.
+  let root: string;
+  let target: string;
+  let source: string;
+  let originalEnv: Record<string, string | undefined>;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    root = await fs.mkdtemp(path.join(os.tmpdir(), 'conduit-merge-activity-no-gi-'));
+    target = path.join(root, 'target');
+    source = path.join(root, 'source');
+    await fs.mkdir(target, { recursive: true });
+    await git(target, 'init', '-q', '-b', 'main');
+    await fs.mkdir(path.join(target, 'src'), { recursive: true });
+    await fs.writeFile(path.join(target, 'src', 'base.ts'), 'export const base = true;\n');
+    await commit(target, 'base');
+    await git(target, 'worktree', 'add', '--detach', source, 'HEAD');
+
+    originalEnv = {
+      GIT_CONFIG_GLOBAL: process.env.GIT_CONFIG_GLOBAL,
+      GIT_CONFIG_NOSYSTEM: process.env.GIT_CONFIG_NOSYSTEM,
+      HOME: process.env.HOME,
+      XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME,
+    };
+    process.env.GIT_CONFIG_GLOBAL = path.join(root, 'missing-global-gitconfig');
+    process.env.GIT_CONFIG_NOSYSTEM = '1';
+    process.env.HOME = path.join(root, 'empty-home');
+    process.env.XDG_CONFIG_HOME = path.join(root, 'empty-xdg');
+  });
+
+  afterEach(async () => {
+    for (const [key, value] of Object.entries(originalEnv)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    await fs.rm(root, { recursive: true, force: true });
+  });
+
+  it("preserves target's pre-existing untracked .conduit/ when source's snapshot collides", async () => {
+    // cloneConduitFolder copied the upstream's summary into both worktrees
+    // before source ran. Same content on both sides — that's the ordinary
+    // shape, not a sibling mutating someone else's summary.
+    await fs.mkdir(path.join(target, '.conduit'), { recursive: true });
+    await fs.writeFile(path.join(target, '.conduit', 'Triage.md'), '# Triage\n\nupstream\n');
+    await fs.mkdir(path.join(source, '.conduit'), { recursive: true });
+    await fs.writeFile(path.join(source, '.conduit', 'Triage.md'), '# Triage\n\nupstream\n');
+    // Source's session writes its own summary + a real change.
+    await fs.writeFile(path.join(source, '.conduit', 'Fix.md'), '# Fix\n');
+    await fs.writeFile(path.join(source, 'src', 'fix.ts'), 'export const fixed = true;\n');
+
+    await mergeWorktreeActivity({
+      runId: 'run-1',
+      sourceWorkspacePath: source,
+      targetWorkspacePath: target,
+      sourceNodeName: 'Fix',
+      targetNodeName: 'Triage',
+    });
+
+    await expect(fs.readFile(path.join(target, '.conduit', 'Triage.md'), 'utf8')).resolves.toContain(
+      'upstream',
+    );
+    await expect(fs.stat(path.join(target, '.conduit', 'Fix.md'))).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
+    await expect(fs.readFile(path.join(target, 'src', 'fix.ts'), 'utf8')).resolves.toContain(
+      'fixed = true',
+    );
+    const trackedConduit = (await git(target, 'ls-files', '--', '.conduit')).trim();
+    expect(trackedConduit).toBe('');
+    const historyConduit = (await git(target, 'log', '--', '.conduit')).trim();
+    expect(historyConduit).toBe('');
+  });
+});
