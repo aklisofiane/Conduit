@@ -20,28 +20,52 @@ Root configs: `turbo.json`, `tsconfig.base.json`, `vitest.workspace.ts`, `vitest
 
 ```
 src/
-  main.ts, app.module.ts, config.ts   Nest bootstrap
-  common/                              API-key guard, Zod body pipe, Prisma service,
+  main.ts, app.module.ts, config.ts   Nest bootstrap. main.ts mounts the Better Auth handler
+                                       at /api/auth/* BEFORE express.json() — the handler needs
+                                       the raw stream; webhook raw-body capture stays on the
+                                       express.json verify hook.
+  auth/                                Better Auth wiring. auth.config.ts builds the auth
+                                       instance (Prisma adapter + organization plugin) and ships
+                                       the signup-shim that creates a personal org and seeds
+                                       session.activeOrganizationId. better-auth.middleware.ts is
+                                       the Express adapter. session.guard.ts is the
+                                       @UseGuards(SessionGuard) replacement for the old API-key
+                                       guard. org-id.decorator.ts exposes @OrgId() — every guarded
+                                       controller forwards req.session.activeOrganizationId to
+                                       its service. auth.controller.ts serves the public
+                                       GET /api/auth-config. See design-docs/auth-integration.md
+                                       and design-docs/tenant-partitioning.md.
+  common/                              Zod body pipe, Prisma service,
                                        `load-json-dir.ts` (shared JSON-folder loader used by
                                        templates + agent-presets — read dir, parse-or-skip,
                                        Zod-issue formatter)
   redis/, temporal/                    clients shared across modules
   modules/
-    workflows/                         workflow CRUD, trigger-match, run dispatch
+    workflows/                         workflow CRUD + duplicate + webhook-secret PUT/DELETE
+                                       (encrypted Workflow.webhookSecret — single secret per
+                                       workflow, rotation overwrites)
     runs/                              run queries + Socket.IO gateway (runs.gateway.ts)
-    credentials/                       credential CRUD + AES-256-GCM (crypto.ts)
-    connections/                       per-workflow WorkflowConnection CRUD (alias → credential + optional
-                                       owner/repo + encrypted webhookSecret)
-    webhooks/                          POST /hooks/:workflowId — HMAC-verify, normalize, match, start run.
+    credentials/                       Credential CRUD + AES-256-GCM (crypto.ts) +
+                                       getConnectionBinding(connectionId) (Connection → Credential
+                                       join, returns parsed scope + decrypted token)
+    connections/                       global Connection CRUD over the typed scope union
+                                       (github_repo / github_projects_v2 / none); refuses delete
+                                       when any workflow's definition JSON references the row
+    trigger/                           POST /trigger/list-projects + /trigger/list-labels — top-level
+                                       config-time helpers; resolve a Connection, decrypt token,
+                                       call the GitHub Projects v2 / labels client
+    webhooks/                          POST /hooks/:workflowId — HMAC-verify against
+                                       Workflow.webhookSecret, normalize, match, start run.
                                        Reads the raw body captured in main.ts express.json verify hook.
     mcp/                               POST /mcp/introspect — live tools/list
     skills/                            GET /skills
     templates/                         template catalog: loads /templates/*.json at boot,
                                        expands `presetId` references via AgentPresetsService,
                                        GET /templates + POST /workflows/from-template/:id
-                                       (atomic $transaction creates all workflows in a bundle
-                                       + per-workflow connections for `new` bindings; polling
-                                       schedules upserted after commit)
+                                       (atomic $transaction materializes `new` bindings as
+                                       global Connection rows once, substitutes placeholder ids
+                                       into each workflow's definition, validates per-slot
+                                       scope kinds; polling schedules upserted after commit)
     agent-presets/                     preset catalog: loads /agent-presets/*.json at boot,
                                        GET /agent-presets[/:id]; consumed by TemplatesService
                                        for template expansion and by the canvas's agent
@@ -121,27 +145,45 @@ Image tag resolution: `CONDUIT_RUNNER_IMAGE` (CI sets a git-sha tag), defaults t
 ```
 src/
   main.tsx, routes/router.tsx
-  pages/                               HomePage, CanvasPage, RunDetailPage, CredentialsPage, ConnectionsPage
+  pages/                               HomePage, CanvasPage, RunDetailPage, CredentialsPage,
+                                       ConnectionsPage (global — typed scope picker on top of
+                                       Credential), AccountSettingsPage, SignInPage, SignUpPage,
+                                       ForgotPasswordPage, ResetPasswordPage
+                                       (auth pages — see docs/design-docs/web-auth-ui.md)
   components/
     canvas/                            TriggerNode, AgentNode, NodePalette, AgentConfigPanel,
-                                       TriggerConfigPanel (platform / connection / mode toggle /
-                                       event / interval / BoardRef / filter builder), McpServerPicker
+                                       TriggerConfigPanel (platform / stacked Repo + Board
+                                       connection sub-rows / mode toggle / event / interval /
+                                       filter builder), McpServerPicker
     run/                               RunTimeline (live trace), NodeSummary (.conduit/ body),
                                        ChangedFiles (workspace diff), NodeError (failure details) —
                                        tabs on the run detail page
     templates/                         TemplatePickerDialog — "From template" flow on the
                                        workflow list (template grid → per-placeholder
                                        connection binding → POST /workflows/from-template/:id)
-    layout/                            TopChrome (global topbar shell, reads slot store),
+    layout/                            TopChrome (global topbar shell, reads slot store; default
+                                       actionsSlot is UserMenuPill), AppLayout, AuthLayout
+                                       (unauthenticated centered-card shell), RequireAuth +
+                                       RedirectIfAuthed (session gates), UserMenuPill (default
+                                       topbar actions — name/email + popover with Account-settings
+                                       + Sign-out; see docs/design-docs/web-auth-ui.md),
                                        WorkflowActions, etc.
     ui/                                shadcn primitives
-  api/                                 HTTP client, TanStack Query hooks, response types
+  api/
+    client.ts, hooks.ts, types.ts      HTTP client (cookie-based, `credentials: 'include'`),
+                                       TanStack Query hooks, response types
+    auth-config.ts                     `useAuthConfig()` — TanStack hook over /api/auth-config
+                                       (deployment + oauthProviders); cached forever per page
   hooks/use-run-updates.ts             Socket.IO → TanStack cache bridge
   state/
     workflow-editor.ts                 Zustand store for the canvas
     topbar-slots.ts                    Zustand store + `useTopbarSlots()` hook — pages publish
                                        ReactNodes into the global topbar (see FRONTEND.md > Run detail)
-  lib/                                 cn, status, time helpers
+  lib/
+    cn.ts, status.ts, time.ts          formatting helpers
+    auth-client.ts                     Better Auth React client (createAuthClient against
+                                       apiBaseUrl); exports signIn / signUp / signOut /
+                                       useSession / requestPasswordReset / resetPassword
   styles/                              tokens.css (CSS vars), globals.css (@theme font bridge +
                                        component primitives), theme.ts (TS mirror + providerStyle).
                                        See docs/DESIGN.md.
@@ -155,7 +197,13 @@ Zod schemas + cross-process contracts. Domain directories line up with subpath e
 src/
   agent/      AgentEvent, provider contract types, `issue-writeback.ts`
               (per-agent allowlist for end-of-run GitHub issue updates)
-  trigger/    TriggerEvent + TriggerConfig (incl. `BoardRef` for Projects v2 polling),
+  connection/ ConnectionScope discriminated union (github_repo /
+              github_projects_v2 / none) + expectScopeKind helper. Used by
+              the API for connection CRUD validation and by the worker for
+              runtime narrowing (poll-board source vs board lookup,
+              repo-clone workspace owner/repo). Web-bundle safe.
+  trigger/    TriggerEvent + TriggerConfig (named `connectionId` +
+              optional `boardConnectionId` slots — no inline BoardRef),
               filter/match logic, `poll.ts` (PollWorkflowInput + PollCycleResult)
   mcp/        MCP server config + tool schemas
   workflow/   Workflow.definition JSON schema (nodes, edges, ui) + `identity.ts`
@@ -165,9 +213,12 @@ src/
               as a 400)
   template/   Template file schema (bundle of one or more workflow definitions)
               + `<alias>` placeholder detection + `resolveTemplate` (substitutes
-              placeholders with real WorkflowConnection cuids for instantiation)
-              + `expandTemplate` (rewrites `presetId`-using agents into the
-              runtime agent shape using a preset resolver)
+              placeholders with real Connection cuids for instantiation)
+              + `collectTemplatePlaceholderDetails` (per-slot expected scope
+              kinds — github_repo for triggers, github_projects_v2 for board
+              slots, 'any' for MCP) + `expandTemplate` (rewrites
+              `presetId`-using agents into the runtime agent shape using a
+              preset resolver)
   agent-preset/ AgentPreset file schema — id, name, category, provider, model,
               instructions (+ optional suggestedConstraints). Catalog data
               referenced by templates (via presetId) and the canvas picker

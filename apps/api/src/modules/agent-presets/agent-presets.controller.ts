@@ -1,8 +1,8 @@
 import { Controller, Get, Param, UseGuards } from '@nestjs/common';
-import { ApiKeyGuard } from '../../common/api-key.guard';
+import { SessionGuard } from '../../auth/session.guard';
 import { AgentPresetsService } from './agent-presets.service';
 
-@UseGuards(ApiKeyGuard)
+@UseGuards(SessionGuard)
 @Controller()
 export class AgentPresetsController {
   constructor(private readonly svc: AgentPresetsService) {}

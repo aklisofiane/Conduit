@@ -10,6 +10,7 @@ import { NestFactory } from '@nestjs/core';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import express, { type Request } from 'express';
 import { AppModule } from './app.module';
+import { betterAuthMiddleware } from './auth/better-auth.middleware';
 import { config } from './config';
 
 async function bootstrap(): Promise<void> {
@@ -22,6 +23,9 @@ async function bootstrap(): Promise<void> {
     logger: ['log', 'warn', 'error', 'debug'],
     bodyParser: false,
   });
+  // Better Auth needs the raw request stream — mount its handler BEFORE
+  // express.json() runs. Routes outside `/api/auth/*` fall through.
+  app.use('/api/auth', betterAuthMiddleware);
   // HMAC verification needs the exact bytes GitHub signed. Attach the raw
   // buffer during JSON parsing so the webhook controller can read it. Kept
   // on the Express request object to avoid poking into Nest internals.

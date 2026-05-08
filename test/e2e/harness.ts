@@ -13,8 +13,6 @@ import { TEST_STACK_ENV } from './stack';
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 
 export interface HarnessOptions {
-  /** API key used for requests + env. Tests share one key by default. */
-  apiKey?: string;
   /** Extra env vars merged into api + worker subprocesses. */
   extraEnv?: Record<string, string>;
 }
@@ -22,7 +20,9 @@ export interface HarnessOptions {
 export interface Harness {
   apiUrl: string;
   wsUrl: string;
-  apiKey: string;
+  /** Set-Cookie strings captured from the harness signup. Pass through to
+   *  Socket.IO `auth` payload or as a `Cookie` header on raw fetches. */
+  authCookie: string;
   stubScriptPath: string;
   /** Root dir used for workspace tmpdirs, base clones, etc. Same as CONDUIT_HOME env. */
   conduitHome: string;
@@ -66,7 +66,38 @@ export interface Harness {
    * checkout. Idempotent — pushing twice is fine.
    */
   seedRemoteBranch(owner: string, repo: string, branch: string): Promise<void>;
+  /**
+   * Sign up a second user (fresh email) and return their auth-cookie + http
+   * client. The signup-shim creates a personal organization for that user,
+   * so the returned client lives in a different `orgId` than the primary
+   * harness user — building block for cross-org E2E rejection assertions.
+   *
+   * Test-code only. No production endpoint added.
+   */
+  createSecondOrg(): Promise<{ authCookie: string; http: HttpClient }>;
+  /**
+   * Open a Socket.IO connection to `/runs?runId=<id>` with an arbitrary
+   * cookie (or none). Returns a probe with `waitForConnect` /
+   * `waitForDisconnect` / `framesReceived` / `close`. Used by the WS
+   * cross-org and no-cookie rejection tests.
+   */
+  connectSocket(runId: string, opts?: { cookie?: string }): SocketProbe;
   stop(): Promise<void>;
+}
+
+export interface SocketProbe {
+  /** Resolves once `connect` fires, rejects on timeout. */
+  waitForConnect(timeoutMs?: number): Promise<void>;
+  /**
+   * Resolves with the disconnect reason (or `'connect_error'`) once the
+   * socket loses its connection without a manual `close()`. Rejects on
+   * timeout.
+   */
+  waitForDisconnect(timeoutMs?: number): Promise<string>;
+  /** Snapshot of any `node-update` frames received so far. */
+  framesReceived(): RunUpdateMessage[];
+  /** Tear down the socket. */
+  close(): void;
 }
 
 export interface HttpClient {
@@ -83,7 +114,6 @@ export interface WsCollector {
 }
 
 export async function startHarness(opts: HarnessOptions = {}): Promise<Harness> {
-  const apiKey = opts.apiKey ?? 'test-api-key';
   const apiPort = await freePort();
   const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'conduit-e2e-'));
   const stubScriptPath = path.join(workspaceRoot, 'stub-script.json');
@@ -105,8 +135,10 @@ export async function startHarness(opts: HarnessOptions = {}): Promise<Harness> 
     ...TEST_STACK_ENV,
     CONDUIT_PROVIDER: 'stub',
     CONDUIT_STUB_SCRIPT: stubScriptPath,
-    CONDUIT_API_KEY: apiKey,
     CONDUIT_CORS_ORIGIN: 'http://localhost',
+    BETTER_AUTH_SECRET:
+      process.env.BETTER_AUTH_SECRET ??
+      'test-better-auth-secret-0123456789abcdef',
     API_PORT: String(apiPort),
     CONDUIT_HOME: path.join(workspaceRoot, 'conduit-home'),
     CONDUIT_TEST_REMOTE_BASE: remoteBase,
@@ -156,16 +188,26 @@ export async function startHarness(opts: HarnessOptions = {}): Promise<Harness> 
     throw err;
   }
 
-  const http = makeHttpClient(apiUrl, apiKey);
+  let authCookie: string;
+  try {
+    authCookie = await signUpAndCaptureCookie(apiUrl);
+  } catch (err) {
+    api.kill('SIGTERM');
+    worker.kill('SIGTERM');
+    await Promise.all([waitExit(api), waitExit(worker)]);
+    await fs.rm(workspaceRoot, { recursive: true, force: true });
+    throw err;
+  }
+  const http = makeHttpClient(apiUrl, authCookie);
 
   return {
     apiUrl,
     wsUrl: `${apiUrl}/runs`,
-    apiKey,
+    authCookie,
     stubScriptPath,
     conduitHome,
     http,
-    collectRun: (runId) => makeCollector(`${apiUrl}/runs`, runId),
+    collectRun: (runId) => makeCollector(`${apiUrl}/runs`, runId, authCookie),
     async setStubScript(script) {
       await fs.writeFile(stubScriptPath, JSON.stringify(script));
     },
@@ -184,6 +226,13 @@ export async function startHarness(opts: HarnessOptions = {}): Promise<Harness> 
     async seedRemoteBranch(owner, repo, branch) {
       return seedRemoteBranch(conduitHome, remoteBase, owner, repo, branch);
     },
+    async createSecondOrg() {
+      const otherCookie = await signUpAndCaptureCookie(apiUrl);
+      return { authCookie: otherCookie, http: makeHttpClient(apiUrl, otherCookie) };
+    },
+    connectSocket(runId, opts = {}) {
+      return makeSocketProbe(`${apiUrl}/runs`, runId, opts.cookie);
+    },
     async stop() {
       api.kill('SIGTERM');
       worker.kill('SIGTERM');
@@ -193,8 +242,8 @@ export async function startHarness(opts: HarnessOptions = {}): Promise<Harness> 
   };
 }
 
-function makeHttpClient(apiUrl: string, apiKey: string): HttpClient {
-  const headers = { 'content-type': 'application/json', 'x-api-key': apiKey };
+function makeHttpClient(apiUrl: string, authCookie: string): HttpClient {
+  const headers = { 'content-type': 'application/json', cookie: authCookie };
   async function call<T>(method: string, urlPath: string, body?: unknown): Promise<T> {
     const res = await fetch(`${apiUrl}/api${urlPath}`, {
       method,
@@ -215,12 +264,46 @@ function makeHttpClient(apiUrl: string, apiKey: string): HttpClient {
   };
 }
 
-function makeCollector(wsUrl: string, runId: string): WsCollector {
+/**
+ * Signs up a synthetic user against Better Auth's `/api/auth/sign-up/email`
+ * endpoint and returns the captured `Set-Cookie` header(s) joined with `; `.
+ * Each harness owns its own DB (via `TEST_STACK_ENV`), so a fresh email
+ * per harness is sufficient — no need to pre-clean the user table.
+ */
+async function signUpAndCaptureCookie(apiUrl: string): Promise<string> {
+  const email = `e2e-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@conduit.test`;
+  const res = await fetch(`${apiUrl}/api/auth/sign-up/email`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      email,
+      password: 'harness-password-123',
+      name: 'E2E Harness User',
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`sign-up/email → ${res.status}: ${await res.text()}`);
+  }
+  // Node's fetch exposes Set-Cookie as a single comma-joined header via .get(),
+  // but raw entries via .getSetCookie() preserve each cookie individually.
+  const setCookies =
+    typeof res.headers.getSetCookie === 'function'
+      ? res.headers.getSetCookie()
+      : ([res.headers.get('set-cookie')].filter(Boolean) as string[]);
+  if (setCookies.length === 0) {
+    throw new Error('sign-up/email returned no Set-Cookie header');
+  }
+  return setCookies.map((c) => c.split(';')[0]).join('; ');
+}
+
+function makeCollector(wsUrl: string, runId: string, authCookie: string): WsCollector {
   const frames: RunUpdateMessage[] = [];
   const socket: Socket = ioClient(wsUrl, {
     transports: ['websocket'],
     query: { runId },
     forceNew: true,
+    extraHeaders: { cookie: authCookie },
+    auth: { cookie: authCookie },
   });
   socket.on('node-update', (msg: RunUpdateMessage) => frames.push(msg));
 
@@ -248,6 +331,74 @@ function makeCollector(wsUrl: string, runId: string): WsCollector {
         };
         socket.on('node-update', onFrame);
       }),
+    close: () => {
+      socket.disconnect();
+    },
+  };
+}
+
+/**
+ * Lightweight Socket.IO probe — used by the cross-org / no-cookie rejection
+ * tests where we don't want to consume the connection as a frame collector
+ * and need explicit control over connect / disconnect / connect_error.
+ * Pass `undefined` cookie for the anonymous case.
+ */
+function makeSocketProbe(
+  wsUrl: string,
+  runId: string,
+  cookie: string | undefined,
+): SocketProbe {
+  const frames: RunUpdateMessage[] = [];
+  const socketOpts: Parameters<typeof ioClient>[1] = {
+    transports: ['websocket'],
+    query: { runId },
+    forceNew: true,
+    reconnection: false,
+  };
+  if (cookie) {
+    socketOpts.extraHeaders = { cookie };
+    socketOpts.auth = { cookie };
+  }
+  const socket: Socket = ioClient(wsUrl, socketOpts);
+  socket.on('node-update', (msg: RunUpdateMessage) => frames.push(msg));
+
+  return {
+    waitForConnect(timeoutMs = 5_000) {
+      return new Promise<void>((resolve, reject) => {
+        if (socket.connected) return resolve();
+        const timer = setTimeout(() => {
+          socket.off('connect', onConnect);
+          reject(new Error(`Timed out after ${timeoutMs}ms waiting for connect`));
+        }, timeoutMs);
+        const onConnect = (): void => {
+          clearTimeout(timer);
+          resolve();
+        };
+        socket.once('connect', onConnect);
+      });
+    },
+    waitForDisconnect(timeoutMs = 5_000) {
+      return new Promise<string>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          socket.off('disconnect', onDisconnect);
+          socket.off('connect_error', onConnectError);
+          reject(new Error(`Timed out after ${timeoutMs}ms waiting for disconnect`));
+        }, timeoutMs);
+        const onDisconnect = (reason: string): void => {
+          clearTimeout(timer);
+          socket.off('connect_error', onConnectError);
+          resolve(reason);
+        };
+        const onConnectError = (err: Error): void => {
+          clearTimeout(timer);
+          socket.off('disconnect', onDisconnect);
+          resolve(`connect_error:${err.message}`);
+        };
+        socket.once('disconnect', onDisconnect);
+        socket.once('connect_error', onConnectError);
+      });
+    },
+    framesReceived: () => [...frames],
     close: () => {
       socket.disconnect();
     },

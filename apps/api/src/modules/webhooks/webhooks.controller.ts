@@ -6,8 +6,8 @@ import {
 } from './webhooks.service';
 
 /**
- * Inbound webhooks. Deliberately NOT guarded by ApiKeyGuard — the platform
- * doesn't carry an API key. Authentication is HMAC-SHA256 over the raw
+ * Inbound webhooks. Deliberately NOT guarded by SessionGuard — the platform
+ * doesn't carry a session cookie. Authentication is HMAC-SHA256 over the raw
  * request body (see WebhooksService.verify and docs/SECURITY.md).
  *
  * Responses:

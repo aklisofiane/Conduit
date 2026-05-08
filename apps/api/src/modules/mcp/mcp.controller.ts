@@ -1,10 +1,10 @@
 import { Body, Controller, Post, UseGuards } from '@nestjs/common';
-import { ApiKeyGuard } from '../../common/api-key.guard';
+import { SessionGuard } from '../../auth/session.guard';
 import { ZodBodyPipe } from '../../common/zod-body.pipe';
 import { type IntrospectMcpDto, introspectMcpDtoSchema } from './dto';
 import { McpService } from './mcp.service';
 
-@UseGuards(ApiKeyGuard)
+@UseGuards(SessionGuard)
 @Controller('mcp')
 export class McpController {
   constructor(private readonly svc: McpService) {}

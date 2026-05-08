@@ -1,0 +1,176 @@
+import { betterAuth } from 'better-auth';
+import { prismaAdapter } from 'better-auth/adapters/prisma';
+import { organization } from 'better-auth/plugins';
+import { Redis } from 'ioredis';
+import { Logger } from '@nestjs/common';
+import { prisma } from '@conduit/database';
+import { config } from '../config';
+import { createBetterAuthRedisStorage } from '../redis/redis.service';
+import { AbuseSignalsService } from './abuse-signals';
+import { AuditLogService } from './audit-log.service';
+import { createAuditAfterMiddleware, createOrganizationAuditHooks } from './audit-hooks';
+import { rateLimitConfig } from './rate-limit-config';
+
+const githubOAuth = config.betterAuth.githubOAuth;
+
+export const oauthProviders: readonly string[] = githubOAuth ? ['github'] : [];
+
+/**
+ * Derive a deterministic personal-org name + slug from the user's email.
+ * Slug is `<localpart>-ws` plus a short random suffix to avoid the unique-
+ * constraint collision when two users share the same localpart on
+ * different domains (rare but possible). Polished naming + rename UI are
+ * `org-on-signup-and-switching`'s job; this is the minimal shim.
+ */
+function personalOrgFor(email: string): { name: string; slug: string } {
+  const localpart = email.split('@')[0] ?? 'user';
+  const cleanLocal = localpart.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'user';
+  const suffix = Math.random().toString(36).slice(2, 8);
+  return {
+    name: `${localpart}'s workspace`,
+    slug: `${cleanLocal}-${suffix}`,
+  };
+}
+
+/**
+ * Idempotent: returns the user's first existing org id, or creates a fresh
+ * personal org and returns its id. Called from `session.create.before` so
+ * brand-new users get an active org stamped on their very first session.
+ *
+ * Re-entrant on subsequent sessions for the same user (login again on a
+ * second device) — the early-return on existing membership keeps the
+ * shim from creating duplicate personal orgs.
+ */
+async function ensurePersonalOrgFor(userId: string): Promise<string> {
+  const existing = await prisma.member.findFirst({
+    where: { userId },
+    orderBy: { createdAt: 'asc' },
+    select: { organizationId: true },
+  });
+  if (existing) return existing.organizationId;
+  const user = await prisma.user.findUniqueOrThrow({
+    where: { id: userId },
+    select: { email: true },
+  });
+  const { name, slug } = personalOrgFor(user.email);
+  // `auth.api.createOrganization` accepts a `userId` for system invocations
+  // (no session yet), creates the org, and adds the user as `creatorRole`
+  // (default "owner") in one server call.
+  const org = await auth.api.createOrganization({
+    body: {
+      name,
+      slug,
+      userId,
+      keepCurrentActiveOrganization: false,
+    },
+  });
+  if (!org) {
+    throw new Error(`Failed to create personal org for user ${userId}`);
+  }
+  return org.id;
+}
+
+// Module-level Redis client used by Better Auth for `secondaryStorage`. We
+// don't reuse `RedisService` here because the Better Auth instance is itself
+// module-level (consumed by `better-auth.middleware.ts`, `session.guard.ts`,
+// and `ws-session.ts` at module load), and threading a Nest-DI'd service
+// through those imports would require restructuring three call sites for
+// no functional gain — the multiple Redis connections share the same Redis
+// instance, which is what "shared rate-limit counters" actually requires.
+// `RedisService.betterAuthSecondaryStorage()` exists for parity (and tests),
+// using the same `createBetterAuthRedisStorage` adapter.
+const betterAuthRedis = new Redis(config.redis.url, {
+  lazyConnect: false,
+  maxRetriesPerRequest: null,
+});
+
+// Audit log + abuse signals run against the singleton Prisma client. Better
+// Auth's hooks fire from the Express middleware (mounted before Nest's
+// controllers run), so a Nest-DI'd `AuditLogService` provider is for tests;
+// the production write path uses these direct instances. Both reach the same
+// Prisma connection pool — `PrismaService` re-uses `PrismaClient` and Prisma
+// keeps a single connection per `DATABASE_URL`.
+const auditLogService = new AuditLogService(prisma);
+const abuseSignalsService = new AbuseSignalsService(prisma);
+const auditHookDeps = { auditLog: auditLogService, abuseSignals: abuseSignalsService };
+const auditAfterMiddleware = createAuditAfterMiddleware(auditHookDeps);
+const organizationAuditHooks = createOrganizationAuditHooks(auditHookDeps);
+
+const bootLogger = new Logger('AuthConfig');
+bootLogger.log(
+  `Better Auth rate-limit mode=${config.deployment} storage=secondary-storage(redis)`,
+);
+
+export const auth = betterAuth({
+  database: prismaAdapter(prisma, { provider: 'postgresql' }),
+  secret: config.betterAuth.secret,
+  baseURL: config.betterAuth.baseURL,
+  trustedOrigins: [config.corsOrigin],
+  emailAndPassword: {
+    enabled: true,
+    // No email transport yet — see SPEC_PLAN cross-cutting note.
+    requireEmailVerification: false,
+  },
+  emailVerification: {
+    sendOnSignUp: false,
+  },
+  socialProviders: githubOAuth
+    ? {
+        github: {
+          clientId: githubOAuth.clientId,
+          clientSecret: githubOAuth.clientSecret,
+        },
+      }
+    : {},
+  // Redis-backed shared storage for rate-limit counters (and Better Auth's
+  // session-cache reads, when the latter is enabled). Hosted deployments
+  // running multiple API processes need a shared store so a flood across
+  // processes still trips the rate limit. If Redis is unreachable at boot,
+  // the ioredis client (above) throws synchronously, which fails the API
+  // process — same posture as `RedisService` for `RunsGateway`.
+  secondaryStorage: createBetterAuthRedisStorage(betterAuthRedis),
+  // Mode-aware rate limiting. Local: lenient. Hosted: tuned per the
+  // operational-hardening spec table. See `rate-limit-config.ts`.
+  rateLimit: rateLimitConfig(config.deployment),
+  // Audit-log writer. The path-dispatching middleware covers auth events
+  // (sign-in success/failure, sign-up, sign-out, password reset). Org-
+  // mutation events use the `organization` plugin's typed `organizationHooks`
+  // so we get `previousRole` / typed `member`/`organization` payloads
+  // without a synthetic re-query.
+  hooks: { after: auditAfterMiddleware },
+  // Auto-create one personal organization per new user and seed the
+  // session's `activeOrganizationId`. This is the minimum needed for the
+  // `@OrgId()` decorator to resolve on the user's first request after
+  // signup. Polished naming + rename UI + multi-org switching live in
+  // `org-on-signup-and-switching`.
+  //
+  // The work happens in `session.create.before` rather than
+  // `user.create.after`. Better Auth runs `*.after` hooks via
+  // `queueAfterTransactionHook`, which fires *after* `runWithTransaction`
+  // unwinds — by then the brand-new session row is already persisted with
+  // `activeOrganizationId = null`. By stamping the value during
+  // `session.create.before`, we set it on the row at insert time, so the
+  // very first cookie the client receives carries an active org and
+  // `@OrgId()` resolves on the first authenticated request.
+  databaseHooks: {
+    session: {
+      create: {
+        async before(session) {
+          const orgId = await ensurePersonalOrgFor(session.userId);
+          return {
+            data: {
+              ...session,
+              activeOrganizationId: orgId,
+            },
+          };
+        },
+      },
+    },
+  },
+  // Enabled here so the schema lands in one db:push. The signup-time shim
+  // that auto-creates a personal org + sets activeOrganizationId is owned
+  // by the data-model-partitioning sub-feature and lands separately.
+  plugins: [organization({ organizationHooks: organizationAuditHooks })],
+});
+
+export type Auth = typeof auth;

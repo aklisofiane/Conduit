@@ -1,0 +1,122 @@
+# Auth Integration
+
+How Conduit authenticates HTTP requests. The API embeds [Better Auth](https://better-auth.com/) for sign-up / sign-in / session storage, and a Nest guard (`SessionGuard`) replaces the old single-shared-API-key model on every protected route. This doc covers the mount, the guard, the public auth-config endpoint, and how the E2E harness signs in.
+
+Out of scope here:
+- Tenant scoping (`orgId` on Conduit models, `@OrgId()` decorator, signup-time shim) — see [tenant-partitioning.md](./tenant-partitioning.md).
+- Web login/signup UI — see [web-auth-ui.md](./web-auth-ui.md).
+- Socket.IO authentication on `RunsGateway`, the cross-org-404 convention, and the v1 RBAC stance — see [authorization-enforcement.md](./authorization-enforcement.md).
+- Rate limits, audit log, abuse signals — handled by `operational-hardening`.
+
+## Module layout
+
+`apps/api/src/auth/` is a peer of `common/`, `redis/`, `temporal/` — same shape as the rest of the API's infra modules.
+
+| File | Role |
+|---|---|
+| `auth.config.ts` | Configured Better Auth instance + `oauthProviders` list. Exports the `auth` singleton consumed by middleware, guard, and (later) the data-partitioning signup hook. |
+| `better-auth.middleware.ts` | Express adapter via `toNodeHandler(auth)`. Handles every `/api/auth/*` route. |
+| `session.guard.ts` | Nest `CanActivate` that calls `auth.api.getSession({ headers })`, attaches `req.user` + `req.session`, throws 401 on miss. |
+| `auth.controller.ts` | Public `GET /api/auth-config` — surfaces `{ deployment, oauthProviders }` so the web UI knows which buttons to render. |
+| `auth.module.ts` | `@Global()` Nest module. Exports `SessionGuard` and the `AUTH` symbol-keyed provider that hands out the `auth` instance. |
+| `types.ts` | Side-effect global `Express.Request` augmentation declaring `user` and `session`. |
+
+## Mount order in `main.ts`
+
+Better Auth needs the **raw** request stream — calling `express.json()` first would consume the body and the auth handler would hang on pending requests.
+
+```
+app.use('/api/auth', betterAuthMiddleware);   // raw body, no parsing
+app.use(express.json({ verify: rawBody }));   // everyone else
+app.use(express.urlencoded({ extended: true }));
+```
+
+The webhook controller (`POST /api/hooks/:workflowId`) still receives the raw bytes for HMAC via `verify: rawBody` — that flow is unchanged. Both Better Auth and the webhook HMAC-verifier are deliberately positioned around `express.json()` to preserve their respective raw-stream / raw-buffer needs.
+
+## Configuration
+
+`apps/api/src/config.ts`:
+
+| Field | Env | Default | Purpose |
+|---|---|---|---|
+| `deployment` | `CONDUIT_DEPLOYMENT` | `local` | `local \| hosted`. Drives rate-limit aggressiveness later — does **not** gate which providers exist. |
+| `betterAuth.secret` | `BETTER_AUTH_SECRET` | dev fallback | Signs session cookies. Required in prod; rotate to invalidate every session. |
+| `betterAuth.baseURL` | `BETTER_AUTH_URL` | `http://localhost:${port}` | Public origin used for OAuth redirect URIs. |
+| `betterAuth.githubOAuth` | `GITHUB_CLIENT_ID` + `GITHUB_CLIENT_SECRET` | undefined | GitHub OAuth surfaces only when **both** halves are set, in either deployment mode. |
+
+`auth.config.ts` wires those into Better Auth with the Prisma adapter, `emailAndPassword: { enabled: true, requireEmailVerification: false }`, `emailVerification.sendOnSignUp: false` (no email transport yet — tracked as a cross-cutting TODO), and the `organization()` plugin. The signup-time shim — `databaseHooks.user.create.after` creates a personal org, `databaseHooks.session.create.before` stamps `activeOrganizationId` onto new sessions — is **owned by tenant-partitioning** but lives in this same file because it's part of Better Auth config. See [tenant-partitioning.md](./tenant-partitioning.md#signup-time-shim).
+
+`oauthProviders` is computed once at module load: `['github']` when `githubOAuth` is set, `[]` otherwise. The auth controller returns it verbatim so the web client doesn't re-read env.
+
+## Guarded routes
+
+Every non-webhook controller carries `@UseGuards(SessionGuard)`:
+
+```
+workflows • runs • credentials • connections • templates •
+trigger • mcp • agent-presets • skills
+```
+
+`SessionGuard.canActivate`:
+
+1. Pulls `req.headers` and converts via Better Auth's `fromNodeHeaders` (Node `IncomingHttpHeaders` → Web `Headers`).
+2. Calls `await auth.api.getSession({ headers })`.
+3. Miss → `UnauthorizedException('Authentication required')` → 401.
+4. Hit → assigns `req.user = result.user`, `req.session = result.session`, returns true.
+
+`POST /api/hooks/:workflowId` deliberately stays unguarded — the platform doesn't carry a session cookie, and authentication runs through HMAC-SHA256 over the raw body inside `WebhooksService`.
+
+## Public `GET /api/auth-config`
+
+Returns `{ deployment: 'local' | 'hosted', oauthProviders: string[] }`. Not session-guarded — by definition, callers haven't authenticated yet. `web-auth-ui` will read this once at app start to decide whether to render the GitHub button.
+
+## Auth surface (Better Auth)
+
+Mounted under `/api/auth/*`. The endpoints relevant to first-party callers today:
+
+| Method | Path | Notes |
+|---|---|---|
+| `POST` | `/api/auth/sign-up/email` | Body `{ email, password, name }`. Sets `Set-Cookie: better-auth.session_token=…; HttpOnly; SameSite=Lax`. Returns `{ token, user }`. |
+| `POST` | `/api/auth/sign-in/email` | Same cookie shape. |
+| `POST` | `/api/auth/sign-out` | Clears the session row + cookie. |
+| `GET`  | `/api/auth/get-session` | Returns the active `{ user, session }` for the cookie or `null`. |
+
+The `organization` plugin contributes `/api/auth/organization/*` endpoints (create, list, set-active) — they're available now because the plugin is loaded, but Conduit doesn't call them until `data-model-partitioning` adds the signup-time shim and `org-on-signup-and-switching` adds the switcher UI.
+
+## Web client cookie flow
+
+`apps/web/src/api/client.ts` sets `credentials: 'include'` on every fetch — the browser attaches `better-auth.session_token` automatically. The Socket.IO client (`apps/web/src/hooks/use-run-updates.ts`) passes `withCredentials: true` for the same reason. Until `web-auth-ui` ships, there is no UI to obtain that cookie in a browser; the test harness is the only consumer that authenticates today.
+
+## E2E harness signup
+
+`test/e2e/harness.ts` creates one synthetic user per harness instance:
+
+1. `signUpAndCaptureCookie` POSTs `{ email: e2e-${ts}-${rand}@conduit.test, password: 'harness-password-123', name: 'E2E Harness User' }` to `/api/auth/sign-up/email`.
+2. Captures all `Set-Cookie` headers via `headers.getSetCookie()` (Node fetch — preserves multi-value cookies that `.get()` collapses).
+3. Joins the cookie names + values with `'; '` and exposes the result as `harness.authCookie`.
+4. `makeHttpClient` sends every request with `cookie: authCookie`.
+5. `makeCollector` (Socket.IO) attaches the same string via `extraHeaders.cookie`. The `auth.cookie` payload field is sent too, so `authorization-enforcement` can read it from `client.handshake.auth` later without changing the harness.
+
+Because each harness owns its own DB (via `TEST_STACK_ENV` → `docker-compose.test.yml`), a fresh email per harness is enough — no need to clean the `user` table between runs.
+
+## Data model
+
+The Better Auth section of `packages/database/prisma/schema.prisma` is generated by `npx @better-auth/cli generate` and pasted in. Better Auth populates these tables itself; **Conduit business code never reads or writes them directly** — go through the `auth` instance exposed via `AuthModule`.
+
+| Table | Owner | Notes |
+|---|---|---|
+| `user` | core | `id`, `name`, `email` (unique), `emailVerified`, `image`. |
+| `session` | core | `id`, `token` (unique), `userId`, `expiresAt`, plus `activeOrganizationId` contributed by the org plugin. |
+| `account` | core | OAuth provider linkage + hashed password row for email/password. |
+| `verification` | core | Email-verification / password-reset tokens (unused today). |
+| `organization` | org plugin | `id`, `name`, `slug` (unique), `metadata`. |
+| `member` | org plugin | `(userId, organizationId, role)`. |
+| `invitation` | org plugin | Pending org invitations. |
+
+See [data-model.md](../data-model.md) for the full schema text.
+
+## Handing off to next sub-features
+
+- The `auth` instance is exported as a `Symbol.for('conduit.auth')` provider (`AUTH`). The `databaseHooks` (signup → personal-org, session → `activeOrganizationId`) ship with `tenant-partitioning`; see [tenant-partitioning.md](./tenant-partitioning.md).
+- `req.session.activeOrganizationId` is read by `@OrgId()` (`apps/api/src/auth/org-id.decorator.ts`).
+- The harness already threads the cookie into Socket.IO's `auth` handshake payload — `authorization-enforcement` only needs to read it on the server side.

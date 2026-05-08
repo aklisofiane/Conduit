@@ -1,8 +1,8 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
 import { discoverSkills } from '@conduit/agent';
-import { ApiKeyGuard } from '../../common/api-key.guard';
+import { SessionGuard } from '../../auth/session.guard';
 
-@UseGuards(ApiKeyGuard)
+@UseGuards(SessionGuard)
 @Controller('skills')
 export class SkillsController {
   /**
