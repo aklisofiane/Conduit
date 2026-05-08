@@ -15,7 +15,7 @@ export default defineWorkspace([
     ...sharedVitestConfig,
     test: {
       name: 'unit',
-      include: ['packages/**/src/**/*.test.ts', 'apps/**/src/**/*.test.ts'],
+      include: ['packages/**/src/**/*.test.{ts,tsx}', 'apps/**/src/**/*.test.{ts,tsx}'],
       exclude: SHARED_TEST_EXCLUDE,
       testTimeout: 5_000,
     },
