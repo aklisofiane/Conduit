@@ -1,0 +1,37 @@
+{
+  "name": "Phase 4 polling — PR scope, ready_for_review",
+  "description": "Polls a GitHub Projects v2 board with `scope: pull_requests`, only firing on PRs that are marked ready for review.",
+  "definition": {
+    "triggers": [
+      {
+        "id": "trigger-phase4-pr",
+        "name": "Phase4PrTrigger",
+        "platform": "github",
+        "connectionId": "__placeholder__",
+        "mode": { "kind": "polling", "intervalSec": 3600, "scope": "pull_requests" },
+        "filters": [{ "field": "pr_state", "value": "ready_for_review" }],
+        "board": { "ownerType": "org", "owner": "acme", "number": 5 }
+      }
+    ],
+    "nodes": [
+      {
+        "id": "agent-review",
+        "name": "Review",
+        "provider": "claude",
+        "model": "stub-model",
+        "instructions": "Review the PR that just went ready.",
+        "mcpServers": [],
+        "skills": []
+      }
+    ],
+    "edges": [{ "from": "Phase4PrTrigger", "to": "Review" }],
+    "mcpServers": [],
+    "ui": {
+      "nodePositions": {
+        "Phase4PrTrigger": { "x": 80, "y": 120 },
+        "Review": { "x": 440, "y": 120 }
+      },
+      "viewport": { "x": 0, "y": 0, "zoom": 1 }
+    }
+  }
+}

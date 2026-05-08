@@ -149,6 +149,109 @@ describe('fetchProjectBoardItems', () => {
     ).rejects.toThrow(/Bad credentials/);
   });
 
+  it('populates `pr` with head/base refs and draft state for PullRequest items', async () => {
+    const canned = {
+      data: {
+        owner: {
+          projectV2: {
+            items: {
+              pageInfo: { hasNextPage: false, endCursor: null },
+              nodes: [
+                {
+                  id: 'PVTI_pr_draft',
+                  content: {
+                    __typename: 'PullRequest',
+                    id: 'PR_1',
+                    number: 7,
+                    title: 'WIP feature',
+                    url: 'https://github.com/acme/shop/pull/7',
+                    repository: { name: 'shop', owner: { login: 'acme' } },
+                    labels: { nodes: [{ name: 'enhancement' }] },
+                    isDraft: true,
+                    headRefName: 'feature-7',
+                    baseRefName: 'main',
+                    headRepository: { name: 'shop', owner: { login: 'acme' } },
+                  },
+                  fieldValues: { nodes: [] },
+                },
+                {
+                  id: 'PVTI_pr_ready_fork',
+                  content: {
+                    __typename: 'PullRequest',
+                    id: 'PR_2',
+                    number: 8,
+                    title: 'External contributor change',
+                    url: 'https://github.com/acme/shop/pull/8',
+                    repository: { name: 'shop', owner: { login: 'acme' } },
+                    labels: { nodes: [] },
+                    isDraft: false,
+                    headRefName: 'patch-1',
+                    baseRefName: 'main',
+                    headRepository: { name: 'shop', owner: { login: 'contributor' } },
+                  },
+                  fieldValues: { nodes: [] },
+                },
+              ],
+            },
+          },
+        },
+      },
+    };
+    const fakeFetch = makeFetch([canned]);
+    const items = await fetchProjectBoardItems(
+      { ownerType: 'org', owner: 'acme', projectNumber: 5, token: 't' },
+      fakeFetch,
+    );
+    expect(items[0]?.pr).toEqual({
+      headRef: 'feature-7',
+      baseRef: 'main',
+      state: 'draft',
+    });
+    // Same-repo PR: `headRepo` stays undefined so consumers can treat
+    // presence as the "fork PR" signal — matches the webhook-side semantic.
+    expect(items[0]?.pr?.headRepo).toBeUndefined();
+    expect(items[1]?.pr).toEqual({
+      headRef: 'patch-1',
+      baseRef: 'main',
+      state: 'ready_for_review',
+      headRepo: { owner: 'contributor', name: 'shop' },
+    });
+  });
+
+  it('does not populate `pr` for Issue items', async () => {
+    const canned = {
+      data: {
+        owner: {
+          projectV2: {
+            items: {
+              pageInfo: { hasNextPage: false, endCursor: null },
+              nodes: [
+                {
+                  id: 'PVTI_issue',
+                  content: {
+                    __typename: 'Issue',
+                    id: 'I_1',
+                    number: 1,
+                    title: 't',
+                    url: 'https://x',
+                    repository: { name: 'shop', owner: { login: 'acme' } },
+                  },
+                  fieldValues: { nodes: [] },
+                },
+              ],
+            },
+          },
+        },
+      },
+    };
+    const fakeFetch = makeFetch([canned]);
+    const items = await fetchProjectBoardItems(
+      { ownerType: 'org', owner: 'acme', projectNumber: 5, token: 't' },
+      fakeFetch,
+    );
+    expect(items[0]?.pr).toBeUndefined();
+  });
+
   it('sends Bearer auth + JSON Accept header', async () => {
     const canned = {
       data: {

@@ -46,7 +46,7 @@ describe('validateWorkflowDefinition', () => {
       nodes: [agentNode()],
       triggers: [
         trigger({
-          mode: { kind: 'polling', intervalSec: 60 },
+          mode: { kind: 'polling', intervalSec: 60, scope: 'issues' },
           filters: [{ field: 'status', value: 'Dev' }],
           board: { ownerType: 'org', owner: 'acme', number: 1 },
         }),

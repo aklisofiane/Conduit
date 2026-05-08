@@ -11,11 +11,13 @@ import { triggerSourceSchema } from '../platform/index';
  * (branch names, DB keys, Temporal workflow IDs) reads `issue.key`.
  *
  * `pr` is populated only on PR-shaped events (`pull_request.*` and PR-scoped
- * `issue_comment.created`). It carries the head/base refs the workspace
- * manager needs to land directly on the PR's branch — `ticket-branch`'s
- * PR arm uses `pr.headRef` instead of deriving a `conduit/<id>-<slug>` name.
- * `issue` continues to be populated for PR events so trigger filters that
- * key on `issue.key` keep working unchanged.
+ * `issue_comment.created` webhooks, plus polling triggers with
+ * `mode.scope === 'pull_requests'` which emit `pull_request.detected`). It
+ * carries the head/base refs the workspace manager needs to land directly on
+ * the PR's branch — `ticket-branch`'s PR arm uses `pr.headRef` instead of
+ * deriving a `conduit/<id>-<slug>` name. `issue` continues to be populated
+ * for PR events so trigger filters that key on `issue.key` keep working
+ * unchanged.
  */
 export const triggerEventSchema = z.object({
   source: triggerSourceSchema,

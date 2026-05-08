@@ -2,13 +2,11 @@ import { WorkflowExecutionAlreadyStartedError } from '@temporalio/client';
 import {
   AGENT_WORKFLOW_TYPE,
   agentWorkflowId,
-  applyFilter,
   matchesTrigger,
   ticketLockFor,
   type PollCycleResult,
   type PollWorkflowInput,
   type TriggerEvent,
-  type TriggerFilter,
   type WorkflowDefinition,
   workflowDefinitionSchema,
 } from '@conduit/shared';
@@ -16,11 +14,9 @@ import { decryptSecret, loadEncryptionKey } from '@conduit/shared/crypto';
 import { config } from '../config';
 import { prisma } from '../runtime/prisma';
 import { writeSystemLog } from '../runtime/log-writer';
-import {
-  fetchProjectBoardItems,
-  type ProjectBoardItem,
-} from '@conduit/shared/platform';
+import { fetchProjectBoardItems } from '@conduit/shared/platform';
 import { getTemporalClient } from '../runtime/temporal-client';
+import { itemPassesFilters, toTriggerEvent } from './poll-board-helpers';
 
 /**
  * One poll cycle. Diffs the current matching set against `PollSnapshot`;
@@ -80,7 +76,14 @@ export async function pollBoardActivity(
   });
   const fetchedCount = items.length;
 
-  const matching = items.filter((item) => itemPassesFilters(item, trigger.filters));
+  // Scope-filter against contentType so issue triggers never see PRs (and
+  // drafts) and PR triggers never see issues. Defaults to 'issues' via the
+  // Zod default for triggers persisted before scope existed.
+  const scope = trigger.mode.scope;
+  const wantedContentType = scope === 'pull_requests' ? 'PullRequest' : 'Issue';
+  const inScopeItems = items.filter((item) => item.contentType === wantedContentType);
+
+  const matching = inScopeItems.filter((item) => itemPassesFilters(item, trigger.filters));
   const matchingIds = matching.map((item) => item.itemNodeId).sort();
 
   const previousIds = readPreviousIds(wf.pollSnapshot?.matchingIds);
@@ -91,7 +94,7 @@ export async function pollBoardActivity(
   // Second gate: the platform query filters by the API's current view, but
   // `matchesTrigger` also enforces platform + filter-field parity against
   // the normalized event. Cheap belt-and-braces.
-  const candidateEvents = newItems.map((item) => toTriggerEvent(item));
+  const candidateEvents = newItems.map((item) => toTriggerEvent(item, scope));
   const eventsToStart = candidateEvents.filter((event) => matchesTrigger(event, trigger));
   const gatedOutCount = candidateEvents.length - eventsToStart.length;
 
@@ -153,49 +156,6 @@ function readPreviousIds(raw: unknown): string[] {
   return raw.filter((v): v is string => typeof v === 'string');
 }
 
-/**
- * Build the `FilterView` for a project board item and run the trigger's
- * filters against it. Mirrors the webhook-side flatten+apply dance in
- * `matchesTrigger` so a single filter set works in either mode.
- */
-function itemPassesFilters(item: ProjectBoardItem, filters: TriggerFilter[]): boolean {
-  const view = {
-    status: item.singleSelectValues.Status,
-    labels: item.labels,
-  };
-  return filters.every((f) => applyFilter(view, f));
-}
-
-function toTriggerEvent(item: ProjectBoardItem): TriggerEvent {
-  const payload: Record<string, unknown> = {
-    projectItemNodeId: item.itemNodeId,
-    singleSelectValues: item.singleSelectValues,
-    contentNodeId: item.contentNodeId,
-    contentType: item.contentType,
-  };
-  // Surface Status directly on the payload so filter-flattener picks it up
-  // and so downstream agents see the column name without having to dig.
-  if (item.singleSelectValues.Status) {
-    payload.status = item.singleSelectValues.Status;
-  }
-
-  const event: TriggerEvent = {
-    source: 'github',
-    mode: 'polling',
-    event: 'board.column.changed',
-    payload,
-  };
-  if (item.repo) event.repo = item.repo;
-  if (item.contentNodeId && item.contentKey && item.contentTitle && item.contentUrl) {
-    event.issue = {
-      id: item.contentNodeId,
-      key: item.contentKey,
-      title: item.contentTitle,
-      url: item.contentUrl,
-    };
-  }
-  return event;
-}
 
 type StartOutcome =
   | { ok: true; runId: string }

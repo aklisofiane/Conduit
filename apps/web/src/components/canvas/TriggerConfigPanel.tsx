@@ -47,6 +47,18 @@ export function TriggerConfigPanel({
     (trigger.mode.kind === 'webhook' &&
       trigger.mode.event === 'board.column.changed');
 
+  const pollingScope =
+    trigger.mode.kind === 'polling' ? trigger.mode.scope : undefined;
+
+  // One-shot notice for filters dropped on scope flip. Cleared after a few
+  // seconds so it doesn't persist across unrelated edits.
+  const [filterNotice, setFilterNotice] = useState<string | null>(null);
+  useEffect(() => {
+    if (!filterNotice) return;
+    const handle = window.setTimeout(() => setFilterNotice(null), 5000);
+    return () => window.clearTimeout(handle);
+  }, [filterNotice]);
+
   // Coalesce keystrokes so typing "acme" doesn't re-key the query four times.
   const [debouncedOwner, setDebouncedOwner] = useState(owner);
   useEffect(() => {
@@ -83,12 +95,23 @@ export function TriggerConfigPanel({
           kind: 'webhook',
           event: trigger.platform === 'github' ? 'issues.opened' : '',
         },
+        filters: dropFiltersForScope(trigger.filters, 'webhook', null, setFilterNotice),
       });
     } else {
       onChange({
-        mode: { kind: 'polling', intervalSec: 60 },
+        mode: { kind: 'polling', intervalSec: 60, scope: 'issues' },
+        filters: dropFiltersForScope(trigger.filters, 'polling', 'issues', setFilterNotice),
       });
     }
+  };
+
+  const setScope = (scope: 'issues' | 'pull_requests') => {
+    if (trigger.mode.kind !== 'polling') return;
+    if (trigger.mode.scope === scope) return;
+    onChange({
+      mode: { ...trigger.mode, scope },
+      filters: dropFiltersForScope(trigger.filters, 'polling', scope, setFilterNotice),
+    });
   };
 
   const setBoard = (patch: Partial<BoardRef>) => {
@@ -205,24 +228,42 @@ export function TriggerConfigPanel({
           )}
 
           {trigger.mode.kind === 'polling' && (
-            <Field label="Interval" hint="seconds between poll cycles">
-              <input
-                className="field-input"
-                type="number"
-                min={10}
-                step={10}
-                value={trigger.mode.intervalSec}
-                onChange={(e) =>
-                  onChange({
-                    mode: {
-                      ...trigger.mode,
-                      kind: 'polling',
-                      intervalSec: Math.max(10, Number(e.target.value) || 60),
-                    },
-                  })
-                }
-              />
-            </Field>
+            <>
+              <Field label="Scope" hint="what the poller pulls from the board">
+                <div className="grid grid-cols-2 gap-2">
+                  <ModeButton
+                    active={trigger.mode.scope === 'issues'}
+                    onClick={() => setScope('issues')}
+                    label="Issues"
+                    hint="board issues only"
+                  />
+                  <ModeButton
+                    active={trigger.mode.scope === 'pull_requests'}
+                    onClick={() => setScope('pull_requests')}
+                    label="Pull requests"
+                    hint="board PRs only"
+                  />
+                </div>
+              </Field>
+              <Field label="Interval" hint="seconds between poll cycles">
+                <input
+                  className="field-input"
+                  type="number"
+                  min={10}
+                  step={10}
+                  value={trigger.mode.intervalSec}
+                  onChange={(e) => {
+                    if (trigger.mode.kind !== 'polling') return;
+                    onChange({
+                      mode: {
+                        ...trigger.mode,
+                        intervalSec: Math.max(10, Number(e.target.value) || 60),
+                      },
+                    });
+                  }}
+                />
+              </Field>
+            </>
           )}
 
           {(trigger.mode.kind === 'polling' ||
@@ -280,10 +321,16 @@ export function TriggerConfigPanel({
           <Field label="Filters" hint="AND-combined — an event must pass all">
             <FilterEditor
               filters={trigger.filters}
+              scope={pollingScope ?? null}
               statusOptions={statusOptions}
               labelOptions={labelOptions}
               onChange={(filters) => onChange({ filters })}
             />
+            {filterNotice && (
+              <div className="mt-2 font-mono text-[11px] text-[var(--color-text-muted)]">
+                {filterNotice}
+              </div>
+            )}
           </Field>
         </div>
       </div>
@@ -300,13 +347,61 @@ export function TriggerConfigPanel({
   );
 }
 
+/** Filter fields offered for a given trigger context. */
+function fieldsForContext(
+  scope: 'issues' | 'pull_requests' | null,
+): Array<TriggerFilter['field']> {
+  if (scope === 'pull_requests') return ['pr_state', 'label'];
+  return ['status', 'label'];
+}
+
+const FIELD_LABELS: Record<TriggerFilter['field'], string> = {
+  status: 'Status',
+  label: 'Label',
+  pr_state: 'PR state',
+};
+
+function emptyFilter(field: TriggerFilter['field']): TriggerFilter {
+  if (field === 'pr_state') return { field: 'pr_state', value: 'any' };
+  return { field, value: '' };
+}
+
+/**
+ * Drop filters whose `field` isn't offered under the new scope. Surfaces a
+ * one-shot notice via `setNotice` so users see what happened. `scope` is
+ * null for webhook mode (where pr_state isn't offered either).
+ */
+function dropFiltersForScope(
+  filters: TriggerFilter[],
+  modeKind: 'polling' | 'webhook',
+  scope: 'issues' | 'pull_requests' | null,
+  setNotice: (message: string) => void,
+): TriggerFilter[] {
+  const offered = new Set<TriggerFilter['field']>(
+    modeKind === 'webhook' ? ['status', 'label'] : fieldsForContext(scope),
+  );
+  const kept: TriggerFilter[] = [];
+  const dropped: TriggerFilter[] = [];
+  for (const f of filters) {
+    if (offered.has(f.field)) kept.push(f);
+    else dropped.push(f);
+  }
+  if (dropped.length > 0) {
+    const labels = dropped.map((f) => FIELD_LABELS[f.field]).join(', ');
+    setNotice(`Dropped ${dropped.length} filter${dropped.length === 1 ? '' : 's'} not available in this scope: ${labels}.`);
+  }
+  return kept;
+}
+
 function FilterEditor({
   filters,
+  scope,
   statusOptions,
   labelOptions,
   onChange,
 }: {
   filters: TriggerFilter[];
+  scope: 'issues' | 'pull_requests' | null;
   statusOptions: string[];
   labelOptions: string[];
   onChange: (filters: TriggerFilter[]) => void;
@@ -314,7 +409,8 @@ function FilterEditor({
   const replaceAt = (i: number, next: TriggerFilter) =>
     onChange(filters.map((f, idx) => (idx === i ? next : f)));
   const removeAt = (i: number) => onChange(filters.filter((_, idx) => idx !== i));
-  const add = () => onChange([...filters, { field: 'status', value: '' }]);
+  const offeredFields = fieldsForContext(scope);
+  const add = () => onChange([...filters, emptyFilter(offeredFields[0]!)]);
 
   return (
     <div className="space-y-2">
@@ -327,6 +423,7 @@ function FilterEditor({
         <FilterRow
           key={i}
           filter={f}
+          offeredFields={offeredFields}
           statusOptions={statusOptions}
           labelOptions={labelOptions}
           onReplace={(next) => replaceAt(i, next)}
@@ -342,12 +439,14 @@ function FilterEditor({
 
 function FilterRow({
   filter,
+  offeredFields,
   statusOptions,
   labelOptions,
   onReplace,
   onRemove,
 }: {
   filter: TriggerFilter;
+  offeredFields: Array<TriggerFilter['field']>;
   statusOptions: string[];
   labelOptions: string[];
   onReplace: (next: TriggerFilter) => void;
@@ -355,8 +454,15 @@ function FilterRow({
 }) {
   const setKind = (next: TriggerFilter['field']) => {
     if (next === filter.field) return;
-    onReplace({ field: next, value: '' });
+    onReplace(emptyFilter(next));
   };
+
+  // When a filter row's field isn't in the current scope's offered set
+  // (e.g. a stale `status` row mid-edit), show it as a synthetic option so
+  // the user can still see/change it instead of a silent reset.
+  const fieldDropdownOptions = offeredFields.includes(filter.field)
+    ? offeredFields
+    : [filter.field, ...offeredFields];
 
   return (
     <div className="grid grid-cols-[100px_1fr_28px] gap-1.5 rounded-[var(--radius)] border border-[var(--color-divider)] bg-[var(--color-pill-bg)] p-1.5">
@@ -365,23 +471,43 @@ function FilterRow({
         value={filter.field}
         onChange={(e) => setKind(e.target.value as TriggerFilter['field'])}
       >
-        <option value="status">Status</option>
-        <option value="label">Label</option>
+        {fieldDropdownOptions.map((f) => (
+          <option key={f} value={f}>
+            {FIELD_LABELS[f]}
+          </option>
+        ))}
       </select>
-      {filter.field === 'status' ? (
+      {filter.field === 'status' && (
         <OptionsValueInput
           value={filter.value}
           options={statusOptions}
           emptyHint="(pick a board to load Status options)"
           onChange={(value) => onReplace({ field: 'status', value })}
         />
-      ) : (
+      )}
+      {filter.field === 'label' && (
         <OptionsValueInput
           value={filter.value}
           options={labelOptions}
           emptyHint="(no labels — pick a connection bound to a repo)"
           onChange={(value) => onReplace({ field: 'label', value })}
         />
+      )}
+      {filter.field === 'pr_state' && (
+        <select
+          className="field-input"
+          value={filter.value}
+          onChange={(e) =>
+            onReplace({
+              field: 'pr_state',
+              value: e.target.value as 'draft' | 'ready_for_review' | 'any',
+            })
+          }
+        >
+          <option value="any">Any state</option>
+          <option value="draft">Draft only</option>
+          <option value="ready_for_review">Ready for review only</option>
+        </select>
       )}
       <button
         className="btn"

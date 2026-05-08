@@ -50,7 +50,7 @@ describe('matchesTrigger', () => {
         { ...BASE_EVENT, mode: 'polling', event: 'status.changed' },
         {
           ...BASE_TRIGGER,
-          mode: { kind: 'polling', intervalSec: 60 },
+          mode: { kind: 'polling', intervalSec: 60, scope: 'issues' },
         },
       ),
     ).toBe(true);
@@ -154,10 +154,63 @@ describe('matchesTrigger', () => {
     };
     const trigger: TriggerConfig = {
       ...BASE_TRIGGER,
-      mode: { kind: 'polling', intervalSec: 60 },
+      mode: { kind: 'polling', intervalSec: 60, scope: 'issues' },
       filters: [{ field: 'status', value: 'Dev' }],
     };
     expect(matchesTrigger(pollingEvent, trigger)).toBe(true);
+  });
+
+  it('matches a polling-PR event via `pr_state = ready_for_review`', () => {
+    const event: TriggerEvent = {
+      source: 'github',
+      mode: 'polling',
+      event: 'pull_request.detected',
+      payload: { prState: 'ready_for_review' },
+      issue: { id: 'PR_1', key: '7', title: 't', url: 'https://x' },
+      pr: { headRef: 'feature-x', baseRef: 'main' },
+    };
+    const trigger: TriggerConfig = {
+      ...BASE_TRIGGER,
+      mode: { kind: 'polling', intervalSec: 60, scope: 'pull_requests' },
+      filters: [{ field: 'pr_state', value: 'ready_for_review' }],
+    };
+    expect(matchesTrigger(event, trigger)).toBe(true);
+  });
+
+  it('rejects a polling-PR event whose pr_state mismatches', () => {
+    const draftEvent: TriggerEvent = {
+      source: 'github',
+      mode: 'polling',
+      event: 'pull_request.detected',
+      payload: { prState: 'draft' },
+      pr: { headRef: 'feature-x', baseRef: 'main' },
+    };
+    const trigger: TriggerConfig = {
+      ...BASE_TRIGGER,
+      mode: { kind: 'polling', intervalSec: 60, scope: 'pull_requests' },
+      filters: [{ field: 'pr_state', value: 'ready_for_review' }],
+    };
+    expect(matchesTrigger(draftEvent, trigger)).toBe(false);
+  });
+
+  it('pr_state: any always matches regardless of payload state', () => {
+    const draftEvent: TriggerEvent = {
+      source: 'github',
+      mode: 'polling',
+      event: 'pull_request.detected',
+      payload: { prState: 'draft' },
+    };
+    const readyEvent: TriggerEvent = {
+      ...draftEvent,
+      payload: { prState: 'ready_for_review' },
+    };
+    const trigger: TriggerConfig = {
+      ...BASE_TRIGGER,
+      mode: { kind: 'polling', intervalSec: 60, scope: 'pull_requests' },
+      filters: [{ field: 'pr_state', value: 'any' }],
+    };
+    expect(matchesTrigger(draftEvent, trigger)).toBe(true);
+    expect(matchesTrigger(readyEvent, trigger)).toBe(true);
   });
 });
 
@@ -189,5 +242,33 @@ describe('applyFilter', () => {
 
   it('label — empty labels view never matches', () => {
     expect(applyFilter({ labels: [] }, { field: 'label', value: 'bug' })).toBe(false);
+  });
+
+  it('pr_state — exact match', () => {
+    const prView: FilterView = { labels: [], prState: 'ready_for_review' };
+    expect(
+      applyFilter(prView, { field: 'pr_state', value: 'ready_for_review' }),
+    ).toBe(true);
+    expect(applyFilter(prView, { field: 'pr_state', value: 'draft' })).toBe(false);
+  });
+
+  it('pr_state — `any` always matches', () => {
+    const draftView: FilterView = { labels: [], prState: 'draft' };
+    const readyView: FilterView = { labels: [], prState: 'ready_for_review' };
+    const noneView: FilterView = { labels: [] };
+    expect(applyFilter(draftView, { field: 'pr_state', value: 'any' })).toBe(true);
+    expect(applyFilter(readyView, { field: 'pr_state', value: 'any' })).toBe(true);
+    // Even when prState is undefined (e.g. an issue-shaped event leaking
+    // through), `any` short-circuits to true.
+    expect(applyFilter(noneView, { field: 'pr_state', value: 'any' })).toBe(true);
+  });
+
+  it('pr_state — undefined prState fails for concrete values (webhook-side fail-closed)', () => {
+    expect(
+      applyFilter({ labels: [] }, { field: 'pr_state', value: 'draft' }),
+    ).toBe(false);
+    expect(
+      applyFilter({ labels: [] }, { field: 'pr_state', value: 'ready_for_review' }),
+    ).toBe(false);
   });
 });

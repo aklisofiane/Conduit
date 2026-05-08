@@ -10,6 +10,8 @@ import type { TriggerFilter } from './filter';
 export interface FilterView {
   status?: string;
   labels: string[];
+  /** Set by the polling poller for `scope: 'pull_requests'` items. */
+  prState?: 'draft' | 'ready_for_review';
 }
 
 export function matchesTrigger(event: TriggerEvent, trigger: TriggerConfig): boolean {
@@ -33,6 +35,9 @@ export function applyFilter(view: FilterView, filter: TriggerFilter): boolean {
       return view.status === filter.value;
     case 'label':
       return view.labels.includes(filter.value);
+    case 'pr_state':
+      if (filter.value === 'any') return true;
+      return view.prState === filter.value;
     default: {
       const _exhaustive: never = filter;
       return _exhaustive;
@@ -41,10 +46,15 @@ export function applyFilter(view: FilterView, filter: TriggerFilter): boolean {
 }
 
 function flattenEventForFilters(event: TriggerEvent): FilterView {
-  return {
+  const view: FilterView = {
     status: getStatus(event.payload),
     labels: getLabels(event.payload),
   };
+  const prState = (event.payload as { prState?: unknown }).prState;
+  if (prState === 'draft' || prState === 'ready_for_review') {
+    view.prState = prState;
+  }
+  return view;
 }
 
 function getLabels(payload: Record<string, unknown>): string[] {

@@ -23,7 +23,10 @@ type TriggerConfig = {
 
 type TriggerMode =
   | { kind: 'webhook'; event: string }        // platform pushes events (e.g. 'issues.opened', 'board.column.changed')
-  | { kind: 'polling'; intervalSec: number }; // Conduit polls the board API on an interval (default 60s)
+  | { kind: 'polling';                        // Conduit polls the board API on an interval (default 60s)
+      intervalSec: number;
+      scope: 'issues' | 'pull_requests';      // what the poller pulls from the board (default 'issues')
+    };
 
 type BoardRef = {
   ownerType: 'user' | 'org';  // GitHub Projects v2 are owned by a user or an org
@@ -32,17 +35,30 @@ type BoardRef = {
 };
 
 type TriggerFilter =
-  | { field: 'status'; value: string }   // exact match against the issue/PR's Status column
-  | { field: 'label'; value: string };   // membership: row matches if `value` is in the issue's labels
+  | { field: 'status'; value: string }                                    // exact match against the issue/PR's Status column
+  | { field: 'label'; value: string }                                     // membership: row matches if `value` is in the issue's labels
+  | { field: 'pr_state'; value: 'draft' | 'ready_for_review' | 'any' };   // polling + scope=pull_requests only
 
-// Both shapes are single-valued strings. Multiple filters on the same trigger combine with AND;
+// `status`/`label` are single-valued strings. Multiple filters on the same trigger combine with AND;
 // to require multiple labels, add multiple label rows. The matcher safe-fails on empty `value` so
 // in-progress UI rows are persistable without ever matching.
+//
+// `pr_state` matches the PR's draft state. `'any'` is an explicit always-match (so the UI can show
+// a selected value rather than leaning on absence-of-row to mean match-all). Filter availability is
+// scope-aware in the UI: issue triggers offer `status` + `label`; PR triggers offer `pr_state` +
+// `label`. The schema accepts all three regardless of mode — per-scope exclusion is a UI concern.
 ```
 
 **Webhook mode**: platform sends an event to `POST /api/hooks/:workflowId`. Conduit verifies the signature, normalizes the event, checks filters, and triggers a run if matched. GitHub webhooks currently normalize four events: `issues.opened`, `pull_request.opened`, `issue_comment.created` (PR-scoped), and `board.column.changed` (from `projects_v2_item.edited` single-select field moves). The `board.column.changed` webhook carries only the Projects v2 item's `content_node_id` — no issue number — so it can't drive a workflow on its own; polling is the supported mode for board-driven flows.
 
 **Polling mode**: a Temporal Schedule fires `pollWorkflow` every `intervalSec` seconds. The activity queries the platform API (GitHub Projects v2 GraphQL for v1 — the `TriggerConfig.board` reference picks which project), filters on the returned items, and triggers a run for each matching item that hasn't been processed for this specific transition yet. Polling mode **requires** `TriggerConfig.board` — the poller has nothing to query without it. See [agent-execution.md](./agent-execution.md#polling-pipeline) for the activity lifecycle.
+
+`mode.scope` splits polling into two non-overlapping sub-modes:
+
+- `'issues'` (default) — the poller keeps board items whose `contentType === 'Issue'` and emits `event === 'board.column.changed'` on each new match. Drafts (`DraftIssue`) are filtered out for free, fixing a long-standing footgun where they reached the agent without an issue number.
+- `'pull_requests'` — the poller keeps PR items, populates the `TriggerEvent.pr` head/base refs (so the workspace manager lands on the PR's branch instead of `conduit/<id>-<slug>`), and emits `event === 'pull_request.detected'`. The new event name is polling-only — webhook PR events keep `pull_request.opened` so consumers can distinguish "GitHub pushed us at PR open" from "the polling tick saw the PR enter the matching set."
+
+`scope` defaults to `'issues'` via the Zod default, so triggers persisted before this field round-trip to the existing behavior.
 
 #### Dedup for polling
 

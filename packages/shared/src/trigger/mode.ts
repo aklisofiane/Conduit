@@ -5,7 +5,10 @@ import { z } from 'zod';
  *
  * - `webhook` — platform pushes events to `POST /api/hooks/:workflowId`.
  * - `polling` — Conduit polls the platform API every `intervalSec` seconds,
- *   diffing results against the last `PollSnapshot` for dedup.
+ *   diffing results against the last `PollSnapshot` for dedup. `scope`
+ *   targets either issues or pull requests on the configured project board;
+ *   defaults to `'issues'` so triggers persisted before this field round-trip
+ *   to the existing behavior.
  */
 export const triggerModeSchema = z.discriminatedUnion('kind', [
   z.object({
@@ -15,6 +18,7 @@ export const triggerModeSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('polling'),
     intervalSec: z.number().int().positive(),
+    scope: z.enum(['issues', 'pull_requests']).default('issues'),
   }),
 ]);
 export type TriggerMode = z.infer<typeof triggerModeSchema>;

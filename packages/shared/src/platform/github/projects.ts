@@ -33,6 +33,17 @@ export interface ProjectBoardItem {
   singleSelectValues: Record<string, string>;
   /** Issue/PR label names. Empty for draft items or content with no labels. */
   labels: string[];
+  /**
+   * PR-specific fields. Populated only when `contentType === 'PullRequest'`
+   * and the GraphQL response carried head/base ref names. Polling-of-PRs
+   * needs this to land on the PR's branch and to drive the `pr_state` filter.
+   */
+  pr?: {
+    headRef: string;
+    baseRef: string;
+    headRepo?: { owner: string; name: string };
+    state: 'draft' | 'ready_for_review';
+  };
 }
 
 export interface ListProjectBoardsQuery {
@@ -102,6 +113,11 @@ interface RawProjectItem {
         url?: string;
         repository?: { name: string; owner: { login: string } };
         labels?: { nodes: Array<{ name?: string } | null> };
+        // PullRequest-only fields
+        isDraft?: boolean;
+        headRefName?: string;
+        baseRefName?: string;
+        headRepository?: { name: string; owner: { login: string } } | null;
       };
   fieldValues: {
     nodes: Array<
@@ -147,6 +163,10 @@ function buildItemsQuery(ownerType: 'user' | 'org'): string {
                   url
                   repository { name owner { login } }
                   labels(first: 20) { nodes { name } }
+                  isDraft
+                  headRefName
+                  baseRefName
+                  headRepository { name owner { login } }
                 }
                 ... on DraftIssue {
                   id
@@ -347,6 +367,32 @@ function toItem(raw: RawProjectItem): ProjectBoardItem {
     for (const node of content.labels.nodes) {
       if (node?.name) item.labels.push(node.name);
     }
+  }
+  if (
+    content.__typename === 'PullRequest' &&
+    typeof content.headRefName === 'string' &&
+    typeof content.baseRefName === 'string'
+  ) {
+    const pr: NonNullable<ProjectBoardItem['pr']> = {
+      headRef: content.headRefName,
+      baseRef: content.baseRefName,
+      state: content.isDraft ? 'draft' : 'ready_for_review',
+    };
+    // Match the webhook-side `extractPr` semantic: only surface `headRepo`
+    // when the head lives in a different repo than the base (fork PR), so
+    // consumers can treat presence as the fork signal.
+    const headOwner = content.headRepository?.owner?.login;
+    const headName = content.headRepository?.name;
+    const baseOwner = content.repository?.owner?.login;
+    const baseName = content.repository?.name;
+    if (
+      headOwner &&
+      headName &&
+      (headOwner !== baseOwner || headName !== baseName)
+    ) {
+      pr.headRepo = { owner: headOwner, name: headName };
+    }
+    item.pr = pr;
   }
   return item;
 }
