@@ -6,6 +6,45 @@ import { config } from '../config';
 export type { RunUpdateMessage };
 
 /**
+ * Better Auth's `secondaryStorage` interface. Reproduced here verbatim so
+ * we don't take a build-time dependency on `@better-auth/core` for a shape
+ * that's unlikely to drift (`get/set/delete` strings + ttl).
+ */
+export interface BetterAuthSecondaryStorage {
+  get(key: string): Promise<string | null>;
+  set(key: string, value: string, ttl?: number): Promise<void>;
+  delete(key: string): Promise<void>;
+}
+
+/**
+ * Adapt an `ioredis` client to Better Auth's `secondaryStorage` shape. Used
+ * for both rate-limit counter storage and the session cache. Lives next to
+ * the Redis client (not in `auth/`) so the Redis adapter logic lives with
+ * the rest of the Redis surface.
+ *
+ * `set`'s `ttl` is in seconds (Better Auth's contract). We forward to
+ * `EX` — a missing ttl writes a key without expiry, which is what
+ * Better Auth wants for non-rate-limit values.
+ */
+export function createBetterAuthRedisStorage(redis: Redis): BetterAuthSecondaryStorage {
+  return {
+    async get(key) {
+      return redis.get(key);
+    },
+    async set(key, value, ttl) {
+      if (typeof ttl === 'number' && ttl > 0) {
+        await redis.set(key, value, 'EX', ttl);
+      } else {
+        await redis.set(key, value);
+      }
+    },
+    async delete(key) {
+      await redis.del(key);
+    },
+  };
+}
+
+/**
  * One Redis connection for publishing, one for subscribing — required by
  * ioredis: subscriber mode blocks the client from other commands. Tiny
  * wrapper so WS gateways and webhook handlers don't reach for ioredis
@@ -40,6 +79,16 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
   async publishRunUpdate(msg: RunUpdateMessage): Promise<void> {
     await this.pub.publish(RUN_UPDATES_CHANNEL, JSON.stringify(msg));
+  }
+
+  /**
+   * Return a Better Auth-compatible `secondaryStorage` that reuses the
+   * publisher connection. Better Auth uses this for rate-limit counters and
+   * (optionally) session cache reads — both fit within the publisher
+   * client's command surface (no pub/sub interference).
+   */
+  betterAuthSecondaryStorage(): BetterAuthSecondaryStorage {
+    return createBetterAuthRedisStorage(this.pub);
   }
 }
 
