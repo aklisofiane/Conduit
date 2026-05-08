@@ -1,3 +1,4 @@
+import { Redis } from 'ioredis';
 import { PrismaClient } from '@conduit/database';
 import { TEST_STACK_ENV } from '../../../../test/e2e/stack';
 
@@ -33,4 +34,33 @@ export async function clearTenantData(prisma: PrismaClient): Promise<void> {
   await prisma.member.deleteMany({});
   await prisma.invitation.deleteMany({});
   await prisma.organization.deleteMany({});
+}
+
+/**
+ * Wipe Better Auth's tables (audit log + identity rows). `auditLog`,
+ * `account`, and `session` have no inter-FK so they delete in parallel;
+ * `user` runs after to satisfy the FK from `account`/`session`. Pair with
+ * `clearTenantData` to also drop `member`/`invitation`/`organization`.
+ */
+export async function clearAuthData(prisma: PrismaClient): Promise<void> {
+  await Promise.all([
+    prisma.auditLog.deleteMany({}),
+    prisma.account.deleteMany({}),
+    prisma.session.deleteMany({}),
+  ]);
+  await prisma.user.deleteMany({});
+}
+
+/**
+ * Reset Better Auth's secondary-storage so per-IP rate-limit counters
+ * don't leak between specs. `flushdb` is acceptable because the contract
+ * suite's Redis only stores rate-limit keys.
+ */
+export async function flushBetterAuthRateLimit(): Promise<void> {
+  const r = new Redis(process.env.REDIS_URL!, { lazyConnect: false });
+  try {
+    await r.flushdb();
+  } finally {
+    await r.quit();
+  }
 }

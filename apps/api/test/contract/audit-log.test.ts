@@ -2,15 +2,14 @@ import { Logger } from '@nestjs/common';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@conduit/database';
 import { auth } from '../../src/auth/auth.config';
-import { clearTenantData, makePrisma } from './setup';
+import { clearAuthData, clearTenantData, flushBetterAuthRateLimit, makePrisma } from './setup';
 
 /**
- * End-to-end audit-log contract: sign-in / sign-up / sign-out / password
- * reset / org-events all land as `AuditLog` rows. Drives Better Auth's
- * `auth.api.*` directly (the HTTP-only rate-limit middleware is exercised
- * separately in `audit-rate-limit.test.ts`). Each spec asserts both the
- * row count and the column values to lock the no-FK schema and the closed
- * event taxonomy in place.
+ * End-to-end audit-log contract: sign-up, sign-in (success + failure),
+ * org member-invite, no-FK survival, and the failed-login spike signal
+ * all land as `AuditLog` rows. Drives Better Auth's `auth.api.*` directly;
+ * the HTTP-only rate-limit middleware is exercised separately in
+ * `audit-rate-limit.test.ts`.
  */
 describe('AuditLog: auth + org events', () => {
   let prisma: PrismaClient;
@@ -24,12 +23,7 @@ describe('AuditLog: auth + org events', () => {
 
   beforeEach(async () => {
     prisma = makePrisma();
-    await prisma.auditLog.deleteMany({});
-    await prisma.account.deleteMany({});
-    await prisma.session.deleteMany({});
-    await prisma.member.deleteMany({});
-    await prisma.invitation.deleteMany({});
-    await prisma.user.deleteMany({});
+    await clearAuthData(prisma);
     await clearTenantData(prisma);
     // Each rate-limited test bumps the per-IP counter; clear it so audit
     // tests can run their own sign-ins without tripping the cap.
@@ -50,9 +44,7 @@ describe('AuditLog: auth + org events', () => {
       orderBy: { createdAt: 'asc' },
     });
     const events = rows.map((r) => r.event);
-    // sign-up triggers: auth.signUp + (session-create) + org.created from
-    // the signup-shim. We only require the auth.signUp row exists; the rest
-    // are out of scope for this assertion.
+    // signup also fires session-create + org.created via the shim; only auth.signUp is in scope here.
     expect(events).toContain('auth.signUp');
     const signUpRow = rows.find((r) => r.event === 'auth.signUp')!;
     expect(signUpRow.actorEmail).toBe(email);
@@ -84,7 +76,6 @@ describe('AuditLog: auth + org events', () => {
 
   it('bad-password sign-in writes auth.signIn.failed with email but no actorUserId', async () => {
     const email = freshEmail('si-bad');
-    // user exists, but password is wrong
     await auth.api.signUpEmail({
       body: { name: 'Test', email, password: 'pw-correct-12345' },
     });
@@ -151,8 +142,9 @@ describe('AuditLog: auth + org events', () => {
       where: { event: 'org.member.invited' },
     });
     expect(rows).toHaveLength(1);
-    expect((rows[0]!.metadata as { inviteeEmail: string }).inviteeEmail).toBe(inviteeEmail);
-    expect((rows[0]!.metadata as { role: string }).role).toBe('member');
+    const meta = rows[0]!.metadata as { inviteeEmail: string; role: string };
+    expect(meta.inviteeEmail).toBe(inviteeEmail);
+    expect(meta.role).toBe('member');
     expect(rows[0]!.actorEmail).toBe(inviterEmail);
     expect(rows[0]!.orgId).toBeTruthy();
   });
@@ -199,22 +191,6 @@ describe('AuditLog: auth + org events', () => {
     }
   });
 });
-
-/**
- * Better Auth's secondary-storage rate-limit keys are `<ip>|<path>`. We
- * flush every key starting with `127.` (the default test IP from
- * better-auth's getIp) and the test x-forwarded-for IPs we use, so each
- * spec starts with a clean per-IP counter.
- */
-async function flushBetterAuthRateLimit(): Promise<void> {
-  const { Redis } = await import('ioredis');
-  const r = new Redis(process.env.REDIS_URL!, { lazyConnect: false });
-  try {
-    await r.flushdb();
-  } finally {
-    await r.quit();
-  }
-}
 
 let counter = 0;
 function freshEmail(prefix: string): string {

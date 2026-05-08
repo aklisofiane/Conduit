@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { PrismaClient } from '@conduit/database';
 import { auth } from '../../src/auth/auth.config';
-import { makePrisma, clearTenantData } from './setup';
+import { clearAuthData, clearTenantData, flushBetterAuthRateLimit, makePrisma } from './setup';
 
 /**
  * Hosted-mode rate-limit contract: the 11th `/sign-in/email` from a single
@@ -26,12 +26,7 @@ describe('Rate limit (hosted mode, /sign-in/email = 10 / 5min)', () => {
     await flushBetterAuthRateLimit();
     // Audit-log + auth tables share the test DB — keep this suite isolated
     // from the audit suite that runs in the same process.
-    await prisma.auditLog.deleteMany({});
-    await prisma.account.deleteMany({});
-    await prisma.session.deleteMany({});
-    await prisma.member.deleteMany({});
-    await prisma.invitation.deleteMany({});
-    await prisma.user.deleteMany({});
+    await clearAuthData(prisma);
     await clearTenantData(prisma);
   });
 
@@ -50,9 +45,7 @@ describe('Rate limit (hosted mode, /sign-in/email = 10 / 5min)', () => {
       expect(res.status).not.toBe(429);
     }
 
-    // 11th attempt: still under-the-radar wrt audit log, but the rate-
-    // limit middleware should now return 429 on `onRequest` before reaching
-    // the endpoint at all.
+    // 11th attempt: rate-limit middleware returns 429 on onRequest before reaching the endpoint.
     const final = await auth.handler(makeSignInRequest(ip, 'nope-final@example.com'));
     expect(final.status).toBe(429);
   });
@@ -70,10 +63,6 @@ describe('Rate limit (hosted mode, /sign-in/email = 10 / 5min)', () => {
 });
 
 function makeSignInRequest(ip: string, email: string): Request {
-  // Better Auth's `baseURL` is set to `http://localhost` in test setup; the
-  // path it serves on is `/sign-in/email` (no `/api/auth` prefix at the
-  // handler level — that prefix is the Express mount point, stripped by
-  // the time the request reaches `auth.handler`).
   return new Request('http://localhost/api/auth/sign-in/email', {
     method: 'POST',
     headers: {
@@ -82,14 +71,4 @@ function makeSignInRequest(ip: string, email: string): Request {
     },
     body: JSON.stringify({ email, password: 'whatever' }),
   });
-}
-
-async function flushBetterAuthRateLimit(): Promise<void> {
-  const { Redis } = await import('ioredis');
-  const r = new Redis(process.env.REDIS_URL!, { lazyConnect: false });
-  try {
-    await r.flushdb();
-  } finally {
-    await r.quit();
-  }
 }
