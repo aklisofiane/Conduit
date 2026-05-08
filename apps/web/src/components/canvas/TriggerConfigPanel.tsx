@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import type { BoardRef, TriggerConfig, TriggerFilter } from '@conduit/shared';
 import type { ProjectBoardSummary } from '@conduit/shared/platform';
-import { useConnections, useListProjectBoards } from '../../api/hooks.js';
+import {
+  useConnections,
+  useListLabels,
+  useListProjectBoards,
+} from '../../api/hooks.js';
 import { ApiError } from '../../api/client.js';
 import { cn } from '../../lib/cn.js';
 import { Icon } from './Icon.js';
-
-type BoardField = ProjectBoardSummary['fields'][number];
 
 interface TriggerConfigPanelProps {
   trigger: TriggerConfig;
@@ -62,6 +64,16 @@ export function TriggerConfigPanel({
 
   const selectedBoard =
     boardsQuery.data?.find((b) => b.number === trigger.board?.number) ?? null;
+
+  const labelsQuery = useListLabels({
+    workflowId,
+    connectionId: trigger.connectionId,
+    enabled: !!trigger.connectionId,
+  });
+
+  const statusOptions =
+    selectedBoard?.fields.find((f) => f.name === 'Status')?.options ?? [];
+  const labelOptions = labelsQuery.data?.map((l) => l.name) ?? [];
 
   const setMode = (kind: 'webhook' | 'polling') => {
     if (kind === trigger.mode.kind) return;
@@ -268,7 +280,8 @@ export function TriggerConfigPanel({
           <Field label="Filters" hint="AND-combined — an event must pass all">
             <FilterEditor
               filters={trigger.filters}
-              boardFields={selectedBoard?.fields}
+              statusOptions={statusOptions}
+              labelOptions={labelOptions}
               onChange={(filters) => onChange({ filters })}
             />
           </Field>
@@ -289,23 +302,19 @@ export function TriggerConfigPanel({
 
 function FilterEditor({
   filters,
-  boardFields,
+  statusOptions,
+  labelOptions,
   onChange,
 }: {
   filters: TriggerFilter[];
-  boardFields?: BoardField[];
+  statusOptions: string[];
+  labelOptions: string[];
   onChange: (filters: TriggerFilter[]) => void;
 }) {
-  const setAt = (i: number, patch: Partial<TriggerFilter>) => {
-    const next = filters.map((f, idx) => (idx === i ? { ...f, ...patch } : f));
-    onChange(next as TriggerFilter[]);
-  };
+  const replaceAt = (i: number, next: TriggerFilter) =>
+    onChange(filters.map((f, idx) => (idx === i ? next : f)));
   const removeAt = (i: number) => onChange(filters.filter((_, idx) => idx !== i));
-  const add = () =>
-    onChange([...filters, { field: 'status', op: 'eq', value: '' }]);
-
-  const findBoardField = (name: string) =>
-    boardFields?.find((bf) => bf.name.toLowerCase() === name.toLowerCase());
+  const add = () => onChange([...filters, { field: 'status', value: '' }]);
 
   return (
     <div className="space-y-2">
@@ -318,8 +327,9 @@ function FilterEditor({
         <FilterRow
           key={i}
           filter={f}
-          match={findBoardField(f.field)}
-          onPatch={(patch) => setAt(i, patch)}
+          statusOptions={statusOptions}
+          labelOptions={labelOptions}
+          onReplace={(next) => replaceAt(i, next)}
           onRemove={() => removeAt(i)}
         />
       ))}
@@ -332,75 +342,46 @@ function FilterEditor({
 
 function FilterRow({
   filter,
-  match,
-  onPatch,
+  statusOptions,
+  labelOptions,
+  onReplace,
   onRemove,
 }: {
   filter: TriggerFilter;
-  match: BoardField | undefined;
-  onPatch: (patch: Partial<TriggerFilter>) => void;
+  statusOptions: string[];
+  labelOptions: string[];
+  onReplace: (next: TriggerFilter) => void;
   onRemove: () => void;
 }) {
-  // Verified board field → strict dropdown, no op selector. Old rows may
-  // still carry `op: 'in'` with a string array; show the first element and
-  // rewrite to `op: 'eq'` on the next user pick so we don't lie about the
-  // saved semantics.
-  const currentValue = Array.isArray(filter.value) ? (filter.value[0] ?? '') : filter.value;
+  const setKind = (next: TriggerFilter['field']) => {
+    if (next === filter.field) return;
+    onReplace({ field: next, value: '' });
+  };
+
   return (
-    <div
-      className={cn(
-        'grid gap-1.5 rounded-[var(--radius)] border border-[var(--color-divider)] bg-[var(--color-pill-bg)] p-1.5',
-        match ? 'grid-cols-[1fr_1fr_28px]' : 'grid-cols-[1fr_78px_1fr_28px]',
-      )}
-    >
-      <input
+    <div className="grid grid-cols-[100px_1fr_28px] gap-1.5 rounded-[var(--radius)] border border-[var(--color-divider)] bg-[var(--color-pill-bg)] p-1.5">
+      <select
         className="field-input"
-        placeholder="field"
         value={filter.field}
-        onChange={(e) => onPatch({ field: e.target.value })}
-      />
-      {match ? (
-        <select
-          className="field-input"
-          value={currentValue}
-          onChange={(e) => onPatch({ op: 'eq', value: e.target.value })}
-        >
-          <option value="">— select —</option>
-          {match.options.map((opt) => (
-            <option key={opt} value={opt}>
-              {opt}
-            </option>
-          ))}
-        </select>
+        onChange={(e) => setKind(e.target.value as TriggerFilter['field'])}
+      >
+        <option value="status">Status</option>
+        <option value="label">Label</option>
+      </select>
+      {filter.field === 'status' ? (
+        <OptionsValueInput
+          value={filter.value}
+          options={statusOptions}
+          emptyHint="(pick a board to load Status options)"
+          onChange={(value) => onReplace({ field: 'status', value })}
+        />
       ) : (
-        <>
-          <select
-            className="field-input"
-            value={filter.op}
-            onChange={(e) => onPatch({ op: e.target.value as TriggerFilter['op'] })}
-          >
-            <option value="eq">eq</option>
-            <option value="neq">neq</option>
-            <option value="in">in</option>
-            <option value="contains">contains</option>
-          </select>
-          <input
-            className="field-input"
-            placeholder={filter.op === 'in' ? 'a, b, c' : 'value'}
-            value={Array.isArray(filter.value) ? filter.value.join(', ') : filter.value}
-            onChange={(e) => {
-              const raw = e.target.value;
-              const next =
-                filter.op === 'in'
-                  ? raw
-                      .split(',')
-                      .map((s) => s.trim())
-                      .filter(Boolean)
-                  : raw;
-              onPatch({ value: next });
-            }}
-          />
-        </>
+        <OptionsValueInput
+          value={filter.value}
+          options={labelOptions}
+          emptyHint="(no labels — pick a connection bound to a repo)"
+          onChange={(value) => onReplace({ field: 'label', value })}
+        />
       )}
       <button
         className="btn"
@@ -411,6 +392,50 @@ function FilterRow({
         ×
       </button>
     </div>
+  );
+}
+
+function OptionsValueInput({
+  value,
+  options,
+  emptyHint,
+  onChange,
+}: {
+  value: string;
+  options: string[];
+  emptyHint: string;
+  onChange: (next: string) => void;
+}) {
+  // No options loaded yet → fall back to free-text input so the row stays
+  // usable. Saving an unmatchable value is the user's call.
+  if (options.length === 0) {
+    return (
+      <input
+        className="field-input"
+        placeholder={emptyHint}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    );
+  }
+  // Stale-cache safety: if the saved value isn't in the live options list
+  // (e.g. label was renamed since save), show it as a synthetic option so
+  // the user sees the truth of what's stored, not a silent reset to ''.
+  const showStaleOption = value !== '' && !options.includes(value);
+  return (
+    <select
+      className="field-input"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+    >
+      <option value="">— select —</option>
+      {showStaleOption && <option value={value}>{value} (not found)</option>}
+      {options.map((opt) => (
+        <option key={opt} value={opt}>
+          {opt}
+        </option>
+      ))}
+    </select>
   );
 }
 

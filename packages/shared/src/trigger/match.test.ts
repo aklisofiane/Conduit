@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { TriggerConfig } from './config';
 import type { TriggerEvent } from './event';
-import { applyFilter, matchesTrigger } from './match';
+import { applyFilter, matchesTrigger, type FilterView } from './match';
 
 const BASE_EVENT: TriggerEvent = {
   source: 'github',
@@ -10,7 +10,6 @@ const BASE_EVENT: TriggerEvent = {
   payload: {
     issue: {
       labels: [{ name: 'bug' }, { name: 'priority:high' }],
-      assignee: { login: 'alice' },
     },
   },
   repo: { owner: 'acme', name: 'shop' },
@@ -57,27 +56,77 @@ describe('matchesTrigger', () => {
     ).toBe(true);
   });
 
-  it('AND-combines filters — all must pass', () => {
+  it('AND-combines status + label filters — all must pass', () => {
+    const trigger: TriggerConfig = {
+      ...BASE_TRIGGER,
+      mode: { kind: 'webhook', event: 'board.column.changed' },
+      filters: [
+        { field: 'status', value: 'Dev' },
+        { field: 'label', value: 'bug' },
+      ],
+    };
+    const event: TriggerEvent = {
+      source: 'github',
+      mode: 'webhook',
+      event: 'board.column.changed',
+      payload: {
+        status: 'Dev',
+        issue: { labels: [{ name: 'bug' }] },
+      },
+    };
+    expect(matchesTrigger(event, trigger)).toBe(true);
+    // Same status, but the issue lacks the required label.
+    expect(
+      matchesTrigger(
+        {
+          ...event,
+          payload: { status: 'Dev', issue: { labels: [{ name: 'chore' }] } },
+        },
+        trigger,
+      ),
+    ).toBe(false);
+  });
+
+  it('matches a label filter via membership on the issue payload', () => {
+    expect(
+      matchesTrigger(BASE_EVENT, {
+        ...BASE_TRIGGER,
+        filters: [{ field: 'label', value: 'bug' }],
+      }),
+    ).toBe(true);
+    // Multi-label issues used to fail eq-on-comma-string; membership fixes it.
+    expect(
+      matchesTrigger(BASE_EVENT, {
+        ...BASE_TRIGGER,
+        filters: [{ field: 'label', value: 'priority:high' }],
+      }),
+    ).toBe(true);
+    expect(
+      matchesTrigger(BASE_EVENT, {
+        ...BASE_TRIGGER,
+        filters: [{ field: 'label', value: 'nope' }],
+      }),
+    ).toBe(false);
+  });
+
+  it('AND-combines two label rows — issue must have both labels', () => {
     const trigger: TriggerConfig = {
       ...BASE_TRIGGER,
       filters: [
-        { field: 'actor', op: 'eq', value: 'alice' },
-        { field: 'repo.owner', op: 'eq', value: 'acme' },
+        { field: 'label', value: 'bug' },
+        { field: 'label', value: 'priority:high' },
       ],
     };
     expect(matchesTrigger(BASE_EVENT, trigger)).toBe(true);
     expect(
-      matchesTrigger({ ...BASE_EVENT, actor: 'bob' }, trigger),
+      matchesTrigger(
+        {
+          ...BASE_EVENT,
+          payload: { issue: { labels: [{ name: 'bug' }] } },
+        },
+        trigger,
+      ),
     ).toBe(false);
-  });
-
-  it('filters on labels via the surfaced `label` field', () => {
-    expect(
-      matchesTrigger(BASE_EVENT, {
-        ...BASE_TRIGGER,
-        filters: [{ field: 'label', op: 'contains', value: 'bug' }],
-      }),
-    ).toBe(true);
   });
 
   it('matches board.column.changed webhook via `status = Dev`', () => {
@@ -90,19 +139,14 @@ describe('matchesTrigger', () => {
       },
     };
     const trigger: TriggerConfig = {
-      id: 'trigger-1',
-      name: 'Trigger1',
-      platform: 'github',
-      connectionId: 'conn_1',
+      ...BASE_TRIGGER,
       mode: { kind: 'webhook', event: 'board.column.changed' },
-      filters: [{ field: 'status', op: 'eq', value: 'Dev' }],
+      filters: [{ field: 'status', value: 'Dev' }],
     };
     expect(matchesTrigger(webhookEvent, trigger)).toBe(true);
   });
 
   it('matches a polling-synthesized event via `status = Dev`', () => {
-    // Polling writes the column name directly to payload.status so the same
-    // filter works regardless of how the event arrived.
     const pollingEvent: TriggerEvent = {
       source: 'github',
       mode: 'polling',
@@ -111,42 +155,37 @@ describe('matchesTrigger', () => {
       issue: { id: 'I_1', key: '42', title: 't', url: 'https://x' },
     };
     const trigger: TriggerConfig = {
-      id: 'trigger-1',
-      name: 'Trigger1',
-      platform: 'github',
-      connectionId: 'conn_1',
+      ...BASE_TRIGGER,
       mode: { kind: 'polling', intervalSec: 60 },
-      filters: [{ field: 'status', op: 'eq', value: 'Dev' }],
+      filters: [{ field: 'status', value: 'Dev' }],
     };
     expect(matchesTrigger(pollingEvent, trigger)).toBe(true);
   });
 });
 
 describe('applyFilter', () => {
-  const fields = { status: 'Dev', label: 'bug,priority:high', assignee: 'alice' };
+  const view: FilterView = { status: 'Dev', labels: ['bug', 'priority:high'] };
 
-  it('eq', () => {
-    expect(applyFilter(fields, { field: 'status', op: 'eq', value: 'Dev' })).toBe(true);
-    expect(applyFilter(fields, { field: 'status', op: 'eq', value: 'Review' })).toBe(false);
+  it('status — exact match', () => {
+    expect(applyFilter(view, { field: 'status', value: 'Dev' })).toBe(true);
+    expect(applyFilter(view, { field: 'status', value: 'Review' })).toBe(false);
   });
 
-  it('neq', () => {
-    expect(applyFilter(fields, { field: 'status', op: 'neq', value: 'Review' })).toBe(true);
+  it('status — undefined view value fails', () => {
+    expect(applyFilter({ labels: [] }, { field: 'status', value: 'Dev' })).toBe(false);
   });
 
-  it('in', () => {
-    expect(
-      applyFilter(fields, { field: 'status', op: 'in', value: ['Dev', 'AIReview'] }),
-    ).toBe(true);
-    expect(applyFilter(fields, { field: 'status', op: 'in', value: ['Done'] })).toBe(false);
+  it('label — exact membership', () => {
+    expect(applyFilter(view, { field: 'label', value: 'bug' })).toBe(true);
+    expect(applyFilter(view, { field: 'label', value: 'priority:high' })).toBe(true);
+    expect(applyFilter(view, { field: 'label', value: 'nope' })).toBe(false);
   });
 
-  it('contains', () => {
-    expect(applyFilter(fields, { field: 'label', op: 'contains', value: 'bug' })).toBe(true);
-    expect(applyFilter(fields, { field: 'label', op: 'contains', value: 'chore' })).toBe(false);
+  it('label — empty value never matches (in-progress UI row)', () => {
+    expect(applyFilter(view, { field: 'label', value: '' })).toBe(false);
   });
 
-  it('rejects when the field is not surfaced', () => {
-    expect(applyFilter(fields, { field: 'nope', op: 'eq', value: 'x' })).toBe(false);
+  it('label — empty labels view never matches', () => {
+    expect(applyFilter({ labels: [] }, { field: 'label', value: 'bug' })).toBe(false);
   });
 });

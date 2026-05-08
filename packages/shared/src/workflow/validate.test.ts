@@ -47,7 +47,7 @@ describe('validateWorkflowDefinition', () => {
       triggers: [
         trigger({
           mode: { kind: 'polling', intervalSec: 60 },
-          filters: [{ field: 'status', op: 'eq', value: 'Dev' }],
+          filters: [{ field: 'status', value: 'Dev' }],
           board: { ownerType: 'org', owner: 'acme', number: 1 },
         }),
       ],

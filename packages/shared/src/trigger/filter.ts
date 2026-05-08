@@ -1,17 +1,26 @@
 import { z } from 'zod';
 
 /**
- * Filter applied to incoming trigger events. Multiple filters on the same
- * trigger combine with AND.
+ * Filter applied to incoming trigger events. Multiple filters on a trigger
+ * combine with AND.
  *
- * Operator semantics:
- * - `eq` / `neq` — `value` is a string, exact match (case-sensitive).
- * - `in`         — `value` is string[]; field must equal any entry.
- * - `contains`   — `value` is a string, substring match on field (case-sensitive).
+ * Two kinds, both single-valued:
+ * - `status` — exact equality on the issue/PR's Status column (project board
+ *   single-select).
+ * - `label`  — membership: row matches if `value` is one of the issue's
+ *   labels. To require multiple labels, add multiple label rows (AND).
  */
-export const triggerFilterSchema = z.object({
-  field: z.string().min(1),
-  op: z.enum(['eq', 'neq', 'in', 'contains']),
-  value: z.union([z.string(), z.array(z.string())]),
-});
+export const triggerFilterSchema = z.discriminatedUnion('field', [
+  z.object({
+    field: z.literal('status'),
+    // Empty string is allowed for in-progress UI rows; the matcher
+    // safe-fails because no real Status column ever equals ''.
+    value: z.string(),
+  }),
+  z.object({
+    field: z.literal('label'),
+    // Empty string is allowed for in-progress UI rows; matcher safe-fails.
+    value: z.string(),
+  }),
+]);
 export type TriggerFilter = z.infer<typeof triggerFilterSchema>;

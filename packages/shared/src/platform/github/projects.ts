@@ -31,6 +31,8 @@ export interface ProjectBoardItem {
   repo?: { owner: string; name: string };
   /** Current single-select field values on the item, keyed by field name (e.g. `Status`). */
   singleSelectValues: Record<string, string>;
+  /** Issue/PR label names. Empty for draft items or content with no labels. */
+  labels: string[];
 }
 
 export interface ListProjectBoardsQuery {
@@ -99,6 +101,7 @@ interface RawProjectItem {
         title?: string;
         url?: string;
         repository?: { name: string; owner: { login: string } };
+        labels?: { nodes: Array<{ name?: string } | null> };
       };
   fieldValues: {
     nodes: Array<
@@ -135,6 +138,7 @@ function buildItemsQuery(ownerType: 'user' | 'org'): string {
                   title
                   url
                   repository { name owner { login } }
+                  labels(first: 20) { nodes { name } }
                 }
                 ... on PullRequest {
                   id
@@ -142,6 +146,7 @@ function buildItemsQuery(ownerType: 'user' | 'org'): string {
                   title
                   url
                   repository { name owner { login } }
+                  labels(first: 20) { nodes { name } }
                 }
                 ... on DraftIssue {
                   id
@@ -327,7 +332,7 @@ function toItem(raw: RawProjectItem): ProjectBoardItem {
   }
 
   const content = raw.content ?? undefined;
-  const item: ProjectBoardItem = { itemNodeId: raw.id, singleSelectValues };
+  const item: ProjectBoardItem = { itemNodeId: raw.id, singleSelectValues, labels: [] };
   if (!content) return item;
 
   item.contentType = content.__typename;
@@ -337,6 +342,11 @@ function toItem(raw: RawProjectItem): ProjectBoardItem {
   if (content.url) item.contentUrl = content.url;
   if (content.repository?.name && content.repository.owner?.login) {
     item.repo = { owner: content.repository.owner.login, name: content.repository.name };
+  }
+  if (content.labels?.nodes) {
+    for (const node of content.labels.nodes) {
+      if (node?.name) item.labels.push(node.name);
+    }
   }
   return item;
 }

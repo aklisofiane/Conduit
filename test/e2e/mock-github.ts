@@ -60,6 +60,7 @@ export interface MockBoardItem {
   number?: number;
   title?: string;
   status: string;
+  labels?: string[];
 }
 
 export function projectBoardResponse(items: MockBoardItem[]): unknown {
@@ -78,6 +79,9 @@ export function projectBoardResponse(items: MockBoardItem[]): unknown {
                 title: it.title ?? `Item ${it.itemId}`,
                 url: `https://github.com/acme/shop/issues/${it.number ?? 1}`,
                 repository: { name: 'shop', owner: { login: 'acme' } },
+                labels: {
+                  nodes: (it.labels ?? []).map((name) => ({ name })),
+                },
               },
               fieldValues: {
                 nodes: [

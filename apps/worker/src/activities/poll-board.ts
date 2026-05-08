@@ -154,31 +154,16 @@ function readPreviousIds(raw: unknown): string[] {
 }
 
 /**
- * Build the flat field view for a project board item and run the trigger's
+ * Build the `FilterView` for a project board item and run the trigger's
  * filters against it. Mirrors the webhook-side flatten+apply dance in
- * `matchesTrigger` so the user can write one filter set and have it work
- * for either mode.
+ * `matchesTrigger` so a single filter set works in either mode.
  */
 function itemPassesFilters(item: ProjectBoardItem, filters: TriggerFilter[]): boolean {
-  const fields: Record<string, string> = {};
-  // Surface every single-select field under its own name so users can
-  // filter on `Priority` etc., not just `Status`. `status` is always
-  // populated (lowercase) from `Status` when present — matches the webhook
-  // flattener in `match.ts` and the docs' canonical example.
-  for (const [name, value] of Object.entries(item.singleSelectValues)) {
-    fields[name] = value;
-  }
-  if (item.singleSelectValues.Status !== undefined) {
-    fields.status = item.singleSelectValues.Status;
-  }
-  if (item.contentKey) fields['issue.key'] = item.contentKey;
-  if (item.contentTitle) fields['issue.title'] = item.contentTitle;
-  if (item.repo) {
-    fields['repo.owner'] = item.repo.owner;
-    fields['repo.name'] = item.repo.name;
-  }
-
-  return filters.every((f) => applyFilter(fields, f));
+  const view = {
+    status: item.singleSelectValues.Status,
+    labels: item.labels,
+  };
+  return filters.every((f) => applyFilter(view, f));
 }
 
 function toTriggerEvent(item: ProjectBoardItem): TriggerEvent {
