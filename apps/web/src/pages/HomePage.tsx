@@ -18,6 +18,7 @@ export function HomePage() {
   const [renamingId, setRenamingId] = useState<string | null>(null);
 
   const activeCount = workflows.filter((w) => w.isActive).length;
+  const totalRuns = workflows.reduce((sum, w) => sum + w._count.runs, 0);
   const runningCount = workflows.filter((w) => w.runs[0]?.status === 'RUNNING').length;
   const failingCount = workflows.filter((w) => w.runs[0]?.status === 'FAILED').length;
 
@@ -46,8 +47,9 @@ export function HomePage() {
         </div>
       </section>
 
-      <section className="grid grid-cols-4 gap-3">
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <StatCard label="Workflows" value={workflows.length.toString()} hint="total configured" />
+        <StatCard label="Total runs" value={totalRuns.toString()} hint="across all workflows" />
         <StatCard label="Active" value={activeCount.toString()} hint="triggering on events" />
         <StatCard label="Running now" value={runningCount.toString()} hint="live runs" />
         <StatCard

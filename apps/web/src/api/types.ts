@@ -22,6 +22,7 @@ export interface WorkflowRow {
   createdAt: string;
   updatedAt: string;
   runs: WorkflowRunSummary[];
+  _count: { runs: number };
 }
 
 export interface WorkflowRunSummary {

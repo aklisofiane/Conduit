@@ -61,6 +61,7 @@ export class WorkflowsService implements OnModuleInit {
             error: true,
           },
         },
+        _count: { select: { runs: true } },
       },
     });
   }
