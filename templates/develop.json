@@ -13,10 +13,10 @@
             "id": "trigger-develop",
             "name": "DevelopTrigger",
             "platform": "github",
-            "connectionId": "<github>",
-            "mode": { "kind": "polling", "intervalSec": 60 },
-            "filters": [{ "field": "status", "op": "eq", "value": "Dev" }],
-            "board": { "ownerType": "org", "owner": "acme", "number": 1 }
+            "connectionId": "<github-repo>",
+            "boardConnectionId": "<github-board>",
+            "mode": { "kind": "polling", "intervalSec": 60, "scope": "issues", "source": "board" },
+            "filters": [{ "field": "status", "value": "Dev" }]
           }
         ],
         "nodes": [
@@ -67,7 +67,7 @@
           {
             "id": "github-mcp",
             "presetId": "github",
-            "connectionId": "<github>"
+            "connectionId": "<github-repo>"
           }
         ],
         "ui": {

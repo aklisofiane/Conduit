@@ -8,10 +8,10 @@
           "id": "trigger-phase5-worker",
           "name": "Phase5WorkerTrigger",
           "platform": "github",
-          "connectionId": "__placeholder__",
-          "mode": { "kind": "polling", "intervalSec": 3600 },
-          "filters": [{ "field": "status", "op": "eq", "value": "Dev" }],
-          "board": { "ownerType": "org", "owner": "acme", "number": 5 }
+          "connectionId": "__placeholder_repo__",
+          "boardConnectionId": "__placeholder_board__",
+          "mode": { "kind": "polling", "intervalSec": 3600, "scope": "issues", "source": "board" },
+          "filters": [{ "field": "status", "value": "Dev" }]
         }
       ],
       "nodes": [
@@ -44,10 +44,10 @@
           "id": "trigger-phase5-critic",
           "name": "Phase5CriticTrigger",
           "platform": "github",
-          "connectionId": "__placeholder__",
-          "mode": { "kind": "polling", "intervalSec": 3600 },
-          "filters": [{ "field": "status", "op": "eq", "value": "AIReview" }],
-          "board": { "ownerType": "org", "owner": "acme", "number": 5 }
+          "connectionId": "__placeholder_repo__",
+          "boardConnectionId": "__placeholder_board__",
+          "mode": { "kind": "polling", "intervalSec": 3600, "scope": "issues", "source": "board" },
+          "filters": [{ "field": "status", "value": "AIReview" }]
         }
       ],
       "nodes": [

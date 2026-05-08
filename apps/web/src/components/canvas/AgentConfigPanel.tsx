@@ -4,7 +4,13 @@ import {
   type AgentIssueWriteback,
   type TriggerConfig,
 } from '@conduit/shared';
-import { useAgentPresets, useListLabels, useListProjectBoards, useSkills } from '../../api/hooks.js';
+import {
+  useAgentPresets,
+  useConnections,
+  useListLabels,
+  useListProjectBoards,
+  useSkills,
+} from '../../api/hooks.js';
 import type { AgentPreset } from '../../api/types.js';
 import { cn } from '../../lib/cn.js';
 import { providerStyle } from '../../styles/theme.js';
@@ -189,7 +195,6 @@ export function AgentConfigPanel({
             hint="set status / apply labels at end of run"
           >
             <IssueWritebackControl
-              workflowId={workflowId}
               trigger={githubTrigger}
               value={agent.issueWriteback}
               onChange={(next) => onChange({ issueWriteback: next })}
@@ -281,34 +286,36 @@ function Field({
 }
 
 function IssueWritebackControl({
-  workflowId,
   trigger,
   value,
   onChange,
 }: {
-  workflowId: string;
   trigger: TriggerConfig | undefined;
   value: AgentIssueWriteback | undefined;
   onChange: (next: AgentIssueWriteback | undefined) => void;
 }) {
   const enabled = value !== undefined;
-  const board = trigger?.board;
   const connectionId = trigger?.connectionId ?? '';
+  const boardConnectionId = trigger?.boardConnectionId ?? '';
+  const { data: boardConnections = [] } = useConnections({ scopeKind: 'github_projects_v2' });
+  const boardConnection = boardConnections.find((c) => c.id === boardConnectionId);
+  const boardScope =
+    boardConnection?.scope.kind === 'github_projects_v2'
+      ? boardConnection.scope
+      : undefined;
 
   const boardsQuery = useListProjectBoards({
-    workflowId,
     connectionId,
-    ownerType: board?.ownerType ?? 'org',
-    owner: board?.owner ?? '',
-    enabled: enabled && !!trigger && !!board,
+    ownerType: boardScope?.ownerType ?? 'org',
+    owner: boardScope?.owner ?? '',
+    enabled: enabled && !!trigger && !!boardScope,
   });
   const matchedBoard =
-    boardsQuery.data?.find((b) => b.number === board?.number) ?? null;
+    boardsQuery.data?.find((b) => b.number === boardScope?.number) ?? null;
   const statusOptions =
     matchedBoard?.fields.find((f) => f.name.toLowerCase() === 'status')?.options ?? [];
 
   const labelsQuery = useListLabels({
-    workflowId,
     connectionId,
     enabled: enabled && !!trigger,
   });
@@ -358,7 +365,7 @@ function IssueWritebackControl({
           <PillSection
             label="Allowed statuses"
             empty={
-              !board
+              !boardScope
                 ? "Trigger has no project board — set one to pick statuses."
                 : boardsQuery.isLoading
                   ? 'Loading…'

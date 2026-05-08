@@ -6,14 +6,16 @@ import {
   type OnModuleInit,
 } from '@nestjs/common';
 import {
+  connectionScopeSchema,
   resolveTemplate,
+  type ConnectionScopeKind,
+  type TemplatePlaceholder,
   type TemplateSummary,
   type WorkflowDefinition,
 } from '@conduit/shared';
 import { PrismaService } from '../../common/prisma.service';
 import { assertDefinitionValid } from '../../common/assert-definition-valid';
 import { TemporalService } from '../../temporal/temporal.service';
-import { encrypt } from '../credentials/crypto';
 import { AgentPresetsService } from '../agent-presets/agent-presets.service';
 import { loadTemplates, type LoadedTemplate } from './template-loader';
 import type { CreateFromTemplateDto, TemplateBinding } from './dto';
@@ -51,6 +53,7 @@ export class TemplatesService implements OnModuleInit {
   }
 
   async createFromTemplate(
+    orgId: string,
     templateId: string,
     dto: CreateFromTemplateDto,
   ): Promise<CreatedFromTemplate> {
@@ -58,11 +61,33 @@ export class TemplatesService implements OnModuleInit {
     if (!loaded) throw new NotFoundException(`Template ${templateId} not found`);
 
     this.assertBindingsCoverPlaceholders(loaded, dto.bindings);
-    await this.assertCredentialsExist(dto.bindings);
-
-    const placeholderAliases = loaded.placeholders;
+    await this.assertExistingBindingsValid(orgId, loaded, dto.bindings);
 
     const created = await this.prisma.$transaction(async (tx) => {
+      // Materialize "new" bindings into real Connection rows once per
+      // template-apply (shared across all workflows in the bundle).
+      const aliasToConnId: Record<string, string> = {};
+      for (const placeholder of loaded.placeholderDetails) {
+        const binding = dto.bindings[placeholder.alias];
+        if (!binding) {
+          throw new BadRequestException(`Missing binding for <${placeholder.alias}>`);
+        }
+        if (binding.mode === 'existing') {
+          aliasToConnId[placeholder.alias] = binding.connectionId;
+        } else {
+          this.assertScopeCompatible(placeholder, binding.scope.kind);
+          const conn = await tx.connection.create({
+            data: {
+              orgId,
+              credentialId: binding.credentialId,
+              name: binding.name,
+              scope: binding.scope as unknown as object,
+            },
+          });
+          aliasToConnId[placeholder.alias] = conn.id;
+        }
+      }
+
       const results: {
         id: string;
         name: string;
@@ -71,50 +96,21 @@ export class TemplatesService implements OnModuleInit {
       }[] = [];
 
       for (const wf of loaded.file.workflows) {
-        const stub = await tx.workflow.create({
-          data: {
-            name: wf.name,
-            description: wf.description,
-            definition: {} as unknown as object,
-            isActive: false,
-          },
-        });
-
-        const aliasToConn: Record<string, string> = {};
-        for (const alias of placeholderAliases) {
-          const binding = dto.bindings[alias];
-          if (!binding) {
-            throw new BadRequestException(`Missing binding for <${alias}>`);
-          }
-          if (binding.mode === 'existing') {
-            aliasToConn[alias] = binding.connectionId;
-          } else {
-            const conn = await tx.workflowConnection.create({
-              data: {
-                workflowId: stub.id,
-                alias: binding.alias,
-                credentialId: binding.credentialId,
-                owner: binding.owner,
-                repo: binding.repo,
-                webhookSecret: binding.webhookSecret
-                  ? encrypt(binding.webhookSecret)
-                  : null,
-              },
-            });
-            aliasToConn[alias] = conn.id;
-          }
-        }
-
         const resolved = resolveTemplate(
           { ...loaded.file, workflows: [wf] },
-          aliasToConn,
+          aliasToConnId,
         );
         const resolvedDefinition = resolved[0]!.definition;
         assertDefinitionValid(resolvedDefinition);
 
-        const finalWf = await tx.workflow.update({
-          where: { id: stub.id },
-          data: { definition: resolvedDefinition as unknown as object },
+        const finalWf = await tx.workflow.create({
+          data: {
+            orgId,
+            name: wf.name,
+            description: wf.description,
+            definition: resolvedDefinition as unknown as object,
+            isActive: false,
+          },
           select: { id: true, name: true, isActive: true },
         });
         results.push({ ...finalWf, definition: resolvedDefinition });
@@ -162,27 +158,38 @@ export class TemplatesService implements OnModuleInit {
     }
   }
 
-  private async assertCredentialsExist(
+  /**
+   * Validate that `existing`-mode bindings point at real Connection rows
+   * whose scope kind is compatible with every slot the alias resolves into.
+   * `new`-mode bindings are validated against the same rule, but we don't
+   * need a DB read for those — `binding.scope` is already typed.
+   * `credentialId` references are checked in one round-trip. Cross-org id
+   * references are reported as "unknown" (404-shaped here, BadRequest on the
+   * existing surface) — we never confirm that a different org's row exists.
+   */
+  private async assertExistingBindingsValid(
+    orgId: string,
+    loaded: LoadedTemplate,
     bindings: Record<string, TemplateBinding>,
   ): Promise<void> {
     const credentialIds = new Set<string>();
-    const existingConnectionIds = new Set<string>();
+    const existingConnIds = new Set<string>();
     for (const binding of Object.values(bindings)) {
-      if (binding.mode === 'new') credentialIds.add(binding.credentialId);
-      else existingConnectionIds.add(binding.connectionId);
+      if (binding.mode === 'existing') existingConnIds.add(binding.connectionId);
+      else credentialIds.add(binding.credentialId);
     }
 
     const [credRows, connRows] = await Promise.all([
       credentialIds.size > 0
-        ? this.prisma.platformCredential.findMany({
-            where: { id: { in: [...credentialIds] } },
+        ? this.prisma.credential.findMany({
+            where: { id: { in: [...credentialIds] }, orgId },
             select: { id: true },
           })
         : Promise.resolve([]),
-      existingConnectionIds.size > 0
-        ? this.prisma.workflowConnection.findMany({
-            where: { id: { in: [...existingConnectionIds] } },
-            select: { id: true },
+      existingConnIds.size > 0
+        ? this.prisma.connection.findMany({
+            where: { id: { in: [...existingConnIds] }, orgId },
+            select: { id: true, scope: true },
           })
         : Promise.resolve([]),
     ]);
@@ -193,11 +200,42 @@ export class TemplatesService implements OnModuleInit {
         `Unknown credentialId(s): ${missingCreds.join(', ')}`,
       );
     }
-    const missingConns = diff(existingConnectionIds, connRows);
+    const missingConns = diff(existingConnIds, connRows);
     if (missingConns.length > 0) {
       throw new BadRequestException(
         `Unknown connectionId(s): ${missingConns.join(', ')}`,
       );
+    }
+
+    const placeholderByAlias = new Map(
+      loaded.placeholderDetails.map((p) => [p.alias, p]),
+    );
+    const connKindById = new Map<string, ConnectionScopeKind>();
+    for (const row of connRows) {
+      const parsed = connectionScopeSchema.parse(row.scope);
+      connKindById.set(row.id, parsed.kind);
+    }
+    for (const [alias, binding] of Object.entries(bindings)) {
+      const placeholder = placeholderByAlias.get(alias);
+      if (!placeholder) continue;
+      if (binding.mode === 'existing') {
+        const kind = connKindById.get(binding.connectionId);
+        if (kind) this.assertScopeCompatible(placeholder, kind);
+      }
+    }
+  }
+
+  private assertScopeCompatible(
+    placeholder: TemplatePlaceholder,
+    actualKind: ConnectionScopeKind,
+  ): void {
+    for (const expected of placeholder.expectedScopeKinds) {
+      if (expected === 'any') continue;
+      if (expected !== actualKind) {
+        throw new BadRequestException(
+          `Binding for <${placeholder.alias}> has scope kind "${actualKind}", but the template requires "${expected}" for at least one slot.`,
+        );
+      }
     }
   }
 }

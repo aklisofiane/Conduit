@@ -169,7 +169,7 @@ type McpTransport =
 
 Conduit ships a set of **preset MCP server configs** (GitHub, Slack, filesystem, etc.) that users can add with one click. Users can also add any custom MCP server by providing a transport config.
 
-Credentials are injected as environment variables when spawning `stdio` servers, or as headers for `sse`/`streamable-http` servers — resolved from the linked `WorkflowConnection` at runtime.
+Credentials are injected as environment variables when spawning `stdio` servers, or as headers for `sse`/`streamable-http` servers — resolved from the linked `Connection` (and through to its `Credential`) at runtime. See [connections.md](./connections.md).
 
 ### Workspace inheritance
 
@@ -284,10 +284,10 @@ type NodeOutput = {
 4. No cycles within a single workflow graph. Cross-run cycles — via board transitions that re-trigger the same workflow — are the intended loop mechanism; see "Cross-run iteration" below.
 5. Agents are *allowed* to be unreachable from any trigger — orphans don't fail save, they just don't execute (the runtime topo-sort drops them). This keeps edits incremental: dropping an agent on the canvas before wiring it doesn't immediately invalidate the workflow.
 6. Every trigger surfaces an issue or PR identifier — webhook events that don't (`push`, `release`, `workflow_run`, `board.column.changed`) are rejected. Polling-mode triggers always pull issue identity from the GraphQL response and pass unconditionally.
-7. All triggers in a workflow share the same `connectionId`. v1 has a single trigger today; multi-trigger workflows must still target a single repo connection.
+7. All triggers in a workflow share the same `connectionId` (and the same `boardConnectionId`, when present). v1 has a single trigger today; multi-trigger workflows must still target a single repo + at most one board connection.
 8. Every `mcpServers[].serverId` references a server defined at the workflow level.
-9. MCP servers with a `connectionId` must reference a valid `WorkflowConnection`.
-10. Polling-mode triggers require `TriggerConfig.board` only under `scope: 'issues'` + `source: 'board'`; the `pollBoardActivity` throws at tick time if it's missing under that combination. PR-scope and `source: 'repo'` polling derive the repo from the connection and ignore `board`. Webhook-mode triggers may omit it unless `event === 'board.column.changed'` (which is rejected by rule 6 anyway in v1).
+9. MCP servers with a `connectionId` must reference a valid `Connection`.
+10. Polling-mode triggers require `boardConnectionId` only under `scope: 'issues'` + `source: 'board'`; webhook triggers require it on `event === 'board.column.changed'`. The validator (`validateWorkflowDefinition`) emits `trigger-board-connection-required` when the slot is missing for those modes. PR-scope and `source: 'repo'` polling derive owner/repo from the source `Connection` (which must be `scope.kind: 'github_repo'`) and ignore the board slot. See [connections.md](./connections.md).
 
 ## Cross-run iteration
 

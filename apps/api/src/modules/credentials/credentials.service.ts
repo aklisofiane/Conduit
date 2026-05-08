@@ -1,4 +1,5 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { connectionScopeSchema, type ConnectionScope } from '@conduit/shared';
 import { PrismaService } from '../../common/prisma.service';
 import type { CreateCredentialDto, UpdateCredentialDto } from './dto';
 import { decrypt, encrypt, redactedSuffix } from './crypto';
@@ -7,8 +8,9 @@ import { decrypt, encrypt, redactedSuffix } from './crypto';
 export class CredentialsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async list() {
-    const creds = await this.prisma.platformCredential.findMany({
+  async list(orgId: string) {
+    const creds = await this.prisma.credential.findMany({
+      where: { orgId },
       orderBy: { createdAt: 'desc' },
       include: {
         _count: { select: { connections: true } },
@@ -26,9 +28,10 @@ export class CredentialsService {
     }));
   }
 
-  async create(dto: CreateCredentialDto) {
-    const created = await this.prisma.platformCredential.create({
+  async create(orgId: string, dto: CreateCredentialDto) {
+    const created = await this.prisma.credential.create({
       data: {
+        orgId,
         platform: dto.platform,
         name: dto.name,
         secret: encrypt(dto.secret),
@@ -38,9 +41,9 @@ export class CredentialsService {
     return { id: created.id, platform: created.platform, name: created.name };
   }
 
-  async update(id: string, dto: UpdateCredentialDto) {
-    await this.findOrThrow(id);
-    return this.prisma.platformCredential.update({
+  async update(orgId: string, id: string, dto: UpdateCredentialDto) {
+    await this.findOrThrow(orgId, id);
+    return this.prisma.credential.update({
       where: { id },
       data: {
         name: dto.name,
@@ -51,23 +54,25 @@ export class CredentialsService {
     });
   }
 
-  async delete(id: string) {
-    const cred = await this.findOrThrow(id);
-    const inUse = await this.prisma.workflowConnection.count({ where: { credentialId: id } });
+  async delete(orgId: string, id: string) {
+    const cred = await this.findOrThrow(orgId, id);
+    const inUse = await this.prisma.connection.count({ where: { credentialId: id } });
     if (inUse > 0) {
       throw new ConflictException(
         `Credential "${cred.name}" is used by ${inUse} connection(s) — delete them first`,
       );
     }
-    await this.prisma.platformCredential.delete({ where: { id } });
+    await this.prisma.credential.delete({ where: { id } });
   }
 
   /**
    * Looks up a credential by connection id and returns plaintext. Used at
    * agent-node runtime by the MCP config resolver — never by the public API.
+   * Server-trusted: callers (worker, config helpers) have already authorized
+   * via the run row, so no `orgId` filter here.
    */
   async decryptForConnection(connectionId: string): Promise<string | undefined> {
-    const conn = await this.prisma.workflowConnection.findUnique({
+    const conn = await this.prisma.connection.findUnique({
       where: { id: connectionId },
       include: { credential: true },
     });
@@ -76,33 +81,29 @@ export class CredentialsService {
   }
 
   /**
-   * Returns the connection's platform binding (owner/repo) along with its
-   * decrypted token. Rejects if the connection isn't on the given workflow,
-   * so config-time helpers exposed over the public API can only resolve
-   * tokens for connections the caller owns.
+   * Returns the connection's parsed scope along with its decrypted token.
+   * Server-trusted (called from worker / config-time helpers that already
+   * authorized against the workflow row); not `orgId`-scoped.
    */
   async getConnectionBinding(
-    workflowId: string,
     connectionId: string,
-  ): Promise<{ owner: string | null; repo: string | null; token: string }> {
-    const conn = await this.prisma.workflowConnection.findUnique({
+  ): Promise<{ scope: ConnectionScope; token: string }> {
+    const conn = await this.prisma.connection.findUnique({
       where: { id: connectionId },
       include: { credential: true },
     });
-    if (!conn || conn.workflowId !== workflowId) {
-      throw new NotFoundException(
-        `Connection ${connectionId} not found on workflow ${workflowId}`,
-      );
+    if (!conn) {
+      throw new NotFoundException(`Connection ${connectionId} not found`);
     }
+    const scope = connectionScopeSchema.parse(conn.scope);
     return {
-      owner: conn.owner,
-      repo: conn.repo,
+      scope,
       token: decrypt(conn.credential.secret),
     };
   }
 
-  private async findOrThrow(id: string) {
-    const cred = await this.prisma.platformCredential.findUnique({ where: { id } });
+  private async findOrThrow(orgId: string, id: string) {
+    const cred = await this.prisma.credential.findFirst({ where: { id, orgId } });
     if (!cred) throw new NotFoundException(`Credential ${id} not found`);
     return cred;
   }

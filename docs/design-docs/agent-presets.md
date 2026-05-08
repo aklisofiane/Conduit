@@ -47,7 +47,7 @@ Workflow-scoped fields (`mcpServers`, `skills`) are intentionally **absent**. Th
 | `GET` | `/agent-presets` | List all loaded presets. |
 | `GET` | `/agent-presets/:id` | Fetch one preset by id. 404 if not loaded. |
 
-Both routes go through `ApiKeyGuard`. The web client wraps them with `useAgentPresets` (`apps/web/src/api/hooks.ts`).
+Both routes go through `SessionGuard` (Better Auth session cookie). The web client wraps them with `useAgentPresets` (`apps/web/src/api/hooks.ts`).
 
 ## Canvas picker behavior
 

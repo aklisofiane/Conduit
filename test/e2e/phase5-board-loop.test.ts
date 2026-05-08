@@ -212,21 +212,32 @@ describe('Phase 5 — board loop (Worker ↔ Critic) over ticket-branch', () => 
 
     const fixture = await loadPhase5Fixture();
 
+    // Global connections — the same repo + board pair is shared across both
+    // workflows. The reshape moved connections out of the per-workflow
+    // namespace, so one row each is enough.
+    const repoConn = await harness.http.post<ConnectionResponse>('/connections', {
+      name: 'acme/shop',
+      credentialId: cred.id,
+      scope: { kind: 'github_repo', owner: 'acme', repo: 'shop' },
+    });
+    const boardConn = await harness.http.post<ConnectionResponse>('/connections', {
+      name: 'acme · project #5',
+      credentialId: cred.id,
+      scope: { kind: 'github_projects_v2', ownerType: 'org', owner: 'acme', number: 5 },
+    });
+
     // Worker workflow
     const worker = await harness.http.post<CreateWorkflowResponse>('/workflows', {
       name: fixture.worker.name,
       description: fixture.worker.description,
       definition: fixture.worker.definition,
     });
-    const workerConn = await harness.http.post<ConnectionResponse>(
-      `/workflows/${worker.id}/connections`,
-      { alias: 'github-main', credentialId: cred.id, owner: 'acme', repo: 'shop' },
-    );
     const patchedWorker: WorkflowDefinition = {
       ...worker.definition,
       triggers: worker.definition.triggers.map((t) => ({
         ...t,
-        connectionId: workerConn.id,
+        connectionId: repoConn.id,
+        boardConnectionId: boardConn.id,
       })),
     };
     await harness.http.put(`/workflows/${worker.id}`, {
@@ -240,15 +251,12 @@ describe('Phase 5 — board loop (Worker ↔ Critic) over ticket-branch', () => 
       description: fixture.critic.description,
       definition: fixture.critic.definition,
     });
-    const criticConn = await harness.http.post<ConnectionResponse>(
-      `/workflows/${critic.id}/connections`,
-      { alias: 'github-main', credentialId: cred.id, owner: 'acme', repo: 'shop' },
-    );
     const patchedCritic: WorkflowDefinition = {
       ...critic.definition,
       triggers: critic.definition.triggers.map((t) => ({
         ...t,
-        connectionId: criticConn.id,
+        connectionId: repoConn.id,
+        boardConnectionId: boardConn.id,
       })),
     };
     await harness.http.put(`/workflows/${critic.id}`, {

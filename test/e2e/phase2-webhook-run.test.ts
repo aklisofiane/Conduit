@@ -28,7 +28,7 @@ interface CreateWorkflowResponse {
 
 interface ConnectionResponse {
   id: string;
-  alias: string;
+  name: string;
   credentialId: string;
 }
 
@@ -70,22 +70,16 @@ describe('Phase 2 — webhook triggers a run and streams MCP tool calls', () => 
       definition: fixture.definition,
     });
 
-    // 3. Connection — alias + credential + webhook signing secret. The
-    //    webhook endpoint reads the signing secret off this row.
-    const connection = await harness.http.post<ConnectionResponse>(
-      `/workflows/${created.id}/connections`,
-      {
-        alias: 'github-main',
-        credentialId: cred.id,
-        owner: 'acme',
-        repo: 'triage-tests',
-        webhookSecret: WEBHOOK_SECRET,
-      },
-    );
+    // 3. Connection — global, scoped to the GitHub repo.
+    const connection = await harness.http.post<ConnectionResponse>('/connections', {
+      name: 'acme/triage-tests',
+      credentialId: cred.id,
+      scope: { kind: 'github_repo', owner: 'acme', repo: 'triage-tests' },
+    });
 
     // 4. Patch the workflow definition so the trigger points at the real
-    //    connection id, and activate it so the webhook handler doesn't
-    //    drop the delivery.
+    //    connection id, set the workflow's webhook secret, and activate it
+    //    so the webhook handler doesn't drop the delivery.
     const patched: WorkflowDefinition = {
       ...created.definition,
       triggers: created.definition.triggers.map((t) => ({
@@ -96,6 +90,9 @@ describe('Phase 2 — webhook triggers a run and streams MCP tool calls', () => 
     await harness.http.put(`/workflows/${created.id}`, {
       definition: patched,
       isActive: true,
+    });
+    await harness.http.put(`/workflows/${created.id}/webhook-secret`, {
+      secret: WEBHOOK_SECRET,
     });
 
     // 5. Script the stub provider — simulates the agent calling a GitHub

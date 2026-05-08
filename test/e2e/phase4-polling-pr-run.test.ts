@@ -122,15 +122,11 @@ describe('Phase 4 PR scope — repo polling fires runs on PR set-diff', () => {
       definition: fixture.definition,
     });
 
-    const conn = await harness.http.post<ConnectionResponse>(
-      `/workflows/${created.id}/connections`,
-      {
-        alias: 'github-main',
-        credentialId: cred.id,
-        owner: 'acme',
-        repo: 'shop',
-      },
-    );
+    const conn = await harness.http.post<ConnectionResponse>('/connections', {
+      name: 'acme/shop',
+      credentialId: cred.id,
+      scope: { kind: 'github_repo', owner: 'acme', repo: 'shop' },
+    });
 
     const patched: WorkflowDefinition = {
       ...created.definition,

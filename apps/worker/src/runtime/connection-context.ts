@@ -1,13 +1,14 @@
 import path from 'node:path';
 import type { ConnectionContext } from '@conduit/agent';
+import { connectionScopeSchema, expectScopeKind } from '@conduit/shared';
 import { prisma } from './prisma';
 import { makeCredentialLookup } from './credential-lookup';
 
 /**
- * Hydrate the subset of `WorkflowConnection` the workspace manager needs
- * for a clone. Missing owner/repo on a `repo-clone` workspace surfaces as
- * `undefined` here so the caller can throw rather than silently cloning
- * the wrong thing.
+ * Hydrate the subset of `Connection` the workspace manager needs for a
+ * clone. The bound scope must be `github_repo` — for any other kind, return
+ * `undefined` so callers can throw rather than silently cloning the wrong
+ * thing.
  *
  * **Test hook**: when `CONDUIT_TEST_REMOTE_BASE` is set, the clone URL is
  * rebased under that directory (`<base>/<owner>/<repo>.git`). Lets the
@@ -18,24 +19,27 @@ import { makeCredentialLookup } from './credential-lookup';
 export async function loadConnectionContext(
   connectionId: string,
 ): Promise<ConnectionContext | undefined> {
-  const conn = await prisma().workflowConnection.findUnique({
+  const conn = await prisma().connection.findUnique({
     where: { id: connectionId },
     include: { credential: true },
   });
-  if (!conn || !conn.owner || !conn.repo) return undefined;
+  if (!conn) return undefined;
+  const scope = connectionScopeSchema.parse(conn.scope);
+  if (scope.kind !== 'github_repo') return undefined;
+  const repo = expectScopeKind(scope, 'github_repo');
   const lookup = makeCredentialLookup();
   const token = await lookup(connectionId);
   const platform = conn.credential.platform === 'GITLAB' ? 'gitlab' : 'github';
   const host = platform === 'github' ? 'github.com' : 'gitlab.com';
   const testBase = process.env.CONDUIT_TEST_REMOTE_BASE;
   const cloneUrl = testBase
-    ? path.join(testBase, conn.owner, `${conn.repo}.git`)
-    : `https://${host}/${conn.owner}/${conn.repo}.git`;
+    ? path.join(testBase, repo.owner, `${repo.repo}.git`)
+    : `https://${host}/${repo.owner}/${repo.repo}.git`;
   return {
     id: conn.id,
     platform,
-    owner: conn.owner,
-    repo: conn.repo,
+    owner: repo.owner,
+    repo: repo.repo,
     cloneUrl,
     token,
   };

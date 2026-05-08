@@ -55,14 +55,14 @@ Note: **filesystem/shell tools are not MCP servers**. When an agent node has a w
 }
 ```
 
-The `{{credential}}` placeholder in env/headers resolves to the decrypted secret from the linked `WorkflowConnection` at runtime. Simple string replacement, not a template engine.
+The `{{credential}}` placeholder in env/headers resolves to the decrypted secret from the linked `Connection`'s `Credential` at runtime. Simple string replacement, not a template engine.
 
 ## Credential resolution
 
 Before passing the MCP config to the SDK, `runAgentNode`:
 
 1. Looks up `connectionId` on the `WorkflowMcpServer`.
-2. Decrypts the linked `PlatformCredential.secret`.
+2. Walks `Connection → Credential` and decrypts `Credential.secret`.
 3. Substitutes `{{credential}}` in `env` (stdio) or `headers` (SSE/HTTP).
 4. Passes the resolved config to the SDK.
 

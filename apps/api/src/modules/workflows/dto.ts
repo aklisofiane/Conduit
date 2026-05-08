@@ -20,3 +20,8 @@ export const updateWorkflowDtoSchema = z.object({
   isActive: z.boolean().optional(),
 });
 export type UpdateWorkflowDto = z.infer<typeof updateWorkflowDtoSchema>;
+
+export const setWebhookSecretDtoSchema = z.object({
+  secret: z.string().min(1),
+});
+export type SetWebhookSecretDto = z.infer<typeof setWebhookSecretDtoSchema>;

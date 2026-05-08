@@ -26,7 +26,7 @@ interface CreateWorkflowResponse {
 }
 interface ConnectionResponse {
   id: string;
-  alias: string;
+  name: string;
   credentialId: string;
 }
 interface RunDetail {
@@ -73,21 +73,19 @@ describe('Phase 3 — parallel fan-out, merge-back, .conduit/ propagation', () =
       definition: fixture.definition,
     });
 
-    const connection = await harness.http.post<ConnectionResponse>(
-      `/workflows/${created.id}/connections`,
-      {
-        alias: 'github-main',
-        credentialId: cred.id,
-        owner: 'acme',
-        repo: 'parallel-tests',
-        webhookSecret: WEBHOOK_SECRET,
-      },
-    );
+    const connection = await harness.http.post<ConnectionResponse>('/connections', {
+      name: 'acme/parallel-tests',
+      credentialId: cred.id,
+      scope: { kind: 'github_repo', owner: 'acme', repo: 'parallel-tests' },
+    });
 
     const patched = rewireConnectionIds(created.definition, connection.id);
     await harness.http.put(`/workflows/${created.id}`, {
       definition: patched,
       isActive: true,
+    });
+    await harness.http.put(`/workflows/${created.id}/webhook-secret`, {
+      secret: WEBHOOK_SECRET,
     });
 
     // byPrompt dispatch — each node's `instructions` contains a unique

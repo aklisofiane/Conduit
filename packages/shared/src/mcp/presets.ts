@@ -6,12 +6,12 @@ import type { McpTransport } from './transport';
  * One-click starting point for a `WorkflowMcpServer`. The UI renders these
  * as cards in the MCP server picker; clicking a card copies `transport`
  * into the workflow definition and prompts the user to bind a
- * `WorkflowConnection` whose credential's platform matches `platform`.
+ * `Connection` whose credential's platform matches `platform`.
  *
  * `transport.env` / `transport.headers` use the `{{credential}}` sentinel,
  * which `resolveMcpServers` substitutes at runtime after decrypting the
- * linked `PlatformCredential.secret`. Same mechanism as user-defined MCP
- * configs — presets get no special handling.
+ * linked `Connection`'s `Credential.secret`. Same mechanism as user-defined
+ * MCP configs — presets get no special handling.
  */
 export interface McpPreset {
   /** Stable identifier — UI keys off this, don't change once shipped. */
@@ -19,8 +19,8 @@ export interface McpPreset {
   name: string;
   description: string;
   /**
-   * `PlatformCredential.platform` value the preset expects. The UI filters
-   * the connection picker to credentials with this platform.
+   * `Credential.platform` value the preset expects. The UI filters the
+   * connection picker to credentials with this platform.
    */
   platform: Platform;
   /**

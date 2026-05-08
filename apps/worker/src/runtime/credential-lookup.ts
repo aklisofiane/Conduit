@@ -11,7 +11,7 @@ import { prisma } from './prisma';
  */
 export function makeCredentialLookup(): CredentialLookup {
   return async (connectionId: string): Promise<string | undefined> => {
-    const conn = await prisma().workflowConnection.findUnique({
+    const conn = await prisma().connection.findUnique({
       where: { id: connectionId },
       include: { credential: true },
     });

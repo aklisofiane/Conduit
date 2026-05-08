@@ -19,7 +19,7 @@ export type WorkflowMcpServer = z.infer<typeof workflowMcpServerSchema>;
 /**
  * MCP server config with credentials already substituted — the shape handed
  * to the provider SDK at runtime. Produced by `runAgentNode` after decrypting
- * the linked `WorkflowConnection` secret and replacing `{{credential}}`
+ * the linked `Connection`'s `Credential.secret` and replacing `{{credential}}`
  * placeholders in `transport.env` / `transport.headers`.
  */
 export const resolvedMcpServerSchema = z.object({

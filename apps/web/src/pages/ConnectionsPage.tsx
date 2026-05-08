@@ -1,50 +1,44 @@
 import { useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import type { ConnectionScope } from '@conduit/shared';
 import { ApiError } from '../api/client.js';
 import {
   useConnections,
   useCreateConnection,
   useCredentials,
   useDeleteConnection,
-  useWorkflow,
 } from '../api/hooks.js';
 import type { ConnectionRow, CredentialRow } from '../api/types.js';
 
+type CreateBody = {
+  credentialId: string;
+  name: string;
+  scope: ConnectionScope;
+};
+
 /**
- * Per-workflow connections. A connection binds a workflow to a
- * `PlatformCredential` via an alias, plus optional platform-specific
- * bindings (owner/repo for GitHub) and an optional webhook signing
- * secret. Dropping a connection row deletes the binding, not the
- * credential.
+ * Global Connections page. A Connection binds a typed scope (a GitHub repo,
+ * a Projects v2 board, etc.) on top of a `Credential`. Workflows reference
+ * connections by id from inside their trigger and MCP server slots —
+ * connections are no longer per-workflow.
  */
 export function ConnectionsPage() {
-  const { id: workflowId } = useParams<{ id: string }>();
-  const { data: workflow } = useWorkflow(workflowId);
-  const { data: connections = [], isLoading } = useConnections(workflowId);
+  const { data: connections = [], isLoading } = useConnections();
   const { data: credentials = [] } = useCredentials();
-  const create = useCreateConnection(workflowId ?? '');
-  const del = useDeleteConnection(workflowId ?? '');
+  const create = useCreateConnection();
+  const del = useDeleteConnection();
 
   const [creating, setCreating] = useState(false);
 
-  if (!workflowId) return null;
-
   return (
     <div className="mx-auto flex w-full max-w-[900px] flex-col gap-6 px-6 pb-16 pt-10">
-      <div className="flex items-center gap-3">
-        <Link to={`/workflows/${workflowId}`} className="btn">
-          ← canvas
-        </Link>
-        <h1
-          className="text-[34px] font-semibold leading-none tracking-tight text-[var(--color-text)]"
-          style={{ fontFamily: 'var(--font-serif)' }}
-        >
-          {workflow?.name ?? 'Workflow'}
-          <em className="text-[var(--color-claude)] not-italic"> · connections</em>
-        </h1>
-      </div>
+      <h1
+        className="text-[34px] font-semibold leading-none tracking-tight text-[var(--color-text)]"
+        style={{ fontFamily: 'var(--font-serif)' }}
+      >
+        Connections<em className="text-[var(--color-claude)] not-italic">.</em>
+      </h1>
       <p className="font-mono text-[12px] text-[var(--color-text-2)]">
-        Bind this workflow to a platform credential. Triggers and MCP servers reference connections by alias.
+        A connection picks a credential and pins it to a specific scope (a repo, a project board). Workflows reference connections directly.
       </p>
 
       <section className="rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-1)]">
@@ -86,7 +80,7 @@ export function ConnectionsPage() {
             key={conn.id}
             conn={conn}
             onDelete={async () => {
-              if (!confirm(`Delete connection "${conn.alias}"?`)) return;
+              if (!confirm(`Delete connection "${conn.name}"?`)) return;
               try {
                 await del.mutateAsync(conn.id);
               } catch (e) {
@@ -100,13 +94,13 @@ export function ConnectionsPage() {
   );
 }
 
-interface CreateBody {
-  alias: string;
-  credentialId: string;
-  owner?: string;
-  repo?: string;
-  webhookSecret?: string;
-}
+const SCOPE_KINDS = [
+  { value: 'github_repo', label: 'GitHub repo' },
+  { value: 'github_projects_v2', label: 'GitHub Projects v2 board' },
+  { value: 'none', label: 'No specific scope' },
+] as const;
+
+type ScopeKind = (typeof SCOPE_KINDS)[number]['value'];
 
 function CreateConnectionForm({
   credentials,
@@ -119,29 +113,42 @@ function CreateConnectionForm({
   onSubmit: (body: CreateBody) => Promise<void>;
   onCancel: () => void;
 }) {
-  const [alias, setAlias] = useState('');
+  const [name, setName] = useState('');
   const [credentialId, setCredentialId] = useState<string>(credentials[0]?.id ?? '');
+  const [scopeKind, setScopeKind] = useState<ScopeKind>('github_repo');
   const [owner, setOwner] = useState('');
   const [repo, setRepo] = useState('');
-  const [webhookSecret, setWebhookSecret] = useState('');
+  const [ownerType, setOwnerType] = useState<'user' | 'org'>('org');
+  const [boardNumber, setBoardNumber] = useState('');
 
   const chosen = useMemo(
     () => credentials.find((c) => c.id === credentialId),
     [credentialId, credentials],
   );
-  const needsRepo = chosen?.platform === 'GITHUB' || chosen?.platform === 'GITLAB';
 
-  const canSave = Boolean(alias && credentialId);
+  const scope = useMemo<ConnectionScope | null>(() => {
+    if (scopeKind === 'github_repo') {
+      if (!owner.trim() || !repo.trim()) return null;
+      return { kind: 'github_repo', owner: owner.trim(), repo: repo.trim() };
+    }
+    if (scopeKind === 'github_projects_v2') {
+      const num = Number(boardNumber);
+      if (!owner.trim() || !Number.isInteger(num) || num <= 0) return null;
+      return {
+        kind: 'github_projects_v2',
+        ownerType,
+        owner: owner.trim(),
+        number: num,
+      };
+    }
+    return { kind: 'none' };
+  }, [scopeKind, owner, repo, ownerType, boardNumber]);
+
+  const canSave = Boolean(name && credentialId && scope);
 
   const handleSave = async () => {
-    if (!canSave) return;
-    await onSubmit({
-      alias,
-      credentialId,
-      owner: owner || undefined,
-      repo: repo || undefined,
-      webhookSecret: webhookSecret || undefined,
-    });
+    if (!canSave || !scope) return;
+    await onSubmit({ name, credentialId, scope });
   };
 
   return (
@@ -149,13 +156,13 @@ function CreateConnectionForm({
       <div className="grid grid-cols-2 gap-3">
         <label className="flex flex-col gap-1">
           <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
-            Alias
+            Name
           </span>
           <input
             className="input"
-            placeholder="e.g. github-main"
-            value={alias}
-            onChange={(e) => setAlias(e.target.value)}
+            placeholder="e.g. acme/shop repo"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
           />
         </label>
         <label className="flex flex-col gap-1">
@@ -177,7 +184,24 @@ function CreateConnectionForm({
         </label>
       </div>
 
-      {needsRepo && (
+      <label className="flex flex-col gap-1">
+        <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+          Scope kind
+        </span>
+        <select
+          className="input"
+          value={scopeKind}
+          onChange={(e) => setScopeKind(e.target.value as ScopeKind)}
+        >
+          {SCOPE_KINDS.map((s) => (
+            <option key={s.value} value={s.value}>
+              {s.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      {scopeKind === 'github_repo' && (
         <div className="grid grid-cols-2 gap-3">
           <label className="flex flex-col gap-1">
             <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
@@ -204,28 +228,58 @@ function CreateConnectionForm({
         </div>
       )}
 
-      <label className="flex flex-col gap-1">
-        <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
-          Webhook signing secret (optional)
-        </span>
-        <input
-          className="input"
-          type="password"
-          autoComplete="new-password"
-          placeholder="Paste the secret configured in the platform's webhook settings"
-          value={webhookSecret}
-          onChange={(e) => setWebhookSecret(e.target.value)}
-        />
-        <span className="font-mono text-[10.5px] text-[var(--color-text-4)]">
-          Encrypted at rest. Required only if this connection's workflow uses a webhook trigger.
-        </span>
-      </label>
+      {scopeKind === 'github_projects_v2' && (
+        <div className="grid grid-cols-[110px_1fr_120px] gap-3">
+          <label className="flex flex-col gap-1">
+            <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+              Owner type
+            </span>
+            <select
+              className="input"
+              value={ownerType}
+              onChange={(e) => setOwnerType(e.target.value as 'user' | 'org')}
+            >
+              <option value="org">Org</option>
+              <option value="user">User</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+              Owner
+            </span>
+            <input
+              className="input"
+              placeholder="acme"
+              value={owner}
+              onChange={(e) => setOwner(e.target.value)}
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+              Project #
+            </span>
+            <input
+              className="input"
+              type="number"
+              min={1}
+              placeholder="5"
+              value={boardNumber}
+              onChange={(e) => setBoardNumber(e.target.value)}
+            />
+          </label>
+        </div>
+      )}
 
       <div className="flex justify-end gap-2">
         <button className="btn" onClick={onCancel}>
           Cancel
         </button>
-        <button className="btn primary" disabled={!canSave || pending} onClick={handleSave}>
+        <button
+          className="btn primary"
+          disabled={!canSave || pending}
+          onClick={handleSave}
+          title={chosen ? '' : 'Pick a credential'}
+        >
           {pending ? 'Saving…' : 'Save'}
         </button>
       </div>
@@ -234,22 +288,15 @@ function CreateConnectionForm({
 }
 
 function ConnectionRowView({ conn, onDelete }: { conn: ConnectionRow; onDelete: () => void }) {
-  const scope = conn.owner && conn.repo ? `${conn.owner}/${conn.repo}` : '—';
   return (
     <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4 border-b border-[var(--color-line)] px-4 py-3 last:border-b-0">
       <span className="flex h-7 w-7 items-center justify-center rounded-md border border-[var(--color-line)] bg-[var(--color-bg-2)] font-mono text-[10.5px]">
         {conn.credential.platform.slice(0, 2)}
       </span>
       <div>
-        <div className="font-mono text-[13px] font-medium">{conn.alias}</div>
+        <div className="font-mono text-[13px] font-medium">{conn.name}</div>
         <div className="font-mono text-[11px] text-[var(--color-text-3)]">
-          {conn.credential.name} · {conn.credential.platform.toLowerCase()} · {scope}
-          {conn.hasWebhookSecret && (
-            <>
-              {' '}
-              · webhook ••••{conn.webhookSecretSuffix ?? '****'}
-            </>
-          )}
+          {conn.credential.name} · {conn.credential.platform.toLowerCase()} · {scopeSummary(conn.scope)}
         </div>
       </div>
       <button className="btn" onClick={onDelete}>
@@ -257,4 +304,15 @@ function ConnectionRowView({ conn, onDelete }: { conn: ConnectionRow; onDelete: 
       </button>
     </div>
   );
+}
+
+function scopeSummary(scope: ConnectionScope): string {
+  switch (scope.kind) {
+    case 'github_repo':
+      return `${scope.owner}/${scope.repo}`;
+    case 'github_projects_v2':
+      return `${scope.owner} · project #${scope.number}`;
+    case 'none':
+      return 'no scope';
+  }
 }

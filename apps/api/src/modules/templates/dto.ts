@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { connectionScopeSchema } from '@conduit/shared';
 
 export const templateBindingSchema = z.union([
   z.object({
@@ -7,11 +8,9 @@ export const templateBindingSchema = z.union([
   }),
   z.object({
     mode: z.literal('new'),
-    alias: z.string().min(1).max(60),
+    name: z.string().min(1).max(120),
     credentialId: z.string().min(1),
-    owner: z.string().min(1).optional(),
-    repo: z.string().min(1).optional(),
-    webhookSecret: z.string().min(1).optional(),
+    scope: connectionScopeSchema,
   }),
 ]);
 export type TemplateBinding = z.infer<typeof templateBindingSchema>;

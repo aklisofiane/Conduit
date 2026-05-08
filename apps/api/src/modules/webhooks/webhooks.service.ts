@@ -17,7 +17,7 @@ export interface WebhookResult {
 }
 
 /**
- * Webhook ingestion. Verifies the HMAC signature against the connection's
+ * Webhook ingestion. Verifies the HMAC signature against the workflow's
  * stored `webhookSecret`, normalizes the platform payload into a
  * `TriggerEvent`, applies trigger filters, and — on match — starts a run via
  * `WorkflowsService.startRun`. Keeps business logic off the controller so
@@ -36,7 +36,6 @@ export class WebhooksService {
   async handleGithub(workflowId: string, req: RawBodyRequest): Promise<WebhookResult> {
     const workflow = await this.prisma.workflow.findUnique({
       where: { id: workflowId },
-      include: { connections: true },
     });
     if (!workflow) throw new NotFoundException(`Workflow ${workflowId} not found`);
 
@@ -48,16 +47,6 @@ export class WebhooksService {
       );
     }
 
-    // Credential lookup: the trigger's connectionId identifies which
-    // connection's signing secret to use. We never fall back across
-    // connections — a mismatched secret must fail auth, not silently pass.
-    const connection = workflow.connections.find((c) => c.id === trigger.connectionId);
-    if (!connection) {
-      throw new UnauthorizedException(
-        `Workflow ${workflowId} trigger references unknown connection ${trigger.connectionId}`,
-      );
-    }
-
     const rawBody = req.rawBody;
     if (!rawBody) {
       this.logger.error('Raw body missing on webhook request — check main.ts body parser setup');
@@ -65,7 +54,7 @@ export class WebhooksService {
     }
 
     const signatureHeader = headerString(req.headers['x-hub-signature-256']);
-    if (!this.verify(connection.webhookSecret, rawBody, signatureHeader)) {
+    if (!this.verify(workflow.webhookSecret, rawBody, signatureHeader)) {
       throw new UnauthorizedException('Invalid webhook signature');
     }
 
@@ -92,7 +81,10 @@ export class WebhooksService {
       return { status: 'filtered' };
     }
 
-    const run = await this.workflows.startRun(workflowId, triggerEvent);
+    // Webhook path is HMAC-only and unguarded — there's no session to read
+    // `activeOrganizationId` from. Take the workflow row's `orgId` as the
+    // authoritative tenant for the run we're about to start.
+    const run = await this.workflows.startRun(workflow.orgId, workflowId, triggerEvent);
     if (!run) {
       // ticket-branch workflow already running on this ticket — swallow the
       // trigger so GitHub doesn't retry. See DuplicateRunError in the

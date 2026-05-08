@@ -13,7 +13,7 @@
             "id": "trigger-analyze",
             "name": "AnalyzeTrigger",
             "platform": "github",
-            "connectionId": "<github>",
+            "connectionId": "<github-repo>",
             "mode": { "kind": "webhook", "event": "issues.opened" },
             "filters": []
           }
@@ -50,7 +50,7 @@
           {
             "id": "github-mcp",
             "presetId": "github",
-            "connectionId": "<github>"
+            "connectionId": "<github-repo>"
           }
         ],
         "ui": {

@@ -36,7 +36,7 @@
 | App | Stack | Responsibility |
 |---|---|---|
 | `apps/api` | NestJS 11, Socket.IO, Prisma | Webhook ingestion + signature verify, workflow CRUD, trigger matching, Temporal client, WS gateway for live run updates. Owns polling-trigger `Schedule` lifecycle (create / update / delete on workflow save + boot-time reconcile) via `TemporalService.upsertPollSchedule` |
-| `apps/web` | React 19, Vite 8, `@xyflow/react`, TanStack Query, Zustand, Tailwind v4 + shadcn/ui (New York/Zinc), react-hook-form + Zod | Canvas editor (design only), agent config UI, trigger config UI (webhook / polling mode toggle, `BoardRef` fieldset, filter builder), run history + dedicated run detail page with streaming logs |
+| `apps/web` | React 19, Vite 8, `@xyflow/react`, TanStack Query, Zustand, Tailwind v4 + shadcn/ui (New York/Zinc), react-hook-form + Zod | Canvas editor (design only), agent config UI, trigger config UI (webhook / polling mode toggle, stacked Repo + Board connection sub-rows, filter builder), run history + dedicated run detail page with streaming logs |
 | `apps/worker` | Temporal TS SDK | Executes `agentWorkflow` — loads nodes, topo sorts, invokes the orchestrator activity per node. The activity spawns a fresh `agent-runner` container, writes a `RunnerRequest` to its stdin, and translates each returned `RunnerEvent` back into Prisma writes + Redis publishes + Temporal heartbeats. Also executes `pollWorkflow` → `pollBoardActivity` when a Temporal Schedule fires — dispatches on the trigger's `mode.scope` / `mode.source` (Projects v2 board, repo issues, or repo PRs), diffs the matching set against `PollSnapshot`, and starts `agentWorkflow`s for new matches. **Provider SDKs no longer live here** — they're baked into the runner image |
 | `apps/agent-runner` | `@anthropic-ai/claude-agent-sdk`, `@openai/codex-sdk`, `@conduit/agent` | One short-lived container per agent node. Reads `RunnerRequest` on stdin, drives the provider session (main → optional issue-writeback → final summary turn), streams `AgentEvent`s as JSON lines on stdout, emits a terminal `exit` carrying head/changedFiles/`.conduit/<NodeName>.md`. No DB, no Redis, no master KEK, no other runs' credentials. See [design-docs/agent-execution.md > Runner container model](./design-docs/agent-execution.md#runner-container-model) |
 
@@ -111,7 +111,14 @@ The V8 sandbox constraint still applies: workflow file imports nothing Node-spec
 
 ## API surface
 
-All routes prefixed `/api`. Non-webhook routes require `X-API-Key` header (see [SECURITY.md](./SECURITY.md)).
+All routes prefixed `/api`. Non-webhook routes require a Better Auth session cookie (see [design-docs/auth-integration.md](./design-docs/auth-integration.md)).
+
+### Auth
+
+| Method | Path | Description |
+|---|---|---|
+| `*`    | `/auth/*` | Better Auth handler (sign-up/sign-in/sign-out/get-session, `organization/*`). Mounted **before** `express.json()` so the handler sees the raw body. |
+| `GET`  | `/auth-config` | Public — returns `{ deployment, oauthProviders }`. Drives which login buttons the web UI renders. |
 
 ### Workflows
 
@@ -137,20 +144,33 @@ All routes prefixed `/api`. Non-webhook routes require `X-API-Key` header (see [
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/hooks/:workflowId` | Inbound platform webhook. HMAC-SHA256 verified against the connection's `webhookSecret` (GitHub: `X-Hub-Signature-256`). Unauthenticated by API key — the platform doesn't carry one. Normalizes the payload to a `TriggerEvent`, applies filters, starts a run. Returns `200 started | filtered | unsupported` so the platform doesn't retry soft drops; `401` only for auth failures, `404` for unknown workflow. |
+| `POST` | `/hooks/:workflowId` | Inbound platform webhook. HMAC-SHA256 verified against `Workflow.webhookSecret` (GitHub: `X-Hub-Signature-256`). Not session-guarded — the platform doesn't carry a session cookie. Normalizes the payload to a `TriggerEvent`, applies filters, starts a run. Returns `200 started | filtered | unsupported | duplicate-dropped` so the platform doesn't retry soft drops; `401` only for auth failures, `404` for unknown workflow. |
 
-### Credentials & Connections
+### Credentials
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/credentials` | List platform credentials (secrets redacted) |
+| `GET` | `/credentials` | List `Credential` rows (secrets redacted, with `connectionCount` + suffix) |
 | `POST` | `/credentials` | Create a credential (encrypted at rest) |
-| `PUT` | `/credentials/:id` | Update credential (rotate secret) |
-| `DELETE` | `/credentials/:id` | Delete credential (fails if in use by connections) |
-| `GET` | `/workflows/:id/connections` | List connections (secrets redacted — `hasWebhookSecret` + `webhookSecretSuffix` only) |
-| `POST` | `/workflows/:id/connections` | Create a connection (alias + credential + optional owner/repo + optional webhook signing secret) |
-| `PUT` | `/workflows/:id/connections/:connId` | Update bindings. `webhookSecret: ""` clears it; omitting the field leaves it alone |
-| `DELETE` | `/workflows/:id/connections/:connId` | Delete a connection |
+| `PUT` | `/credentials/:id` | Update credential (rotate secret) — propagates to every Connection that references it |
+| `DELETE` | `/credentials/:id` | Delete credential (409 if any Connection references it — detach connections first) |
+
+### Connections
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/connections` | List `Connection` rows. Optional filters: `?platform=GITHUB`, `?scopeKind=github_repo`. Used by the canvas's trigger Repo / Board pickers and the global Connections page. |
+| `GET` | `/connections/:id` | Fetch one connection with its joined credential summary |
+| `POST` | `/connections` | Create a connection — `{ credentialId, name, scope }` where `scope` is the typed discriminated union (see [design-docs/connections.md](./design-docs/connections.md)) |
+| `PATCH` | `/connections/:id` | Update connection `{ credentialId?, name?, scope? }` |
+| `DELETE` | `/connections/:id` | Delete a connection. 409 if any workflow's `definition` JSON references it (trigger or MCP slot) — body lists the blocking workflows. |
+
+### Workflow webhook secret
+
+| Method | Path | Description |
+|---|---|---|
+| `PUT` | `/workflows/:id/webhook-secret` | Body: `{ secret }`. Encrypts and stores on `Workflow.webhookSecret`. Rotating overwrites — single secret per workflow in v1. |
+| `DELETE` | `/workflows/:id/webhook-secret` | Clear the workflow's webhook secret (sets the column to `null`). |
 
 ### MCP
 
@@ -162,8 +182,8 @@ All routes prefixed `/api`. Non-webhook routes require `X-API-Key` header (see [
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/workflows/:id/trigger/list-projects` | Body: `{ connectionId, ownerType: 'user' \| 'org', owner }`. Resolves the workflow's connection binding via `CredentialsService.getConnectionBinding`, calls `listProjectBoards` (`@conduit/shared/platform`), returns `ProjectBoardSummary[]` — number, title, url, single-select fields with options. Drives the board dropdown + filter-value dropdowns in the trigger config UI. Bad token / missing scope / unknown owner surface as `400` so the message renders inline next to the input, mirroring `/mcp/introspect`. The web side calls this through `useListProjectBoards` (`useQuery`, keyed on `(connectionId, ownerType, owner)`, 30s `staleTime`), so toggling between webhook and polling modes — or revisiting the same owner — hits cache. |
-| `POST` | `/workflows/:id/trigger/list-labels` | Body: `{ connectionId }`. Same binding lookup; reads the connection's bound `owner`/`repo` and calls `listRepoLabels` (`@conduit/shared/platform`). Returns `RepoLabel[]` (name, color, description). Drives the **Allowed labels** picker in the agent panel's issue-writeback control — see [agent-execution.md > Issue writeback](./design-docs/agent-execution.md#issue-writeback). 400 if the connection isn't bound to a repo. The web side calls it via `useListLabels` (30s `staleTime`). |
+| `POST` | `/trigger/list-projects` | Body: `{ connectionId, ownerType: 'user' \| 'org', owner }`. Resolves the connection via `CredentialsService.getConnectionBinding`, calls `listProjectBoards` (`@conduit/shared/platform`), returns `ProjectBoardSummary[]` — number, title, url, single-select fields with options. Drives the board dropdown + filter-value dropdowns in the trigger config UI. Bad token / missing scope / unknown owner surface as `400` so the message renders inline next to the input, mirroring `/mcp/introspect`. The web side calls this through `useListProjectBoards` (`useQuery`, keyed on `(connectionId, ownerType, owner)`, 30s `staleTime`). |
+| `POST` | `/trigger/list-labels` | Body: `{ connectionId }`. Same binding lookup; the connection must have `scope.kind === 'github_repo'` (400 otherwise) — `owner`/`repo` come from the parsed scope. Calls `listRepoLabels` (`@conduit/shared/platform`); returns `RepoLabel[]`. Drives the **Allowed labels** picker in the agent panel's issue-writeback control — see [agent-execution.md > Issue writeback](./design-docs/agent-execution.md#issue-writeback). The web side calls it via `useListLabels` (30s `staleTime`). |
 
 ### Skills
 
@@ -177,7 +197,7 @@ All routes prefixed `/api`. Non-webhook routes require `X-API-Key` header (see [
 |---|---|---|
 | `GET` | `/templates` | List workflow templates loaded from `/templates/*.json` at boot — id, name, description, category, `workflowCount`, and the unique `<alias>` connection placeholders the bundle references. Templates that reference an unknown `presetId` are skipped at boot. |
 | `GET` | `/templates/:id` | Fetch a single template summary (same shape as list entries). 404 if the id isn't loaded. |
-| `POST` | `/workflows/from-template/:templateId` | Create **all** workflows in the template atomically. Body: `{ bindings: Record<alias, Binding> }` where `Binding` is `{ mode: 'existing', connectionId }` or `{ mode: 'new', alias, credentialId, owner?, repo?, webhookSecret? }`. A single Prisma `$transaction` inserts N workflow rows + one `WorkflowConnection` per (workflow × `new` binding), substitutes placeholder ids, runs `validateWorkflowDefinition` per workflow, then upserts Temporal poll schedules. 400 on missing bindings, unknown credential/connection ids, or post-substitution validation failures. |
+| `POST` | `/workflows/from-template/:templateId` | Create **all** workflows in the template atomically. Body: `{ bindings: Record<alias, Binding> }` where `Binding` is `{ mode: 'existing', connectionId }` or `{ mode: 'new', name, credentialId, scope }` (`scope` is the typed discriminated union — see [design-docs/connections.md](./design-docs/connections.md)). A single Prisma `$transaction` materializes any `new` bindings into `Connection` rows once, then creates N workflow rows with placeholder ids substituted into each `definition`. `validateWorkflowDefinition` runs per workflow inside the transaction, and connection scope-kinds are checked against each placeholder's expected slot kinds. 400 on missing bindings, unknown credential/connection ids, scope-kind mismatch, or post-substitution validation failures. Polling schedules upsert after commit. |
 
 ### Agent presets
 

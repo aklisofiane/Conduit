@@ -1,12 +1,15 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import type { ConnectionScope } from '@conduit/shared';
 import { ApiError } from '../../api/client.js';
 import {
+  useConnections,
   useCreateFromTemplate,
   useCredentials,
   useTemplates,
 } from '../../api/hooks.js';
 import type {
+  ConnectionRow,
   CredentialRow,
   TemplateBinding,
   TemplateSummary,
@@ -15,6 +18,7 @@ import type {
 export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
   const { data: templates = [], isLoading } = useTemplates();
   const { data: credentials = [] } = useCredentials();
+  const { data: connections = [] } = useConnections();
   const createFromTemplate = useCreateFromTemplate();
   const navigate = useNavigate();
 
@@ -28,7 +32,7 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
       const b = bindings[p];
       if (!b) return false;
       if (b.mode === 'existing') return Boolean(b.connectionId);
-      return Boolean(b.alias && b.credentialId);
+      return Boolean(b.name && b.credentialId && b.scope);
     });
 
   const handlePick = (t: TemplateSummary) => {
@@ -37,7 +41,7 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
       Object.fromEntries(
         t.placeholders.map<[string, TemplateBinding]>((alias) => [
           alias,
-          { mode: 'new', alias, credentialId: credentials[0]?.id ?? '' },
+          newBindingForAlias(alias, credentials[0]?.id ?? ''),
         ]),
       ),
     );
@@ -126,6 +130,7 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
                       alias={alias}
                       binding={bindings[alias]}
                       credentials={credentials}
+                      connections={connections}
                       onChange={(b) =>
                         setBindings((prev) => ({ ...prev, [alias]: b }))
                       }
@@ -197,18 +202,49 @@ function TemplateCard({
   );
 }
 
+/**
+ * Map a placeholder alias to a sensible default scope. Aliases follow the
+ * `<github-repo>` / `<github-board>` convention; anything else falls back
+ * to `github_repo` until templates demand richer kinds.
+ */
+function defaultScopeForAlias(alias: string): ConnectionScope {
+  if (/board/.test(alias)) {
+    return { kind: 'github_projects_v2', ownerType: 'org', owner: '', number: 1 };
+  }
+  return { kind: 'github_repo', owner: '', repo: '' };
+}
+
+function newBindingForAlias(alias: string, credentialId: string): TemplateBinding {
+  return {
+    mode: 'new',
+    name: alias,
+    credentialId,
+    scope: defaultScopeForAlias(alias),
+  };
+}
+
 function BindingRow({
   alias,
   binding,
   credentials,
+  connections,
   onChange,
 }: {
   alias: string;
   binding: TemplateBinding | undefined;
   credentials: CredentialRow[];
+  connections: ConnectionRow[];
   onChange: (b: TemplateBinding) => void;
 }) {
   const mode = binding?.mode ?? 'new';
+  const expectedKind = useMemo<ConnectionScope['kind']>(
+    () =>
+      /board/.test(alias) ? 'github_projects_v2' : 'github_repo',
+    [alias],
+  );
+  const eligibleConnections = connections.filter(
+    (c) => c.scope.kind === expectedKind,
+  );
 
   return (
     <div className="rounded-md border border-[var(--color-line)] bg-[var(--color-bg-2)] p-3">
@@ -221,14 +257,14 @@ function BindingRow({
           <ModeButton
             active={mode === 'new'}
             onClick={() =>
-              onChange({
-                mode: 'new',
-                alias,
-                credentialId:
+              onChange(
+                newBindingForAlias(
+                  alias,
                   (binding?.mode === 'new' ? binding.credentialId : '') ||
-                  credentials[0]?.id ||
-                  '',
-              })
+                    credentials[0]?.id ||
+                    '',
+                ),
+              )
             }
           >
             New
@@ -238,7 +274,8 @@ function BindingRow({
             onClick={() =>
               onChange({
                 mode: 'existing',
-                connectionId: binding?.mode === 'existing' ? binding.connectionId : '',
+                connectionId:
+                  binding?.mode === 'existing' ? binding.connectionId : '',
               })
             }
           >
@@ -248,50 +285,138 @@ function BindingRow({
       </div>
 
       {binding?.mode === 'new' && (
-        <div className="mt-3 grid grid-cols-2 gap-3">
-          <LabeledInput
-            label="Alias"
-            value={binding.alias}
-            onChange={(v) => onChange({ ...binding, alias: v })}
-          />
-          <LabeledSelect
-            label="Credential"
-            value={binding.credentialId}
-            onChange={(v) => onChange({ ...binding, credentialId: v })}
-          >
-            <option value="" disabled>
-              {credentials.length === 0 ? 'No credentials yet' : 'Pick one…'}
-            </option>
-            {credentials.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.platform.toLowerCase()} · {c.name}
-              </option>
-            ))}
-          </LabeledSelect>
-          <LabeledInput
-            label="Owner (optional)"
-            value={binding.owner ?? ''}
-            onChange={(v) => onChange({ ...binding, owner: v || undefined })}
-          />
-          <LabeledInput
-            label="Repo (optional)"
-            value={binding.repo ?? ''}
-            onChange={(v) => onChange({ ...binding, repo: v || undefined })}
-          />
-        </div>
+        <NewBindingFields
+          binding={binding}
+          credentials={credentials}
+          onChange={onChange}
+        />
       )}
 
       {binding?.mode === 'existing' && (
         <div className="mt-3">
-          <LabeledInput
-            label="Connection ID"
+          <LabeledSelect
+            label="Connection"
             value={binding.connectionId}
             onChange={(v) => onChange({ ...binding, connectionId: v })}
-            placeholder="paste an existing WorkflowConnection id"
-          />
+          >
+            <option value="" disabled>
+              {eligibleConnections.length === 0
+                ? `No ${expectedKind} connections yet`
+                : 'Pick one…'}
+            </option>
+            {eligibleConnections.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name} · {c.credential.platform.toLowerCase()}
+              </option>
+            ))}
+          </LabeledSelect>
         </div>
       )}
     </div>
+  );
+}
+
+function NewBindingFields({
+  binding,
+  credentials,
+  onChange,
+}: {
+  binding: Extract<TemplateBinding, { mode: 'new' }>;
+  credentials: CredentialRow[];
+  onChange: (b: TemplateBinding) => void;
+}) {
+  const setScope = (scope: ConnectionScope) => onChange({ ...binding, scope });
+  return (
+    <div className="mt-3 grid grid-cols-2 gap-3">
+      <LabeledInput
+        label="Name"
+        value={binding.name}
+        onChange={(v) => onChange({ ...binding, name: v })}
+      />
+      <LabeledSelect
+        label="Credential"
+        value={binding.credentialId}
+        onChange={(v) => onChange({ ...binding, credentialId: v })}
+      >
+        <option value="" disabled>
+          {credentials.length === 0 ? 'No credentials yet' : 'Pick one…'}
+        </option>
+        {credentials.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.platform.toLowerCase()} · {c.name}
+          </option>
+        ))}
+      </LabeledSelect>
+
+      {binding.scope.kind === 'github_repo' && (
+        <RepoScopeFields scope={binding.scope} setScope={setScope} />
+      )}
+
+      {binding.scope.kind === 'github_projects_v2' && (
+        <BoardScopeFields scope={binding.scope} setScope={setScope} />
+      )}
+    </div>
+  );
+}
+
+function RepoScopeFields({
+  scope,
+  setScope,
+}: {
+  scope: Extract<ConnectionScope, { kind: 'github_repo' }>;
+  setScope: (s: ConnectionScope) => void;
+}) {
+  return (
+    <>
+      <LabeledInput
+        label="Owner"
+        value={scope.owner}
+        onChange={(v) => setScope({ kind: 'github_repo', owner: v, repo: scope.repo })}
+      />
+      <LabeledInput
+        label="Repo"
+        value={scope.repo}
+        onChange={(v) => setScope({ kind: 'github_repo', owner: scope.owner, repo: v })}
+      />
+    </>
+  );
+}
+
+function BoardScopeFields({
+  scope,
+  setScope,
+}: {
+  scope: Extract<ConnectionScope, { kind: 'github_projects_v2' }>;
+  setScope: (s: ConnectionScope) => void;
+}) {
+  return (
+    <>
+      <LabeledSelect
+        label="Owner type"
+        value={scope.ownerType}
+        onChange={(v) =>
+          setScope({ ...scope, ownerType: v as 'user' | 'org' })
+        }
+      >
+        <option value="org">Org</option>
+        <option value="user">User</option>
+      </LabeledSelect>
+      <LabeledInput
+        label="Owner"
+        value={scope.owner}
+        onChange={(v) => setScope({ ...scope, owner: v })}
+      />
+      <LabeledInput
+        label="Project #"
+        value={String(scope.number)}
+        onChange={(v) => {
+          const num = Number(v);
+          if (Number.isInteger(num) && num > 0) {
+            setScope({ ...scope, number: num });
+          }
+        }}
+      />
+    </>
   );
 }
 

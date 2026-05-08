@@ -41,7 +41,7 @@ export function McpServerPicker({ agent, workflowId, onChange }: Props) {
   const addMcpServer = useWorkflowEditor((s) => s.addMcpServer);
   const removeMcpServer = useWorkflowEditor((s) => s.removeMcpServer);
   const servers = useWorkflowEditor((s) => s.draft?.mcpServers ?? []);
-  const { data: connections = [] } = useConnections(workflowId);
+  const { data: connections = [] } = useConnections();
   const [showAdd, setShowAdd] = useState(false);
 
   const attachedByServerId = useMemo(
@@ -198,7 +198,7 @@ function ServerCard({
             <option value="">(none)</option>
             {connections.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.alias} · {c.credential.platform.toLowerCase()}
+                {c.name} · {c.credential.platform.toLowerCase()}
               </option>
             ))}
           </select>
@@ -322,7 +322,7 @@ function AddServerForm({
 
 type ConnectionOption = {
   id: string;
-  alias: string;
+  name: string;
   credential: { platform: string };
 };
 
@@ -390,7 +390,7 @@ function PresetPicker({
               <option value="">(none)</option>
               {eligible.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.alias}
+                  {c.name}
                 </option>
               ))}
             </select>
@@ -525,7 +525,7 @@ function CustomServerForm({
           <option value="">(none)</option>
           {connections.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.alias} · {c.credential.platform.toLowerCase()}
+              {c.name} · {c.credential.platform.toLowerCase()}
             </option>
           ))}
         </select>

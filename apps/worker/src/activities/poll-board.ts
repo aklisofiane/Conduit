@@ -2,6 +2,8 @@ import { WorkflowExecutionAlreadyStartedError } from '@temporalio/client';
 import {
   AGENT_WORKFLOW_TYPE,
   agentWorkflowId,
+  connectionScopeSchema,
+  expectScopeKind,
   matchesTrigger,
   ticketLockFor,
   type PollCycleResult,
@@ -58,16 +60,21 @@ export async function pollBoardActivity(
     throw new Error(`Polling for platform "${trigger.platform}" not implemented`);
   }
 
-  const connection = await prisma().workflowConnection.findUnique({
+  // Source connection — must be a `github_repo` scope for repo-source paths
+  // (PRs always, issues with `source: 'repo'`); board polling only needs
+  // its credential, but we still walk the same lookup so token decryption
+  // happens in one place.
+  const sourceConn = await prisma().connection.findUnique({
     where: { id: trigger.connectionId },
     include: { credential: true },
   });
-  if (!connection) {
+  if (!sourceConn) {
     throw new Error(
       `Workflow ${workflowId} trigger references unknown connection ${trigger.connectionId}`,
     );
   }
-  const token = decryptSecret(connection.credential.secret, loadEncryptionKey());
+  const sourceScope = connectionScopeSchema.parse(sourceConn.scope);
+  const token = decryptSecret(sourceConn.credential.secret, loadEncryptionKey());
 
   const scope = trigger.mode.scope;
   const source = trigger.mode.source;
@@ -79,35 +86,41 @@ export async function pollBoardActivity(
   // pipeline (filter, dedup, event-build) doesn't care which one fired.
   let items;
   if (scope === 'pull_requests') {
-    if (!connection.owner || !connection.repo) {
-      throw new Error(
-        `Workflow ${workflowId} polling PR trigger requires connection owner/repo`,
-      );
-    }
+    const repoScope = expectScopeKind(sourceScope, 'github_repo');
     items = await fetchRepositoryPullRequests({
-      owner: connection.owner,
-      name: connection.repo,
+      owner: repoScope.owner,
+      name: repoScope.repo,
       token,
     });
   } else if (source === 'repo') {
-    if (!connection.owner || !connection.repo) {
-      throw new Error(
-        `Workflow ${workflowId} polling issue trigger (source: repo) requires connection owner/repo`,
-      );
-    }
+    const repoScope = expectScopeKind(sourceScope, 'github_repo');
     items = await fetchRepositoryIssues({
-      owner: connection.owner,
-      name: connection.repo,
+      owner: repoScope.owner,
+      name: repoScope.repo,
       token,
     });
   } else {
-    if (!trigger.board) {
-      throw new Error(`Workflow ${workflowId} polling issue trigger has no board reference`);
+    if (!trigger.boardConnectionId) {
+      throw new Error(
+        `Workflow ${workflowId} polling issue trigger has no boardConnectionId`,
+      );
     }
+    const boardConn = await prisma().connection.findUnique({
+      where: { id: trigger.boardConnectionId },
+    });
+    if (!boardConn) {
+      throw new Error(
+        `Workflow ${workflowId} trigger references unknown board connection ${trigger.boardConnectionId}`,
+      );
+    }
+    const boardScope = expectScopeKind(
+      connectionScopeSchema.parse(boardConn.scope),
+      'github_projects_v2',
+    );
     const boardItems = await fetchProjectBoardItems({
-      ownerType: trigger.board.ownerType,
-      owner: trigger.board.owner,
-      projectNumber: trigger.board.number,
+      ownerType: boardScope.ownerType,
+      owner: boardScope.owner,
+      projectNumber: boardScope.number,
       token,
     });
     // Drop PRs and DraftIssues so issue triggers only see real issues.
@@ -131,7 +144,7 @@ export async function pollBoardActivity(
   const gatedOutCount = candidateEvents.length - eventsToStart.length;
 
   const outcomes = await Promise.all(
-    eventsToStart.map((event) => startAgentWorkflow(workflowId, definition, event)),
+    eventsToStart.map((event) => startAgentWorkflow(workflowId, wf.orgId, definition, event)),
   );
   const startedRunIds = outcomes
     .filter((o): o is Extract<StartOutcome, { ok: true }> => o.ok)
@@ -147,7 +160,11 @@ export async function pollBoardActivity(
   if (snapshotChanged) {
     await prisma().pollSnapshot.upsert({
       where: { workflowId },
-      create: { workflowId, matchingIds: matchingIds as unknown as object },
+      create: {
+        workflowId,
+        orgId: wf.orgId,
+        matchingIds: matchingIds as unknown as object,
+      },
       update: { matchingIds: matchingIds as unknown as object, polledAt: new Date() },
     });
   }
@@ -195,6 +212,7 @@ type StartOutcome =
 
 async function startAgentWorkflow(
   workflowId: string,
+  orgId: string,
   definition: WorkflowDefinition,
   triggerEvent: TriggerEvent,
 ): Promise<StartOutcome> {
@@ -203,6 +221,7 @@ async function startAgentWorkflow(
   const run = await prisma().workflowRun.create({
     data: {
       workflowId,
+      orgId,
       status: 'PENDING',
       trigger: triggerEvent as unknown as object,
     },
@@ -241,6 +260,7 @@ async function startAgentWorkflow(
     });
     await writeSystemLog(
       run.id,
+      orgId,
       null,
       `pollBoardActivity: failed to start agentWorkflow: ${errMsg}`,
       'ERROR',

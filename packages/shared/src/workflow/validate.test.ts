@@ -41,21 +41,21 @@ function agentNode(name = 'Worker') {
 }
 
 describe('validateWorkflowDefinition', () => {
-  it('passes a workflow with a polling trigger', () => {
+  it('passes a workflow with a polling board trigger that carries a board connection', () => {
     const def = baseDefinition({
       nodes: [agentNode()],
       triggers: [
         trigger({
           mode: { kind: 'polling', intervalSec: 60, scope: 'issues', source: 'board' },
           filters: [{ field: 'status', value: 'Dev' }],
-          board: { ownerType: 'org', owner: 'acme', number: 1 },
+          boardConnectionId: 'conn_board_1',
         }),
       ],
     });
     expect(validateWorkflowDefinition(def)).toEqual([]);
   });
 
-  it('passes a workflow with issues.opened webhook', () => {
+  it('passes a workflow with issues.opened webhook (no board needed)', () => {
     const def = baseDefinition({ nodes: [agentNode()] });
     expect(validateWorkflowDefinition(def)).toEqual([]);
   });
@@ -74,14 +74,14 @@ describe('validateWorkflowDefinition', () => {
       triggers: [
         trigger({
           mode: { kind: 'webhook', event: 'board.column.changed' },
-          board: { ownerType: 'org', owner: 'acme', number: 1 },
+          boardConnectionId: 'conn_board_1',
         }),
       ],
     });
     const issues = validateWorkflowDefinition(def);
-    expect(issues).toHaveLength(1);
-    expect(issues[0]!.code).toBe('trigger-requires-issue-or-pr');
-    expect(issues[0]!.nodeName).toBe('Trigger1');
+    // board.column.changed is not on the issue/PR allowlist (today),
+    // separate from board-connection-required.
+    expect(issues.map((i) => i.code)).toContain('trigger-requires-issue-or-pr');
   });
 
   it('rejects an unsupported webhook event', () => {
@@ -117,6 +117,52 @@ describe('validateWorkflowDefinition', () => {
     });
     const issues = validateWorkflowDefinition(def);
     expect(issues.map((i) => i.code)).toContain('triggers-must-share-connection');
+  });
+
+  it('rejects a polling-board trigger missing boardConnectionId', () => {
+    const def = baseDefinition({
+      nodes: [agentNode()],
+      triggers: [
+        trigger({
+          mode: { kind: 'polling', intervalSec: 60, scope: 'issues', source: 'board' },
+        }),
+      ],
+    });
+    const issues = validateWorkflowDefinition(def);
+    expect(issues.map((i) => i.code)).toContain('trigger-board-connection-required');
+  });
+
+  it('rejects a board.column.changed webhook missing boardConnectionId (orthogonal to issue/PR rule)', () => {
+    const def = baseDefinition({
+      nodes: [agentNode()],
+      triggers: [
+        trigger({ mode: { kind: 'webhook', event: 'board.column.changed' } }),
+      ],
+    });
+    const codes = validateWorkflowDefinition(def).map((i) => i.code);
+    expect(codes).toContain('trigger-board-connection-required');
+  });
+
+  it('rejects a workflow whose triggers reference different boardConnectionIds', () => {
+    const def = baseDefinition({
+      nodes: [agentNode()],
+      triggers: [
+        trigger({
+          id: 't1',
+          name: 'T1',
+          mode: { kind: 'polling', intervalSec: 60, scope: 'issues', source: 'board' },
+          boardConnectionId: 'conn_board_a',
+        }),
+        trigger({
+          id: 't2',
+          name: 'T2',
+          mode: { kind: 'polling', intervalSec: 60, scope: 'issues', source: 'board' },
+          boardConnectionId: 'conn_board_b',
+        }),
+      ],
+    });
+    const issues = validateWorkflowDefinition(def);
+    expect(issues.map((i) => i.code)).toContain('triggers-must-share-board-connection');
   });
 });
 

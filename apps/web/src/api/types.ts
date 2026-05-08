@@ -1,5 +1,7 @@
 import type {
   AgentEvent,
+  ConnectionScope,
+  ConnectionScopeKind,
   DiscoveredTool,
   ExecutionLogKind,
   LogLevel,
@@ -107,31 +109,27 @@ export interface CredentialRow {
 
 export interface ConnectionRow {
   id: string;
-  workflowId: string;
-  alias: string;
+  name: string;
   credentialId: string;
   credential: {
     id: string;
     name: string;
     platform: 'GITHUB' | 'GITLAB' | 'JIRA' | 'SLACK' | 'DISCORD';
   };
-  owner: string | null;
-  repo: string | null;
-  hasWebhookSecret: boolean;
-  webhookSecretSuffix: string | null;
+  scope: ConnectionScope;
+  createdAt: string;
+  updatedAt: string;
 }
 
-export type { TemplateSummary, AgentPreset };
+export type { ConnectionScope, ConnectionScopeKind, TemplateSummary, AgentPreset };
 
 export type TemplateBinding =
   | { mode: 'existing'; connectionId: string }
   | {
       mode: 'new';
-      alias: string;
+      name: string;
       credentialId: string;
-      owner?: string;
-      repo?: string;
-      webhookSecret?: string;
+      scope: ConnectionScope;
     };
 
 export interface CreatedFromTemplate {

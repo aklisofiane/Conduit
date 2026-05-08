@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react';
-import type { BoardRef, TriggerConfig, TriggerFilter } from '@conduit/shared';
-import type { ProjectBoardSummary } from '@conduit/shared/platform';
+import { useEffect, useMemo, useState } from 'react';
+import type { ConnectionScope, TriggerConfig, TriggerFilter } from '@conduit/shared';
 import {
   useConnections,
   useListLabels,
@@ -25,7 +24,7 @@ interface TriggerConfigPanelProps {
 
 export function TriggerConfigPanel({
   trigger,
-  workflowId,
+  workflowId: _workflowId,
   isActive,
   onChange,
   onActiveChange,
@@ -35,13 +34,17 @@ export function TriggerConfigPanel({
   saving,
   dirty,
 }: TriggerConfigPanelProps) {
-  const { data: connections = [] } = useConnections(workflowId);
-  const platformConnections = connections.filter(
-    (c) => c.credential.platform.toLowerCase() === trigger.platform,
-  );
+  // Repo connections feed the source slot; board connections feed the
+  // optional board slot. Filtering is platform + scope-kind in v1.
+  const { data: repoConnections = [] } = useConnections({
+    platform: platformToCredentialPlatform(trigger.platform),
+    scopeKind: 'github_repo',
+  });
+  const { data: boardConnections = [] } = useConnections({
+    platform: platformToCredentialPlatform(trigger.platform),
+    scopeKind: 'github_projects_v2',
+  });
 
-  const owner = trigger.board?.owner?.trim() ?? '';
-  const ownerType = trigger.board?.ownerType ?? 'org';
   const pollingScope =
     trigger.mode.kind === 'polling' ? trigger.mode.scope : undefined;
   const pollingSource =
@@ -53,6 +56,15 @@ export function TriggerConfigPanel({
     (trigger.mode.kind === 'webhook' &&
       trigger.mode.event === 'board.column.changed');
 
+  const selectedBoardConnection = useMemo(
+    () => boardConnections.find((c) => c.id === trigger.boardConnectionId),
+    [boardConnections, trigger.boardConnectionId],
+  );
+  const boardScope =
+    selectedBoardConnection?.scope.kind === 'github_projects_v2'
+      ? selectedBoardConnection.scope
+      : undefined;
+
   // One-shot notice for filters dropped on scope flip. Cleared after a few
   // seconds so it doesn't persist across unrelated edits.
   const [filterNotice, setFilterNotice] = useState<string | null>(null);
@@ -62,32 +74,23 @@ export function TriggerConfigPanel({
     return () => window.clearTimeout(handle);
   }, [filterNotice]);
 
-  // Coalesce keystrokes so typing "acme" doesn't re-key the query four times.
-  const [debouncedOwner, setDebouncedOwner] = useState(owner);
-  useEffect(() => {
-    const handle = window.setTimeout(() => setDebouncedOwner(owner), 400);
-    return () => window.clearTimeout(handle);
-  }, [owner]);
-
   const boardsQuery = useListProjectBoards({
-    workflowId,
     connectionId: trigger.connectionId,
-    ownerType,
-    owner: debouncedOwner,
-    enabled: showsBoardPicker,
+    ownerType: boardScope?.ownerType ?? 'org',
+    owner: boardScope?.owner ?? '',
+    enabled: showsBoardPicker && !!trigger.connectionId && !!boardScope,
   });
 
-  const selectedBoard =
-    boardsQuery.data?.find((b) => b.number === trigger.board?.number) ?? null;
-
   const labelsQuery = useListLabels({
-    workflowId,
     connectionId: trigger.connectionId,
     enabled: !!trigger.connectionId,
   });
 
+  const selectedBoardSummary = boardsQuery.data?.find(
+    (b) => boardScope && b.number === boardScope.number,
+  );
   const statusOptions =
-    selectedBoard?.fields.find((f) => f.name === 'Status')?.options ?? [];
+    selectedBoardSummary?.fields.find((f) => f.name === 'Status')?.options ?? [];
   const labelOptions = labelsQuery.data?.map((l) => l.name) ?? [];
 
   const setMode = (kind: 'webhook' | 'polling') => {
@@ -144,12 +147,6 @@ export function TriggerConfigPanel({
     });
   };
 
-  const setBoard = (patch: Partial<BoardRef>) => {
-    const current: BoardRef =
-      trigger.board ?? { ownerType: 'org', owner: '', number: 1 };
-    onChange({ board: { ...current, ...patch } });
-  };
-
   return (
     <>
       <div className="flex items-start justify-between border-b border-[var(--color-divider)] px-5 py-4">
@@ -198,26 +195,27 @@ export function TriggerConfigPanel({
             </select>
           </Field>
 
-          <Field label="Connection" hint="credential used by this trigger">
-            {platformConnections.length === 0 ? (
-              <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
-                No {trigger.platform} connections yet. Add one on the Connections page.
-              </div>
-            ) : (
-              <select
-                className="field-input"
+          <Field label="Connections" hint="repo (always) and board (when needed)">
+            <div className="space-y-2">
+              <ConnectionSubRow
+                label="Repo"
+                connections={repoConnections}
                 value={trigger.connectionId}
-                onChange={(e) => onChange({ connectionId: e.target.value })}
-              >
-                <option value="">— select a connection —</option>
-                {platformConnections.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.alias}
-                    {c.owner && c.repo ? ` · ${c.owner}/${c.repo}` : ''}
-                  </option>
-                ))}
-              </select>
-            )}
+                onChange={(id) => onChange({ connectionId: id })}
+                emptyHint="No repo connections yet — create one on the Connections page."
+              />
+              {showsBoardPicker && (
+                <ConnectionSubRow
+                  label="Board"
+                  connections={boardConnections}
+                  value={trigger.boardConnectionId ?? ''}
+                  onChange={(id) =>
+                    onChange({ boardConnectionId: id || undefined })
+                  }
+                  emptyHint="No Projects v2 connections yet — create one on the Connections page."
+                />
+              )}
+            </div>
           </Field>
 
           <Field label="Mode">
@@ -318,40 +316,12 @@ export function TriggerConfigPanel({
             </>
           )}
 
-          {showsBoardPicker && (
-            <Field
-              label="Project board"
-              hint="GitHub Projects v2 — Conduit watches this board"
-            >
-              <div className="grid grid-cols-[110px_1fr] gap-2">
-                <select
-                  className="field-input"
-                  value={trigger.board?.ownerType ?? 'org'}
-                  onChange={(e) =>
-                    setBoard({ ownerType: e.target.value as BoardRef['ownerType'] })
-                  }
-                >
-                  <option value="org">Org</option>
-                  <option value="user">User</option>
-                </select>
-                <input
-                  className="field-input"
-                  placeholder="owner (e.g. acme)"
-                  value={trigger.board?.owner ?? ''}
-                  onChange={(e) => setBoard({ owner: e.target.value })}
-                />
-              </div>
-              <div className="mt-2">
-                <BoardPicker
-                  hasConnection={!!trigger.connectionId}
-                  owner={owner}
-                  ownerType={ownerType}
-                  query={boardsQuery}
-                  selectedNumber={trigger.board?.number}
-                  selectedBoard={selectedBoard}
-                  onPick={(number) => setBoard({ number })}
-                />
-              </div>
+          {showsBoardPicker && selectedBoardSummary && (
+            <Field label="Project board">
+              <BoardPickerHint
+                query={boardsQuery}
+                selectedBoard={selectedBoardSummary}
+              />
             </Field>
           )}
 
@@ -398,6 +368,66 @@ export function TriggerConfigPanel({
   );
 }
 
+function platformToCredentialPlatform(
+  platform: TriggerConfig['platform'],
+): 'GITHUB' | 'GITLAB' | 'JIRA' {
+  if (platform === 'github') return 'GITHUB';
+  if (platform === 'gitlab') return 'GITLAB';
+  return 'JIRA';
+}
+
+function ConnectionSubRow({
+  label,
+  connections,
+  value,
+  onChange,
+  emptyHint,
+}: {
+  label: string;
+  connections: { id: string; name: string; scope: ConnectionScope }[];
+  value: string;
+  onChange: (id: string) => void;
+  emptyHint: string;
+}) {
+  return (
+    <div className="grid grid-cols-[60px_1fr] items-center gap-2">
+      <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-muted)]">
+        {label}
+      </span>
+      {connections.length === 0 ? (
+        <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
+          {emptyHint}
+        </div>
+      ) : (
+        <select
+          className="field-input"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        >
+          <option value="">— select a connection —</option>
+          {connections.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+              {scopeSummary(c.scope) ? ` · ${scopeSummary(c.scope)}` : ''}
+            </option>
+          ))}
+        </select>
+      )}
+    </div>
+  );
+}
+
+function scopeSummary(scope: ConnectionScope): string {
+  switch (scope.kind) {
+    case 'github_repo':
+      return `${scope.owner}/${scope.repo}`;
+    case 'github_projects_v2':
+      return `${scope.owner} #${scope.number}`;
+    case 'none':
+      return '';
+  }
+}
+
 /**
  * Filter fields offered for a given trigger context. `status` requires a
  * Projects v2 board to filter against; under repo-source issue polling
@@ -423,11 +453,6 @@ function emptyFilter(field: TriggerFilter['field']): TriggerFilter {
   return { field, value: '' };
 }
 
-/**
- * Drop filters whose `field` isn't offered under the new (scope, source)
- * combo. Surfaces a one-shot notice via `setNotice` so users see what
- * happened. `scope` and `source` are null for webhook mode.
- */
 function dropFiltersForScope(
   filters: TriggerFilter[],
   modeKind: 'polling' | 'webhook',
@@ -519,9 +544,6 @@ function FilterRow({
     onReplace(emptyFilter(next));
   };
 
-  // When a filter row's field isn't in the current scope's offered set
-  // (e.g. a stale `status` row mid-edit), show it as a synthetic option so
-  // the user can still see/change it instead of a silent reset.
   const fieldDropdownOptions = offeredFields.includes(filter.field)
     ? offeredFields
     : [filter.field, ...offeredFields];
@@ -604,9 +626,6 @@ function OptionsValueInput({
       />
     );
   }
-  // If the saved value isn't in the live options list (e.g. label was
-  // renamed since save), surface it as a synthetic option so the user sees
-  // what's stored rather than a silent reset to ''.
   const showStaleOption = value !== '' && !options.includes(value);
   return (
     <select
@@ -625,67 +644,39 @@ function OptionsValueInput({
   );
 }
 
-function BoardPicker({
-  hasConnection,
-  owner,
-  ownerType,
+function BoardPickerHint({
   query,
-  selectedNumber,
   selectedBoard,
-  onPick,
 }: {
-  hasConnection: boolean;
-  owner: string;
-  ownerType: BoardRef['ownerType'];
   query: ReturnType<typeof useListProjectBoards>;
-  selectedNumber: number | undefined;
-  selectedBoard: ProjectBoardSummary | null;
-  onPick: (number: number) => void;
+  selectedBoard: { number: number; title: string; url: string; fields: { name: string; options: string[] }[] };
 }) {
-  if (!hasConnection) return <Hint>Pick a connection to load projects.</Hint>;
-  if (!owner) return <Hint>Type the {ownerType} login to load its projects.</Hint>;
-  if (query.isFetching && !query.data) return <Hint>Loading projects…</Hint>;
   if (query.error) {
     const message = query.error instanceof ApiError ? query.error.message : String(query.error);
     return <Hint tone="danger">{message}</Hint>;
   }
-  if (!query.data) return null;
-  if (query.data.length === 0) {
-    return <Hint>No Projects v2 boards found under {owner}.</Hint>;
-  }
   return (
     <div className="space-y-1.5">
-      <select
-        className="field-input"
-        value={selectedNumber ?? ''}
-        onChange={(e) => onPick(Number(e.target.value) || 1)}
-      >
-        <option value="">— select a project —</option>
-        {query.data.map((b) => (
-          <option key={b.number} value={b.number}>
-            #{b.number} · {b.title}
-          </option>
-        ))}
-      </select>
-      {selectedBoard && (
-        <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
-          <a
-            href={selectedBoard.url}
-            target="_blank"
-            rel="noreferrer"
-            className="text-[var(--color-accent)] hover:underline"
-          >
-            open on github ↗
-          </a>
-          {selectedBoard.fields.length > 0 && (
-            <span>
-              {' · '}
-              {selectedBoard.fields.length} single-select field
-              {selectedBoard.fields.length === 1 ? '' : 's'}
-            </span>
-          )}
-        </div>
-      )}
+      <div className="font-mono text-[12px] text-[var(--color-text)]">
+        #{selectedBoard.number} · {selectedBoard.title}
+      </div>
+      <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
+        <a
+          href={selectedBoard.url}
+          target="_blank"
+          rel="noreferrer"
+          className="text-[var(--color-accent)] hover:underline"
+        >
+          open on github ↗
+        </a>
+        {selectedBoard.fields.length > 0 && (
+          <span>
+            {' · '}
+            {selectedBoard.fields.length} single-select field
+            {selectedBoard.fields.length === 1 ? '' : 's'}
+          </span>
+        )}
+      </div>
     </div>
   );
 }

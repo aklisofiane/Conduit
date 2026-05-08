@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { AgentPreset } from '../agent-preset/index';
 import { MCP_PRESETS, findMcpPreset } from '../mcp/presets';
 import {
+  collectTemplatePlaceholderDetails,
   collectTemplatePlaceholders,
   expandTemplate,
   isPlaceholder,
@@ -29,7 +30,7 @@ const TEMPLATE: TemplateFile = {
             id: 'trigger-1',
             name: 'Trigger1',
             platform: 'github',
-            connectionId: '<github>',
+            connectionId: '<github-repo>',
             mode: { kind: 'webhook', event: 'issues.opened' },
             filters: [],
           },
@@ -57,7 +58,7 @@ const TEMPLATE: TemplateFile = {
               args: [],
               env: {},
             },
-            connectionId: '<github>',
+            connectionId: '<github-repo>',
           },
         ],
         ui: { nodePositions: {}, viewport: { x: 0, y: 0, zoom: 1 } },
@@ -66,34 +67,92 @@ const TEMPLATE: TemplateFile = {
   ],
 };
 
+const BOARD_TEMPLATE: TemplateFile = {
+  id: 'demo-board',
+  name: 'Demo Board',
+  description: 'demo template with a board connection',
+  category: 'board-loop',
+  workflows: [
+    {
+      name: 'A',
+      definition: {
+        triggers: [
+          {
+            id: 'trigger-1',
+            name: 'Trigger1',
+            platform: 'github',
+            connectionId: '<github-repo>',
+            boardConnectionId: '<github-board>',
+            mode: { kind: 'polling', intervalSec: 60, scope: 'issues', source: 'board' },
+            filters: [],
+          },
+        ],
+        nodes: [
+          {
+            id: 'agent-a',
+            name: 'A',
+            provider: 'claude',
+            model: 'stub',
+            instructions: 'do something',
+            mcpServers: [],
+            skills: [],
+            webSearch: false,
+          },
+        ],
+        edges: [],
+        mcpServers: [],
+        ui: { nodePositions: {}, viewport: { x: 0, y: 0, zoom: 1 } },
+      },
+    },
+  ],
+};
+
 describe('template placeholders', () => {
   it('identifies placeholder strings', () => {
-    expect(isPlaceholder('<github>')).toBe(true);
+    expect(isPlaceholder('<github-repo>')).toBe(true);
     expect(isPlaceholder('<slack-prod>')).toBe(true);
     expect(isPlaceholder('github')).toBe(false);
     expect(isPlaceholder('<>')).toBe(false);
-    expect(placeholderAlias('<github>')).toBe('github');
+    expect(placeholderAlias('<github-repo>')).toBe('github-repo');
   });
 
   it('collects unique placeholders across all connection slots', () => {
-    expect(collectTemplatePlaceholders(TEMPLATE)).toEqual(['github']);
+    expect(collectTemplatePlaceholders(TEMPLATE)).toEqual(['github-repo']);
+  });
+
+  it('reports per-slot expected scope kinds via collectTemplatePlaceholderDetails', () => {
+    const details = collectTemplatePlaceholderDetails(BOARD_TEMPLATE);
+    const byAlias = new Map(details.map((d) => [d.alias, d.expectedScopeKinds]));
+    expect(byAlias.get('github-repo')).toEqual(['github_repo']);
+    expect(byAlias.get('github-board')).toEqual(['github_projects_v2']);
   });
 });
 
 describe('resolveTemplate', () => {
   it('substitutes placeholders with real connection ids without mutating input', () => {
-    const resolved = resolveTemplate(TEMPLATE, { github: 'conn_123' })[0]!;
+    const resolved = resolveTemplate(TEMPLATE, { 'github-repo': 'conn_123' })[0]!;
     expect(resolved.definition.triggers[0]!.connectionId).toBe('conn_123');
     expect(resolved.definition.mcpServers[0]!.connectionId).toBe('conn_123');
     // Workspaces are derived from edges at runtime; templates carry no
     // workspace fields, so there's nothing to substitute on a node.
     expect(resolved.definition.nodes[0]!.workspace).toBeUndefined();
     // Input untouched.
-    expect(TEMPLATE.workflows[0]!.definition.triggers[0]!.connectionId).toBe('<github>');
+    expect(TEMPLATE.workflows[0]!.definition.triggers[0]!.connectionId).toBe(
+      '<github-repo>',
+    );
+  });
+
+  it('substitutes both connectionId and boardConnectionId when present', () => {
+    const resolved = resolveTemplate(BOARD_TEMPLATE, {
+      'github-repo': 'conn_repo',
+      'github-board': 'conn_board',
+    })[0]!;
+    expect(resolved.definition.triggers[0]!.connectionId).toBe('conn_repo');
+    expect(resolved.definition.triggers[0]!.boardConnectionId).toBe('conn_board');
   });
 
   it('throws when a placeholder has no binding', () => {
-    expect(() => resolveTemplate(TEMPLATE, {})).toThrow(/<github>/);
+    expect(() => resolveTemplate(TEMPLATE, {})).toThrow(/<github-repo>/);
   });
 });
 
@@ -139,7 +198,7 @@ const PRESET_TEMPLATE: TemplateInputFile = {
             id: 'trigger-1',
             name: 'Trigger1',
             platform: 'github',
-            connectionId: '<github>',
+            connectionId: '<github-repo>',
             mode: { kind: 'webhook', event: 'issues.opened' },
             filters: [],
           },
@@ -229,7 +288,7 @@ describe('mcp preset expansion', () => {
               id: 'trigger-1',
               name: 'Trigger1',
               platform: 'github',
-              connectionId: '<github>',
+              connectionId: '<github-repo>',
               mode: { kind: 'webhook', event: 'issues.opened' },
               filters: [],
             },
@@ -246,7 +305,7 @@ describe('mcp preset expansion', () => {
           ],
           edges: [],
           mcpServers: [
-            { id: 'github-mcp', presetId: 'github', connectionId: '<github>' },
+            { id: 'github-mcp', presetId: 'github', connectionId: '<github-repo>' },
           ],
           ui: { nodePositions: {}, viewport: { x: 0, y: 0, zoom: 1 } },
         },
@@ -266,7 +325,7 @@ describe('mcp preset expansion', () => {
     const server = expanded.workflows[0]!.definition.mcpServers[0]!;
     expect(server.name).toBe(githubPreset.name);
     expect(server.transport).toEqual(githubPreset.transport);
-    expect(server.connectionId).toBe('<github>');
+    expect(server.connectionId).toBe('<github-repo>');
     expect(templateFileSchema.safeParse(expanded).success).toBe(true);
   });
 
@@ -283,7 +342,7 @@ describe('mcp preset expansion', () => {
     const bad = structuredClone(baseInput);
     bad.workflows[0]!.definition.mcpServers[0] = {
       id: 'github-mcp',
-      connectionId: '<github>',
+      connectionId: '<github-repo>',
     } as (typeof bad)['workflows'][0]['definition']['mcpServers'][0];
     expect(templateInputFileSchema.safeParse(bad).success).toBe(false);
   });

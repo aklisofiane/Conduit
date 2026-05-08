@@ -12,7 +12,9 @@ import type { WorkflowDefinition } from './definition';
 export interface WorkflowValidationIssue {
   code:
     | 'trigger-requires-issue-or-pr'
-    | 'triggers-must-share-connection';
+    | 'triggers-must-share-connection'
+    | 'trigger-board-connection-required'
+    | 'triggers-must-share-board-connection';
   message: string;
   /** Optional node name (or trigger name) the issue is attached to, for UI highlighting. */
   nodeName?: string;
@@ -37,6 +39,16 @@ const ISSUE_OR_PR_WEBHOOK_EVENTS = new Set([
   'pull_request.opened',
   'issue_comment.created',
 ]);
+
+/** Trigger modes whose semantics require a board connection. */
+function modeRequiresBoardConnection(
+  mode: WorkflowDefinition['triggers'][number]['mode'],
+): boolean {
+  if (mode.kind === 'polling') {
+    return mode.scope === 'issues' && mode.source === 'board';
+  }
+  return mode.event === 'board.column.changed';
+}
 
 export function validateWorkflowDefinition(
   definition: WorkflowDefinition,
@@ -65,6 +77,21 @@ export function validateWorkflowDefinition(
     }
   }
 
+  // Rule: a trigger whose mode targets a board must carry a
+  // boardConnectionId so the resolver knows which board to query. Webhook
+  // triggers on `board.column.changed` need the board for the same reason
+  // (filter + identity resolution against the project graph).
+  for (const trigger of triggers) {
+    if (modeRequiresBoardConnection(trigger.mode) && !trigger.boardConnectionId) {
+      issues.push({
+        code: 'trigger-board-connection-required',
+        message:
+          `Trigger "${trigger.name}" targets a project board but is missing a boardConnectionId.`,
+        nodeName: trigger.name,
+      });
+    }
+  }
+
   // Rule: a workflow targets exactly one repo connection, so every trigger
   // must reference the same connectionId. v1 has a single trigger today,
   // but the rule is written for the multi-trigger future without changing.
@@ -73,6 +100,22 @@ export function validateWorkflowDefinition(
     issues.push({
       code: 'triggers-must-share-connection',
       message: `All triggers in a workflow must reference the same connectionId — found ${distinctConnectionIds.size} distinct connections.`,
+    });
+  }
+
+  // Rule: at most one board connection across the workflow's triggers. A
+  // workflow targets one source + one board; multiple triggers all key off
+  // the same pair. Triggers without a board contribute `undefined` and are
+  // ignored.
+  const distinctBoardConnectionIds = new Set(
+    triggers
+      .map((t) => t.boardConnectionId)
+      .filter((id): id is string => Boolean(id)),
+  );
+  if (distinctBoardConnectionIds.size > 1) {
+    issues.push({
+      code: 'triggers-must-share-board-connection',
+      message: `All triggers in a workflow must reference the same boardConnectionId — found ${distinctBoardConnectionIds.size} distinct board connections.`,
     });
   }
 

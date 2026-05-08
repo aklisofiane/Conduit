@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { Logger } from '@nestjs/common';
 import {
-  collectTemplatePlaceholders,
+  collectTemplatePlaceholderDetails,
   expandTemplate,
   findMcpPreset,
   templateInputFileSchema,
@@ -10,6 +10,7 @@ import {
   UnknownPresetError,
   type AgentPreset,
   type TemplateFile,
+  type TemplatePlaceholder,
 } from '@conduit/shared';
 import { formatZodIssues, loadJsonDir } from '../../common/load-json-dir';
 
@@ -24,6 +25,7 @@ function resolveTemplatesDir(): string {
 export interface LoadedTemplate {
   file: TemplateFile;
   placeholders: string[];
+  placeholderDetails: TemplatePlaceholder[];
 }
 
 export type PresetResolver = (id: string) => AgentPreset | undefined;
@@ -83,8 +85,10 @@ function parseTemplate(
     return null;
   }
 
+  const placeholderDetails = collectTemplatePlaceholderDetails(runtimeParse.data);
   return {
     file: runtimeParse.data,
-    placeholders: collectTemplatePlaceholders(runtimeParse.data),
+    placeholders: placeholderDetails.map((p) => p.alias),
+    placeholderDetails,
   };
 }

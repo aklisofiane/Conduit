@@ -13,9 +13,9 @@ import {
 import { PrismaService } from '../../common/prisma.service';
 import { assertDefinitionValid } from '../../common/assert-definition-valid';
 import { DuplicateRunError, TemporalService } from '../../temporal/temporal.service';
+import { encrypt } from '../credentials/crypto';
 import type { CreateWorkflowDto, UpdateWorkflowDto } from './dto';
 import { defaultDefinition } from './defaults';
-import { remapConnectionIds } from './remap-connection-ids';
 
 @Injectable()
 export class WorkflowsService implements OnModuleInit {
@@ -46,8 +46,9 @@ export class WorkflowsService implements OnModuleInit {
     );
   }
 
-  async list() {
+  async list(orgId: string) {
     return this.prisma.workflow.findMany({
+      where: { orgId },
       orderBy: { updatedAt: 'desc' },
       include: {
         runs: {
@@ -65,17 +66,18 @@ export class WorkflowsService implements OnModuleInit {
     });
   }
 
-  async get(id: string) {
-    const wf = await this.prisma.workflow.findUnique({ where: { id } });
+  async get(orgId: string, id: string) {
+    const wf = await this.prisma.workflow.findFirst({ where: { id, orgId } });
     if (!wf) throw new NotFoundException(`Workflow ${id} not found`);
     return wf;
   }
 
-  async create(dto: CreateWorkflowDto) {
+  async create(orgId: string, dto: CreateWorkflowDto) {
     const definition = dto.definition ?? defaultDefinition();
     assertDefinitionValid(definition);
     const wf = await this.prisma.workflow.create({
       data: {
+        orgId,
         name: dto.name,
         description: dto.description,
         definition: definition as unknown as object,
@@ -86,34 +88,35 @@ export class WorkflowsService implements OnModuleInit {
     return wf;
   }
 
-  async update(id: string, dto: UpdateWorkflowDto) {
+  async update(orgId: string, id: string, dto: UpdateWorkflowDto) {
     if (dto.definition) assertDefinitionValid(dto.definition);
-    try {
-      const wf = await this.prisma.workflow.update({
-        where: { id },
-        data: {
-          name: dto.name,
-          description: dto.description,
-          definition: dto.definition as unknown as object | undefined,
-          isActive: dto.isActive,
-        },
-      });
-      if (dto.isActive !== undefined || dto.definition !== undefined) {
-        await this.syncPollSchedule(wf.id, wf.definition, wf.isActive);
-      }
-      return wf;
-    } catch (err) {
-      if (isPrismaNotFound(err)) throw new NotFoundException(`Workflow ${id} not found`);
-      throw err;
+    // updateMany returns count rather than throwing on miss — gives us the
+    // 404-on-cross-org shape the spec requires (no 403 leak).
+    const result = await this.prisma.workflow.updateMany({
+      where: { id, orgId },
+      data: {
+        name: dto.name,
+        description: dto.description,
+        definition: dto.definition as unknown as object | undefined,
+        isActive: dto.isActive,
+      },
+    });
+    if (result.count === 0) {
+      throw new NotFoundException(`Workflow ${id} not found`);
     }
+    const wf = await this.prisma.workflow.findUniqueOrThrow({ where: { id } });
+    if (dto.isActive !== undefined || dto.definition !== undefined) {
+      await this.syncPollSchedule(wf.id, wf.definition, wf.isActive);
+    }
+    return wf;
   }
 
-  async delete(id: string) {
-    try {
-      await this.prisma.workflow.delete({ where: { id } });
-    } catch (err) {
-      if (isPrismaNotFound(err)) throw new NotFoundException(`Workflow ${id} not found`);
-      throw err;
+  async delete(orgId: string, id: string) {
+    const result = await this.prisma.workflow.deleteMany({
+      where: { id, orgId },
+    });
+    if (result.count === 0) {
+      throw new NotFoundException(`Workflow ${id} not found`);
     }
     // Schedule cleanup is best-effort: the row is gone, so a leaked schedule
     // would fire against a missing workflow and self-recover at next reconcile.
@@ -128,57 +131,63 @@ export class WorkflowsService implements OnModuleInit {
   }
 
   /**
-   * Clone a workflow + its `WorkflowConnection` rows in a single transaction,
-   * rewriting every `connectionId` reference inside the cloned `definition`
-   * to point at the new connection ids. The duplicate starts paused
+   * Clone a workflow's row + its `Workflow.definition` JSON. Connections are
+   * global now — the copied definition keeps the same `connectionId` /
+   * `boardConnectionId` references as the source. The duplicate starts paused
    * (`isActive: false`) so it doesn't trigger until the user reviews it.
    *
-   * Webhook signing secrets are copied byte-for-byte — the AES-GCM ciphertext
-   * is workflow-agnostic, so the duplicate shares the source's secret. That's
-   * acceptable: webhook URLs are per-workflow (`/hooks/:workflowId`), so the
-   * duplicate gets its own URL while reusing the same secret value.
+   * The encrypted `webhookSecret` ciphertext is workflow-agnostic, so the
+   * duplicate inherits the same plaintext secret. Webhook URLs are
+   * per-workflow (`/hooks/:workflowId`) so the duplicate gets its own URL
+   * while reusing the same secret value.
    */
-  async duplicate(id: string) {
-    const source = await this.prisma.workflow.findUnique({
-      where: { id },
-      include: { connections: true },
-    });
+  async duplicate(orgId: string, id: string) {
+    const source = await this.prisma.workflow.findFirst({ where: { id, orgId } });
     if (!source) throw new NotFoundException(`Workflow ${id} not found`);
 
-    const created = await this.prisma.$transaction(async (tx) => {
-      const stub = await tx.workflow.create({
-        data: {
-          name: `${source.name} (copy)`,
-          description: source.description,
-          definition: {} as unknown as object,
-          isActive: false,
-        },
-      });
-
-      const idMap: Record<string, string> = {};
-      for (const conn of source.connections) {
-        const cloned = await tx.workflowConnection.create({
-          data: {
-            workflowId: stub.id,
-            alias: conn.alias,
-            credentialId: conn.credentialId,
-            owner: conn.owner,
-            repo: conn.repo,
-            webhookSecret: conn.webhookSecret,
-          },
-        });
-        idMap[conn.id] = cloned.id;
-      }
-
-      const definition = remapConnectionIds(source.definition, idMap);
-      return tx.workflow.update({
-        where: { id: stub.id },
-        data: { definition: definition as unknown as object },
-      });
+    const created = await this.prisma.workflow.create({
+      data: {
+        orgId,
+        name: `${source.name} (copy)`,
+        description: source.description,
+        definition: source.definition as unknown as object,
+        webhookSecret: source.webhookSecret,
+        isActive: false,
+      },
     });
 
     await this.syncPollSchedule(created.id, created.definition, created.isActive);
     return created;
+  }
+
+  /**
+   * Set or rotate the webhook signing secret for a workflow. The plaintext is
+   * encrypted server-side with the same AES-256-GCM format as
+   * `Credential.secret`; clients send it once over TLS.
+   */
+  async setWebhookSecret(orgId: string, id: string, plaintext: string) {
+    const result = await this.prisma.workflow.updateMany({
+      where: { id, orgId },
+      data: { webhookSecret: encrypt(plaintext) },
+    });
+    if (result.count === 0) {
+      throw new NotFoundException(`Workflow ${id} not found`);
+    }
+    const wf = await this.prisma.workflow.findUniqueOrThrow({
+      where: { id },
+      select: { id: true, updatedAt: true },
+    });
+    return wf;
+  }
+
+  async clearWebhookSecret(orgId: string, id: string) {
+    const result = await this.prisma.workflow.updateMany({
+      where: { id, orgId },
+      data: { webhookSecret: null },
+    });
+    if (result.count === 0) {
+      throw new NotFoundException(`Workflow ${id} not found`);
+    }
   }
 
   /**
@@ -225,8 +234,8 @@ export class WorkflowsService implements OnModuleInit {
    * the placeholder row and return `null`. Callers propagate that as a
    * soft-drop (HTTP 200 `status: 'duplicate-dropped'` on the webhook path).
    */
-  async startRun(workflowId: string, triggerEvent: TriggerEvent) {
-    const wf = await this.get(workflowId);
+  async startRun(orgId: string, workflowId: string, triggerEvent: TriggerEvent) {
+    const wf = await this.get(orgId, workflowId);
     const definition = workflowDefinitionSchema.safeParse(wf.definition);
     const ticketLock = definition.success
       ? ticketLockFor(definition.data, workflowId, triggerEvent)
@@ -234,6 +243,7 @@ export class WorkflowsService implements OnModuleInit {
 
     const run = await this.prisma.workflowRun.create({
       data: {
+        orgId,
         workflowId,
         status: 'PENDING',
         trigger: triggerEvent as unknown as object,
@@ -269,12 +279,4 @@ export class WorkflowsService implements OnModuleInit {
 
 function errMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
-}
-
-function isPrismaNotFound(err: unknown): boolean {
-  return (
-    typeof err === 'object' &&
-    err !== null &&
-    (err as { code?: string }).code === 'P2025'
-  );
 }

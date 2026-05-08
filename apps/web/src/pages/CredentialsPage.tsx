@@ -13,9 +13,9 @@ const PLATFORMS = ['GITHUB', 'GITLAB', 'JIRA', 'SLACK', 'DISCORD'] as const;
 
 /**
  * Platform credentials management. Flat list + inline create/rotate/delete.
- * Connections (the per-workflow binding of a credential) live on
- * `/workflows/:id/connections`; this page is deliberately global because
- * credentials are shared across workflows.
+ * Credentials feed Connections (`/connections`) — one credential can back
+ * many connections (e.g. a single GitHub PAT bound to a repo and a project
+ * board), and rotating the credential propagates to every connection.
  */
 export function CredentialsPage() {
   const { data: credentials = [], isLoading } = useCredentials();
@@ -50,7 +50,7 @@ export function CredentialsPage() {
         Credentials<em className="text-[var(--color-claude)] not-italic">.</em>
       </h1>
       <p className="font-mono text-[12px] text-[var(--color-text-2)]">
-        Encrypted at rest with AES-256-GCM. Bound to workflows via connections.
+        Encrypted at rest with AES-256-GCM. Used by connections (a credential can back many).
       </p>
 
       <section className="rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-1)]">

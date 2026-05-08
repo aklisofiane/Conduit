@@ -5,11 +5,14 @@ import {
   Get,
   HttpCode,
   Param,
+  Patch,
   Post,
-  Put,
+  Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiKeyGuard } from '../../common/api-key.guard';
+import type { ConnectionScopeKind, Platform } from '@conduit/shared';
+import { OrgId } from '../../auth/org-id.decorator';
+import { SessionGuard } from '../../auth/session.guard';
 import { ZodBodyPipe } from '../../common/zod-body.pipe';
 import { ConnectionsService } from './connections.service';
 import {
@@ -19,45 +22,71 @@ import {
   updateConnectionDtoSchema,
 } from './dto';
 
+const VALID_PLATFORMS = new Set<Platform>([
+  'GITHUB',
+  'GITLAB',
+  'JIRA',
+  'SLACK',
+  'DISCORD',
+]);
+
+const VALID_SCOPE_KINDS = new Set<ConnectionScopeKind>([
+  'github_repo',
+  'github_projects_v2',
+  'none',
+]);
+
 /**
- * Per-workflow connections. Mounted under the workflow URL so the UI can
- * reason about them as children of a workflow (they share cascade semantics
- * too — deleting the workflow drops its connections). See
- * docs/ARCHITECTURE.md for the full route table.
+ * Global Connection CRUD. Connections aren't per-workflow anymore —
+ * workflows reference them by id from inside `Workflow.definition` slots.
  */
-@UseGuards(ApiKeyGuard)
-@Controller('workflows/:workflowId/connections')
+@UseGuards(SessionGuard)
+@Controller('connections')
 export class ConnectionsController {
   constructor(private readonly svc: ConnectionsService) {}
 
   @Get()
-  list(@Param('workflowId') workflowId: string) {
-    return this.svc.list(workflowId);
+  list(
+    @OrgId() orgId: string,
+    @Query('platform') platform?: string,
+    @Query('scopeKind') scopeKind?: string,
+  ) {
+    return this.svc.list(orgId, {
+      platform: platform && VALID_PLATFORMS.has(platform as Platform)
+        ? (platform as Platform)
+        : undefined,
+      scopeKind:
+        scopeKind && VALID_SCOPE_KINDS.has(scopeKind as ConnectionScopeKind)
+          ? (scopeKind as ConnectionScopeKind)
+          : undefined,
+    });
+  }
+
+  @Get(':id')
+  get(@OrgId() orgId: string, @Param('id') id: string) {
+    return this.svc.get(orgId, id);
   }
 
   @Post()
   create(
-    @Param('workflowId') workflowId: string,
+    @OrgId() orgId: string,
     @Body(new ZodBodyPipe(createConnectionDtoSchema)) dto: CreateConnectionDto,
   ) {
-    return this.svc.create(workflowId, dto);
+    return this.svc.create(orgId, dto);
   }
 
-  @Put(':connectionId')
+  @Patch(':id')
   update(
-    @Param('workflowId') workflowId: string,
-    @Param('connectionId') connectionId: string,
+    @OrgId() orgId: string,
+    @Param('id') id: string,
     @Body(new ZodBodyPipe(updateConnectionDtoSchema)) dto: UpdateConnectionDto,
   ) {
-    return this.svc.update(workflowId, connectionId, dto);
+    return this.svc.update(orgId, id, dto);
   }
 
-  @Delete(':connectionId')
+  @Delete(':id')
   @HttpCode(204)
-  async delete(
-    @Param('workflowId') workflowId: string,
-    @Param('connectionId') connectionId: string,
-  ) {
-    await this.svc.delete(workflowId, connectionId);
+  async delete(@OrgId() orgId: string, @Param('id') id: string) {
+    await this.svc.delete(orgId, id);
   }
 }

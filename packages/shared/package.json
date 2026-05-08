@@ -19,6 +19,10 @@
       "types": "./dist/trigger/index.d.ts",
       "default": "./dist/trigger/index.js"
     },
+    "./connection": {
+      "types": "./dist/connection/index.d.ts",
+      "default": "./dist/connection/index.js"
+    },
     "./mcp": {
       "types": "./dist/mcp/index.d.ts",
       "default": "./dist/mcp/index.js"

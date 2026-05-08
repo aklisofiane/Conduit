@@ -1,26 +1,21 @@
 import { z } from 'zod';
+import { connectionScopeSchema } from '@conduit/shared';
 
 /**
- * Per-workflow connection — binds an alias to a `PlatformCredential` plus
- * optional platform bindings (owner/repo) and an optional webhook signing
- * secret. Webhook secret is encrypted server-side before persist; clients
- * send it in plaintext over TLS exactly once.
+ * Global Connection — binds a name to a `Credential` plus a typed `scope`
+ * (e.g. a GitHub repo, a Projects v2 board). One Credential can back many
+ * Connections; rotation flows through the underlying Credential row.
  */
 export const createConnectionDtoSchema = z.object({
-  alias: z.string().min(1).max(60),
   credentialId: z.string().min(1),
-  owner: z.string().min(1).optional(),
-  repo: z.string().min(1).optional(),
-  webhookSecret: z.string().min(1).optional(),
+  name: z.string().min(1).max(120),
+  scope: connectionScopeSchema,
 });
 export type CreateConnectionDto = z.infer<typeof createConnectionDtoSchema>;
 
 export const updateConnectionDtoSchema = z.object({
-  alias: z.string().min(1).max(60).optional(),
   credentialId: z.string().min(1).optional(),
-  owner: z.string().min(1).optional(),
-  repo: z.string().min(1).optional(),
-  // Pass empty string to clear the webhook secret, omit to leave unchanged.
-  webhookSecret: z.string().optional(),
+  name: z.string().min(1).max(120).optional(),
+  scope: connectionScopeSchema.optional(),
 });
 export type UpdateConnectionDto = z.infer<typeof updateConnectionDtoSchema>;

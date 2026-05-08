@@ -9,10 +9,11 @@ const kebabIdSchema = (label: string) =>
 
 /**
  * One workflow inside a template bundle. `definition` is the same shape as
- * `Workflow.definition` in the DB, with one exception: `connectionId` fields
- * may carry `<alias>` placeholders that the `from-template` endpoint resolves
- * before persisting. Validation of those placeholders happens in
- * `collectTemplatePlaceholders` — the Zod layer only enforces structure.
+ * `Workflow.definition` in the DB, with one exception: `connectionId` and
+ * `boardConnectionId` fields may carry `<alias>` placeholders that the
+ * `from-template` endpoint resolves into real Connection ids before
+ * persisting. The Zod layer only enforces structure; per-slot scope-kind
+ * validation runs in `collectTemplatePlaceholderDetails` + the API layer.
  */
 export const templateWorkflowSchema = z.object({
   name: z.string().min(1),

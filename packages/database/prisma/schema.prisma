@@ -22,49 +22,42 @@ datasource db {
 
 model Workflow {
   id          String   @id @default(cuid())
+  // Tenant column — every business-data row belongs to exactly one
+  // organization. Writers stamp this on create and never let it cross over;
+  // readers filter by it. See docs/data-model.md for the same-org invariant.
+  orgId       String
   name        String
   description String?
   // { trigger, nodes: Node[], edges: Edge[], mcpServers: WorkflowMcpServer[], ui: CanvasUI }
   // See @conduit/shared `WorkflowDefinition` for the Zod-validated shape.
   definition  Json
   isActive    Boolean  @default(true)
+  // Webhook signing secret for verifying inbound deliveries to this
+  // workflow's webhook URL (`POST /api/hooks/:workflowId`). Encrypted at
+  // rest (AES-256-GCM). Nullable — polling-only workflows don't need one.
+  // Single-secret per workflow; rotating overwrites. See docs/SECURITY.md.
+  webhookSecret String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  connections  WorkflowConnection[]
+  organization Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
   runs         WorkflowRun[]
   pollSnapshot PollSnapshot?
 
   @@index([isActive])
+  @@index([orgId, isActive])
 }
 
 // -----------------------------------------------------------------------------
 // Connections & credentials
 // -----------------------------------------------------------------------------
 
-model WorkflowConnection {
-  id           String @id @default(cuid())
-  workflowId   String
-  alias        String
-  credentialId String
-  // Platform-specific bindings (nullable — e.g. Slack connection has no repo).
-  owner        String?
-  repo         String?
-  // Webhook signing secret for verifying inbound deliveries against this
-  // connection. Encrypted at rest (same AES-256-GCM format as
-  // PlatformCredential.secret). Nullable — polling-only workflows don't
-  // need one. See docs/SECURITY.md ("Webhook authentication").
-  webhookSecret String?
-
-  workflow   Workflow           @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-  credential PlatformCredential @relation(fields: [credentialId], references: [id])
-
-  @@unique([workflowId, alias])
-  @@index([credentialId])
-}
-
-model PlatformCredential {
+// A rotatable platform secret (e.g. a GitHub PAT). One row per token. Rotation
+// updates `secret` in place and propagates to every Connection that references
+// it, so workflows pick up the new token without rebinding.
+model Credential {
   id        String   @id @default(cuid())
+  orgId     String
   platform  Platform
   name      String
   // Encrypted at rest (AES-256-GCM). See docs/SECURITY.md.
@@ -73,7 +66,36 @@ model PlatformCredential {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  connections WorkflowConnection[]
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  connections  Connection[]
+
+  @@index([platform])
+  @@index([orgId, createdAt])
+}
+
+// A named, typed binding on top of a Credential — the unit a workflow actually
+// references. `scope` is a Zod-validated discriminated union (see
+// `@conduit/shared/connection`); the Prisma layer just stores it as JSON.
+//
+// One Credential can back many Connections (one PAT bound to a repo *and* a
+// board = two Connection rows pointing at one Credential). Resolution at run
+// time walks Connection → Credential and decrypts the secret. The
+// `Connection.orgId` invariant (must equal `Credential.orgId`) is enforced by
+// the writer — no FK in Postgres.
+model Connection {
+  id           String   @id @default(cuid())
+  orgId        String
+  credentialId String
+  name         String
+  scope        Json
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  credential   Credential   @relation(fields: [credentialId], references: [id])
+
+  @@index([credentialId])
+  @@index([orgId, createdAt])
 }
 
 // Superset covering every platform Conduit stores credentials for.
@@ -95,11 +117,15 @@ enum Platform {
 // The poll activity diffs current matching IDs against this snapshot to find new entries.
 model PollSnapshot {
   id          String   @id @default(cuid())
+  // Denormalized from Workflow.orgId for defense-in-depth; the writer (poll
+  // activity) copies it from the loaded workflow row.
+  orgId       String
   workflowId  String   @unique
   matchingIds Json
   polledAt    DateTime @default(now())
 
-  workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  workflow     Workflow     @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 }
 
 // -----------------------------------------------------------------------------
@@ -113,6 +139,10 @@ model PollSnapshot {
 // See docs/design-docs/branch-management.md.
 model TicketBranch {
   id         String    @id @default(cuid())
+  // Tenant-scoped so two orgs working the same Github repo / ticket don't
+  // collide on slug. Within a single org, Worker + Critic on the same ticket
+  // still converge on one row (the desired shared-naming property).
+  orgId      String
   platform   Platform
   owner      String
   repo       String
@@ -126,7 +156,9 @@ model TicketBranch {
   createdAt  DateTime  @default(now())
   lastRunAt  DateTime?
 
-  @@unique([platform, owner, repo, ticketId])
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, platform, owner, repo, ticketId])
   @@index([platform, owner, repo])
 }
 
@@ -136,6 +168,9 @@ model TicketBranch {
 
 model WorkflowRun {
   id                 String    @id @default(cuid())
+  // Copied from Workflow.orgId at run-start. Same-org invariant: must equal
+  // the parent Workflow's orgId — the writer maintains this.
+  orgId              String
   workflowId         String
   status             RunStatus @default(PENDING)
   // Normalized TriggerEvent.
@@ -147,12 +182,14 @@ model WorkflowRun {
   temporalWorkflowId String?
   temporalRunId      String?
 
-  workflow Workflow       @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-  nodes    NodeRun[]
-  logs     ExecutionLog[]
+  workflow     Workflow       @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  organization Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  nodes        NodeRun[]
+  logs         ExecutionLog[]
 
   @@index([workflowId, startedAt])
   @@index([status])
+  @@index([orgId, startedAt])
 }
 
 // WorkflowRun: PENDING (row created) -> RUNNING (Temporal started) -> COMPLETED | FAILED | CANCELLED.
@@ -167,6 +204,8 @@ enum RunStatus {
 
 model NodeRun {
   id            String    @id @default(cuid())
+  // Copied from WorkflowRun.orgId at upsert time.
+  orgId         String
   runId         String
   // Matches definition.nodes[i].name.
   nodeName      String
@@ -186,7 +225,8 @@ model NodeRun {
   // the run detail page show it after cleanup. Freeform markdown, no schema.
   conduitSummary String?
 
-  run WorkflowRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  run          WorkflowRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   @@unique([runId, nodeName])
   @@index([runId])
@@ -203,6 +243,8 @@ enum NodeType {
 
 model ExecutionLog {
   id       String           @id @default(cuid())
+  // Copied from WorkflowRun.orgId at write time.
+  orgId    String
   runId    String
   nodeName String?
   ts       DateTime         @default(now())
@@ -211,7 +253,8 @@ model ExecutionLog {
   kind     ExecutionLogKind
   payload  Json
 
-  run WorkflowRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  run          WorkflowRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   @@index([runId, ts])
   @@index([runId, nodeName, ts])
@@ -230,4 +273,168 @@ enum LogLevel {
   INFO
   WARN
   ERROR
+}
+
+// -----------------------------------------------------------------------------
+// Better Auth
+// -----------------------------------------------------------------------------
+// Generated by `npx @better-auth/cli generate` (Better Auth core + organization
+// plugin) and pasted in. Better Auth populates these tables itself; do NOT
+// reference them from Conduit business code — go through the Better Auth
+// instance in `apps/api/src/auth/`.
+
+model User {
+  id            String       @id
+  name          String
+  email         String
+  emailVerified Boolean      @default(false)
+  image         String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+  members       Member[]
+  invitations   Invitation[]
+
+  @@unique([email])
+  @@map("user")
+}
+
+model Session {
+  id                   String   @id
+  expiresAt            DateTime
+  token                String
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  ipAddress            String?
+  userAgent            String?
+  userId               String
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activeOrganizationId String?
+
+  @@unique([token])
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+model Organization {
+  id          String       @id
+  name        String
+  slug        String
+  logo        String?
+  createdAt   DateTime
+  metadata    String?
+  members     Member[]
+  invitations Invitation[]
+  // Back-relations to tenant-scoped business data. Cascade-deletes in those
+  // models clean up all org-owned rows when the org row is removed (deletion
+  // is gated by Better Auth's organization plugin in v1; see SPEC out-of-scope).
+  workflows     Workflow[]
+  credentials   Credential[]
+  connections   Connection[]
+  pollSnapshots PollSnapshot[]
+  workflowRuns  WorkflowRun[]
+  nodeRuns      NodeRun[]
+  executionLogs ExecutionLog[]
+  ticketBranches TicketBranch[]
+
+  @@unique([slug])
+  @@map("organization")
+}
+
+model Member {
+  id             String       @id
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role           String       @default("member")
+  createdAt      DateTime
+
+  @@index([organizationId])
+  @@index([userId])
+  @@map("member")
+}
+
+model Invitation {
+  id             String       @id
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email          String
+  role           String?
+  status         String       @default("pending")
+  expiresAt      DateTime
+  createdAt      DateTime     @default(now())
+  inviterId      String
+  user           User         @relation(fields: [inviterId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([email])
+  @@map("invitation")
+}
+
+// -----------------------------------------------------------------------------
+// Audit log
+// -----------------------------------------------------------------------------
+// Snapshot-style security event log. Plain string columns for actorUserId /
+// orgId / targetUserId — deliberately NOT FKs, so audit rows survive user/org
+// deletion. Append-only at the application layer; operators retain SQL access
+// for retention/redaction. See docs/data-model.md and docs/SECURITY.md.
+
+model AuditLog {
+  id            String   @id @default(cuid())
+  // Closed event taxonomy enforced in TypeScript (see audit-events.ts).
+  // Stored as a plain string so future events can land without a migration.
+  event         String
+  // Plain string — not an FK. Null for failed sign-ins where credentials did
+  // not match any user row.
+  actorUserId   String?
+  // Snapshot at write time so failed-login spikes correlate by email even
+  // when actorUserId is null.
+  actorEmail    String?
+  // Best-effort from req.ip / X-Forwarded-For; null for non-HTTP events.
+  actorIp       String?
+  // Plain string — not an FK. Null for auth.* events that pre-date org
+  // context (sign-up, sign-in).
+  orgId         String?
+  // Plain string — not an FK. Set for org.member.* events where actor != target.
+  targetUserId  String?
+  metadata      Json?
+  createdAt     DateTime @default(now())
+
+  @@index([orgId, createdAt(sort: Desc)])
+  @@index([actorEmail, event, createdAt])
+  @@map("audit_log")
 }

@@ -5,19 +5,20 @@ import { startHarness, type Harness } from './harness';
 import { TEST_STACK_ENV } from './stack';
 
 /**
- * Phase 6 exit criterion: user picks a template, binds their connection,
+ * Phase 6 exit criterion: user picks a template, binds their connection(s),
  * workflows are created atomically and ready to run.
  *
  * Verifies:
  *
  *   1. `GET /api/templates` lists the v1 templates with placeholder metadata.
  *   2. `POST /api/workflows/from-template/:id` for the `board-loop` bundle
- *      creates *both* workflows in a single call with the `<github>`
- *      placeholder resolved to a real connection id on each.
- *   3. The resolved definitions reference real connection cuids in every
- *      connection slot (trigger, mcpServers, workspace).
+ *      creates *both* workflows in a single call with the
+ *      `<github-repo>` / `<github-board>` placeholders resolved to real
+ *      Connection ids on each.
+ *   3. The resolved definitions reference real Connection cuids in every
+ *      connection slot (trigger, mcpServers, boardConnectionId).
  *   4. Polling schedules are upserted for polling-mode templates (here
- *      both Worker and Critic are polling).
+ *      both Developer and Reviewer are polling).
  *   5. A single-workflow template (`analyze`) works the same way.
  */
 
@@ -78,26 +79,22 @@ describe('Phase 6 — create workflows from template', () => {
     const templates = await harness.http.get<TemplateSummary[]>('/templates');
     const byId = new Map(templates.map((t) => [t.id, t]));
 
-    // All four v1 templates present.
     for (const id of ['analyze', 'pr-review', 'develop', 'board-loop']) {
       expect(byId.has(id), `${id} template missing`).toBe(true);
     }
 
-    // board-loop is a multi-workflow bundle.
     expect(byId.get('board-loop')?.workflowCount).toBe(2);
-    // analyze is single-workflow.
     expect(byId.get('analyze')?.workflowCount).toBe(1);
 
-    // Every template exposes the <github> placeholder — this is the
-    // contract the UI's connection-binding step reads.
+    // Every template exposes the <github-repo> placeholder — board-loop +
+    // develop additionally surface <github-board>.
     for (const t of templates) {
-      expect(t.placeholders).toContain('github');
+      expect(t.placeholders).toContain('github-repo');
     }
+    expect(byId.get('board-loop')?.placeholders).toContain('github-board');
   });
 
-  it('creates the board-loop bundle atomically with one shared binding', async () => {
-    // A credential the user will bind once for the whole bundle. Secret
-    // content doesn't matter — we never actually run these workflows.
+  it('creates the board-loop bundle atomically with one shared pair of bindings', async () => {
     const cred = await harness.http.post<{ id: string }>('/credentials', {
       platform: 'GITHUB',
       name: 'e2e-phase6-pat',
@@ -108,24 +105,34 @@ describe('Phase 6 — create workflows from template', () => {
       '/workflows/from-template/board-loop',
       {
         bindings: {
-          github: {
+          'github-repo': {
             mode: 'new',
-            alias: 'github-main',
+            name: 'acme/shop',
             credentialId: cred.id,
-            owner: 'acme',
-            repo: 'shop',
+            scope: { kind: 'github_repo', owner: 'acme', repo: 'shop' },
+          },
+          'github-board': {
+            mode: 'new',
+            name: 'acme · project #1',
+            credentialId: cred.id,
+            scope: {
+              kind: 'github_projects_v2',
+              ownerType: 'org',
+              owner: 'acme',
+              number: 1,
+            },
           },
         },
       },
     );
 
-    // Atomic creation → both workflows come back in one response.
     expect(result.workflows).toHaveLength(2);
     const names = result.workflows.map((w) => w.name).sort();
     expect(names).toEqual(['Developer', 'Reviewer']);
 
-    // Each workflow row now exists and has the placeholder substituted in
-    // every connection slot with a real connection cuid (not `<github>`).
+    // Both workflows in the bundle reference the same pair of connection ids.
+    let sharedRepoId: string | undefined;
+    let sharedBoardId: string | undefined;
     for (const { id } of result.workflows) {
       const wf = await harness.http.get<WorkflowRow>(`/workflows/${id}`);
       const def = wf.definition;
@@ -133,27 +140,22 @@ describe('Phase 6 — create workflows from template', () => {
       const trigger = def.triggers[0]!;
       expect(trigger.connectionId).toMatch(/^[a-z0-9]+$/);
       expect(trigger.connectionId).not.toMatch(/^</);
+      expect(trigger.boardConnectionId).toMatch(/^[a-z0-9]+$/);
+      expect(trigger.boardConnectionId).not.toMatch(/^</);
+
+      sharedRepoId ??= trigger.connectionId;
+      sharedBoardId ??= trigger.boardConnectionId;
+      expect(trigger.connectionId).toBe(sharedRepoId);
+      expect(trigger.boardConnectionId).toBe(sharedBoardId);
 
       for (const server of def.mcpServers) {
         expect(server.connectionId).not.toMatch(/^</);
       }
-      // Templates no longer carry per-node workspace — the trigger's
-      // connectionId above is the only repo connection on the workflow.
       for (const node of def.nodes) {
         expect(node.workspace).toBeUndefined();
       }
-
-      // A real WorkflowConnection row was created for this workflow.
-      const conns = await harness.http.get<{ id: string; alias: string }[]>(
-        `/workflows/${id}/connections`,
-      );
-      expect(conns.map((c) => c.alias)).toContain('github-main');
-      // The connection id on the trigger must be one of the workflow's connections.
-      expect(conns.map((c) => c.id)).toContain(trigger.connectionId);
     }
 
-    // Polling schedules are registered — both templates trigger on polling,
-    // and the API upserts them after the create transaction commits.
     for (const { id } of result.workflows) {
       const handle = scheduleClient.getHandle(pollScheduleId(id));
       await waitFor(
@@ -168,13 +170,13 @@ describe('Phase 6 — create workflows from template', () => {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        'x-api-key': harness.apiKey,
+        cookie: harness.authCookie,
       },
       body: JSON.stringify({ bindings: {} }),
     });
     expect(res.status).toBe(400);
     const body = (await res.json()) as { message: string; missing: string[] };
-    expect(body.missing).toEqual(['github']);
+    expect(body.missing).toEqual(['github-repo']);
   });
 
   it('creates a single-workflow template with no extra churn', async () => {
@@ -188,10 +190,11 @@ describe('Phase 6 — create workflows from template', () => {
       '/workflows/from-template/analyze',
       {
         bindings: {
-          github: {
+          'github-repo': {
             mode: 'new',
-            alias: 'github',
+            name: 'acme/shop',
             credentialId: cred.id,
+            scope: { kind: 'github_repo', owner: 'acme', repo: 'shop' },
           },
         },
       },
@@ -199,8 +202,6 @@ describe('Phase 6 — create workflows from template', () => {
     expect(result.workflows).toHaveLength(1);
     const wf = await harness.http.get<WorkflowRow>(`/workflows/${result.workflows[0]!.id}`);
     expect(wf.definition.triggers[0]!.mode.kind).toBe('webhook');
-    // Webhook triggers don't get a schedule — verify we didn't accidentally
-    // create one.
     const handle = scheduleClient.getHandle(pollScheduleId(wf.id));
     await expect(handle.describe()).rejects.toBeDefined();
   }, 45_000);

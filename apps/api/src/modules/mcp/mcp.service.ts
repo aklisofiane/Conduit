@@ -35,11 +35,8 @@ export class McpService {
   }
 
   private async resolveTransport(dto: IntrospectMcpDto): Promise<McpTransport> {
-    if (!dto.connectionId || !dto.workflowId) return dto.transport;
-    const { token } = await this.credentials.getConnectionBinding(
-      dto.workflowId,
-      dto.connectionId,
-    );
+    if (!dto.connectionId) return dto.transport;
+    const { token } = await this.credentials.getConnectionBinding(dto.connectionId);
     return substituteCredentialInTransport(dto.transport, token);
   }
 }

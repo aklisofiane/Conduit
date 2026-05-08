@@ -1,11 +1,11 @@
 /**
- * Tiny typed fetch wrapper around the Conduit API. All requests carry
- * `X-API-Key` + `Content-Type: application/json`; errors surface with the
- * server-provided body where possible.
+ * Tiny typed fetch wrapper around the Conduit API. Carries
+ * `Content-Type: application/json` and uses `credentials: 'include'` so the
+ * Better Auth session cookie rides along on every request. Errors surface
+ * with the server-provided body where possible.
  */
 
 const BASE_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:3001';
-const API_KEY = (import.meta.env.VITE_API_KEY as string | undefined) ?? '';
 
 export class ApiError extends Error {
   constructor(
@@ -20,9 +20,9 @@ export class ApiError extends Error {
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(`${BASE_URL}/api${path}`, {
     ...init,
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      ...(API_KEY ? { 'X-API-Key': API_KEY } : {}),
       ...init.headers,
     },
   });
@@ -44,6 +44,8 @@ export const api = {
     request<T>(path, { method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) }),
   put: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: 'PUT', body: body === undefined ? undefined : JSON.stringify(body) }),
+  patch: <T>(path: string, body?: unknown) =>
+    request<T>(path, { method: 'PATCH', body: body === undefined ? undefined : JSON.stringify(body) }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
 };
 

@@ -1,4 +1,5 @@
 export * from './platform/index';
+export * from './connection/index';
 export * from './trigger/index';
 export * from './mcp/index';
 export * from './workspace/index';

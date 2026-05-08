@@ -128,15 +128,16 @@ describe('Phase 4 — polling trigger fires runs on board set-diff', () => {
       definition: fixture.definition,
     });
 
-    const conn = await harness.http.post<ConnectionResponse>(
-      `/workflows/${created.id}/connections`,
-      {
-        alias: 'github-main',
-        credentialId: cred.id,
-        owner: 'acme',
-        repo: 'poll-tests',
-      },
-    );
+    const repoConn = await harness.http.post<ConnectionResponse>('/connections', {
+      name: 'acme/poll-tests',
+      credentialId: cred.id,
+      scope: { kind: 'github_repo', owner: 'acme', repo: 'poll-tests' },
+    });
+    const boardConn = await harness.http.post<ConnectionResponse>('/connections', {
+      name: 'acme · project #5',
+      credentialId: cred.id,
+      scope: { kind: 'github_projects_v2', ownerType: 'org', owner: 'acme', number: 5 },
+    });
 
     // Activate the workflow — the API should register the Temporal Schedule
     // on save. `isActive: true` is required so the poll activity won't
@@ -145,7 +146,8 @@ describe('Phase 4 — polling trigger fires runs on board set-diff', () => {
       ...created.definition,
       triggers: created.definition.triggers.map((t) => ({
         ...t,
-        connectionId: conn.id,
+        connectionId: repoConn.id,
+        boardConnectionId: boardConn.id,
       })),
     };
     await harness.http.put(`/workflows/${created.id}`, {

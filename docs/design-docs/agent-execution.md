@@ -171,7 +171,7 @@ Lives in `@conduit/agent/workspace`. Responsibilities:
 - **Strip auth from remote URLs** after seeding — prevents tokens leaking into agent-visible `.git/config`. For `ticket-branch`, push auth is provided via env var + credential helper instead; see [SECURITY.md](../SECURITY.md).
 - **Cleanup** on activity finish (tmpdir rm + `git worktree prune`). `ticket-branch` remote branches are preserved; only the local worktree is cleaned.
 
-Credentials for cloning come from the referenced `WorkflowConnection`, not from MCP servers — the workspace manager clones *before* the agent runs.
+Credentials for cloning come from the referenced `Connection` (resolved via `loadConnectionContext`, which requires `scope.kind === 'github_repo'`), not from MCP servers — the workspace manager clones *before* the agent runs. See [connections.md](./connections.md).
 
 ## MCP servers
 

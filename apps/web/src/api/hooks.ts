@@ -5,6 +5,8 @@ import { api } from './client.js';
 import type {
   AgentPreset,
   ConnectionRow,
+  ConnectionScope,
+  ConnectionScopeKind,
   CreatedFromTemplate,
   CredentialRow,
   DiscoveredSkill,
@@ -81,9 +83,6 @@ export function useWorkflowRuns(workflowId: string | undefined, limit = 50) {
     queryFn: () =>
       api.get<WorkflowRunListItem[]>(`/workflows/${workflowId!}/runs?limit=${limit}`),
     enabled: !!workflowId,
-    // Poll on a baseline so polling/webhook-triggered runs surface even when
-    // the user did nothing locally to invalidate the cache; speed up while
-    // any row is in flight so the dot/duration update tightly.
     refetchInterval: (q) => {
       const data = q.state.data as WorkflowRunListItem[] | undefined;
       const inFlight = data?.some((r) => r.status === 'PENDING' || r.status === 'RUNNING');
@@ -98,8 +97,6 @@ export function useRun(runId: string | undefined) {
     queryFn: () => api.get<RunDetail>(`/runs/${runId!}`),
     enabled: !!runId,
     refetchInterval: (q) => {
-      // Socket.IO drives most live updates; this poll is a coarse fallback
-      // so node-level rows refresh even if a frame was dropped.
       const data = q.state.data as RunDetail | undefined;
       return data && (data.status === 'PENDING' || data.status === 'RUNNING') ? 15000 : false;
     },
@@ -168,62 +165,66 @@ export function useDeleteCredential() {
   });
 }
 
-const connectionsKey = (workflowId: string) =>
-  ['workflow', workflowId, 'connections'] as const;
+const CONNECTIONS = ['connections'] as const;
 
-export function useConnections(workflowId: string | undefined) {
+export interface ConnectionsFilter {
+  platform?: CredentialRow['platform'];
+  scopeKind?: ConnectionScopeKind;
+}
+
+export function useConnections(filter: ConnectionsFilter = {}) {
+  const params = new URLSearchParams();
+  if (filter.platform) params.set('platform', filter.platform);
+  if (filter.scopeKind) params.set('scopeKind', filter.scopeKind);
+  const qs = params.toString();
   return useQuery({
-    queryKey: workflowId ? connectionsKey(workflowId) : ['workflow', 'none', 'connections'],
-    queryFn: () => api.get<ConnectionRow[]>(`/workflows/${workflowId!}/connections`),
-    enabled: !!workflowId,
+    queryKey: [...CONNECTIONS, filter.platform ?? null, filter.scopeKind ?? null] as const,
+    queryFn: () => api.get<ConnectionRow[]>(`/connections${qs ? `?${qs}` : ''}`),
   });
 }
 
-export function useCreateConnection(workflowId: string) {
+export function useCreateConnection() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: {
-      alias: string;
-      credentialId: string;
-      owner?: string;
-      repo?: string;
-      webhookSecret?: string;
-    }) =>
-      api.post<{ id: string; alias: string; credentialId: string }>(
-        `/workflows/${workflowId}/connections`,
-        body,
-      ),
-    onSuccess: () => qc.invalidateQueries({ queryKey: connectionsKey(workflowId) }),
+    mutationFn: (body: { credentialId: string; name: string; scope: ConnectionScope }) =>
+      api.post<ConnectionRow>('/connections', body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: CONNECTIONS }),
   });
 }
 
-export function useUpdateConnection(workflowId: string) {
+export function useUpdateConnection() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (args: {
-      connectionId: string;
-      body: {
-        alias?: string;
-        credentialId?: string;
-        owner?: string;
-        repo?: string;
-        webhookSecret?: string;
-      };
-    }) =>
-      api.put<{ id: string }>(
-        `/workflows/${workflowId}/connections/${args.connectionId}`,
-        args.body,
-      ),
-    onSuccess: () => qc.invalidateQueries({ queryKey: connectionsKey(workflowId) }),
+      id: string;
+      body: { credentialId?: string; name?: string; scope?: ConnectionScope };
+    }) => api.patch<ConnectionRow>(`/connections/${args.id}`, args.body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: CONNECTIONS }),
   });
 }
 
-export function useDeleteConnection(workflowId: string) {
+export function useDeleteConnection() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (connectionId: string) =>
-      api.delete<void>(`/workflows/${workflowId}/connections/${connectionId}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: connectionsKey(workflowId) }),
+    mutationFn: (id: string) => api.delete<void>(`/connections/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: CONNECTIONS }),
+  });
+}
+
+export function useSetWebhookSecret(workflowId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (secret: string) =>
+      api.put<{ id: string }>(`/workflows/${workflowId}/webhook-secret`, { secret }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: workflowKey(workflowId) }),
+  });
+}
+
+export function useClearWebhookSecret(workflowId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.delete<void>(`/workflows/${workflowId}/webhook-secret`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: workflowKey(workflowId) }),
   });
 }
 
@@ -238,38 +239,32 @@ export function useIntrospectMcp() {
 }
 
 export function useListProjectBoards(args: {
-  workflowId: string;
   connectionId: string;
   ownerType: 'user' | 'org';
   owner: string;
   enabled: boolean;
 }) {
-  const { workflowId, connectionId, ownerType, owner, enabled } = args;
+  const { connectionId, ownerType, owner, enabled } = args;
   return useQuery({
-    queryKey: ['workflow', workflowId, 'project-boards', connectionId, ownerType, owner] as const,
+    queryKey: ['project-boards', connectionId, ownerType, owner] as const,
     queryFn: () =>
-      api.post<ProjectBoardSummary[]>(
-        `/workflows/${workflowId}/trigger/list-projects`,
-        { connectionId, ownerType, owner },
-      ),
+      api.post<ProjectBoardSummary[]>('/trigger/list-projects', {
+        connectionId,
+        ownerType,
+        owner,
+      }),
     enabled: enabled && !!connectionId && !!owner,
     staleTime: 30_000,
     retry: false,
   });
 }
 
-export function useListLabels(args: {
-  workflowId: string;
-  connectionId: string;
-  enabled: boolean;
-}) {
-  const { workflowId, connectionId, enabled } = args;
+export function useListLabels(args: { connectionId: string; enabled: boolean }) {
+  const { connectionId, enabled } = args;
   return useQuery({
-    queryKey: ['workflow', workflowId, 'labels', connectionId] as const,
+    queryKey: ['labels', connectionId] as const,
     queryFn: () =>
-      api.post<RepoLabel[]>(`/workflows/${workflowId}/trigger/list-labels`, {
-        connectionId,
-      }),
+      api.post<RepoLabel[]>('/trigger/list-labels', { connectionId }),
     enabled: enabled && !!connectionId,
     staleTime: 30_000,
     retry: false,
