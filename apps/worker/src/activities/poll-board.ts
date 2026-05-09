@@ -60,14 +60,22 @@ export async function pollBoardActivity(
     throw new Error(`Polling for platform "${trigger.platform}" not implemented`);
   }
 
-  // Source connection — must be a `github_repo` scope for repo-source paths
-  // (PRs always, issues with `source: 'repo'`); board polling only needs
-  // its credential, but we still walk the same lookup so token decryption
-  // happens in one place.
-  const sourceConn = await prisma().connection.findUnique({
-    where: { id: trigger.connectionId },
-    include: { credential: true },
-  });
+  const scope = trigger.mode.scope;
+  const source = trigger.mode.source;
+  const needsBoard = scope === 'issues' && source !== 'repo';
+
+  // Source connection carries the credential for every path; board path also
+  // resolves a separate Projects v2 connection for its scope. Fetch both up
+  // front so each tick is one round-trip pair, not two serial reads.
+  const [sourceConn, boardConn] = await Promise.all([
+    prisma().connection.findUnique({
+      where: { id: trigger.connectionId },
+      include: { credential: true },
+    }),
+    needsBoard && trigger.boardConnectionId
+      ? prisma().connection.findUnique({ where: { id: trigger.boardConnectionId } })
+      : Promise.resolve(null),
+  ]);
   if (!sourceConn) {
     throw new Error(
       `Workflow ${workflowId} trigger references unknown connection ${trigger.connectionId}`,
@@ -75,9 +83,6 @@ export async function pollBoardActivity(
   }
   const sourceScope = connectionScopeSchema.parse(sourceConn.scope);
   const token = decryptSecret(sourceConn.credential.secret, loadEncryptionKey());
-
-  const scope = trigger.mode.scope;
-  const source = trigger.mode.source;
 
   // PR scope is always repo-sourced (a board adds nothing). Issue scope
   // dispatches on `source`: 'board' (default) hits Projects v2; 'repo' hits
@@ -105,9 +110,6 @@ export async function pollBoardActivity(
         `Workflow ${workflowId} polling issue trigger has no boardConnectionId`,
       );
     }
-    const boardConn = await prisma().connection.findUnique({
-      where: { id: trigger.boardConnectionId },
-    });
     if (!boardConn) {
       throw new Error(
         `Workflow ${workflowId} trigger references unknown board connection ${trigger.boardConnectionId}`,

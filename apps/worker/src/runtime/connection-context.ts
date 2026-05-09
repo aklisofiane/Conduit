@@ -1,8 +1,8 @@
 import path from 'node:path';
 import type { ConnectionContext } from '@conduit/agent';
-import { connectionScopeSchema, expectScopeKind } from '@conduit/shared';
+import { connectionScopeSchema } from '@conduit/shared';
+import { decryptSecret, loadEncryptionKey } from '@conduit/shared/crypto';
 import { prisma } from './prisma';
-import { makeCredentialLookup } from './credential-lookup';
 
 /**
  * Hydrate the subset of `Connection` the workspace manager needs for a
@@ -26,20 +26,18 @@ export async function loadConnectionContext(
   if (!conn) return undefined;
   const scope = connectionScopeSchema.parse(conn.scope);
   if (scope.kind !== 'github_repo') return undefined;
-  const repo = expectScopeKind(scope, 'github_repo');
-  const lookup = makeCredentialLookup();
-  const token = await lookup(connectionId);
+  const token = decryptSecret(conn.credential.secret, loadEncryptionKey());
   const platform = conn.credential.platform === 'GITLAB' ? 'gitlab' : 'github';
   const host = platform === 'github' ? 'github.com' : 'gitlab.com';
   const testBase = process.env.CONDUIT_TEST_REMOTE_BASE;
   const cloneUrl = testBase
-    ? path.join(testBase, repo.owner, `${repo.repo}.git`)
-    : `https://${host}/${repo.owner}/${repo.repo}.git`;
+    ? path.join(testBase, scope.owner, `${scope.repo}.git`)
+    : `https://${host}/${scope.owner}/${scope.repo}.git`;
   return {
     id: conn.id,
     platform,
-    owner: repo.owner,
-    repo: repo.repo,
+    owner: scope.owner,
+    repo: scope.repo,
     cloneUrl,
     token,
   };
