@@ -407,7 +407,6 @@ function CanvasInner() {
         <InspectorShell width={panelWidth} onResizeStart={startPanelResize}>
           <TriggerConfigPanel
             trigger={selectedTrigger}
-            workflowId={id}
             isActive={Boolean(wf?.isActive)}
             onChange={(patch) => updateTrigger(selectedTrigger.id, patch)}
             onActiveChange={(next) => updateWorkflow.mutate({ isActive: next })}

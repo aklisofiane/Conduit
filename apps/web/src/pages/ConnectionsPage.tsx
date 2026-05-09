@@ -8,6 +8,7 @@ import {
   useDeleteConnection,
 } from '../api/hooks.js';
 import type { ConnectionRow, CredentialRow } from '../api/types.js';
+import { scopeSummary } from '../lib/connection.js';
 
 type CreateBody = {
   credentialId: string;
@@ -121,11 +122,6 @@ function CreateConnectionForm({
   const [ownerType, setOwnerType] = useState<'user' | 'org'>('org');
   const [boardNumber, setBoardNumber] = useState('');
 
-  const chosen = useMemo(
-    () => credentials.find((c) => c.id === credentialId),
-    [credentialId, credentials],
-  );
-
   const scope = useMemo<ConnectionScope | null>(() => {
     if (scopeKind === 'github_repo') {
       if (!owner.trim() || !repo.trim()) return null;
@@ -144,7 +140,14 @@ function CreateConnectionForm({
     return { kind: 'none' };
   }, [scopeKind, owner, repo, ownerType, boardNumber]);
 
-  const canSave = Boolean(name && credentialId && scope);
+  const saveBlocker = !credentialId
+    ? 'Pick a credential'
+    : !name
+      ? 'Enter a name'
+      : !scope
+        ? 'Fill in the scope fields'
+        : '';
+  const canSave = !saveBlocker;
 
   const handleSave = async () => {
     if (!canSave || !scope) return;
@@ -278,7 +281,7 @@ function CreateConnectionForm({
           className="btn primary"
           disabled={!canSave || pending}
           onClick={handleSave}
-          title={chosen ? '' : 'Pick a credential'}
+          title={saveBlocker}
         >
           {pending ? 'Saving…' : 'Save'}
         </button>
@@ -288,6 +291,7 @@ function CreateConnectionForm({
 }
 
 function ConnectionRowView({ conn, onDelete }: { conn: ConnectionRow; onDelete: () => void }) {
+  const summary = scopeSummary(conn.scope);
   return (
     <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4 border-b border-[var(--color-line)] px-4 py-3 last:border-b-0">
       <span className="flex h-7 w-7 items-center justify-center rounded-md border border-[var(--color-line)] bg-[var(--color-bg-2)] font-mono text-[10.5px]">
@@ -296,7 +300,8 @@ function ConnectionRowView({ conn, onDelete }: { conn: ConnectionRow; onDelete: 
       <div>
         <div className="font-mono text-[13px] font-medium">{conn.name}</div>
         <div className="font-mono text-[11px] text-[var(--color-text-3)]">
-          {conn.credential.name} · {conn.credential.platform.toLowerCase()} · {scopeSummary(conn.scope)}
+          {conn.credential.name} · {conn.credential.platform.toLowerCase()}
+          {summary && ` · ${summary}`}
         </div>
       </div>
       <button className="btn" onClick={onDelete}>
@@ -304,15 +309,4 @@ function ConnectionRowView({ conn, onDelete }: { conn: ConnectionRow; onDelete: 
       </button>
     </div>
   );
-}
-
-function scopeSummary(scope: ConnectionScope): string {
-  switch (scope.kind) {
-    case 'github_repo':
-      return `${scope.owner}/${scope.repo}`;
-    case 'github_projects_v2':
-      return `${scope.owner} · project #${scope.number}`;
-    case 'none':
-      return 'no scope';
-  }
 }

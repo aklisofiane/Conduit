@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ConnectionScope, TriggerConfig, TriggerFilter } from '@conduit/shared';
+import type { ProjectBoardSummary } from '@conduit/shared/platform';
 import {
   useConnections,
   useListLabels,
@@ -7,11 +8,12 @@ import {
 } from '../../api/hooks.js';
 import { ApiError } from '../../api/client.js';
 import { cn } from '../../lib/cn.js';
+import { scopeSummary } from '../../lib/connection.js';
+import type { CredentialRow } from '../../api/types.js';
 import { Icon } from './Icon.js';
 
 interface TriggerConfigPanelProps {
   trigger: TriggerConfig;
-  workflowId: string;
   isActive: boolean;
   onChange: (patch: Partial<TriggerConfig>) => void;
   onActiveChange: (next: boolean) => void;
@@ -24,7 +26,6 @@ interface TriggerConfigPanelProps {
 
 export function TriggerConfigPanel({
   trigger,
-  workflowId: _workflowId,
   isActive,
   onChange,
   onActiveChange,
@@ -34,16 +35,23 @@ export function TriggerConfigPanel({
   saving,
   dirty,
 }: TriggerConfigPanelProps) {
-  // Repo connections feed the source slot; board connections feed the
-  // optional board slot. Filtering is platform + scope-kind in v1.
-  const { data: repoConnections = [] } = useConnections({
-    platform: platformToCredentialPlatform(trigger.platform),
-    scopeKind: 'github_repo',
-  });
-  const { data: boardConnections = [] } = useConnections({
-    platform: platformToCredentialPlatform(trigger.platform),
-    scopeKind: 'github_projects_v2',
-  });
+  const platform = trigger.platform.toUpperCase() as CredentialRow['platform'];
+  const { data: allConnections = [] } = useConnections();
+  const repoConnections = useMemo(
+    () =>
+      allConnections.filter(
+        (c) => c.scope.kind === 'github_repo' && c.credential.platform === platform,
+      ),
+    [allConnections, platform],
+  );
+  const boardConnections = useMemo(
+    () =>
+      allConnections.filter(
+        (c) =>
+          c.scope.kind === 'github_projects_v2' && c.credential.platform === platform,
+      ),
+    [allConnections, platform],
+  );
 
   const pollingScope =
     trigger.mode.kind === 'polling' ? trigger.mode.scope : undefined;
@@ -368,14 +376,6 @@ export function TriggerConfigPanel({
   );
 }
 
-function platformToCredentialPlatform(
-  platform: TriggerConfig['platform'],
-): 'GITHUB' | 'GITLAB' | 'JIRA' {
-  if (platform === 'github') return 'GITHUB';
-  if (platform === 'gitlab') return 'GITLAB';
-  return 'JIRA';
-}
-
 function ConnectionSubRow({
   label,
   connections,
@@ -405,27 +405,19 @@ function ConnectionSubRow({
           onChange={(e) => onChange(e.target.value)}
         >
           <option value="">— select a connection —</option>
-          {connections.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-              {scopeSummary(c.scope) ? ` · ${scopeSummary(c.scope)}` : ''}
-            </option>
-          ))}
+          {connections.map((c) => {
+            const summary = scopeSummary(c.scope);
+            return (
+              <option key={c.id} value={c.id}>
+                {c.name}
+                {summary && ` · ${summary}`}
+              </option>
+            );
+          })}
         </select>
       )}
     </div>
   );
-}
-
-function scopeSummary(scope: ConnectionScope): string {
-  switch (scope.kind) {
-    case 'github_repo':
-      return `${scope.owner}/${scope.repo}`;
-    case 'github_projects_v2':
-      return `${scope.owner} #${scope.number}`;
-    case 'none':
-      return '';
-  }
 }
 
 /**
@@ -649,7 +641,7 @@ function BoardPickerHint({
   selectedBoard,
 }: {
   query: ReturnType<typeof useListProjectBoards>;
-  selectedBoard: { number: number; title: string; url: string; fields: { name: string; options: string[] }[] };
+  selectedBoard: ProjectBoardSummary;
 }) {
   if (query.error) {
     const message = query.error instanceof ApiError ? query.error.message : String(query.error);

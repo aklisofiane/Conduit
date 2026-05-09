@@ -297,8 +297,8 @@ function IssueWritebackControl({
   const enabled = value !== undefined;
   const connectionId = trigger?.connectionId ?? '';
   const boardConnectionId = trigger?.boardConnectionId ?? '';
-  const { data: boardConnections = [] } = useConnections({ scopeKind: 'github_projects_v2' });
-  const boardConnection = boardConnections.find((c) => c.id === boardConnectionId);
+  const { data: connections = [] } = useConnections();
+  const boardConnection = connections.find((c) => c.id === boardConnectionId);
   const boardScope =
     boardConnection?.scope.kind === 'github_projects_v2'
       ? boardConnection.scope

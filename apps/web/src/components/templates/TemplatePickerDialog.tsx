@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { ConnectionScope } from '@conduit/shared';
 import { ApiError } from '../../api/client.js';
@@ -237,11 +237,7 @@ function BindingRow({
   onChange: (b: TemplateBinding) => void;
 }) {
   const mode = binding?.mode ?? 'new';
-  const expectedKind = useMemo<ConnectionScope['kind']>(
-    () =>
-      /board/.test(alias) ? 'github_projects_v2' : 'github_repo',
-    [alias],
-  );
+  const expectedKind = defaultScopeForAlias(alias).kind;
   const eligibleConnections = connections.filter(
     (c) => c.scope.kind === expectedKind,
   );
@@ -371,12 +367,12 @@ function RepoScopeFields({
       <LabeledInput
         label="Owner"
         value={scope.owner}
-        onChange={(v) => setScope({ kind: 'github_repo', owner: v, repo: scope.repo })}
+        onChange={(v) => setScope({ ...scope, owner: v })}
       />
       <LabeledInput
         label="Repo"
         value={scope.repo}
-        onChange={(v) => setScope({ kind: 'github_repo', owner: scope.owner, repo: v })}
+        onChange={(v) => setScope({ ...scope, repo: v })}
       />
     </>
   );
