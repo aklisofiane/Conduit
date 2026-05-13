@@ -11,6 +11,7 @@ import { ApiError } from '../../api/client.js';
 import { cn } from '../../lib/cn.js';
 import { scopeSummary } from '../../lib/connection.js';
 import type { CredentialRow } from '../../api/types.js';
+import { Select } from '../common/Select.js';
 import { Icon } from './Icon.js';
 
 interface TriggerConfigPanelProps {
@@ -175,21 +176,18 @@ export function TriggerConfigPanel({
         ) : (
           <div className="space-y-5">
             <Field label="Platform">
-              <select
-                className="field-input"
+              <Select
+                ariaLabel="Platform"
                 value={trigger.platform}
-                onChange={(e) =>
-                  onChange({ platform: e.target.value as TriggerConfig['platform'] })
+                onValueChange={(v) =>
+                  onChange({ platform: v as TriggerConfig['platform'] })
                 }
-              >
-                <option value="github">GitHub</option>
-                <option value="gitlab" disabled>
-                  GitLab (coming soon)
-                </option>
-                <option value="jira" disabled>
-                  Jira (coming soon)
-                </option>
-              </select>
+                options={[
+                  { value: 'github', label: 'GitHub' },
+                  { value: 'gitlab', label: 'GitLab (coming soon)', disabled: true },
+                  { value: 'jira', label: 'Jira (coming soon)', disabled: true },
+                ]}
+              />
             </Field>
 
             <Field label="Watch" hint="what fires this workflow">
@@ -354,22 +352,19 @@ function ConnectionSelect({
     );
   }
   return (
-    <select
-      className="field-input"
+    <Select
+      ariaLabel="Connection"
+      placeholder="— select a connection —"
       value={value}
-      onChange={(e) => onChange(e.target.value)}
-    >
-      <option value="">— select a connection —</option>
-      {connections.map((c) => {
+      onValueChange={onChange}
+      options={connections.map((c) => {
         const summary = scopeSummary(c.scope);
-        return (
-          <option key={c.id} value={c.id}>
-            {c.name}
-            {summary && ` · ${summary}`}
-          </option>
-        );
+        return {
+          value: c.id,
+          label: summary ? `${c.name} · ${summary}` : c.name,
+        };
       })}
-    </select>
+    />
   );
 }
 
@@ -462,17 +457,15 @@ function FilterRow({
 
   return (
     <div className="grid grid-cols-[100px_1fr_28px] gap-1.5 rounded-[var(--radius)] border border-[var(--color-divider)] bg-[var(--color-pill-bg)] p-1.5">
-      <select
-        className="field-input"
+      <Select
+        ariaLabel="Filter field"
         value={filter.field}
-        onChange={(e) => setKind(e.target.value as TriggerFilter['field'])}
-      >
-        {fieldDropdownOptions.map((f) => (
-          <option key={f} value={f}>
-            {FIELD_LABELS[f]}
-          </option>
-        ))}
-      </select>
+        onValueChange={(v) => setKind(v as TriggerFilter['field'])}
+        options={fieldDropdownOptions.map((f) => ({
+          value: f,
+          label: FIELD_LABELS[f],
+        }))}
+      />
       {filter.field === 'status' && (
         <OptionsValueInput
           value={filter.value}
@@ -490,20 +483,21 @@ function FilterRow({
         />
       )}
       {filter.field === 'pr_state' && (
-        <select
-          className="field-input"
+        <Select
+          ariaLabel="PR state"
           value={filter.value}
-          onChange={(e) =>
+          onValueChange={(v) =>
             onReplace({
               field: 'pr_state',
-              value: e.target.value as 'draft' | 'ready_for_review' | 'any',
+              value: v as 'draft' | 'ready_for_review' | 'any',
             })
           }
-        >
-          <option value="any">Any state</option>
-          <option value="draft">Draft only</option>
-          <option value="ready_for_review">Ready for review only</option>
-        </select>
+          options={[
+            { value: 'any', label: 'Any state' },
+            { value: 'draft', label: 'Draft only' },
+            { value: 'ready_for_review', label: 'Ready for review only' },
+          ]}
+        />
       )}
       <button
         className="btn"
@@ -540,19 +534,15 @@ function OptionsValueInput({
   }
   const showStaleOption = value !== '' && !options.includes(value);
   return (
-    <select
-      className="field-input"
+    <Select
+      placeholder="— select —"
       value={value}
-      onChange={(e) => onChange(e.target.value)}
-    >
-      <option value="">— select —</option>
-      {showStaleOption && <option value={value}>{value} (not found)</option>}
-      {options.map((opt) => (
-        <option key={opt} value={opt}>
-          {opt}
-        </option>
-      ))}
-    </select>
+      onValueChange={onChange}
+      options={[
+        ...(showStaleOption ? [{ value, label: `${value} (not found)` }] : []),
+        ...options.map((opt) => ({ value: opt, label: opt })),
+      ]}
+    />
   );
 }
 

@@ -16,6 +16,7 @@ export type IconName =
   | 'fit'
   | 'close'
   | 'chevron-down'
+  | 'check'
   | 'more-vertical'
   | 'trash'
   | 'pencil'
@@ -153,6 +154,12 @@ export function Icon({
       return (
         <svg {...common}>
           <path d="M6 9l6 6 6-6" />
+        </svg>
+      );
+    case 'check':
+      return (
+        <svg {...common}>
+          <path d="M5 12l4.5 4.5L19 7" />
         </svg>
       );
     case 'more-vertical':
