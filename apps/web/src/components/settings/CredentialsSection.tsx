@@ -8,8 +8,14 @@ import {
 } from '../../api/hooks.js';
 import { ApiError } from '../../api/client.js';
 import { relativeFromNow } from '../../lib/time.js';
+import { Select } from '../common/Select.js';
 
 const PLATFORMS = ['GITHUB', 'GITLAB', 'JIRA', 'SLACK', 'DISCORD'] as const;
+
+const PLATFORM_OPTIONS = PLATFORMS.map((p) => ({
+  value: p,
+  label: p.toLowerCase(),
+}));
 
 /**
  * Rotating a credential propagates to every connection backed by it — there's
@@ -59,22 +65,17 @@ export function CredentialsSection() {
             <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
               Platform
             </span>
-            <select
-              className="field-input"
+            <Select
+              ariaLabel="Platform"
               value={form.platform}
-              onChange={(e) =>
+              onValueChange={(v) =>
                 setForm((f) => ({
                   ...f,
-                  platform: e.target.value as CredentialRow['platform'],
+                  platform: v as CredentialRow['platform'],
                 }))
               }
-            >
-              {PLATFORMS.map((p) => (
-                <option key={p} value={p}>
-                  {p.toLowerCase()}
-                </option>
-              ))}
-            </select>
+              options={PLATFORM_OPTIONS}
+            />
           </label>
           <label className="flex flex-col gap-1">
             <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">

@@ -9,6 +9,7 @@ import {
 } from '../../api/hooks.js';
 import type { ConnectionRow, CredentialRow } from '../../api/types.js';
 import { scopeSummary } from '../../lib/connection.js';
+import { Select } from '../common/Select.js';
 
 type CreateBody = {
   credentialId: string;
@@ -163,18 +164,18 @@ function CreateConnectionForm({
           <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
             Credential
           </span>
-          <select
-            className="field-input"
+          <Select
+            ariaLabel="Credential"
             value={credentialId}
-            onChange={(e) => setCredentialId(e.target.value)}
-          >
-            {credentials.length === 0 && <option value="">No credentials — create one first</option>}
-            {credentials.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name} · {c.platform.toLowerCase()}
-              </option>
-            ))}
-          </select>
+            onValueChange={setCredentialId}
+            placeholder={
+              credentials.length === 0 ? 'No credentials — create one first' : undefined
+            }
+            options={credentials.map((c) => ({
+              value: c.id,
+              label: `${c.name} · ${c.platform.toLowerCase()}`,
+            }))}
+          />
         </label>
       </div>
 
@@ -182,17 +183,12 @@ function CreateConnectionForm({
         <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
           Scope kind
         </span>
-        <select
-          className="field-input"
+        <Select
+          ariaLabel="Scope kind"
           value={scopeKind}
-          onChange={(e) => setScopeKind(e.target.value as ScopeKind)}
-        >
-          {SCOPE_KINDS.map((s) => (
-            <option key={s.value} value={s.value}>
-              {s.label}
-            </option>
-          ))}
-        </select>
+          onValueChange={(v) => setScopeKind(v as ScopeKind)}
+          options={SCOPE_KINDS.map((s) => ({ value: s.value, label: s.label }))}
+        />
       </label>
 
       {scopeKind === 'github_repo' && (
@@ -228,14 +224,15 @@ function CreateConnectionForm({
             <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
               Owner type
             </span>
-            <select
-              className="field-input"
+            <Select
+              ariaLabel="Owner type"
               value={ownerType}
-              onChange={(e) => setOwnerType(e.target.value as 'user' | 'org')}
-            >
-              <option value="org">Org</option>
-              <option value="user">User</option>
-            </select>
+              onValueChange={(v) => setOwnerType(v as 'user' | 'org')}
+              options={[
+                { value: 'org', label: 'Org' },
+                { value: 'user', label: 'User' },
+              ]}
+            />
           </label>
           <label className="flex flex-col gap-1">
             <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">

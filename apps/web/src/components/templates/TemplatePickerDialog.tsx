@@ -15,6 +15,7 @@ import type {
   TemplateSummary,
 } from '../../api/types.js';
 import { Dialog, DialogContent } from '../common/Dialog.js';
+import { Select, type SelectOption } from '../common/Select.js';
 
 export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
   const { data: templates = [], isLoading } = useTemplates();
@@ -294,18 +295,16 @@ function BindingRow({
             label="Connection"
             value={binding.connectionId}
             onChange={(v) => onChange({ ...binding, connectionId: v })}
-          >
-            <option value="" disabled>
-              {eligibleConnections.length === 0
+            placeholder={
+              eligibleConnections.length === 0
                 ? `No ${expectedKind} connections yet`
-                : 'Pick one…'}
-            </option>
-            {eligibleConnections.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name} · {c.credential.platform.toLowerCase()}
-              </option>
-            ))}
-          </LabeledSelect>
+                : 'Pick one…'
+            }
+            options={eligibleConnections.map((c) => ({
+              value: c.id,
+              label: `${c.name} · ${c.credential.platform.toLowerCase()}`,
+            }))}
+          />
         </div>
       )}
     </div>
@@ -333,16 +332,12 @@ function NewBindingFields({
         label="Credential"
         value={binding.credentialId}
         onChange={(v) => onChange({ ...binding, credentialId: v })}
-      >
-        <option value="" disabled>
-          {credentials.length === 0 ? 'No credentials yet' : 'Pick one…'}
-        </option>
-        {credentials.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.platform.toLowerCase()} · {c.name}
-          </option>
-        ))}
-      </LabeledSelect>
+        placeholder={credentials.length === 0 ? 'No credentials yet' : 'Pick one…'}
+        options={credentials.map((c) => ({
+          value: c.id,
+          label: `${c.platform.toLowerCase()} · ${c.name}`,
+        }))}
+      />
 
       {binding.scope.kind === 'github_repo' && (
         <RepoScopeFields scope={binding.scope} setScope={setScope} />
@@ -393,10 +388,11 @@ function BoardScopeFields({
         onChange={(v) =>
           setScope({ ...scope, ownerType: v as 'user' | 'org' })
         }
-      >
-        <option value="org">Org</option>
-        <option value="user">User</option>
-      </LabeledSelect>
+        options={[
+          { value: 'org', label: 'Org' },
+          { value: 'user', label: 'User' },
+        ]}
+      />
       <LabeledInput
         label="Owner"
         value={scope.owner}
@@ -471,21 +467,27 @@ function LabeledSelect({
   label,
   value,
   onChange,
-  children,
+  options,
+  placeholder,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
-  children: React.ReactNode;
+  options: SelectOption[];
+  placeholder?: string;
 }) {
   return (
-    <label className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1">
       <span className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-3)]">
         {label}
       </span>
-      <select className="field-input" value={value} onChange={(e) => onChange(e.target.value)}>
-        {children}
-      </select>
-    </label>
+      <Select
+        ariaLabel={label}
+        value={value}
+        onValueChange={onChange}
+        options={options}
+        placeholder={placeholder}
+      />
+    </div>
   );
 }
