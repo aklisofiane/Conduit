@@ -1,14 +1,14 @@
 import { useMemo, useState } from 'react';
 import type { ConnectionScope } from '@conduit/shared';
-import { ApiError } from '../api/client.js';
+import { ApiError } from '../../api/client.js';
 import {
   useConnections,
   useCreateConnection,
   useCredentials,
   useDeleteConnection,
-} from '../api/hooks.js';
-import type { ConnectionRow, CredentialRow } from '../api/types.js';
-import { scopeSummary } from '../lib/connection.js';
+} from '../../api/hooks.js';
+import type { ConnectionRow, CredentialRow } from '../../api/types.js';
+import { scopeSummary } from '../../lib/connection.js';
 
 type CreateBody = {
   credentialId: string;
@@ -17,12 +17,12 @@ type CreateBody = {
 };
 
 /**
- * Global Connections page. A Connection binds a typed scope (a GitHub repo,
- * a Projects v2 board, etc.) on top of a `Credential`. Workflows reference
- * connections by id from inside their trigger and MCP server slots —
- * connections are no longer per-workflow.
+ * Connections. A Connection binds a typed scope (a GitHub repo, a Projects v2
+ * board, etc.) on top of a `Credential`. Workflows reference connections by id
+ * from inside their trigger and MCP server slots — connections are not
+ * per-workflow.
  */
-export function ConnectionsPage() {
+export function ConnectionsSection() {
   const { data: connections = [], isLoading } = useConnections();
   const { data: credentials = [] } = useCredentials();
   const create = useCreateConnection();
@@ -31,67 +31,60 @@ export function ConnectionsPage() {
   const [creating, setCreating] = useState(false);
 
   return (
-    <div className="mx-auto flex w-full max-w-[900px] flex-col gap-6 px-6 pb-16 pt-10">
-      <h1
-        className="text-[34px] font-semibold leading-none tracking-tight text-[var(--color-text)]"
-        style={{ fontFamily: 'var(--font-serif)' }}
-      >
-        Connections<em className="text-[var(--color-claude)] not-italic">.</em>
-      </h1>
-      <p className="font-mono text-[12px] text-[var(--color-text-2)]">
-        A connection picks a credential and pins it to a specific scope (a repo, a project board). Workflows reference connections directly.
-      </p>
-
-      <section className="rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-1)]">
-        <header className="flex items-center justify-between border-b border-[var(--color-line)] px-4 py-3">
+    <section className="rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-1)]">
+      <header className="flex items-center justify-between border-b border-[var(--color-line)] px-4 py-3">
+        <div className="flex flex-col gap-0.5">
           <h2 className="font-mono text-[13px] font-semibold">Connections</h2>
-          <button className="btn" onClick={() => setCreating((v) => !v)}>
-            {creating ? 'Cancel' : '+ New'}
-          </button>
-        </header>
+          <p className="font-mono text-[11px] text-[var(--color-text-3)]">
+            A connection picks a credential and pins it to a scope (a repo, a project board). Workflows reference connections directly.
+          </p>
+        </div>
+        <button className="btn shrink-0 whitespace-nowrap" onClick={() => setCreating((v) => !v)}>
+          {creating ? 'Cancel' : '+ New'}
+        </button>
+      </header>
 
-        {creating && (
-          <CreateConnectionForm
-            credentials={credentials}
-            pending={create.isPending}
-            onCancel={() => setCreating(false)}
-            onSubmit={async (body) => {
-              try {
-                await create.mutateAsync(body);
-                setCreating(false);
-              } catch (e) {
-                alert(e instanceof ApiError ? e.message : String(e));
-              }
-            }}
-          />
-        )}
+      {creating && (
+        <CreateConnectionForm
+          credentials={credentials}
+          pending={create.isPending}
+          onCancel={() => setCreating(false)}
+          onSubmit={async (body) => {
+            try {
+              await create.mutateAsync(body);
+              setCreating(false);
+            } catch (e) {
+              alert(e instanceof ApiError ? e.message : String(e));
+            }
+          }}
+        />
+      )}
 
-        {isLoading && (
-          <div className="flex h-16 items-center justify-center font-mono text-[12px] text-[var(--color-text-3)]">
-            Loading…
-          </div>
-        )}
-        {!isLoading && connections.length === 0 && !creating && (
-          <div className="flex h-24 items-center justify-center font-mono text-[12px] text-[var(--color-text-4)]">
-            No connections yet.
-          </div>
-        )}
-        {connections.map((conn) => (
-          <ConnectionRowView
-            key={conn.id}
-            conn={conn}
-            onDelete={async () => {
-              if (!confirm(`Delete connection "${conn.name}"?`)) return;
-              try {
-                await del.mutateAsync(conn.id);
-              } catch (e) {
-                alert(e instanceof ApiError ? e.message : String(e));
-              }
-            }}
-          />
-        ))}
-      </section>
-    </div>
+      {isLoading && (
+        <div className="flex h-16 items-center justify-center font-mono text-[12px] text-[var(--color-text-3)]">
+          Loading…
+        </div>
+      )}
+      {!isLoading && connections.length === 0 && !creating && (
+        <div className="flex h-24 items-center justify-center font-mono text-[12px] text-[var(--color-text-4)]">
+          No connections yet.
+        </div>
+      )}
+      {connections.map((conn) => (
+        <ConnectionRowView
+          key={conn.id}
+          conn={conn}
+          onDelete={async () => {
+            if (!confirm(`Delete connection "${conn.name}"?`)) return;
+            try {
+              await del.mutateAsync(conn.id);
+            } catch (e) {
+              alert(e instanceof ApiError ? e.message : String(e));
+            }
+          }}
+        />
+      ))}
+    </section>
   );
 }
 

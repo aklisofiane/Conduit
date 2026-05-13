@@ -27,7 +27,7 @@ export function TopChrome() {
             className="mx-3 h-[18px] w-px bg-[var(--color-divider)]"
           />
           <NavIconLink to="/" end label="Home — all workflows" icon="home" />
-          <NavIconLink to="/credentials" label="Settings" icon="settings" />
+          <NavIconLink to="/settings" label="Settings" icon="settings" />
         </div>
 
         <div className="flex items-center justify-center">{centerSlot}</div>

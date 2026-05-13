@@ -3,13 +3,13 @@ import { AppLayout } from '../components/layout/AppLayout.js';
 import { AuthLayout } from '../components/layout/AuthLayout.js';
 import { RedirectIfAuthed } from '../components/layout/RedirectIfAuthed.js';
 import { RequireAuth } from '../components/layout/RequireAuth.js';
+import { SettingsLayout } from '../components/layout/SettingsLayout.js';
 import { AcceptInvitationPage } from '../pages/AcceptInvitationPage.js';
 import { AccountSettingsPage } from '../pages/AccountSettingsPage.js';
 import { CanvasPage } from '../pages/CanvasPage.js';
-import { ConnectionsPage } from '../pages/ConnectionsPage.js';
-import { CredentialsPage } from '../pages/CredentialsPage.js';
 import { ForgotPasswordPage } from '../pages/ForgotPasswordPage.js';
 import { HomePage } from '../pages/HomePage.js';
+import { IntegrationsPage } from '../pages/IntegrationsPage.js';
 import { InvitationsPage } from '../pages/InvitationsPage.js';
 import { OrganizationSettingsPage } from '../pages/OrganizationSettingsPage.js';
 import { ResetPasswordPage } from '../pages/ResetPasswordPage.js';
@@ -42,10 +42,18 @@ export const router = createBrowserRouter([
       { index: true, element: <HomePage /> },
       { path: 'workflows/new', element: <Navigate to="/" replace /> },
       { path: 'workflows/:id', element: <CanvasPage /> },
-      { path: 'workflows/:id/connections', element: <Navigate to="/connections" replace /> },
+      { path: 'workflows/:id/connections', element: <Navigate to="/settings/integrations" replace /> },
       { path: 'runs/:runId', element: <RunDetailPage /> },
-      { path: 'credentials', element: <CredentialsPage /> },
-      { path: 'connections', element: <ConnectionsPage /> },
+      { path: 'credentials', element: <Navigate to="/settings/integrations" replace /> },
+      { path: 'connections', element: <Navigate to="/settings/integrations" replace /> },
+      {
+        path: 'settings',
+        element: <SettingsLayout />,
+        children: [
+          { index: true, element: <Navigate to="/settings/integrations" replace /> },
+          { path: 'integrations', element: <IntegrationsPage /> },
+        ],
+      },
       { path: 'account', element: <AccountSettingsPage /> },
       { path: 'account/organization', element: <OrganizationSettingsPage /> },
       { path: 'account/invitations', element: <InvitationsPage /> },
