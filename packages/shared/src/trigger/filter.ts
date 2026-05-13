@@ -8,7 +8,7 @@ import { z } from 'zod';
  *   board single-select). Issue-shaped polling and webhook events.
  * - `label`    — membership: row matches if `value` is one of the issue's
  *   labels. To require multiple labels, add multiple label rows.
- * - `pr_state` — for polling triggers with `mode.scope === 'pull_requests'`.
+ * - `pr_state` — for polling triggers with `type: 'pull_requests'`.
  *   `'draft'` / `'ready_for_review'` match the PR's draft state; `'any'` is
  *   an explicit always-match so the UI can show a selected value without an
  *   empty-row safe-fail.

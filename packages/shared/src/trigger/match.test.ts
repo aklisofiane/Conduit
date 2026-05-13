@@ -22,7 +22,8 @@ const BASE_TRIGGER: TriggerConfig = {
   name: 'Trigger1',
   platform: 'github',
   connectionId: 'conn_1',
-  mode: { kind: 'webhook', event: 'issues.opened' },
+  type: 'webhook',
+  event: 'issues.opened',
   filters: [],
 };
 
@@ -39,7 +40,8 @@ describe('matchesTrigger', () => {
     expect(
       matchesTrigger(BASE_EVENT, {
         ...BASE_TRIGGER,
-        mode: { kind: 'webhook', event: 'pull_request.opened' },
+        type: 'webhook',
+        event: 'pull_request.opened',
       }),
     ).toBe(false);
   });
@@ -49,8 +51,13 @@ describe('matchesTrigger', () => {
       matchesTrigger(
         { ...BASE_EVENT, mode: 'polling', event: 'status.changed' },
         {
-          ...BASE_TRIGGER,
-          mode: { kind: 'polling', intervalSec: 60, scope: 'issues', source: 'board' },
+          id: 'trigger-1',
+          name: 'Trigger1',
+          platform: 'github',
+          connectionId: 'conn_1',
+          type: 'issues',
+          intervalSec: 60,
+          filters: [],
         },
       ),
     ).toBe(true);
@@ -59,7 +66,8 @@ describe('matchesTrigger', () => {
   it('AND-combines status + label filters — all must pass', () => {
     const trigger: TriggerConfig = {
       ...BASE_TRIGGER,
-      mode: { kind: 'webhook', event: 'board.column.changed' },
+      type: 'webhook',
+      event: 'board.column.changed',
       filters: [
         { field: 'status', value: 'Dev' },
         { field: 'label', value: 'bug' },
@@ -138,7 +146,8 @@ describe('matchesTrigger', () => {
     };
     const trigger: TriggerConfig = {
       ...BASE_TRIGGER,
-      mode: { kind: 'webhook', event: 'board.column.changed' },
+      type: 'webhook',
+      event: 'board.column.changed',
       filters: [{ field: 'status', value: 'Dev' }],
     };
     expect(matchesTrigger(webhookEvent, trigger)).toBe(true);
@@ -153,8 +162,12 @@ describe('matchesTrigger', () => {
       issue: { id: 'I_1', key: '42', title: 't', url: 'https://x' },
     };
     const trigger: TriggerConfig = {
-      ...BASE_TRIGGER,
-      mode: { kind: 'polling', intervalSec: 60, scope: 'issues', source: 'board' },
+      id: 'trigger-1',
+      name: 'Trigger1',
+      platform: 'github',
+      connectionId: 'conn_1',
+      type: 'issues',
+      intervalSec: 60,
       filters: [{ field: 'status', value: 'Dev' }],
     };
     expect(matchesTrigger(pollingEvent, trigger)).toBe(true);
@@ -170,8 +183,12 @@ describe('matchesTrigger', () => {
       pr: { headRef: 'feature-x', baseRef: 'main' },
     };
     const trigger: TriggerConfig = {
-      ...BASE_TRIGGER,
-      mode: { kind: 'polling', intervalSec: 60, scope: 'pull_requests', source: 'board' },
+      id: 'trigger-1',
+      name: 'Trigger1',
+      platform: 'github',
+      connectionId: 'conn_1',
+      type: 'pull_requests',
+      intervalSec: 60,
       filters: [{ field: 'pr_state', value: 'ready_for_review' }],
     };
     expect(matchesTrigger(event, trigger)).toBe(true);
@@ -186,8 +203,12 @@ describe('matchesTrigger', () => {
       pr: { headRef: 'feature-x', baseRef: 'main' },
     };
     const trigger: TriggerConfig = {
-      ...BASE_TRIGGER,
-      mode: { kind: 'polling', intervalSec: 60, scope: 'pull_requests', source: 'board' },
+      id: 'trigger-1',
+      name: 'Trigger1',
+      platform: 'github',
+      connectionId: 'conn_1',
+      type: 'pull_requests',
+      intervalSec: 60,
       filters: [{ field: 'pr_state', value: 'ready_for_review' }],
     };
     expect(matchesTrigger(draftEvent, trigger)).toBe(false);
@@ -205,8 +226,12 @@ describe('matchesTrigger', () => {
       payload: { prState: 'ready_for_review' },
     };
     const trigger: TriggerConfig = {
-      ...BASE_TRIGGER,
-      mode: { kind: 'polling', intervalSec: 60, scope: 'pull_requests', source: 'board' },
+      id: 'trigger-1',
+      name: 'Trigger1',
+      platform: 'github',
+      connectionId: 'conn_1',
+      type: 'pull_requests',
+      intervalSec: 60,
       filters: [{ field: 'pr_state', value: 'any' }],
     };
     expect(matchesTrigger(draftEvent, trigger)).toBe(true);

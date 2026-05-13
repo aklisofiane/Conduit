@@ -125,11 +125,11 @@ export class TemplatesService implements OnModuleInit {
     await Promise.allSettled(
       created.map(async ({ id, definition, isActive }) => {
         const trigger = definition.triggers[0];
-        if (!trigger || trigger.mode.kind !== 'polling') return;
+        if (!trigger || trigger.type === 'webhook') return;
         try {
           await this.temporal.upsertPollSchedule({
             workflowId: id,
-            intervalSec: trigger.mode.intervalSec,
+            intervalSec: trigger.intervalSec,
             active: isActive,
           });
         } catch (err) {

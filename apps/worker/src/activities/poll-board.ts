@@ -53,16 +53,17 @@ export async function pollBoardActivity(
   if (!trigger) {
     return emptyResult(workflowId, 'not-polling');
   }
-  if (trigger.mode.kind !== 'polling') {
+  if (trigger.type === 'webhook') {
+    // Webhook triggers are delivered by the webhooks controller, not the
+    // poll loop. A schedule firing here means a stale Temporal schedule —
+    // drop cleanly so reconcile cleans it up on next save.
     return emptyResult(workflowId, 'not-polling');
   }
   if (trigger.platform !== 'github') {
     throw new Error(`Polling for platform "${trigger.platform}" not implemented`);
   }
 
-  const scope = trigger.mode.scope;
-  const source = trigger.mode.source;
-  const needsBoard = scope === 'issues' && source !== 'repo';
+  const needsBoard = trigger.type === 'issues' && !!trigger.boardConnectionId;
 
   // Source connection carries the credential for every path; board path also
   // resolves a separate Projects v2 connection for its scope. Fetch both up
@@ -84,32 +85,21 @@ export async function pollBoardActivity(
   const sourceScope = connectionScopeSchema.parse(sourceConn.scope);
   const token = decryptSecret(sourceConn.credential.secret, loadEncryptionKey());
 
-  // PR scope is always repo-sourced (a board adds nothing). Issue scope
-  // dispatches on `source`: 'board' (default) hits Projects v2; 'repo' hits
-  // the repo's open-issues list directly. The activity returns the same
-  // `ProjectBoardItem` shape from any of the three paths so the rest of the
+  // Three fetch paths, dispatched on `type` and `boardConnectionId` presence:
+  //   - `pull_requests` → repo PRs (a board adds nothing here).
+  //   - `issues` + boardConnectionId → Projects v2 board items.
+  //   - `issues` (no board) → repo open issues.
+  // All three return the same `ProjectBoardItem` shape so the rest of the
   // pipeline (filter, dedup, event-build) doesn't care which one fired.
   let items;
-  if (scope === 'pull_requests') {
+  if (trigger.type === 'pull_requests') {
     const repoScope = expectScopeKind(sourceScope, 'github_repo');
     items = await fetchRepositoryPullRequests({
       owner: repoScope.owner,
       name: repoScope.repo,
       token,
     });
-  } else if (source === 'repo') {
-    const repoScope = expectScopeKind(sourceScope, 'github_repo');
-    items = await fetchRepositoryIssues({
-      owner: repoScope.owner,
-      name: repoScope.repo,
-      token,
-    });
-  } else {
-    if (!trigger.boardConnectionId) {
-      throw new Error(
-        `Workflow ${workflowId} polling issue trigger has no boardConnectionId`,
-      );
-    }
+  } else if (needsBoard) {
     if (!boardConn) {
       throw new Error(
         `Workflow ${workflowId} trigger references unknown board connection ${trigger.boardConnectionId}`,
@@ -127,6 +117,13 @@ export async function pollBoardActivity(
     });
     // Drop PRs and DraftIssues so issue triggers only see real issues.
     items = boardItems.filter((item) => item.contentType === 'Issue');
+  } else {
+    const repoScope = expectScopeKind(sourceScope, 'github_repo');
+    items = await fetchRepositoryIssues({
+      owner: repoScope.owner,
+      name: repoScope.repo,
+      token,
+    });
   }
   const fetchedCount = items.length;
 
@@ -141,7 +138,7 @@ export async function pollBoardActivity(
   // Second gate: the platform query filters by the API's current view, but
   // `matchesTrigger` also enforces platform + filter-field parity against
   // the normalized event. Cheap belt-and-braces.
-  const candidateEvents = newItems.map((item) => toTriggerEvent(item, scope));
+  const candidateEvents = newItems.map((item) => toTriggerEvent(item, trigger.type));
   const eventsToStart = candidateEvents.filter((event) => matchesTrigger(event, trigger));
   const gatedOutCount = candidateEvents.length - eventsToStart.length;
 

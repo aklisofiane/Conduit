@@ -198,6 +198,12 @@ const rowClassName =
 function triggerSummary(def: WorkflowRow['definition']): string {
   const trigger = def.triggers[0];
   if (!trigger) return 'no trigger';
-  if (trigger.mode.kind === 'webhook') return trigger.mode.event;
-  return `polling · every ${trigger.mode.intervalSec}s`;
+  switch (trigger.type) {
+    case 'issues':
+      return `polling · every ${trigger.intervalSec}s`;
+    case 'pull_requests':
+      return `polling · every ${trigger.intervalSec}s · prs`;
+    case 'webhook':
+      return trigger.event;
+  }
 }

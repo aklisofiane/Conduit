@@ -6,61 +6,58 @@ The canvas has **two node types**. That's the whole taxonomy.
 
 Starts a workflow. A trigger is a real graph node — same `id` / `name` shape as agents, addressable by `Edge.from`. The definition stores triggers as `triggers: TriggerConfig[]` and v1 caps the array length at 1, but the plural shape is what every consumer reads (worker `loadGraphActivity`, the canvas, the validator) so multi-trigger lands without another schema migration.
 
-### Trigger modes
+### Trigger types
 
-A trigger can operate in **webhook** mode (event-driven push) or **polling** mode (interval-based pull). Both use the same filter logic.
+A trigger's top-level `type` picks *what the user is watching*. The schema is a discriminated union; mechanism (polling vs. webhook delivery) is inferred from the variant rather than authored as a separate axis.
 
 ```ts
 type TriggerConfig = {
   id: string;                            // stable across renames; used as React Flow node id
   name: string;                          // unique within workflow, shares the namespace with agent names
   platform: 'github' | 'gitlab' | 'jira';
-  connectionId: string;
-  mode: TriggerMode;
-  filters: TriggerFilter[];              // e.g. [{ field: 'status', value: 'Dev' }, { field: 'label', value: 'bug' }]
-  board?: BoardRef;                      // required for polling mode + `board.column.changed` webhook
-};
+  connectionId: string;                  // required — the source binding (today: a `github_repo` Connection)
+  boardConnectionId?: string;            // optional. Presence is load-bearing: under `type: 'issues'` it unlocks
+                                         //   board-aware behavior; under `type: 'webhook'` + `event: 'board.column.changed'`
+                                         //   it's required by the validator.
+  filters: TriggerFilter[];              // per-variant narrowed; e.g. [{ field: 'status', value: 'Dev' }, { field: 'label', value: 'bug' }]
+} & TriggerVariant;
 
-type TriggerMode =
-  | { kind: 'webhook'; event: string }        // platform pushes events (e.g. 'issues.opened', 'board.column.changed')
-  | { kind: 'polling';                        // Conduit polls the platform API on an interval (default 60s)
-      intervalSec: number;
-      scope: 'issues' | 'pull_requests';      // what to watch (default 'issues')
-      source: 'board' | 'repo';               // where to query — default 'board' (issue scope only; PR scope always repo)
-    };
+type TriggerVariant =
+  // Polling-delivered. Optional `boardConnectionId` enables status filter + board-column semantics.
+  | { type: 'issues';        intervalSec: number; filters: Array<LabelFilter | StatusFilter> }
+  // Polling-delivered, repo-sourced. `boardConnectionId` is allowed but ignored.
+  | { type: 'pull_requests'; intervalSec: number; filters: Array<LabelFilter | PrStateFilter> }
+  // Platform-pushed. Preserved in the schema for the dormant `WebhooksController` — NOT exposed in the UI today.
+  | { type: 'webhook';       event: string;       filters: Array<LabelFilter | StatusFilter | PrStateFilter> };
 
-type BoardRef = {
-  ownerType: 'user' | 'org';  // GitHub Projects v2 are owned by a user or an org
-  owner: string;              // the login of that user/org
-  number: number;             // Projects v2 project number (scoped to owner)
-};
-
-type TriggerFilter =
-  | { field: 'status'; value: string }                                    // exact match against the issue/PR's Status column
-  | { field: 'label'; value: string }                                     // membership: row matches if `value` is in the issue's labels
-  | { field: 'pr_state'; value: 'draft' | 'ready_for_review' | 'any' };   // polling + scope=pull_requests only
+type LabelFilter   = { field: 'label';    value: string };                                  // membership against the issue's labels
+type StatusFilter  = { field: 'status';   value: string };                                  // exact match against the board's Status column
+type PrStateFilter = { field: 'pr_state'; value: 'draft' | 'ready_for_review' | 'any' };    // PR draft state
 
 // `status`/`label` are single-valued strings. Multiple filters on the same trigger combine with AND;
 // to require multiple labels, add multiple label rows. The matcher safe-fails on empty `value` so
 // in-progress UI rows are persistable without ever matching.
 //
 // `pr_state` matches the PR's draft state. `'any'` is an explicit always-match (so the UI can show
-// a selected value rather than leaning on absence-of-row to mean match-all). Filter availability is
-// scope-aware in the UI: issue triggers offer `status` + `label`; PR triggers offer `pr_state` +
-// `label`. The schema accepts all three regardless of mode — per-scope exclusion is a UI concern.
+// a selected value rather than leaning on absence-of-row to mean match-all). Filter validity is
+// schema-enforced per variant — the matcher never sees a filter that doesn't belong to the variant.
+
+// `BoardRef` no longer lives on the trigger. The Projects v2 board details are
+// carried by the `boardConnectionId`'s `Connection.scope` (`github_projects_v2`:
+// `{ ownerType, owner, number }`); the validator only sees the id. Re-exported
+// as a type alias from `@conduit/shared/trigger` for legacy call sites.
+type BoardRef = Omit<GithubProjectsV2Scope, 'kind'>;
 ```
 
-**Webhook mode**: platform sends an event to `POST /api/hooks/:workflowId`. Conduit verifies the signature, normalizes the event, checks filters, and triggers a run if matched. GitHub webhooks currently normalize four events: `issues.opened`, `pull_request.opened`, `issue_comment.created` (PR-scoped), and `board.column.changed` (from `projects_v2_item.edited` single-select field moves). The `board.column.changed` webhook carries only the Projects v2 item's `content_node_id` — no issue number — so it can't drive a workflow on its own; polling is the supported mode for board-driven flows.
+**`type: 'webhook'`**: platform sends an event to `POST /api/hooks/:workflowId`. Conduit verifies the signature, normalizes the event, checks filters, and starts a run if matched. GitHub webhooks currently normalize four events: `issues.opened`, `pull_request.opened`, `issue_comment.created` (PR-scoped), and `board.column.changed` (from `projects_v2_item.edited` single-select field moves). The `board.column.changed` webhook carries only the Projects v2 item's `content_node_id` — no issue number — so it can't drive a workflow on its own; the `'issues'` variant with a board connection is the supported shape for board-driven flows. The webhook variant is preserved in the schema but **has no UI on-ramp today** — the `WebhooksController` is mounted and `matchesTrigger` honors the `event` name, but no picker creates a webhook trigger. Default-created workflows land on `type: 'issues'`.
 
-**Polling mode**: a Temporal Schedule fires `pollWorkflow` every `intervalSec` seconds. The activity queries the platform API (GitHub GraphQL for v1), filters on the returned items, and triggers a run for each matching item that hasn't been processed for this specific transition yet. The query target is picked by `mode.scope` and `mode.source` (see below); only `scope: 'issues'` + `source: 'board'` reads `TriggerConfig.board` — repo-sourced issue polling and PR-scope polling derive the repo from the connection. See [agent-execution.md](./agent-execution.md#polling-pipeline) for the activity lifecycle.
+**`type: 'issues'`** and **`type: 'pull_requests'`**: a Temporal Schedule fires `pollWorkflow` every `intervalSec` seconds. The activity queries the platform API (GitHub GraphQL for v1), filters on the returned items, and starts a run for each new match. The board-vs-repo dispatch reads `boardConnectionId` presence — no separate `source` axis. See [agent-execution.md](./agent-execution.md#polling-pipeline) for the activity lifecycle.
 
-`mode.scope` and `mode.source` together pick *what* to watch and *where* to query:
+`type` together with `boardConnectionId` presence picks *what* to watch and *where* to query:
 
-- `scope: 'issues'` + `source: 'board'` (default) — query the configured Projects v2 board. The poller keeps items whose `contentType === 'Issue'` and emits `event === 'board.column.changed'` on each new match. Drafts (`DraftIssue`) and PRs that happen to live on the board are filtered out for free. The `status` filter works against the board's Status column.
-- `scope: 'issues'` + `source: 'repo'` — query the connection's `repository.issues(states: OPEN)`. No board ref needed. Same `event === 'board.column.changed'` for downstream consistency, but `singleSelectValues` is empty (no Status column off-board); the UI hides the `status` filter accordingly.
-- `scope: 'pull_requests'` — always repo-sourced. Query the connection's `repository.pullRequests(states: OPEN)`. The poller populates `TriggerEvent.pr` head/base refs (so the workspace manager lands on the PR's branch instead of `conduit/<id>-<slug>`) and emits `event === 'pull_request.detected'`. The new event name is polling-only — webhook PR events keep `pull_request.opened` so consumers can distinguish "GitHub pushed us at PR open" from "the polling tick saw the PR enter the matching set." The `source` field is allowed but ignored under PR scope.
-
-`scope` and `source` both default via Zod (`'issues'`, `'board'`) so triggers persisted before either field existed round-trip to the prior board-issue behavior.
+- `type: 'issues'` + `boardConnectionId` set — query the configured Projects v2 board (resolved through the board Connection's scope). The poller keeps items whose `contentType === 'Issue'` and emits `event === 'board.column.changed'` on each new match. Drafts (`DraftIssue`) and PRs that happen to live on the board are filtered out for free. The `status` filter works against the board's Status column.
+- `type: 'issues'`, no `boardConnectionId` — query the connection's `repository.issues(states: OPEN)`. Same `event === 'board.column.changed'` for downstream consistency, but `singleSelectValues` is empty (no Status column off-board). The UI only offers the `label` filter in this state; a `status` filter persisted in this state never matches (safe-fail).
+- `type: 'pull_requests'` — always repo-sourced. Query the connection's `repository.pullRequests(states: OPEN)`. The poller populates `TriggerEvent.pr` head/base refs (so the workspace manager lands on the PR's branch instead of `conduit/<id>-<slug>`) and emits `event === 'pull_request.detected'`. The new event name is polling-only — webhook PR events keep `pull_request.opened` so consumers can distinguish "GitHub pushed us at PR open" from "the polling tick saw the PR enter the matching set."
 
 #### Dedup for polling
 
@@ -88,7 +85,7 @@ Each platform has its own mapper that normalizes the raw event/API response into
 
 `issue.id` is the platform's opaque identifier (e.g., GitHub's `node_id`) — used for API calls. `issue.key` is the user-visible identifier as a string: `"42"` for GitHub, `"PROJ-123"` for Jira (matches Jira's native "issue key" term). Downstream code that needs a stable, human-readable ticket identifier (branch names, DB keys, Temporal workflow IDs) reads `issue.key`, never `issue.id`.
 
-**UI**: one node at the top of the canvas, no input handles, one output handle. Config panel shows: platform picker → connection picker → mode toggle (webhook / polling) → event picker (webhook) or interval config (polling) → filter builder.
+**UI**: one node at the top of the canvas, no input handles, one output handle. Config panel shows: platform picker → **Watch** picker (Issues · Pull requests) → Repo connection picker → under `'issues'`, an optional Board attachment that progressively unlocks the `status` filter when set → poll-interval input → filter builder. Filter options are gated visibly by `(type, hasBoard)` — attaching/detaching a board toggles `status` filter availability inline; no schema-flip cascade and no dropped-filter toast (filter validity tracks a reversible user action, not a hidden mode change). Legacy `type: 'webhook'` data renders a read-only banner with the event name — there's no creation path for it in v1.
 
 ## 2. Agent node
 
@@ -283,11 +280,11 @@ type NodeOutput = {
 3. Every `Edge.from` references a known trigger or agent; every `Edge.to` references an agent (triggers can't be edge destinations).
 4. No cycles within a single workflow graph. Cross-run cycles — via board transitions that re-trigger the same workflow — are the intended loop mechanism; see "Cross-run iteration" below.
 5. Agents are *allowed* to be unreachable from any trigger — orphans don't fail save, they just don't execute (the runtime topo-sort drops them). This keeps edits incremental: dropping an agent on the canvas before wiring it doesn't immediately invalidate the workflow.
-6. Every trigger surfaces an issue or PR identifier — webhook events that don't (`push`, `release`, `workflow_run`, `board.column.changed`) are rejected. Polling-mode triggers always pull issue identity from the GraphQL response and pass unconditionally.
+6. Every trigger surfaces an issue or PR identifier — `type: 'webhook'` triggers whose `event` doesn't carry one (`push`, `release`, `workflow_run`, `board.column.changed`) are rejected. `type: 'issues'` and `type: 'pull_requests'` always pull issue identity from the GraphQL response and pass unconditionally.
 7. All triggers in a workflow share the same `connectionId` (and the same `boardConnectionId`, when present). v1 has a single trigger today; multi-trigger workflows must still target a single repo + at most one board connection.
 8. Every `mcpServers[].serverId` references a server defined at the workflow level.
 9. MCP servers with a `connectionId` must reference a valid `Connection`.
-10. Polling-mode triggers require `boardConnectionId` only under `scope: 'issues'` + `source: 'board'`; webhook triggers require it on `event === 'board.column.changed'`. The validator (`validateWorkflowDefinition`) emits `trigger-board-connection-required` when the slot is missing for those modes. PR-scope and `source: 'repo'` polling derive owner/repo from the source `Connection` (which must be `scope.kind: 'github_repo'`) and ignore the board slot. See [connections.md](./connections.md).
+10. `boardConnectionId` is required only for `type: 'webhook'` with `event === 'board.column.changed'` — the validator emits `trigger-board-connection-required` in that case. `type: 'issues'` does **not** require a board: with no `boardConnectionId` the poller takes the repo path; attaching one progressively unlocks the board-aware semantics (Status filter, column-change detection). `type: 'pull_requests'` derives owner/repo from the source `Connection` (`scope.kind: 'github_repo'`) and ignores the board slot. See [connections.md](./connections.md).
 
 ## Cross-run iteration
 

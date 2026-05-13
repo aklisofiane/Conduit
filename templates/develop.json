@@ -15,7 +15,8 @@
             "platform": "github",
             "connectionId": "<github-repo>",
             "boardConnectionId": "<github-board>",
-            "mode": { "kind": "polling", "intervalSec": 60, "scope": "issues", "source": "board" },
+            "type": "issues",
+            "intervalSec": 60,
             "filters": [{ "field": "status", "value": "Dev" }]
           }
         ],

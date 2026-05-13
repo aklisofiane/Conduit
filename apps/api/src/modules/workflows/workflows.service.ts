@@ -42,7 +42,7 @@ export class WorkflowsService implements OnModuleInit {
     const polling = workflows.filter((wf) => {
       const trigger = (wf.definition as Partial<WorkflowDefinition> | null)
         ?.triggers?.[0];
-      return trigger?.mode.kind === 'polling';
+      return trigger?.type !== undefined && trigger.type !== 'webhook';
     });
     await Promise.allSettled(
       polling.map((wf) => this.syncPollSchedule(wf.id, wf.definition, wf.isActive)),
@@ -210,10 +210,10 @@ export class WorkflowsService implements OnModuleInit {
   ): Promise<void> {
     const trigger = (definition as Partial<WorkflowDefinition> | null)?.triggers?.[0];
     try {
-      if (trigger?.mode.kind === 'polling') {
+      if (trigger && trigger.type !== 'webhook') {
         await this.temporal.upsertPollSchedule({
           workflowId,
-          intervalSec: trigger.mode.intervalSec,
+          intervalSec: trigger.intervalSec,
           active: isActive,
         });
       } else {

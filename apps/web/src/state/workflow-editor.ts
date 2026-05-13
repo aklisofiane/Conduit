@@ -42,9 +42,24 @@ export const useWorkflowEditor = create<WorkflowEditorState>((set) => ({
   updateTrigger: (id, patch) =>
     set((state) => {
       if (!state.draft) return {};
-      const triggers = state.draft.triggers.map((t) =>
-        t.id === id ? { ...t, ...patch } : t,
-      );
+      const triggers = state.draft.triggers.map((t) => {
+        if (t.id !== id) return t;
+        // Variant flip: when the patch changes `type`, the result must be a
+        // valid variant. We require the caller to supply every variant-specific
+        // field in `patch`; we keep only the shared top-level slots from `t`
+        // so stale fields (e.g. `event` on `webhook` → `issues`) don't leak.
+        if (patch.type !== undefined && patch.type !== t.type) {
+          return {
+            id: t.id,
+            name: t.name,
+            platform: t.platform,
+            connectionId: t.connectionId,
+            boardConnectionId: t.boardConnectionId,
+            ...patch,
+          } as TriggerConfig;
+        }
+        return { ...t, ...patch } as TriggerConfig;
+      });
       return { draft: { ...state.draft, triggers }, dirty: true };
     }),
   addMcpServer: (server) =>

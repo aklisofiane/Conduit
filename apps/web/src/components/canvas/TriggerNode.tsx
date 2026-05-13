@@ -70,6 +70,12 @@ export function TriggerNode({ data, selected }: NodeProps) {
 }
 
 function triggerLabel(t: TriggerConfig): string {
-  if (t.mode.kind === 'webhook') return t.mode.event;
-  return `every ${t.mode.intervalSec}s`;
+  switch (t.type) {
+    case 'issues':
+      return `every ${t.intervalSec}s`;
+    case 'pull_requests':
+      return `every ${t.intervalSec}s · prs`;
+    case 'webhook':
+      return t.event;
+  }
 }

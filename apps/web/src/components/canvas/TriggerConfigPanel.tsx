@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import type { ConnectionScope, TriggerConfig, TriggerFilter } from '@conduit/shared';
 import type { ProjectBoardSummary } from '@conduit/shared/platform';
 import {
@@ -23,6 +23,12 @@ interface TriggerConfigPanelProps {
   saving: boolean;
   dirty: boolean;
 }
+
+const TYPE_LABELS: Record<TriggerConfig['type'], string> = {
+  issues: 'issues',
+  pull_requests: 'pull requests',
+  webhook: 'webhook',
+};
 
 export function TriggerConfigPanel({
   trigger,
@@ -53,16 +59,11 @@ export function TriggerConfigPanel({
     [allConnections, platform],
   );
 
-  const pollingScope =
-    trigger.mode.kind === 'polling' ? trigger.mode.scope : undefined;
-  const pollingSource =
-    trigger.mode.kind === 'polling' ? trigger.mode.source : undefined;
-  const showsBoardPicker =
-    (trigger.mode.kind === 'polling' &&
-      pollingScope === 'issues' &&
-      pollingSource === 'board') ||
-    (trigger.mode.kind === 'webhook' &&
-      trigger.mode.event === 'board.column.changed');
+  const isWebhook = trigger.type === 'webhook';
+  const isIssues = trigger.type === 'issues';
+  const isPRs = trigger.type === 'pull_requests';
+  const hasBoard = !!trigger.boardConnectionId;
+  const showsBoardSection = isIssues; // board section only for issues
 
   const selectedBoardConnection = useMemo(
     () => boardConnections.find((c) => c.id === trigger.boardConnectionId),
@@ -73,20 +74,11 @@ export function TriggerConfigPanel({
       ? selectedBoardConnection.scope
       : undefined;
 
-  // One-shot notice for filters dropped on scope flip. Cleared after a few
-  // seconds so it doesn't persist across unrelated edits.
-  const [filterNotice, setFilterNotice] = useState<string | null>(null);
-  useEffect(() => {
-    if (!filterNotice) return;
-    const handle = window.setTimeout(() => setFilterNotice(null), 5000);
-    return () => window.clearTimeout(handle);
-  }, [filterNotice]);
-
   const boardsQuery = useListProjectBoards({
     connectionId: trigger.connectionId,
     ownerType: boardScope?.ownerType ?? 'org',
     owner: boardScope?.owner ?? '',
-    enabled: showsBoardPicker && !!trigger.connectionId && !!boardScope,
+    enabled: showsBoardSection && hasBoard && !!trigger.connectionId && !!boardScope,
   });
 
   const labelsQuery = useListLabels({
@@ -101,58 +93,30 @@ export function TriggerConfigPanel({
     selectedBoardSummary?.fields.find((f) => f.name === 'Status')?.options ?? [];
   const labelOptions = labelsQuery.data?.map((l) => l.name) ?? [];
 
-  const setMode = (kind: 'webhook' | 'polling') => {
-    if (kind === trigger.mode.kind) return;
-    if (kind === 'webhook') {
+  // Flip the variant. The store's `updateTrigger` action rebuilds the trigger
+  // from shared fields + this patch when `type` changes, so we just send the
+  // new variant's full shape (minus shared fields).
+  const setType = (nextType: 'issues' | 'pull_requests') => {
+    if (trigger.type === nextType) return;
+    const prevInterval =
+      trigger.type === 'issues' || trigger.type === 'pull_requests'
+        ? trigger.intervalSec
+        : 60;
+    if (nextType === 'issues') {
       onChange({
-        mode: {
-          kind: 'webhook',
-          event: trigger.platform === 'github' ? 'issues.opened' : '',
-        },
-        filters: dropFiltersForScope(trigger.filters, 'webhook', null, null, setFilterNotice),
+        type: 'issues',
+        intervalSec: prevInterval,
+        filters: [],
       });
     } else {
       onChange({
-        mode: { kind: 'polling', intervalSec: 60, scope: 'issues', source: 'board' },
-        filters: dropFiltersForScope(
-          trigger.filters,
-          'polling',
-          'issues',
-          'board',
-          setFilterNotice,
-        ),
+        type: 'pull_requests',
+        intervalSec: prevInterval,
+        filters: [],
+        // PRs don't use a board — clear it explicitly.
+        boardConnectionId: undefined,
       });
     }
-  };
-
-  const setScope = (scope: 'issues' | 'pull_requests') => {
-    if (trigger.mode.kind !== 'polling') return;
-    if (trigger.mode.scope === scope) return;
-    onChange({
-      mode: { ...trigger.mode, scope },
-      filters: dropFiltersForScope(
-        trigger.filters,
-        'polling',
-        scope,
-        trigger.mode.source,
-        setFilterNotice,
-      ),
-    });
-  };
-
-  const setSource = (source: 'board' | 'repo') => {
-    if (trigger.mode.kind !== 'polling') return;
-    if (trigger.mode.source === source) return;
-    onChange({
-      mode: { ...trigger.mode, source },
-      filters: dropFiltersForScope(
-        trigger.filters,
-        'polling',
-        trigger.mode.scope,
-        source,
-        setFilterNotice,
-      ),
-    });
   };
 
   return (
@@ -169,7 +133,7 @@ export function TriggerConfigPanel({
             Trigger · {trigger.platform}
           </div>
           <h3 className="mt-2 truncate font-sans text-[15px] font-semibold text-[var(--color-text)]">
-            <span>{trigger.mode.kind}</span>
+            <span>{TYPE_LABELS[trigger.type]}</span>
             <span className="text-[var(--color-text-muted)]"> · config</span>
           </h3>
         </div>
@@ -184,184 +148,185 @@ export function TriggerConfigPanel({
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 py-4">
-        <div className="space-y-5">
-          <Field label="Platform">
-            <select
-              className="field-input"
-              value={trigger.platform}
-              onChange={(e) =>
-                onChange({ platform: e.target.value as TriggerConfig['platform'] })
-              }
-            >
-              <option value="github">GitHub</option>
-              <option value="gitlab" disabled>
-                GitLab (coming soon)
-              </option>
-              <option value="jira" disabled>
-                Jira (coming soon)
-              </option>
-            </select>
-          </Field>
+        {isWebhook ? (
+          <div className="space-y-3">
+            <div className="rounded-[var(--radius)] border border-[var(--color-divider)] bg-[var(--color-pill-bg)] p-3">
+              <div className="font-sans text-[12px] font-medium text-[var(--color-text)]">
+                Webhook trigger (no UI yet)
+              </div>
+              <div className="mt-1 font-mono text-[11px] text-[var(--color-text-muted)]">
+                event: {trigger.event}
+              </div>
+              <div className="mt-2 font-mono text-[11px] text-[var(--color-text-muted)]">
+                Convert this trigger by picking Issues or Pull requests below.
+              </div>
+            </div>
+            <Field label="Watch">
+              <div className="grid grid-cols-2 gap-2">
+                <TypeButton
+                  active={false}
+                  onClick={() => setType('issues')}
+                  label="Issues"
+                  hint="board or repo issues"
+                />
+                <TypeButton
+                  active={false}
+                  onClick={() => setType('pull_requests')}
+                  label="Pull requests"
+                  hint="open PRs in the repo"
+                />
+              </div>
+            </Field>
+          </div>
+        ) : (
+          <div className="space-y-5">
+            <Field label="Platform">
+              <select
+                className="field-input"
+                value={trigger.platform}
+                onChange={(e) =>
+                  onChange({ platform: e.target.value as TriggerConfig['platform'] })
+                }
+              >
+                <option value="github">GitHub</option>
+                <option value="gitlab" disabled>
+                  GitLab (coming soon)
+                </option>
+                <option value="jira" disabled>
+                  Jira (coming soon)
+                </option>
+              </select>
+            </Field>
 
-          <Field label="Connections" hint="repo (always) and board (when needed)">
-            <div className="space-y-2">
-              <ConnectionSubRow
-                label="Repo"
+            <Field label="Watch" hint="what fires this workflow">
+              <div className="grid grid-cols-2 gap-2">
+                <TypeButton
+                  active={isIssues}
+                  onClick={() => setType('issues')}
+                  label="Issues"
+                  hint={hasBoard ? 'from a project board' : 'open issues in the repo'}
+                />
+                <TypeButton
+                  active={isPRs}
+                  onClick={() => setType('pull_requests')}
+                  label="Pull requests"
+                  hint="open PRs in the repo"
+                />
+              </div>
+            </Field>
+
+            <Field label="Repo" hint="source connection for events">
+              <ConnectionSelect
                 connections={repoConnections}
                 value={trigger.connectionId}
                 onChange={(id) => onChange({ connectionId: id })}
                 emptyHint="No repo connections yet — create one on the Connections page."
               />
-              {showsBoardPicker && (
-                <ConnectionSubRow
-                  label="Board"
-                  connections={boardConnections}
-                  value={trigger.boardConnectionId ?? ''}
-                  onChange={(id) =>
-                    onChange({ boardConnectionId: id || undefined })
-                  }
-                  emptyHint="No Projects v2 connections yet — create one on the Connections page."
-                />
-              )}
-            </div>
-          </Field>
-
-          <Field label="Mode">
-            <div className="grid grid-cols-2 gap-2">
-              <ModeButton
-                active={trigger.mode.kind === 'webhook'}
-                onClick={() => setMode('webhook')}
-                label="Webhook"
-                hint="platform pushes events"
-              />
-              <ModeButton
-                active={trigger.mode.kind === 'polling'}
-                onClick={() => setMode('polling')}
-                label="Polling"
-                hint="Conduit pulls on interval"
-              />
-            </div>
-          </Field>
-
-          {trigger.mode.kind === 'webhook' && (
-            <Field label="Event" hint="which webhook fires this trigger">
-              <select
-                className="field-input"
-                value={trigger.mode.event}
-                onChange={(e) =>
-                  onChange({
-                    mode: { ...trigger.mode, event: e.target.value, kind: 'webhook' },
-                  })
-                }
-              >
-                {WEBHOOK_EVENTS.map((ev) => (
-                  <option key={ev.value} value={ev.value}>
-                    {ev.label}
-                  </option>
-                ))}
-              </select>
             </Field>
-          )}
 
-          {trigger.mode.kind === 'polling' && (
-            <>
-              <Field label="Scope" hint="what the poller watches">
-                <div className="grid grid-cols-2 gap-2">
-                  <ModeButton
-                    active={trigger.mode.scope === 'issues'}
-                    onClick={() => setScope('issues')}
-                    label="Issues"
-                    hint={
-                      trigger.mode.source === 'repo'
-                        ? 'open issues in the repo'
-                        : 'from a project board'
-                    }
-                  />
-                  <ModeButton
-                    active={trigger.mode.scope === 'pull_requests'}
-                    onClick={() => setScope('pull_requests')}
-                    label="Pull requests"
-                    hint="open PRs in the repo"
-                  />
-                </div>
-              </Field>
-              {trigger.mode.scope === 'issues' && (
-                <Field label="Source" hint="where issues come from">
-                  <div className="grid grid-cols-2 gap-2">
-                    <ModeButton
-                      active={trigger.mode.source === 'board'}
-                      onClick={() => setSource('board')}
-                      label="Project V2"
-                      hint="status-driven workflows"
-                    />
-                    <ModeButton
-                      active={trigger.mode.source === 'repo'}
-                      onClick={() => setSource('repo')}
-                      label="Repo issues"
-                      hint="every open issue"
+            {showsBoardSection && (
+              <Field
+                label="Board (optional)"
+                hint={hasBoard ? 'board attached unlocks the status filter below' : undefined}
+              >
+                {hasBoard ? (
+                  <div className="flex items-start gap-2">
+                    <div className="min-w-0 flex-1">
+                      <ConnectionSelect
+                        connections={boardConnections}
+                        value={trigger.boardConnectionId ?? ''}
+                        onChange={(id) =>
+                          onChange({ boardConnectionId: id || undefined })
+                        }
+                        emptyHint="No Projects v2 connections yet — create one on the Connections page."
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      className="btn shrink-0"
+                      onClick={() => onChange({ boardConnectionId: undefined })}
+                      aria-label="Detach board"
+                      title="Detach board"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ) : boardConnections.length === 0 ? (
+                  <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
+                    No Projects v2 connections yet — create one on the Connections page.
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn w-full"
+                    onClick={() => {
+                      const first = boardConnections[0];
+                      if (first) onChange({ boardConnectionId: first.id });
+                    }}
+                  >
+                    + Attach a board
+                  </button>
+                )}
+                {hasBoard && selectedBoardSummary && (
+                  <div className="mt-2">
+                    <BoardPickerHint
+                      query={boardsQuery}
+                      selectedBoard={selectedBoardSummary}
                     />
                   </div>
-                </Field>
-              )}
-              <Field label="Interval" hint="seconds between poll cycles">
+                )}
+              </Field>
+            )}
+
+            <Field label="Poll every" hint="seconds between poll cycles">
+              <div className="flex items-center gap-2">
                 <input
                   className="field-input"
                   type="number"
                   min={10}
                   step={10}
-                  value={trigger.mode.intervalSec}
-                  onChange={(e) => {
-                    if (trigger.mode.kind !== 'polling') return;
+                  value={trigger.intervalSec}
+                  onChange={(e) =>
                     onChange({
-                      mode: {
-                        ...trigger.mode,
-                        intervalSec: Math.max(10, Number(e.target.value) || 60),
-                      },
-                    });
-                  }}
+                      intervalSec: Math.max(10, Number(e.target.value) || 60),
+                    })
+                  }
                 />
-              </Field>
-            </>
-          )}
-
-          {showsBoardPicker && selectedBoardSummary && (
-            <Field label="Project board">
-              <BoardPickerHint
-                query={boardsQuery}
-                selectedBoard={selectedBoardSummary}
-              />
-            </Field>
-          )}
-
-          <Field label="Active" hint="pause the trigger without deleting it — saves immediately">
-            <label className="flex cursor-pointer items-center gap-2 font-mono text-[12px]">
-              <input
-                type="checkbox"
-                checked={isActive}
-                onChange={(e) => onActiveChange(e.target.checked)}
-              />
-              <span>
-                {isActive ? 'active — receiving events' : 'paused'}
-              </span>
-            </label>
-          </Field>
-
-          <Field label="Filters" hint="AND-combined — an event must pass all">
-            <FilterEditor
-              filters={trigger.filters}
-              scope={pollingScope ?? null}
-              source={pollingSource ?? null}
-              statusOptions={statusOptions}
-              labelOptions={labelOptions}
-              onChange={(filters) => onChange({ filters })}
-            />
-            {filterNotice && (
-              <div className="mt-2 font-mono text-[11px] text-[var(--color-text-muted)]">
-                {filterNotice}
+                <span className="font-mono text-[11px] text-[var(--color-text-muted)]">
+                  sec
+                </span>
               </div>
-            )}
-          </Field>
-        </div>
+            </Field>
+
+            <Field label="Active" hint="pause the trigger without deleting it — saves immediately">
+              <label className="flex cursor-pointer items-center gap-2 font-mono text-[12px]">
+                <input
+                  type="checkbox"
+                  checked={isActive}
+                  onChange={(e) => onActiveChange(e.target.checked)}
+                />
+                <span>
+                  {isActive ? 'active — receiving events' : 'paused'}
+                </span>
+              </label>
+            </Field>
+
+            <Field label="Filters" hint="AND-combined — an event must pass all">
+              <FilterEditor
+                filters={trigger.filters}
+                offeredFields={offeredFieldsFor(trigger)}
+                statusOptions={statusOptions}
+                labelOptions={labelOptions}
+                onChange={(filters) => onChange({ filters } as Partial<TriggerConfig>)}
+              />
+              {isIssues && !hasBoard && (
+                <div className="mt-2 font-mono text-[11px] text-[var(--color-text-muted)]">
+                  Only `label` available — attach a board to unlock `status`.
+                </div>
+              )}
+            </Field>
+          </div>
+        )}
       </div>
 
       <div className="flex gap-2 border-t border-[var(--color-divider)] bg-[var(--color-bg-panel)] px-5 py-4">
@@ -376,61 +341,55 @@ export function TriggerConfigPanel({
   );
 }
 
-function ConnectionSubRow({
-  label,
+function ConnectionSelect({
   connections,
   value,
   onChange,
   emptyHint,
 }: {
-  label: string;
   connections: { id: string; name: string; scope: ConnectionScope }[];
   value: string;
   onChange: (id: string) => void;
   emptyHint: string;
 }) {
+  if (connections.length === 0) {
+    return (
+      <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
+        {emptyHint}
+      </div>
+    );
+  }
   return (
-    <div className="grid grid-cols-[60px_1fr] items-center gap-2">
-      <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-muted)]">
-        {label}
-      </span>
-      {connections.length === 0 ? (
-        <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
-          {emptyHint}
-        </div>
-      ) : (
-        <select
-          className="field-input"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-        >
-          <option value="">— select a connection —</option>
-          {connections.map((c) => {
-            const summary = scopeSummary(c.scope);
-            return (
-              <option key={c.id} value={c.id}>
-                {c.name}
-                {summary && ` · ${summary}`}
-              </option>
-            );
-          })}
-        </select>
-      )}
-    </div>
+    <select
+      className="field-input"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+    >
+      <option value="">— select a connection —</option>
+      {connections.map((c) => {
+        const summary = scopeSummary(c.scope);
+        return (
+          <option key={c.id} value={c.id}>
+            {c.name}
+            {summary && ` · ${summary}`}
+          </option>
+        );
+      })}
+    </select>
   );
 }
 
 /**
- * Filter fields offered for a given trigger context. `status` requires a
- * Projects v2 board to filter against; under repo-source issue polling
- * there's no Status column, so the field is hidden.
+ * Filter fields offered for the trigger's current variant. `status` requires
+ * a board attachment under `issues`; under repo-source `issues` there's no
+ * Status column, so the field is hidden.
  */
-function fieldsForContext(
-  scope: 'issues' | 'pull_requests' | null,
-  source: 'board' | 'repo' | null,
-): Array<TriggerFilter['field']> {
-  if (scope === 'pull_requests') return ['pr_state', 'label'];
-  if (scope === 'issues' && source === 'repo') return ['label'];
+function offeredFieldsFor(trigger: TriggerConfig): Array<TriggerFilter['field']> {
+  if (trigger.type === 'pull_requests') return ['pr_state', 'label'];
+  if (trigger.type === 'issues') {
+    return trigger.boardConnectionId ? ['status', 'label'] : ['label'];
+  }
+  // webhook — kept for completeness; UI doesn't render this branch.
   return ['status', 'label'];
 }
 
@@ -445,42 +404,15 @@ function emptyFilter(field: TriggerFilter['field']): TriggerFilter {
   return { field, value: '' };
 }
 
-function dropFiltersForScope(
-  filters: TriggerFilter[],
-  modeKind: 'polling' | 'webhook',
-  scope: 'issues' | 'pull_requests' | null,
-  source: 'board' | 'repo' | null,
-  setNotice: (message: string) => void,
-): TriggerFilter[] {
-  const offered = new Set<TriggerFilter['field']>(
-    modeKind === 'webhook' ? ['status', 'label'] : fieldsForContext(scope, source),
-  );
-  const kept: TriggerFilter[] = [];
-  const dropped: TriggerFilter[] = [];
-  for (const f of filters) {
-    if (offered.has(f.field)) kept.push(f);
-    else dropped.push(f);
-  }
-  if (dropped.length > 0) {
-    const labels = dropped.map((f) => FIELD_LABELS[f.field]).join(', ');
-    setNotice(
-      `Dropped ${dropped.length} filter${dropped.length === 1 ? '' : 's'} not available here: ${labels}.`,
-    );
-  }
-  return kept;
-}
-
 function FilterEditor({
   filters,
-  scope,
-  source,
+  offeredFields,
   statusOptions,
   labelOptions,
   onChange,
 }: {
   filters: TriggerFilter[];
-  scope: 'issues' | 'pull_requests' | null;
-  source: 'board' | 'repo' | null;
+  offeredFields: Array<TriggerFilter['field']>;
   statusOptions: string[];
   labelOptions: string[];
   onChange: (filters: TriggerFilter[]) => void;
@@ -488,7 +420,6 @@ function FilterEditor({
   const replaceAt = (i: number, next: TriggerFilter) =>
     onChange(filters.map((f, idx) => (idx === i ? next : f)));
   const removeAt = (i: number) => onChange(filters.filter((_, idx) => idx !== i));
-  const offeredFields = fieldsForContext(scope, source);
   const add = () => onChange([...filters, emptyFilter(offeredFields[0]!)]);
 
   return (
@@ -714,7 +645,7 @@ function Field({
   );
 }
 
-function ModeButton({
+function TypeButton({
   active,
   onClick,
   label,
@@ -740,10 +671,3 @@ function ModeButton({
     </button>
   );
 }
-
-const WEBHOOK_EVENTS: Array<{ value: string; label: string }> = [
-  { value: 'issues.opened', label: 'issues.opened — new issue created' },
-  { value: 'pull_request.opened', label: 'pull_request.opened — new PR' },
-  { value: 'issue_comment.created', label: 'issue_comment.created — PR comment' },
-  { value: 'board.column.changed', label: 'board.column.changed — Projects v2' },
-];

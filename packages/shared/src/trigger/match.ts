@@ -10,7 +10,7 @@ import type { TriggerFilter } from './filter';
 export interface FilterView {
   status?: string;
   labels: string[];
-  /** Set by the polling poller for `scope: 'pull_requests'` items. */
+  /** Set by the polling poller for `type: 'pull_requests'` items. */
   prState?: 'draft' | 'ready_for_review';
 }
 
@@ -18,8 +18,8 @@ export function matchesTrigger(event: TriggerEvent, trigger: TriggerConfig): boo
   if (event.source !== trigger.platform) return false;
 
   // Polling-mode events don't carry a specific event name, so skip the check.
-  if (trigger.mode.kind === 'webhook' && event.mode === 'webhook') {
-    if (event.event !== trigger.mode.event) return false;
+  if (trigger.type === 'webhook' && event.mode === 'webhook') {
+    if (event.event !== trigger.event) return false;
   }
 
   const view = flattenEventForFilters(event);

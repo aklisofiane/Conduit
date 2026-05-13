@@ -9,7 +9,8 @@ const trigger: TriggerConfig = {
   name: 'T',
   platform: 'github',
   connectionId: 'conn_1',
-  mode: { kind: 'webhook', event: 'issues.opened' },
+  type: 'webhook',
+  event: 'issues.opened',
   filters: [],
 };
 

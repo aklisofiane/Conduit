@@ -31,24 +31,14 @@ export class WorkflowValidationError extends Error {
  * Webhook events whose normalized `TriggerEvent` carries an issue or PR
  * identifier. Must stay in lockstep with `normalizeGithubWebhook` in
  * `@conduit/shared/webhook`. `board.column.changed` is intentionally
- * excluded — its payload carries no issue number, so polling is the
- * supported mode for board loops.
+ * excluded — its payload carries no issue number, so an issues-type
+ * polling trigger is the supported path for board loops.
  */
 const ISSUE_OR_PR_WEBHOOK_EVENTS = new Set([
   'issues.opened',
   'pull_request.opened',
   'issue_comment.created',
 ]);
-
-/** Trigger modes whose semantics require a board connection. */
-function modeRequiresBoardConnection(
-  mode: WorkflowDefinition['triggers'][number]['mode'],
-): boolean {
-  if (mode.kind === 'polling') {
-    return mode.scope === 'issues' && mode.source === 'board';
-  }
-  return mode.event === 'board.column.changed';
-}
 
 export function validateWorkflowDefinition(
   definition: WorkflowDefinition,
@@ -59,34 +49,38 @@ export function validateWorkflowDefinition(
   if (triggers.length === 0) return issues;
 
   // Rule: every trigger must surface an issue or PR identifier — Conduit
-  // is ticket/PR-driven in v1. Polling on a project board always pulls
-  // issue identity from the GraphQL response, so polling mode is allowed
-  // unconditionally; webhooks are restricted to the issue/PR event set.
+  // is ticket/PR-driven in v1. Polling triggers always pull issue identity
+  // from the platform response, so they're allowed unconditionally;
+  // webhooks are restricted to the issue/PR event set.
   for (const trigger of triggers) {
-    if (trigger.mode.kind === 'polling') continue;
-    const event = trigger.mode.event;
+    if (trigger.type !== 'webhook') continue;
+    const event = trigger.event;
     if (!ISSUE_OR_PR_WEBHOOK_EVENTS.has(event)) {
       issues.push({
         code: 'trigger-requires-issue-or-pr',
         message:
           `Trigger "${trigger.name}" uses webhook event "${event}", which carries no issue or PR identifier. ` +
           `Supported webhook events: ${[...ISSUE_OR_PR_WEBHOOK_EVENTS].join(', ')}; ` +
-          `or use polling mode for board-status workflows.`,
+          `or use a polling trigger for board-status workflows.`,
         nodeName: trigger.name,
       });
     }
   }
 
-  // Rule: a trigger whose mode targets a board must carry a
-  // boardConnectionId so the resolver knows which board to query. Webhook
-  // triggers on `board.column.changed` need the board for the same reason
-  // (filter + identity resolution against the project graph).
+  // Rule: a `board.column.changed` webhook needs a boardConnectionId so the
+  // resolver knows which board's column event to interpret. Polling triggers
+  // derive board-vs-repo behavior from `boardConnectionId` presence itself,
+  // so this rule no longer fires for polling.
   for (const trigger of triggers) {
-    if (modeRequiresBoardConnection(trigger.mode) && !trigger.boardConnectionId) {
+    if (
+      trigger.type === 'webhook' &&
+      trigger.event === 'board.column.changed' &&
+      !trigger.boardConnectionId
+    ) {
       issues.push({
         code: 'trigger-board-connection-required',
         message:
-          `Trigger "${trigger.name}" targets a project board but is missing a boardConnectionId.`,
+          `Trigger "${trigger.name}" listens for board.column.changed but is missing a boardConnectionId.`,
         nodeName: trigger.name,
       });
     }

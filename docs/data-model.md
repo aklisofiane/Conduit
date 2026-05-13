@@ -385,7 +385,7 @@ The closed event taxonomy and per-event metadata shape live in `apps/api/src/aut
 Triggers carry two named slots, both ids into the `Connection` table:
 
 - `connectionId` (required) — the source binding. Today: a `github_repo`-scoped Connection.
-- `boardConnectionId` (optional) — a `github_projects_v2`-scoped Connection, present when the trigger mode targets a board (`polling { source: 'board' }` or webhook `event: 'board.column.changed'`).
+- `boardConnectionId` (optional) — a `github_projects_v2`-scoped Connection. Under `type: 'issues'`, presence is the board-vs-repo dispatch signal (attached → board path, unset → repo path). Under `type: 'webhook'` + `event: 'board.column.changed'`, it's required by the validator. Under `type: 'pull_requests'`, it's allowed but ignored.
 
 `mcpServers[].connectionId` (optional) is also a Connection id; the runtime decrypts the linked `Credential.secret` and substitutes `{{credential}}` in the MCP transport before handing it to the SDK.
 

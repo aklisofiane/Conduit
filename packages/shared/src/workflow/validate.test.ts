@@ -10,10 +10,11 @@ function trigger(overrides: Partial<TriggerConfig> = {}): TriggerConfig {
     name: 'Trigger1',
     platform: 'github',
     connectionId: 'conn_1',
-    mode: { kind: 'webhook', event: 'issues.opened' },
+    type: 'webhook',
+    event: 'issues.opened',
     filters: [],
     ...overrides,
-  };
+  } as TriggerConfig;
 }
 
 function baseDefinition(overrides: Partial<WorkflowDefinition> = {}): WorkflowDefinition {
@@ -46,7 +47,8 @@ describe('validateWorkflowDefinition', () => {
       nodes: [agentNode()],
       triggers: [
         trigger({
-          mode: { kind: 'polling', intervalSec: 60, scope: 'issues', source: 'board' },
+          type: 'issues',
+          intervalSec: 60,
           filters: [{ field: 'status', value: 'Dev' }],
           boardConnectionId: 'conn_board_1',
         }),
@@ -63,7 +65,7 @@ describe('validateWorkflowDefinition', () => {
   it('passes a workflow with pull_request.opened webhook', () => {
     const def = baseDefinition({
       nodes: [agentNode()],
-      triggers: [trigger({ mode: { kind: 'webhook', event: 'pull_request.opened' } })],
+      triggers: [trigger({ type: 'webhook', event: 'pull_request.opened' })],
     });
     expect(validateWorkflowDefinition(def)).toEqual([]);
   });
@@ -73,7 +75,8 @@ describe('validateWorkflowDefinition', () => {
       nodes: [agentNode()],
       triggers: [
         trigger({
-          mode: { kind: 'webhook', event: 'board.column.changed' },
+          type: 'webhook',
+          event: 'board.column.changed',
           boardConnectionId: 'conn_board_1',
         }),
       ],
@@ -87,19 +90,20 @@ describe('validateWorkflowDefinition', () => {
   it('rejects an unsupported webhook event', () => {
     const def = baseDefinition({
       nodes: [agentNode()],
-      triggers: [trigger({ mode: { kind: 'webhook', event: 'push' } })],
+      triggers: [trigger({ type: 'webhook', event: 'push' })],
     });
     const issues = validateWorkflowDefinition(def);
     expect(issues).toHaveLength(1);
     expect(issues[0]!.code).toBe('trigger-requires-issue-or-pr');
   });
 
-  it('passes a polling PR trigger (board ref omitted — repo is implicit)', () => {
+  it('passes a polling PR trigger (no board ref — repo is implicit)', () => {
     const def = baseDefinition({
       nodes: [agentNode()],
       triggers: [
         trigger({
-          mode: { kind: 'polling', intervalSec: 60, scope: 'pull_requests', source: 'board' },
+          type: 'pull_requests',
+          intervalSec: 60,
           filters: [{ field: 'pr_state', value: 'draft' }],
         }),
       ],
@@ -119,25 +123,10 @@ describe('validateWorkflowDefinition', () => {
     expect(issues.map((i) => i.code)).toContain('triggers-must-share-connection');
   });
 
-  it('rejects a polling-board trigger missing boardConnectionId', () => {
-    const def = baseDefinition({
-      nodes: [agentNode()],
-      triggers: [
-        trigger({
-          mode: { kind: 'polling', intervalSec: 60, scope: 'issues', source: 'board' },
-        }),
-      ],
-    });
-    const issues = validateWorkflowDefinition(def);
-    expect(issues.map((i) => i.code)).toContain('trigger-board-connection-required');
-  });
-
   it('rejects a board.column.changed webhook missing boardConnectionId (orthogonal to issue/PR rule)', () => {
     const def = baseDefinition({
       nodes: [agentNode()],
-      triggers: [
-        trigger({ mode: { kind: 'webhook', event: 'board.column.changed' } }),
-      ],
+      triggers: [trigger({ type: 'webhook', event: 'board.column.changed' })],
     });
     const codes = validateWorkflowDefinition(def).map((i) => i.code);
     expect(codes).toContain('trigger-board-connection-required');
@@ -150,13 +139,15 @@ describe('validateWorkflowDefinition', () => {
         trigger({
           id: 't1',
           name: 'T1',
-          mode: { kind: 'polling', intervalSec: 60, scope: 'issues', source: 'board' },
+          type: 'issues',
+          intervalSec: 60,
           boardConnectionId: 'conn_board_a',
         }),
         trigger({
           id: 't2',
           name: 'T2',
-          mode: { kind: 'polling', intervalSec: 60, scope: 'issues', source: 'board' },
+          type: 'issues',
+          intervalSec: 60,
           boardConnectionId: 'conn_board_b',
         }),
       ],

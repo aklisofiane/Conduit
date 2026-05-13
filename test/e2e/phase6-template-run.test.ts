@@ -201,7 +201,7 @@ describe('Phase 6 — create workflows from template', () => {
     );
     expect(result.workflows).toHaveLength(1);
     const wf = await harness.http.get<WorkflowRow>(`/workflows/${result.workflows[0]!.id}`);
-    expect(wf.definition.triggers[0]!.mode.kind).toBe('webhook');
+    expect(wf.definition.triggers[0]!.type).toBe('webhook');
     const handle = scheduleClient.getHandle(pollScheduleId(wf.id));
     await expect(handle.describe()).rejects.toBeDefined();
   }, 45_000);

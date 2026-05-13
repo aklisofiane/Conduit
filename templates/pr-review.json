@@ -14,7 +14,8 @@
             "name": "PRReviewTrigger",
             "platform": "github",
             "connectionId": "<github-repo>",
-            "mode": { "kind": "webhook", "event": "pull_request.opened" },
+            "type": "webhook",
+            "event": "pull_request.opened",
             "filters": []
           }
         ],

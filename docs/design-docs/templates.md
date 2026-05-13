@@ -130,7 +130,7 @@ Behavior:
 4. Wraps everything in a Prisma `$transaction`:
    - Materialize each unique `new` binding into a `Connection` row once (shared across the bundle).
    - For each template workflow: substitute placeholder ids into the cloned definition, run `assertValidWorkflowDefinition` (any failure rolls back the bundle), create the `Workflow` row.
-5. After commit, iterates the created workflows and calls `TemporalService.upsertPollSchedule` for any polling-mode trigger. Schedule failures are logged (not rolled back) — an inconsistent schedule recovers on next save or API boot via `WorkflowsService.onModuleInit`.
+5. After commit, iterates the created workflows and calls `TemporalService.upsertPollSchedule` for any trigger whose `type !== 'webhook'` (i.e. the polling variants). Schedule failures are logged (not rolled back) — an inconsistent schedule recovers on next save or API boot via `WorkflowsService.onModuleInit`.
 
 Response: `{ templateId, workflows: [{ id, name }, ...] }`.
 
