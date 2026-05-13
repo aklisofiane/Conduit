@@ -153,7 +153,7 @@ function CreateConnectionForm({
             Name
           </span>
           <input
-            className="input"
+            className="field-input"
             placeholder="e.g. acme/shop repo"
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -164,7 +164,7 @@ function CreateConnectionForm({
             Credential
           </span>
           <select
-            className="input"
+            className="field-input"
             value={credentialId}
             onChange={(e) => setCredentialId(e.target.value)}
           >
@@ -183,7 +183,7 @@ function CreateConnectionForm({
           Scope kind
         </span>
         <select
-          className="input"
+          className="field-input"
           value={scopeKind}
           onChange={(e) => setScopeKind(e.target.value as ScopeKind)}
         >
@@ -202,7 +202,7 @@ function CreateConnectionForm({
               Owner / org
             </span>
             <input
-              className="input"
+              className="field-input"
               placeholder="acme"
               value={owner}
               onChange={(e) => setOwner(e.target.value)}
@@ -213,7 +213,7 @@ function CreateConnectionForm({
               Repository
             </span>
             <input
-              className="input"
+              className="field-input"
               placeholder="shop"
               value={repo}
               onChange={(e) => setRepo(e.target.value)}
@@ -229,7 +229,7 @@ function CreateConnectionForm({
               Owner type
             </span>
             <select
-              className="input"
+              className="field-input"
               value={ownerType}
               onChange={(e) => setOwnerType(e.target.value as 'user' | 'org')}
             >
@@ -242,7 +242,7 @@ function CreateConnectionForm({
               Owner
             </span>
             <input
-              className="input"
+              className="field-input"
               placeholder="acme"
               value={owner}
               onChange={(e) => setOwner(e.target.value)}
@@ -253,7 +253,7 @@ function CreateConnectionForm({
               Project #
             </span>
             <input
-              className="input"
+              className="field-input"
               type="number"
               min={1}
               placeholder="5"

@@ -458,7 +458,7 @@ function LabeledInput({
         {label}
       </span>
       <input
-        className="input"
+        className="field-input"
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
@@ -483,7 +483,7 @@ function LabeledSelect({
       <span className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-3)]">
         {label}
       </span>
-      <select className="input" value={value} onChange={(e) => onChange(e.target.value)}>
+      <select className="field-input" value={value} onChange={(e) => onChange(e.target.value)}>
         {children}
       </select>
     </label>

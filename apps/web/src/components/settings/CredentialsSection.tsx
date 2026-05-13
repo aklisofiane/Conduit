@@ -60,7 +60,7 @@ export function CredentialsSection() {
               Platform
             </span>
             <select
-              className="input"
+              className="field-input"
               value={form.platform}
               onChange={(e) =>
                 setForm((f) => ({
@@ -81,7 +81,7 @@ export function CredentialsSection() {
               Name
             </span>
             <input
-              className="input"
+              className="field-input"
               placeholder="e.g. acme-github-pat"
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
@@ -92,7 +92,7 @@ export function CredentialsSection() {
               Secret
             </span>
             <input
-              className="input"
+              className="field-input"
               type="password"
               autoComplete="new-password"
               value={form.secret}
@@ -170,7 +170,7 @@ function CredentialRowView({ cred, onDelete }: { cred: CredentialRow; onDelete: 
         {rotating && (
           <div className="mt-2 flex items-center gap-2">
             <input
-              className="input"
+              className="field-input"
               type="password"
               placeholder="New secret"
               value={newSecret}
