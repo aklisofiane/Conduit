@@ -175,7 +175,13 @@ src/
                                        topbar actions — name/email + popover with Account-settings
                                        + Sign-out; see docs/design-docs/web-auth-ui.md),
                                        WorkflowActions, etc.
-    ui/                                shadcn primitives
+    workflow-list/                     WorkflowRowItem + RowActionsMenu — rows on the
+                                       workflow list (rename / duplicate / delete)
+    common/                            shared UI primitives — `Dialog`, `DropdownMenu`,
+                                       `Select` (thin Radix wrappers, styled via
+                                       `.dialog-*` / `.dropdown-*` / `.select-*` classes
+                                       in `globals.css`), plus `InlineRename`. The legacy
+                                       `ui/` folder is empty
   api/
     client.ts, hooks.ts, types.ts      HTTP client (cookie-based, `credentials: 'include'`),
                                        TanStack Query hooks, response types

@@ -1,6 +1,6 @@
 # Frontend
 
-React 19 + Vite 8 + `@xyflow/react` + TanStack Query + Zustand + Tailwind v4 + shadcn/ui (New York / Zinc).
+React 19 + Vite 8 + `@xyflow/react` + TanStack Query + Zustand + Tailwind v4. Headless primitives come from Radix UI (`@radix-ui/react-dialog`, `react-dropdown-menu`, `react-select`) — wrapped thinly in `apps/web/src/components/common/` (`Dialog`, `DropdownMenu`, `Select`) and styled with custom CSS in `apps/web/src/styles/globals.css`. No shadcn/ui — we use Radix directly so we don't carry a generated component layer.
 
 ## Screens
 
@@ -141,7 +141,7 @@ No canvas, no graph rendering here. Just logs and inspection.
 
 ## Design conventions
 
-- Tailwind v4, custom warm-paper light palette (no Zinc / no shadcn theme — see [DESIGN.md](./DESIGN.md) for the token layer).
+- Tailwind v4, custom warm-paper light palette (no preset theme — see [DESIGN.md](./DESIGN.md) for the token layer).
 - oklch for status and accent colors; per-provider warm/cool families distinguish Claude (amber) from Codex (teal-green).
 - Light surfaces by default. Dense but not cramped.
 - Monospace for identifiers, instructions, JSON. Provider-display font is part of the provider token (Claude → sans, Codex → mono).
