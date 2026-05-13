@@ -135,13 +135,13 @@ export function AgentConfigPanel({
                 value={matchedPresetId || CUSTOM_PRESET_ID}
                 onValueChange={applyPreset}
                 options={[
-                  { value: CUSTOM_PRESET_ID, label: 'Custom — write your own' },
                   ...presetsByCategory.map(
                     ([category, list]): SelectItem => ({
                       label: category,
                       options: list.map((p) => ({ value: p.id, label: p.name })),
                     }),
                   ),
+                  { value: CUSTOM_PRESET_ID, label: 'Custom — write your own' },
                 ]}
               />
             </Field>
