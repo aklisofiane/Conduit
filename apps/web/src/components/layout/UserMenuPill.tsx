@@ -1,14 +1,9 @@
 import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
   useMemo,
-  useRef,
   useState,
   type FormEvent as ReactFormEvent,
-  type MouseEvent as ReactMouseEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
-import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
   useActiveOrganization,
@@ -23,6 +18,12 @@ import {
 import { useSession, signOut } from '../../lib/auth-client.js';
 import { cn } from '../../lib/cn.js';
 import { Icon } from '../canvas/Icon.js';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../common/DropdownMenu.js';
 
 const FILTER_THRESHOLD = 5;
 
@@ -95,65 +96,56 @@ export function filterOtherOrgs(
 export function UserMenuPill() {
   const { data } = useSession();
   const [open, setOpen] = useState(false);
-  const anchorRef = useRef<HTMLDivElement>(null);
-
-  const toggle = useCallback((e: ReactMouseEvent) => {
-    e.stopPropagation();
-    setOpen((v) => !v);
-  }, []);
-  const close = useCallback(() => setOpen(false), []);
 
   if (!data) return null;
   const user = data.user;
   const label = user.name?.trim() || user.email || 'Account';
 
   return (
-    <>
-      <div
-        ref={anchorRef}
-        className="pointer-events-auto inline-flex items-center rounded-[var(--radius-sm)] border border-[var(--color-divider)] bg-[var(--color-bg-panel)] font-mono text-[11px]"
-      >
-        <button
-          type="button"
-          onClick={toggle}
-          aria-label="Open user menu"
-          aria-expanded={open}
-          className={cn(
-            'flex items-center gap-2 px-2 py-[3px] text-[var(--color-text-2)] transition-colors hover:text-[var(--color-text)]',
-            open && 'text-[var(--color-text)]',
-          )}
-        >
-          <span className="status-dot ok" aria-hidden />
-          <span className="max-w-[180px] truncate" title={label}>
-            {label}
-          </span>
-          <Icon name="chevron-down" size={12} />
-        </button>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <div className="pointer-events-auto inline-flex items-center rounded-[var(--radius-sm)] border border-[var(--color-divider)] bg-[var(--color-bg-panel)] font-mono text-[11px]">
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            aria-label="Open user menu"
+            className={cn(
+              'flex items-center gap-2 px-2 py-[3px] text-[var(--color-text-2)] transition-colors hover:text-[var(--color-text)]',
+              open && 'text-[var(--color-text)]',
+            )}
+          >
+            <span className="status-dot ok" aria-hidden />
+            <span className="max-w-[180px] truncate" title={label}>
+              {label}
+            </span>
+            <Icon name="chevron-down" size={12} />
+          </button>
+        </DropdownMenuTrigger>
       </div>
 
-      {open && anchorRef.current && (
-        <UserMenuPopover
-          anchorEl={anchorRef.current}
+      <DropdownMenuContent
+        align="end"
+        sideOffset={6}
+        aria-label="User menu"
+        className="!w-[280px] !p-0"
+      >
+        <UserMenuBody
           email={user.email ?? null}
           name={user.name?.trim() || null}
-          onClose={close}
+          onClose={() => setOpen(false)}
         />
-      )}
-    </>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
-interface UserMenuPopoverProps {
-  anchorEl: HTMLElement;
+interface UserMenuBodyProps {
   name: string | null;
   email: string | null;
   onClose: () => void;
 }
 
-function UserMenuPopover({ anchorEl, name, email, onClose }: UserMenuPopoverProps) {
-  const popRef = useRef<HTMLDivElement>(null);
+function UserMenuBody({ name, email, onClose }: UserMenuBodyProps) {
   const navigate = useNavigate();
-  const [position, setPosition] = useState({ top: 0, left: 0 });
   const [signingOut, setSigningOut] = useState(false);
 
   const { data: orgs = [] } = useOrganizations();
@@ -168,30 +160,6 @@ function UserMenuPopover({ anchorEl, name, email, onClose }: UserMenuPopoverProp
 
   const pendingInvitationCount = invitations.filter((i) => i.status === 'pending').length;
 
-  useLayoutEffect(() => {
-    const rect = anchorEl.getBoundingClientRect();
-    const POPOVER_WIDTH = 280;
-    setPosition({ top: rect.bottom + 6, left: rect.right - POPOVER_WIDTH });
-  }, [anchorEl]);
-
-  useEffect(() => {
-    const onMouseDown = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (popRef.current?.contains(target)) return;
-      if (anchorEl.contains(target)) return;
-      onClose();
-    };
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('mousedown', onMouseDown);
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', onMouseDown);
-      document.removeEventListener('keydown', onKeyDown);
-    };
-  }, [anchorEl, onClose]);
-
   const handleSignOut = async () => {
     if (signingOut) return;
     setSigningOut(true);
@@ -204,25 +172,10 @@ function UserMenuPopover({ anchorEl, name, email, onClose }: UserMenuPopoverProp
     }
   };
 
-  const goTo = (path: string) => () => {
-    onClose();
-    navigate(path);
-  };
+  const goTo = (path: string) => () => navigate(path);
 
-  return createPortal(
-    <div
-      ref={popRef}
-      role="menu"
-      aria-label="User menu"
-      style={{
-        position: 'fixed',
-        top: position.top,
-        left: position.left,
-        zIndex: 50,
-        width: 280,
-      }}
-      className="flex flex-col overflow-hidden rounded-[var(--radius)] border border-[var(--color-divider)] bg-[var(--color-bg-panel)] shadow-[0_8px_24px_rgba(0,0,0,0.25)]"
-    >
+  return (
+    <div className="flex flex-col overflow-hidden rounded-[var(--radius)]">
       <div className="border-b border-[var(--color-divider)] px-3 py-2.5">
         {name && (
           <div className="truncate font-sans text-[12px] font-medium text-[var(--color-text)]" title={name}>
@@ -250,9 +203,9 @@ function UserMenuPopover({ anchorEl, name, email, onClose }: UserMenuPopoverProp
       />
 
       <div className="flex flex-col border-t border-[var(--color-divider)] py-1">
-        <MenuItem onClick={goTo('/account')}>Account settings</MenuItem>
-        <MenuItem onClick={goTo('/account/organization')}>Organization settings</MenuItem>
-        <MenuItem onClick={goTo('/account/invitations')}>
+        <NavMenuItem onSelect={goTo('/account')}>Account settings</NavMenuItem>
+        <NavMenuItem onSelect={goTo('/account/organization')}>Organization settings</NavMenuItem>
+        <NavMenuItem onSelect={goTo('/account/invitations')}>
           <span className="flex w-full items-center justify-between gap-2">
             <span>Pending invitations</span>
             {pendingInvitationCount > 0 && (
@@ -264,16 +217,24 @@ function UserMenuPopover({ anchorEl, name, email, onClose }: UserMenuPopoverProp
               </span>
             )}
           </span>
-        </MenuItem>
+        </NavMenuItem>
       </div>
 
       <div className="flex flex-col border-t border-[var(--color-divider)] py-1">
-        <MenuItem onClick={handleSignOut} disabled={signingOut}>
+        <NavMenuItem
+          onSelect={(e) => {
+            // Keep the menu open while the sign-out request is in flight so
+            // the "Signing out…" affordance stays visible; we close manually
+            // in handleSignOut once navigation kicks in.
+            e.preventDefault();
+            void handleSignOut();
+          }}
+          disabled={signingOut}
+        >
           {signingOut ? 'Signing out…' : 'Sign out'}
-        </MenuItem>
+        </NavMenuItem>
       </div>
-    </div>,
-    document.body,
+    </div>
   );
 }
 
@@ -352,6 +313,7 @@ function OrganizationSection({
             onKeyDown={(e) => {
               if (e.key === 'Escape') {
                 e.preventDefault();
+                e.stopPropagation();
                 setCreating(false);
                 setNewName('');
                 setError(null);
@@ -405,12 +367,19 @@ function SwitchOrgList({
     [orgs, activeOrgId, filter, showFilter],
   );
 
+  // Radix DropdownMenu's roving focus / typeahead would steal keystrokes from
+  // a plain input; stop propagation so typing in the filter behaves normally.
+  const stopFilterKey = (e: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== 'Escape') e.stopPropagation();
+  };
+
   return (
     <div className="mt-1 flex flex-col gap-1">
       {showFilter && (
         <input
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
+          onKeyDown={stopFilterKey}
           placeholder="Filter orgs…"
           aria-label="Filter organizations"
           className="w-full rounded-[var(--radius-sm)] border border-[var(--color-divider)] bg-[var(--color-bg)] px-2 py-1 font-mono text-[10.5px] text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-text-muted)]"
@@ -441,24 +410,22 @@ function SwitchOrgList({
   );
 }
 
-function MenuItem({
+function NavMenuItem({
   children,
-  onClick,
+  onSelect,
   disabled,
 }: {
   children: React.ReactNode;
-  onClick: () => void;
+  onSelect: (event: Event) => void;
   disabled?: boolean;
 }) {
   return (
-    <button
-      type="button"
-      role="menuitem"
-      onClick={onClick}
+    <DropdownMenuItem
+      onSelect={onSelect}
       disabled={disabled}
       className="flex w-full items-center px-3 py-1.5 text-left font-mono text-[11px] text-[var(--color-text-2)] transition-colors hover:bg-[var(--color-pill-bg)] hover:text-[var(--color-text)] disabled:cursor-not-allowed disabled:opacity-60"
     >
       {children}
-    </button>
+    </DropdownMenuItem>
   );
 }
