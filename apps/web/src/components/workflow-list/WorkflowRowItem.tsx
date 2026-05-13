@@ -1,9 +1,3 @@
-import {
-  useCallback,
-  useRef,
-  useState,
-  type MouseEvent as ReactMouseEvent,
-} from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   useDeleteWorkflow,
@@ -42,16 +36,6 @@ export function WorkflowRowItem({
   const duplicate = useDuplicateWorkflow();
   const navigate = useNavigate();
 
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuButtonRef = useRef<HTMLButtonElement>(null);
-
-  const handleMenuToggle = (e: ReactMouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setMenuOpen((open) => !open);
-  };
-  const closeMenu = useCallback(() => setMenuOpen(false), []);
-
   const handleRenameCommit = (next: string) => {
     const trimmed = next.trim();
     onEndRename();
@@ -66,7 +50,6 @@ export function WorkflowRowItem({
   };
 
   const handleDelete = () => {
-    setMenuOpen(false);
     if (!confirm(`Delete workflow "${wf.name}"?`)) return;
     del.mutate(wf.id, {
       onError: (err) => alert(err instanceof Error ? err.message : String(err)),
@@ -74,16 +57,10 @@ export function WorkflowRowItem({
   };
 
   const handleDuplicate = () => {
-    setMenuOpen(false);
     duplicate.mutate(wf.id, {
       onSuccess: (created) => navigate(`/workflows/${created.id}`),
       onError: (err) => alert(err instanceof Error ? err.message : String(err)),
     });
-  };
-
-  const handleRename = () => {
-    setMenuOpen(false);
-    onStartRename();
   };
 
   const inner = (
@@ -150,31 +127,27 @@ export function WorkflowRowItem({
       </div>
       <div className="flex justify-end">
         {renaming ? null : (
-          <button
-            ref={menuButtonRef}
-            type="button"
-            aria-label="Workflow actions"
-            onClick={handleMenuToggle}
-            className={cn(
-              'flex h-6 w-6 items-center justify-center rounded text-[var(--color-text-3)] transition-colors hover:bg-[var(--color-bg-2)] hover:text-[var(--color-text)]',
-              menuOpen && 'bg-[var(--color-bg-2)] text-[var(--color-text)]',
-            )}
+          <RowActionsMenu
+            onRename={onStartRename}
+            onDuplicate={handleDuplicate}
+            onDelete={handleDelete}
+            duplicating={duplicate.isPending}
+            deleting={del.isPending}
           >
-            <Icon name="more-vertical" size={14} />
-          </button>
+            <button
+              type="button"
+              aria-label="Workflow actions"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              className="flex h-6 w-6 items-center justify-center rounded text-[var(--color-text-3)] transition-colors hover:bg-[var(--color-bg-2)] hover:text-[var(--color-text)] data-[state=open]:bg-[var(--color-bg-2)] data-[state=open]:text-[var(--color-text)]"
+            >
+              <Icon name="more-vertical" size={14} />
+            </button>
+          </RowActionsMenu>
         )}
       </div>
-      {menuOpen && menuButtonRef.current && (
-        <RowActionsMenu
-          anchorEl={menuButtonRef.current}
-          onClose={closeMenu}
-          onRename={handleRename}
-          onDuplicate={handleDuplicate}
-          onDelete={handleDelete}
-          duplicating={duplicate.isPending}
-          deleting={del.isPending}
-        />
-      )}
     </>
   );
 
