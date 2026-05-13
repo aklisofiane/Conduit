@@ -67,7 +67,13 @@ export function AgentConfigPanel({
   const selectedSkillIds = new Set(agent.skills.map((s) => s.skillId));
 
   const applyPreset = (presetId: string) => {
-    if (!presetId || presetId === CUSTOM_PRESET_ID || presetId === matchedPresetId) return;
+    if (!presetId || presetId === matchedPresetId) return;
+    if (presetId === CUSTOM_PRESET_ID) {
+      if (!agent.instructions.trim()) return;
+      if (!window.confirm("Clear this agent's instructions and start fresh?")) return;
+      onChange({ instructions: '' });
+      return;
+    }
     const preset = presets.find((p) => p.id === presetId);
     if (!preset) return;
     if (
