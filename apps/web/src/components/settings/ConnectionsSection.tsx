@@ -17,10 +17,8 @@ type CreateBody = {
 };
 
 /**
- * Connections. A Connection binds a typed scope (a GitHub repo, a Projects v2
- * board, etc.) on top of a `Credential`. Workflows reference connections by id
- * from inside their trigger and MCP server slots — connections are not
- * per-workflow.
+ * Connections are global, not per-workflow: a workflow's trigger and MCP slots
+ * reference a connection id, and the same connection can back many workflows.
  */
 export function ConnectionsSection() {
   const { data: connections = [], isLoading } = useConnections();

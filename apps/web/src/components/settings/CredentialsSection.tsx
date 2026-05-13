@@ -12,9 +12,8 @@ import { relativeFromNow } from '../../lib/time.js';
 const PLATFORMS = ['GITHUB', 'GITLAB', 'JIRA', 'SLACK', 'DISCORD'] as const;
 
 /**
- * Platform credentials. Flat list + inline create/rotate/delete. Credentials
- * feed Connections (rendered just below on the Integrations page) — one
- * credential can back many connections, and rotating it propagates.
+ * Rotating a credential propagates to every connection backed by it — there's
+ * no per-connection secret override.
  */
 export function CredentialsSection() {
   const { data: credentials = [], isLoading } = useCredentials();

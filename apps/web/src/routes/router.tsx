@@ -42,7 +42,6 @@ export const router = createBrowserRouter([
       { index: true, element: <HomePage /> },
       { path: 'workflows/new', element: <Navigate to="/" replace /> },
       { path: 'workflows/:id', element: <CanvasPage /> },
-      { path: 'workflows/:id/connections', element: <Navigate to="/settings/integrations" replace /> },
       { path: 'runs/:runId', element: <RunDetailPage /> },
       { path: 'credentials', element: <Navigate to="/settings/integrations" replace /> },
       { path: 'connections', element: <Navigate to="/settings/integrations" replace /> },

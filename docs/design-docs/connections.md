@@ -76,7 +76,7 @@ The error response lists the blocking workflows by name so the user can detach o
 
 ## Inline creation from the canvas
 
-The canvas's trigger config panel (`apps/web/src/components/canvas/TriggerConfigPanel.tsx`) and MCP server picker (`apps/web/src/components/canvas/McpServerPicker.tsx`) filter the connection picker by platform and (for triggers) `scope.kind` — the Repo sub-row only shows `github_repo` connections, the Board sub-row only `github_projects_v2`. Both surfaces will gain inline "+ New connection" affordances that commit through `POST /api/connections` and auto-select the new id without leaving the editor; v1 shipped the data model and the global `/connections` page, with the inline modal as a follow-up.
+The canvas's trigger config panel (`apps/web/src/components/canvas/TriggerConfigPanel.tsx`) and MCP server picker (`apps/web/src/components/canvas/McpServerPicker.tsx`) filter the connection picker by platform and (for triggers) `scope.kind` — the Repo sub-row only shows `github_repo` connections, the Board sub-row only `github_projects_v2`. Both surfaces will gain inline "+ New connection" affordances that commit through `POST /api/connections` and auto-select the new id without leaving the editor; v1 shipped the data model and the management UI at `/settings/integrations` (Credentials + Connections stacked on one surface — see [FRONTEND.md > Screens](../FRONTEND.md#screens)), with the inline modal as a follow-up.
 
 ## API surface
 
@@ -105,4 +105,4 @@ See [ARCHITECTURE.md > API surface](../ARCHITECTURE.md#api-surface) for the full
 | Trigger schema slots | `packages/shared/src/trigger/config.ts` |
 | Validator | `packages/shared/src/workflow/validate.ts` |
 | Template slot enumeration | `packages/shared/src/template/resolve.ts` |
-| Web | `apps/web/src/pages/ConnectionsPage.tsx`, `apps/web/src/components/canvas/TriggerConfigPanel.tsx`, `apps/web/src/components/canvas/McpServerPicker.tsx` |
+| Web | `apps/web/src/pages/IntegrationsPage.tsx`, `apps/web/src/components/settings/{CredentialsSection,ConnectionsSection}.tsx`, `apps/web/src/components/canvas/TriggerConfigPanel.tsx`, `apps/web/src/components/canvas/McpServerPicker.tsx` |

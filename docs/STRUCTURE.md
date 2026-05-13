@@ -145,11 +145,12 @@ Image tag resolution: `CONDUIT_RUNNER_IMAGE` (CI sets a git-sha tag), defaults t
 ```
 src/
   main.tsx, routes/router.tsx
-  pages/                               HomePage, CanvasPage, RunDetailPage, CredentialsPage,
-                                       ConnectionsPage (global — typed scope picker on top of
-                                       Credential), AccountSettingsPage, SignInPage, SignUpPage,
-                                       ForgotPasswordPage, ResetPasswordPage
-                                       (auth pages — see docs/design-docs/web-auth-ui.md)
+  pages/                               HomePage, CanvasPage, RunDetailPage, IntegrationsPage
+                                       (Credentials + Connections combined under /settings —
+                                       see docs/FRONTEND.md > Screens), AccountSettingsPage,
+                                       SignInPage, SignUpPage, ForgotPasswordPage,
+                                       ResetPasswordPage (auth pages — see
+                                       docs/design-docs/web-auth-ui.md)
   components/
     canvas/                            TriggerNode, AgentNode, NodePalette, AgentConfigPanel,
                                        TriggerConfigPanel (platform / stacked Repo + Board
@@ -161,9 +162,15 @@ src/
     templates/                         TemplatePickerDialog — "From template" flow on the
                                        workflow list (template grid → per-placeholder
                                        connection binding → POST /workflows/from-template/:id)
+    settings/                          CredentialsSection + ConnectionsSection (extracted
+                                       bodies of the old pages — composed by IntegrationsPage),
+                                       settings-nav.ts (sidebar config; add an entry here +
+                                       a child route in router.tsx to slot in API keys etc.)
     layout/                            TopChrome (global topbar shell, reads slot store; default
                                        actionsSlot is UserMenuPill), AppLayout, AuthLayout
-                                       (unauthenticated centered-card shell), RequireAuth +
+                                       (unauthenticated centered-card shell), SettingsLayout
+                                       (sidebar + outlet at /settings, driven by
+                                       components/settings/settings-nav.ts), RequireAuth +
                                        RedirectIfAuthed (session gates), UserMenuPill (default
                                        topbar actions — name/email + popover with Account-settings
                                        + Sign-out; see docs/design-docs/web-auth-ui.md),

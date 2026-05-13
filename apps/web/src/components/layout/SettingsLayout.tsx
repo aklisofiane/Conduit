@@ -4,9 +4,8 @@ import { Icon } from '../canvas/Icon.js';
 import { SETTINGS_NAV } from '../settings/settings-nav.js';
 
 /**
- * Two-column shell for `/settings/*`. Sidebar entries come from
- * `SETTINGS_NAV` — adding "API keys" later is one line in that config plus
- * one route registration.
+ * Sidebar is driven by `SETTINGS_NAV` so a new entry (e.g. "API keys") is one
+ * config line plus one route registration.
  */
 export function SettingsLayout() {
   return (

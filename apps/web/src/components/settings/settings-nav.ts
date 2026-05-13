@@ -1,6 +1,6 @@
 import type { IconName } from '../canvas/Icon.js';
 
-export interface SettingsNavEntry {
+interface SettingsNavEntry {
   key: string;
   label: string;
   path: string;

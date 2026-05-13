@@ -10,8 +10,8 @@ React 19 + Vite 8 + `@xyflow/react` + TanStack Query + Zustand + Tailwind v4 + s
 | `/workflows/:id` | Edit — canvas + config side panel (design only, no runtime data) |
 | `/workflows/:id/runs` | Run history list (status, trigger, duration, started at) |
 | `/runs/:runId` | Run detail — dedicated observation page with live logs (not on the canvas) |
-| `/connections` | Global `Connection` rows — typed scope picker (`github_repo` `{owner, repo}` / `github_projects_v2` `{ownerType, owner, number}` / `none`) on top of a `Credential`. Workflows reference connections by id from the canvas. |
-| `/credentials` | Manage `Credential` rows (global — one credential can back many connections; rotation propagates) |
+| `/settings` | Settings shell — left sidebar (`apps/web/src/components/layout/SettingsLayout.tsx`) reading from a config array (`apps/web/src/components/settings/settings-nav.ts`) + content outlet. Index redirects to `/settings/integrations`. The top-bar gear icon (`TopChrome`) lands here. |
+| `/settings/integrations` | `Credential` + `Connection` management stacked on one surface. Credentials feed connections (one credential can back many; rotation propagates), so they live together rather than as separate sidebar entries. Typed scope picker is unchanged (`github_repo` `{owner, repo}` / `github_projects_v2` `{ownerType, owner, number}` / `none`). Old `/credentials` and `/connections` paths redirect here. |
 | `/account` | Profile readout + change-password + sign-out (see [design-docs/web-auth-ui.md](./design-docs/web-auth-ui.md)) |
 | `/account/organization` | Active org's members, pending invitations (with copyable invite URL), invite form, danger zone (see [design-docs/org-switching.md](./design-docs/org-switching.md)) |
 | `/account/invitations` | Incoming pending invitations for the current user (accept/reject) |
