@@ -17,7 +17,7 @@ export type SelectGroup = {
 export type SelectItem = SelectOption | SelectGroup;
 
 function isGroup(item: SelectItem): item is SelectGroup {
-  return (item as SelectGroup).options !== undefined;
+  return 'options' in item;
 }
 
 interface SelectProps {
@@ -64,7 +64,7 @@ export function Select({
             {options.map((item, i) =>
               isGroup(item) ? (
                 <RxSelect.Group key={`g-${i}-${item.label}`}>
-                  <RxSelect.Label className="select-group-label">
+                  <RxSelect.Label className="dropdown-label">
                     {item.label}
                   </RxSelect.Label>
                   {item.options.map((opt) => (

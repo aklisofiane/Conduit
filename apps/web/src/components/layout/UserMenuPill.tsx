@@ -108,10 +108,7 @@ export function UserMenuPill() {
           <button
             type="button"
             aria-label="Open user menu"
-            className={cn(
-              'flex items-center gap-2 px-2 py-[3px] text-[var(--color-text-2)] transition-colors hover:text-[var(--color-text)]',
-              open && 'text-[var(--color-text)]',
-            )}
+            className="flex items-center gap-2 px-2 py-[3px] text-[var(--color-text-2)] transition-colors hover:text-[var(--color-text)] data-[state=open]:text-[var(--color-text)]"
           >
             <span className="status-dot ok" aria-hidden />
             <span className="max-w-[180px] truncate" title={label}>
@@ -223,9 +220,7 @@ function UserMenuBody({ name, email, onClose }: UserMenuBodyProps) {
       <div className="flex flex-col border-t border-[var(--color-divider)] py-1">
         <NavMenuItem
           onSelect={(e) => {
-            // Keep the menu open while the sign-out request is in flight so
-            // the "Signing out…" affordance stays visible; we close manually
-            // in handleSignOut once navigation kicks in.
+            // preventDefault keeps the menu open so "Signing out…" stays visible while the request is in flight.
             e.preventDefault();
             void handleSignOut();
           }}

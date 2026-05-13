@@ -222,11 +222,6 @@ textarea.field-input {
   resize: vertical;
   font-family: var(--font-sans);
 }
-select.field-input {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  cursor: pointer;
-}
 
 /* ---------- Select primitive (Radix-based) ---------- */
 .select-trigger {
@@ -319,14 +314,6 @@ select.field-input {
   display: inline-flex;
   align-items: center;
   color: var(--color-accent);
-}
-.select-group-label {
-  padding: 8px 8px 4px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
 }
 
 /* ---------- DropdownMenu primitive (Radix-based) ---------- */

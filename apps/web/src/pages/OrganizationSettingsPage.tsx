@@ -29,6 +29,8 @@ const inviteSchema = z.object({
   role: z.enum(ORG_ROLES),
 });
 
+const ROLE_OPTIONS = ORG_ROLES.map((r) => ({ value: r, label: r }));
+
 export type InviteValues = z.infer<typeof inviteSchema>;
 
 interface InviteDeps {
@@ -319,7 +321,7 @@ function MemberRow({
             disabled={updateRole.isPending}
             onValueChange={(v) => handleRoleChange(v as OrgRole)}
             className="!w-auto !h-7 !px-2"
-            options={ORG_ROLES.map((r) => ({ value: r, label: r }))}
+            options={ROLE_OPTIONS}
           />
         ) : (
           <span className="font-mono text-[11px] text-[var(--color-text-2)]">{member.role}</span>
@@ -503,7 +505,7 @@ function InviteMemberSection() {
                   ariaLabel="Role"
                   value={field.value}
                   onValueChange={field.onChange}
-                  options={ORG_ROLES.map((r) => ({ value: r, label: r }))}
+                  options={ROLE_OPTIONS}
                 />
               )}
             />

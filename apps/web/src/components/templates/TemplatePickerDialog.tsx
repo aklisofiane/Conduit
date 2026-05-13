@@ -14,6 +14,7 @@ import type {
   TemplateBinding,
   TemplateSummary,
 } from '../../api/types.js';
+import { connectionLabel } from '../../lib/connection.js';
 import { Dialog, DialogContent } from '../common/Dialog.js';
 import { Select, type SelectOption } from '../common/Select.js';
 
@@ -302,7 +303,7 @@ function BindingRow({
             }
             options={eligibleConnections.map((c) => ({
               value: c.id,
-              label: `${c.name} · ${c.credential.platform.toLowerCase()}`,
+              label: connectionLabel(c),
             }))}
           />
         </div>
@@ -477,7 +478,7 @@ function LabeledSelect({
   placeholder?: string;
 }) {
   return (
-    <div className="flex flex-col gap-1">
+    <label className="flex flex-col gap-1">
       <span className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-3)]">
         {label}
       </span>
@@ -488,6 +489,6 @@ function LabeledSelect({
         options={options}
         placeholder={placeholder}
       />
-    </div>
+    </label>
   );
 }

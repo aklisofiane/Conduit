@@ -532,16 +532,16 @@ function OptionsValueInput({
       />
     );
   }
-  const showStaleOption = value !== '' && !options.includes(value);
+  const items = options.map((opt) => ({ value: opt, label: opt }));
+  if (value !== '' && !options.includes(value)) {
+    items.unshift({ value, label: `${value} (not found)` });
+  }
   return (
     <Select
       placeholder="— select —"
       value={value}
       onValueChange={onChange}
-      options={[
-        ...(showStaleOption ? [{ value, label: `${value} (not found)` }] : []),
-        ...options.map((opt) => ({ value: opt, label: opt })),
-      ]}
+      options={items}
     />
   );
 }

@@ -12,6 +12,7 @@ import { ApiError } from '../../api/client.js';
 import { useConnections, useIntrospectMcp } from '../../api/hooks.js';
 import { useWorkflowEditor } from '../../state/workflow-editor.js';
 import { cn } from '../../lib/cn.js';
+import { connectionLabel } from '../../lib/connection.js';
 import { Select } from '../common/Select.js';
 
 interface Props {
@@ -198,7 +199,7 @@ function ServerCard({
             }
             options={connections.map((c) => ({
               value: c.id,
-              label: `${c.name} · ${c.credential.platform.toLowerCase()}`,
+              label: connectionLabel(c),
             }))}
           />
         </label>
@@ -513,7 +514,7 @@ function CustomServerForm({
           onValueChange={setConnectionId}
           options={connections.map((c) => ({
             value: c.id,
-            label: `${c.name} · ${c.credential.platform.toLowerCase()}`,
+            label: connectionLabel(c),
           }))}
         />
       </label>

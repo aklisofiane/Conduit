@@ -10,3 +10,10 @@ export function scopeSummary(scope: ConnectionScope): string {
       return '';
   }
 }
+
+export function connectionLabel(c: {
+  name: string;
+  credential: { platform: string };
+}): string {
+  return `${c.name} · ${c.credential.platform.toLowerCase()}`;
+}
