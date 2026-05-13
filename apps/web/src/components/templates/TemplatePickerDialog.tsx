@@ -14,6 +14,7 @@ import type {
   TemplateBinding,
   TemplateSummary,
 } from '../../api/types.js';
+import { Dialog, DialogContent } from '../common/Dialog.js';
 
 export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
   const { data: templates = [], isLoading } = useTemplates();
@@ -66,16 +67,15 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Create workflow from template"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(9,9,11,0.65)] backdrop-blur-sm"
-      onClick={onClose}
+    <Dialog
+      open
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
     >
-      <div
-        className="flex max-h-[85vh] w-[680px] max-w-[94vw] flex-col overflow-hidden rounded-xl border border-[var(--color-line)] bg-[var(--color-bg-1)]"
-        onClick={(e) => e.stopPropagation()}
+      <DialogContent
+        aria-label="Create workflow from template"
+        className="flex max-h-[85vh] w-[680px] max-w-[94vw] flex-col overflow-hidden rounded-xl border border-[var(--color-line)] bg-[var(--color-bg-1)] p-0 shadow-none"
       >
         <header className="flex items-center justify-between border-b border-[var(--color-line)] px-5 py-4">
           <div>
@@ -169,8 +169,8 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
             </button>
           </div>
         </footer>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
