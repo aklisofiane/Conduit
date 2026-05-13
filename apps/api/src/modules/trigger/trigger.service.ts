@@ -46,12 +46,6 @@ export class TriggerService {
     }
   }
 
-  /**
-   * Two token paths: an existing Connection (caller already picked one — used
-   * by the trigger panel) or a raw Credential (settings preview before a
-   * Connection is created). The DTO's `refine` already guarantees exactly one
-   * is set, so the else-branch is safe.
-   */
   private async resolveToken(orgId: string, dto: ListProjectsDto): Promise<string> {
     if (dto.connectionId) {
       const [, { token }] = await Promise.all([
@@ -60,7 +54,11 @@ export class TriggerService {
       ]);
       return token;
     }
-    return this.credentials.decryptForOrgCredential(orgId, dto.credentialId!);
+    if (!dto.credentialId) {
+      // The DTO's refine guarantees exactly one is set; this branch is unreachable.
+      throw new BadRequestException('Missing connectionId or credentialId');
+    }
+    return this.credentials.decryptForOrgCredential(orgId, dto.credentialId);
   }
 
   async listLabels(orgId: string, dto: ListLabelsDto): Promise<RepoLabel[]> {

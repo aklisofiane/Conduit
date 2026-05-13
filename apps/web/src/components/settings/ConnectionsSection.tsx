@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ConnectionScope } from '@conduit/shared';
 import { ApiError } from '../../api/client.js';
 import {
@@ -248,13 +248,6 @@ function CreateConnectionForm({
   );
 }
 
-/**
- * Owner / project-board picker for `github_projects_v2`. Once a credential
- * and owner are in place, fetches available Projects v2 boards so the user
- * can pick by title instead of guessing the project number. Falls back to a
- * raw number input on error / empty / no-credential so the form is never
- * blocked by a flaky API call.
- */
 function BoardScopeRow({
   credentialId,
   ownerType,
@@ -273,11 +266,18 @@ function BoardScopeRow({
   onBoardNumber: (v: string) => void;
 }) {
   const trimmedOwner = owner.trim();
+  // Debounce so each keystroke doesn't fire a GitHub API call.
+  const [debouncedOwner, setDebouncedOwner] = useState(trimmedOwner);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedOwner(trimmedOwner), 400);
+    return () => clearTimeout(t);
+  }, [trimmedOwner]);
+
   const boardsQuery = useListProjectBoards({
     credentialId,
     ownerType,
-    owner: trimmedOwner,
-    enabled: !!credentialId && !!trimmedOwner,
+    owner: debouncedOwner,
+    enabled: !!credentialId && !!debouncedOwner,
   });
 
   const boards = boardsQuery.data ?? [];
@@ -345,7 +345,7 @@ function BoardScopeRow({
       </div>
       <BoardLoadHint
         credentialId={credentialId}
-        owner={trimmedOwner}
+        owner={debouncedOwner}
         isLoading={boardsQuery.isFetching}
         errorMessage={errorMessage}
         boardCount={boards.length}

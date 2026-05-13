@@ -1,11 +1,5 @@
 import { z } from 'zod';
 
-/**
- * Two token sources: an existing Connection (trigger-config flow) or a raw
- * Credential (settings-flow preview before the Connection is created).
- * `refine` lets the schema enforce "exactly one" without giving up the
- * shared owner/ownerType shape.
- */
 export const listProjectsDtoSchema = z
   .object({
     connectionId: z.string().min(1).optional(),

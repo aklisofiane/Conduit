@@ -238,12 +238,6 @@ export function useIntrospectMcp() {
   });
 }
 
-/**
- * Lists Projects v2 boards for an owner. Pass either a `connectionId`
- * (trigger panel — the board is already attached) or a `credentialId`
- * (settings create-form — the user is previewing before the connection
- * exists). Backend's `/trigger/list-projects` accepts either id.
- */
 export function useListProjectBoards(
   args: { ownerType: 'user' | 'org'; owner: string; enabled: boolean } & (
     | { connectionId: string; credentialId?: undefined }
@@ -251,18 +245,16 @@ export function useListProjectBoards(
   ),
 ) {
   const { ownerType, owner, enabled, connectionId, credentialId } = args;
-  const tokenSource = connectionId
-    ? { kind: 'connection' as const, id: connectionId }
-    : { kind: 'credential' as const, id: credentialId ?? '' };
+  const tokenId = connectionId ?? credentialId ?? '';
   return useQuery({
-    queryKey: ['project-boards', tokenSource.kind, tokenSource.id, ownerType, owner] as const,
+    queryKey: ['project-boards', connectionId ?? null, credentialId ?? null, ownerType, owner] as const,
     queryFn: () =>
       api.post<ProjectBoardSummary[]>('/trigger/list-projects', {
         ...(connectionId ? { connectionId } : { credentialId }),
         ownerType,
         owner,
       }),
-    enabled: enabled && !!tokenSource.id && !!owner,
+    enabled: enabled && !!tokenId && !!owner,
     staleTime: 30_000,
     retry: false,
   });
