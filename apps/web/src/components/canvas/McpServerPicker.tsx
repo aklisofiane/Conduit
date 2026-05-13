@@ -12,6 +12,7 @@ import { ApiError } from '../../api/client.js';
 import { useConnections, useIntrospectMcp } from '../../api/hooks.js';
 import { useWorkflowEditor } from '../../state/workflow-editor.js';
 import { cn } from '../../lib/cn.js';
+import { Select } from '../common/Select.js';
 
 interface Props {
   agent: AgentConfig;
@@ -186,22 +187,20 @@ function ServerCard({
           <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
             Connection
           </span>
-          <select
-            className="field-input"
+          <Select
+            ariaLabel="Connection"
+            placeholder="(none)"
             value={server.connectionId ?? ''}
-            onChange={(e) =>
+            onValueChange={(v) =>
               updateMcpServer(server.id, {
-                connectionId: e.target.value || undefined,
+                connectionId: v || undefined,
               })
             }
-          >
-            <option value="">(none)</option>
-            {connections.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name} · {c.credential.platform.toLowerCase()}
-              </option>
-            ))}
-          </select>
+            options={connections.map((c) => ({
+              value: c.id,
+              label: `${c.name} · ${c.credential.platform.toLowerCase()}`,
+            }))}
+          />
         </label>
         <button
           className="btn"
@@ -382,18 +381,13 @@ function PresetPicker({
             <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
               Connection (optional — can set later)
             </span>
-            <select
-              className="field-input"
+            <Select
+              ariaLabel="Connection"
+              placeholder="(none)"
               value={connectionId}
-              onChange={(e) => setConnectionId(e.target.value)}
-            >
-              <option value="">(none)</option>
-              {eligible.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+              onValueChange={setConnectionId}
+              options={eligible.map((c) => ({ value: c.id, label: c.name }))}
+            />
             {eligible.length === 0 && (
               <span className="font-mono text-[10.5px] text-[var(--color-text-4)]">
                 No {selected.platform.toLowerCase()} connection yet — add one from the Connections page.
@@ -461,17 +455,12 @@ function CustomServerForm({
         <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
           Transport
         </span>
-        <select
-          className="field-input"
+        <Select
+          ariaLabel="Transport"
           value={kind}
-          onChange={(e) => setKind(e.target.value as McpTransport['kind'])}
-        >
-          {TRANSPORT_KINDS.map((k) => (
-            <option key={k} value={k}>
-              {k}
-            </option>
-          ))}
-        </select>
+          onValueChange={(v) => setKind(v as McpTransport['kind'])}
+          options={TRANSPORT_KINDS.map((k) => ({ value: k, label: k }))}
+        />
       </label>
 
       {kind === 'stdio' ? (
@@ -517,18 +506,16 @@ function CustomServerForm({
         <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
           Connection (optional)
         </span>
-        <select
-          className="field-input"
+        <Select
+          ariaLabel="Connection"
+          placeholder="(none)"
           value={connectionId}
-          onChange={(e) => setConnectionId(e.target.value)}
-        >
-          <option value="">(none)</option>
-          {connections.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name} · {c.credential.platform.toLowerCase()}
-            </option>
-          ))}
-        </select>
+          onValueChange={setConnectionId}
+          options={connections.map((c) => ({
+            value: c.id,
+            label: `${c.name} · ${c.credential.platform.toLowerCase()}`,
+          }))}
+        />
       </label>
 
       <button className="btn primary" disabled={!canSave} onClick={handleAdd}>

@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useForm, type UseFormSetError } from 'react-hook-form';
+import { Controller, useForm, type UseFormSetError } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useSession } from '../lib/auth-client.js';
 import { relativeFromNow } from '../lib/time.js';
 import { InlineRename } from '../components/common/InlineRename.js';
+import { Select } from '../components/common/Select.js';
 import {
   buildInviteUrl,
   ORG_ROLES,
@@ -312,18 +313,14 @@ function MemberRow({
       </div>
       <div className="flex shrink-0 items-center gap-2">
         {canManage ? (
-          <select
+          <Select
+            ariaLabel="Role"
             value={member.role}
             disabled={updateRole.isPending}
-            onChange={(e) => handleRoleChange(e.target.value as OrgRole)}
-            className="rounded-[var(--radius-sm)] border border-[var(--color-divider)] bg-[var(--color-bg)] px-2 py-1 font-mono text-[11px] text-[var(--color-text)]"
-          >
-            {ORG_ROLES.map((r) => (
-              <option key={r} value={r}>
-                {r}
-              </option>
-            ))}
-          </select>
+            onValueChange={(v) => handleRoleChange(v as OrgRole)}
+            className="!w-auto !h-7 !px-2"
+            options={ORG_ROLES.map((r) => ({ value: r, label: r }))}
+          />
         ) : (
           <span className="font-mono text-[11px] text-[var(--color-text-2)]">{member.role}</span>
         )}
@@ -498,13 +495,18 @@ function InviteMemberSection() {
           </label>
           <label className="flex flex-col">
             <span className="field-label">Role</span>
-            <select className="field-input" {...form.register('role')}>
-              {ORG_ROLES.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
+            <Controller
+              name="role"
+              control={form.control}
+              render={({ field }) => (
+                <Select
+                  ariaLabel="Role"
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  options={ORG_ROLES.map((r) => ({ value: r, label: r }))}
+                />
+              )}
+            />
           </label>
           <button
             type="submit"

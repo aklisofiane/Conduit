@@ -9,10 +9,21 @@ export type SelectOption = {
   disabled?: boolean;
 };
 
+export type SelectGroup = {
+  label: string;
+  options: SelectOption[];
+};
+
+export type SelectItem = SelectOption | SelectGroup;
+
+function isGroup(item: SelectItem): item is SelectGroup {
+  return (item as SelectGroup).options !== undefined;
+}
+
 interface SelectProps {
   value: string;
   onValueChange: (next: string) => void;
-  options: SelectOption[];
+  options: SelectItem[];
   placeholder?: string;
   disabled?: boolean;
   className?: string;
@@ -50,22 +61,38 @@ export function Select({
           className="select-content"
         >
           <RxSelect.Viewport className="select-viewport">
-            {options.map((opt) => (
-              <RxSelect.Item
-                key={opt.value}
-                value={opt.value}
-                disabled={opt.disabled}
-                className="select-item"
-              >
-                <RxSelect.ItemText>{opt.label}</RxSelect.ItemText>
-                <RxSelect.ItemIndicator className="select-item-indicator">
-                  <Icon name="check" size={12} color="var(--color-accent)" />
-                </RxSelect.ItemIndicator>
-              </RxSelect.Item>
-            ))}
+            {options.map((item, i) =>
+              isGroup(item) ? (
+                <RxSelect.Group key={`g-${i}-${item.label}`}>
+                  <RxSelect.Label className="select-group-label">
+                    {item.label}
+                  </RxSelect.Label>
+                  {item.options.map((opt) => (
+                    <SelectItemRow key={opt.value} option={opt} />
+                  ))}
+                </RxSelect.Group>
+              ) : (
+                <SelectItemRow key={item.value} option={item} />
+              ),
+            )}
           </RxSelect.Viewport>
         </RxSelect.Content>
       </RxSelect.Portal>
     </RxSelect.Root>
+  );
+}
+
+function SelectItemRow({ option }: { option: SelectOption }) {
+  return (
+    <RxSelect.Item
+      value={option.value}
+      disabled={option.disabled}
+      className="select-item"
+    >
+      <RxSelect.ItemText>{option.label}</RxSelect.ItemText>
+      <RxSelect.ItemIndicator className="select-item-indicator">
+        <Icon name="check" size={12} color="var(--color-accent)" />
+      </RxSelect.ItemIndicator>
+    </RxSelect.Item>
   );
 }

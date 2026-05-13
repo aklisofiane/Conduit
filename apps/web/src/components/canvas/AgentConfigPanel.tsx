@@ -14,6 +14,7 @@ import {
 import type { AgentPreset } from '../../api/types.js';
 import { cn } from '../../lib/cn.js';
 import { providerStyle } from '../../styles/theme.js';
+import { Select, type SelectItem } from '../common/Select.js';
 import { Icon } from './Icon.js';
 import { McpServerPicker } from './McpServerPicker.js';
 
@@ -121,51 +122,49 @@ export function AgentConfigPanel({
 
           {presets.length > 0 && (
             <Field label="Preset" hint="prefill instructions, model, provider">
-              <select
-                className="field-input"
+              <Select
+                ariaLabel="Preset"
                 value={matchedPresetId}
-                onChange={(e) => applyPreset(e.target.value)}
-              >
-                <option value="">Custom — write your own</option>
-                {presetsByCategory.map(([category, list]) => (
-                  <optgroup key={category} label={category}>
-                    {list.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} — {p.description}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
+                onValueChange={applyPreset}
+                placeholder="Custom — write your own"
+                options={presetsByCategory.map(
+                  ([category, list]): SelectItem => ({
+                    label: category,
+                    options: list.map((p) => ({
+                      value: p.id,
+                      label: `${p.name} — ${p.description}`,
+                    })),
+                  }),
+                )}
+              />
             </Field>
           )}
 
           <Field label="Provider & model">
             <div className="grid grid-cols-2 gap-2">
-              <select
-                className="field-input"
+              <Select
+                ariaLabel="Provider"
                 value={agent.provider}
-                onChange={(e) => {
-                  const provider = e.target.value as AgentConfig['provider'];
+                onValueChange={(v) => {
+                  const provider = v as AgentConfig['provider'];
                   const models = PROVIDER_MODELS[provider];
                   const model = models.includes(agent.model) ? agent.model : models[0];
                   onChange({ provider, model });
                 }}
-              >
-                <option value="claude">Claude</option>
-                <option value="codex">Codex</option>
-              </select>
-              <select
-                className="field-input"
+                options={[
+                  { value: 'claude', label: 'Claude' },
+                  { value: 'codex', label: 'Codex' },
+                ]}
+              />
+              <Select
+                ariaLabel="Model"
                 value={agent.model}
-                onChange={(e) => onChange({ model: e.target.value })}
-              >
-                {PROVIDER_MODELS[agent.provider].map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
+                onValueChange={(v) => onChange({ model: v })}
+                options={PROVIDER_MODELS[agent.provider].map((m) => ({
+                  value: m,
+                  label: m,
+                }))}
+              />
             </div>
           </Field>
 
