@@ -44,7 +44,7 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
       Object.fromEntries(
         t.placeholders.map<[string, TemplateBinding]>((alias) => [
           alias,
-          newBindingForAlias(alias, credentials[0]?.id ?? ''),
+          defaultBindingForAlias(alias, credentials, connections),
         ]),
       ),
     );
@@ -223,6 +223,20 @@ function newBindingForAlias(alias: string, credentialId: string): TemplateBindin
     credentialId,
     scope: defaultScopeForAlias(alias),
   };
+}
+
+function defaultBindingForAlias(
+  alias: string,
+  credentials: CredentialRow[],
+  connections: ConnectionRow[],
+): TemplateBinding {
+  const expectedKind = defaultScopeForAlias(alias).kind;
+  const eligible = connections.filter((c) => c.scope.kind === expectedKind);
+  const only = eligible.length === 1 ? eligible[0] : undefined;
+  if (eligible.length > 0) {
+    return { mode: 'existing', connectionId: only?.id ?? '' };
+  }
+  return newBindingForAlias(alias, credentials[0]?.id ?? '');
 }
 
 function BindingRow({
