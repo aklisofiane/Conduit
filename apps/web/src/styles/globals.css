@@ -228,6 +228,193 @@ select.field-input {
   cursor: pointer;
 }
 
+/* ---------- Select primitive (Radix-based) ---------- */
+.select-trigger {
+  width: 100%;
+  height: 30px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius);
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text);
+  cursor: pointer;
+  outline: none;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+.select-trigger:hover:not(:disabled) {
+  border-color: var(--color-text-muted);
+}
+.select-trigger:focus-visible,
+.select-trigger[data-state='open'] {
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-focus);
+}
+.select-trigger[data-placeholder] {
+  color: var(--color-text-muted);
+}
+.select-trigger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.select-trigger-chevron {
+  color: var(--color-text-muted);
+  transition: transform 150ms ease;
+  display: inline-flex;
+}
+.select-trigger[data-state='open'] .select-trigger-chevron {
+  transform: rotate(180deg);
+}
+
+.select-content {
+  z-index: 60;
+  min-width: var(--radix-select-trigger-width);
+  max-height: var(--radix-select-content-available-height);
+  background: var(--color-bg-panel);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius);
+  box-shadow:
+    0 4px 16px rgba(11, 16, 32, 0.06),
+    0 1px 2px rgba(11, 16, 32, 0.04);
+  overflow: hidden;
+}
+.select-viewport {
+  padding: 4px;
+}
+.select-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  outline: none;
+  user-select: none;
+}
+.select-item[data-highlighted] {
+  background: var(--color-pill-bg);
+}
+.select-item[data-state='checked'] {
+  background: var(--color-accent-soft);
+  font-weight: 600;
+}
+.select-item[data-disabled] {
+  color: var(--color-text-muted);
+  pointer-events: none;
+  cursor: not-allowed;
+}
+.select-item-indicator {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-accent);
+}
+
+/* ---------- DropdownMenu primitive (Radix-based) ---------- */
+.dropdown-content {
+  z-index: 60;
+  min-width: 168px;
+  background: var(--color-bg-panel);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius);
+  box-shadow:
+    0 4px 16px rgba(11, 16, 32, 0.06),
+    0 1px 2px rgba(11, 16, 32, 0.04);
+  padding: 4px;
+  overflow: hidden;
+}
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--color-text);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  outline: none;
+  user-select: none;
+}
+.dropdown-item[data-highlighted] {
+  background: var(--color-pill-bg);
+}
+.dropdown-item[data-disabled] {
+  color: var(--color-text-muted);
+  pointer-events: none;
+  cursor: not-allowed;
+}
+.dropdown-item.is-danger {
+  color: var(--color-error);
+}
+.dropdown-item.is-danger[data-highlighted] {
+  background: color-mix(in oklch, var(--color-error) 10%, transparent);
+}
+.dropdown-separator {
+  height: 1px;
+  background: var(--color-divider);
+  margin: 4px -4px;
+}
+.dropdown-label {
+  padding: 4px 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+/* ---------- Dialog primitive (Radix-based) ---------- */
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(11, 16, 32, 0.32);
+  z-index: 70;
+}
+.dialog-content {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 71;
+  background: var(--color-bg-panel);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-lg);
+  box-shadow:
+    0 12px 40px rgba(11, 16, 32, 0.18),
+    0 2px 8px rgba(11, 16, 32, 0.08);
+  outline: none;
+  max-height: calc(100vh - 48px);
+  max-width: calc(100vw - 48px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.dialog-title {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0;
+}
+.dialog-description {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
 .kbd {
   font-family: var(--font-mono);
   font-size: 10px;
