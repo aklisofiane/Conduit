@@ -18,6 +18,8 @@ import { Select, type SelectItem } from '../common/Select.js';
 import { Icon } from './Icon.js';
 import { McpServerPicker } from './McpServerPicker.js';
 
+const CUSTOM_PRESET_ID = '__custom__';
+
 interface AgentConfigPanelProps {
   agent: AgentConfig;
   workflowId: string;
@@ -65,7 +67,7 @@ export function AgentConfigPanel({
   const selectedSkillIds = new Set(agent.skills.map((s) => s.skillId));
 
   const applyPreset = (presetId: string) => {
-    if (!presetId || presetId === matchedPresetId) return;
+    if (!presetId || presetId === CUSTOM_PRESET_ID || presetId === matchedPresetId) return;
     const preset = presets.find((p) => p.id === presetId);
     if (!preset) return;
     if (
@@ -124,18 +126,17 @@ export function AgentConfigPanel({
             <Field label="Preset" hint="prefill instructions, model, provider">
               <Select
                 ariaLabel="Preset"
-                value={matchedPresetId}
+                value={matchedPresetId || CUSTOM_PRESET_ID}
                 onValueChange={applyPreset}
-                placeholder="Custom — write your own"
-                options={presetsByCategory.map(
-                  ([category, list]): SelectItem => ({
-                    label: category,
-                    options: list.map((p) => ({
-                      value: p.id,
-                      label: `${p.name} — ${p.description}`,
-                    })),
-                  }),
-                )}
+                options={[
+                  { value: CUSTOM_PRESET_ID, label: 'Custom — write your own' },
+                  ...presetsByCategory.map(
+                    ([category, list]): SelectItem => ({
+                      label: category,
+                      options: list.map((p) => ({ value: p.id, label: p.name })),
+                    }),
+                  ),
+                ]}
               />
             </Field>
           )}
