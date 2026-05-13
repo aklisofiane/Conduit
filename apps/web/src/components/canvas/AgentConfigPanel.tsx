@@ -311,10 +311,10 @@ function IssueWritebackControl({
       : undefined;
 
   const boardsQuery = useListProjectBoards({
-    connectionId,
+    connectionId: boardConnectionId,
     ownerType: boardScope?.ownerType ?? 'org',
     owner: boardScope?.owner ?? '',
-    enabled: enabled && !!trigger && !!boardScope,
+    enabled: enabled && !!trigger && !!boardConnectionId && !!boardScope,
   });
   const matchedBoard =
     boardsQuery.data?.find((b) => b.number === boardScope?.number) ?? null;

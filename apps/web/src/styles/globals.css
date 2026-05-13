@@ -211,6 +211,10 @@ body {
     border-color 120ms ease,
     box-shadow 120ms ease;
 }
+.field-input::placeholder {
+  color: var(--color-text-muted);
+  opacity: 1;
+}
 .field-input:focus,
 .field-input:focus-visible {
   border-color: var(--color-accent);
@@ -226,6 +230,7 @@ textarea.field-input {
 /* ---------- Select primitive (Radix-based) ---------- */
 .select-trigger {
   width: 100%;
+  min-width: 0;
   height: 30px;
   background: var(--color-bg);
   border: 1px solid var(--color-divider);
@@ -243,6 +248,19 @@ textarea.field-input {
   transition:
     border-color 120ms ease,
     box-shadow 120ms ease;
+}
+/* Truncate Radix's Select.Value (rendered as a bare <span>) so long option
+   labels collapse to an ellipsis instead of overflowing the trigger. The
+   explicit `text-align: left` overrides the UA-default `text-align: center`
+   that <button> elements inherit to flex children once the span grows. */
+.select-trigger > span:not(.select-trigger-chevron) {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+  text-align: left;
 }
 .select-trigger:hover:not(:disabled) {
   border-color: var(--color-text-muted);

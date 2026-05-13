@@ -6,6 +6,7 @@ import {
   useCreateConnection,
   useCredentials,
   useDeleteConnection,
+  useListProjectBoards,
 } from '../../api/hooks.js';
 import type { ConnectionRow, CredentialRow } from '../../api/types.js';
 import { scopeSummary } from '../../lib/connection.js';
@@ -219,46 +220,15 @@ function CreateConnectionForm({
       )}
 
       {scopeKind === 'github_projects_v2' && (
-        <div className="grid grid-cols-[110px_1fr_120px] gap-3">
-          <label className="flex flex-col gap-1">
-            <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
-              Owner type
-            </span>
-            <Select
-              ariaLabel="Owner type"
-              value={ownerType}
-              onValueChange={(v) => setOwnerType(v as 'user' | 'org')}
-              options={[
-                { value: 'org', label: 'Org' },
-                { value: 'user', label: 'User' },
-              ]}
-            />
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
-              Owner
-            </span>
-            <input
-              className="field-input"
-              placeholder="acme"
-              value={owner}
-              onChange={(e) => setOwner(e.target.value)}
-            />
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
-              Project #
-            </span>
-            <input
-              className="field-input"
-              type="number"
-              min={1}
-              placeholder="5"
-              value={boardNumber}
-              onChange={(e) => setBoardNumber(e.target.value)}
-            />
-          </label>
-        </div>
+        <BoardScopeRow
+          credentialId={credentialId}
+          ownerType={ownerType}
+          owner={owner}
+          boardNumber={boardNumber}
+          onOwnerType={setOwnerType}
+          onOwner={setOwner}
+          onBoardNumber={setBoardNumber}
+        />
       )}
 
       <div className="flex justify-end gap-2">
@@ -276,6 +246,157 @@ function CreateConnectionForm({
       </div>
     </div>
   );
+}
+
+/**
+ * Owner / project-board picker for `github_projects_v2`. Once a credential
+ * and owner are in place, fetches available Projects v2 boards so the user
+ * can pick by title instead of guessing the project number. Falls back to a
+ * raw number input on error / empty / no-credential so the form is never
+ * blocked by a flaky API call.
+ */
+function BoardScopeRow({
+  credentialId,
+  ownerType,
+  owner,
+  boardNumber,
+  onOwnerType,
+  onOwner,
+  onBoardNumber,
+}: {
+  credentialId: string;
+  ownerType: 'user' | 'org';
+  owner: string;
+  boardNumber: string;
+  onOwnerType: (v: 'user' | 'org') => void;
+  onOwner: (v: string) => void;
+  onBoardNumber: (v: string) => void;
+}) {
+  const trimmedOwner = owner.trim();
+  const boardsQuery = useListProjectBoards({
+    credentialId,
+    ownerType,
+    owner: trimmedOwner,
+    enabled: !!credentialId && !!trimmedOwner,
+  });
+
+  const boards = boardsQuery.data ?? [];
+  const errorMessage = boardsQuery.error
+    ? boardsQuery.error instanceof ApiError
+      ? boardsQuery.error.message
+      : String(boardsQuery.error)
+    : null;
+  const showDropdown = boards.length > 0 && !errorMessage;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="grid grid-cols-[110px_minmax(0,1fr)_minmax(0,1.4fr)] gap-3">
+        <label className="flex min-w-0 flex-col gap-1">
+          <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+            Owner type
+          </span>
+          <Select
+            ariaLabel="Owner type"
+            value={ownerType}
+            onValueChange={(v) => onOwnerType(v as 'user' | 'org')}
+            options={[
+              { value: 'org', label: 'Org' },
+              { value: 'user', label: 'User' },
+            ]}
+          />
+        </label>
+        <label className="flex min-w-0 flex-col gap-1">
+          <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+            Owner
+          </span>
+          <input
+            className="field-input"
+            placeholder="acme"
+            value={owner}
+            onChange={(e) => onOwner(e.target.value)}
+          />
+        </label>
+        <label className="flex min-w-0 flex-col gap-1">
+          <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+            Project
+          </span>
+          {showDropdown ? (
+            <Select
+              ariaLabel="Project"
+              value={boardNumber}
+              onValueChange={onBoardNumber}
+              placeholder="— pick a project —"
+              options={boards.map((b) => ({
+                value: String(b.number),
+                label: `#${b.number} · ${b.title}`,
+              }))}
+            />
+          ) : (
+            <input
+              className="field-input"
+              type="number"
+              min={1}
+              placeholder="5"
+              value={boardNumber}
+              onChange={(e) => onBoardNumber(e.target.value)}
+            />
+          )}
+        </label>
+      </div>
+      <BoardLoadHint
+        credentialId={credentialId}
+        owner={trimmedOwner}
+        isLoading={boardsQuery.isFetching}
+        errorMessage={errorMessage}
+        boardCount={boards.length}
+      />
+    </div>
+  );
+}
+
+function BoardLoadHint({
+  credentialId,
+  owner,
+  isLoading,
+  errorMessage,
+  boardCount,
+}: {
+  credentialId: string;
+  owner: string;
+  isLoading: boolean;
+  errorMessage: string | null;
+  boardCount: number;
+}) {
+  if (!credentialId) return null;
+  if (!owner) {
+    return (
+      <span className="font-mono text-[11px] text-[var(--color-text-3)]">
+        Enter an owner to load available projects.
+      </span>
+    );
+  }
+  if (isLoading) {
+    return (
+      <span className="font-mono text-[11px] text-[var(--color-text-3)]">
+        Loading projects…
+      </span>
+    );
+  }
+  if (errorMessage) {
+    return (
+      <span className="font-mono text-[11px] text-[var(--color-danger,#d54c4c)]">
+        Couldn't load projects ({errorMessage}). Enter the number manually.
+      </span>
+    );
+  }
+  if (boardCount === 0) {
+    return (
+      <span className="font-mono text-[11px] text-[var(--color-text-3)]">
+        No Projects v2 boards found for "{owner}". Enter the number manually.
+      </span>
+    );
+  }
+  return null;
 }
 
 function ConnectionRowView({ conn, onDelete }: { conn: ConnectionRow; onDelete: () => void }) {

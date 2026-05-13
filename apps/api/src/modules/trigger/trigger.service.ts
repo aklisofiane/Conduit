@@ -29,10 +29,7 @@ export class TriggerService {
   ) {}
 
   async listProjects(orgId: string, dto: ListProjectsDto): Promise<ProjectBoardSummary[]> {
-    const [, { token }] = await Promise.all([
-      this.connections.assertInOrg(orgId, dto.connectionId),
-      this.credentials.getConnectionBinding(dto.connectionId),
-    ]);
+    const token = await this.resolveToken(orgId, dto);
 
     try {
       return await listProjectBoards({
@@ -47,6 +44,23 @@ export class TriggerService {
       );
       throw new BadRequestException({ message });
     }
+  }
+
+  /**
+   * Two token paths: an existing Connection (caller already picked one — used
+   * by the trigger panel) or a raw Credential (settings preview before a
+   * Connection is created). The DTO's `refine` already guarantees exactly one
+   * is set, so the else-branch is safe.
+   */
+  private async resolveToken(orgId: string, dto: ListProjectsDto): Promise<string> {
+    if (dto.connectionId) {
+      const [, { token }] = await Promise.all([
+        this.connections.assertInOrg(orgId, dto.connectionId),
+        this.credentials.getConnectionBinding(dto.connectionId),
+      ]);
+      return token;
+    }
+    return this.credentials.decryptForOrgCredential(orgId, dto.credentialId!);
   }
 
   async listLabels(orgId: string, dto: ListLabelsDto): Promise<RepoLabel[]> {

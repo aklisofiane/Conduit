@@ -74,10 +74,11 @@ export function TriggerConfigPanel({
       : undefined;
 
   const boardsQuery = useListProjectBoards({
-    connectionId: trigger.connectionId,
+    connectionId: trigger.boardConnectionId ?? '',
     ownerType: boardScope?.ownerType ?? 'org',
     owner: boardScope?.owner ?? '',
-    enabled: showsBoardSection && hasBoard && !!trigger.connectionId && !!boardScope,
+    enabled:
+      showsBoardSection && hasBoard && !!trigger.boardConnectionId && !!boardScope,
   });
 
   const labelsQuery = useListLabels({

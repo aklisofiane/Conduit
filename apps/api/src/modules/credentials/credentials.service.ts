@@ -89,6 +89,22 @@ export class CredentialsService {
   }
 
   /**
+   * Org-scoped variant of `decryptForConnection`: looks up a credential
+   * directly by id (no connection in between) and returns its plaintext
+   * token. Used by config-time previews — e.g. listing Projects v2 boards
+   * before a Connection has been created. Throws 404 for cross-org / missing
+   * ids so we don't leak existence.
+   */
+  async decryptForOrgCredential(orgId: string, credentialId: string): Promise<string> {
+    const cred = await this.prisma.credential.findFirst({
+      where: { id: credentialId, orgId },
+      select: { secret: true },
+    });
+    if (!cred) throw new NotFoundException(`Credential ${credentialId} not found`);
+    return decrypt(cred.secret);
+  }
+
+  /**
    * Returns the connection's parsed scope along with its decrypted token.
    * Server-trusted (called from worker / config-time helpers that already
    * authorized against the workflow row); not `orgId`-scoped.
