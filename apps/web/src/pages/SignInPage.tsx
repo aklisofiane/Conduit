@@ -174,7 +174,11 @@ function Divider() {
 
 function GithubButton({ callbackURL }: { callbackURL: string }) {
   const handleClick = async () => {
-    await signIn.social({ provider: 'github', callbackURL });
+    // Relative callbackURLs resolve against the API origin, not the SPA.
+    await signIn.social({
+      provider: 'github',
+      callbackURL: `${window.location.origin}${callbackURL}`,
+    });
   };
   return (
     <button type="button" className="btn justify-center" onClick={handleClick}>
