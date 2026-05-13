@@ -269,7 +269,7 @@ textarea.field-input {
 }
 
 .select-content {
-  z-index: 60;
+  z-index: 80;
   min-width: var(--radix-select-trigger-width);
   max-height: var(--radix-select-content-available-height);
   background: var(--color-bg-panel);
