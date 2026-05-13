@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import {
   connectionScopeSchema,
+  isPollingTrigger,
   resolveTemplate,
   type ConnectionScopeKind,
   type TemplatePlaceholder,
@@ -125,7 +126,7 @@ export class TemplatesService implements OnModuleInit {
     await Promise.allSettled(
       created.map(async ({ id, definition, isActive }) => {
         const trigger = definition.triggers[0];
-        if (!trigger || trigger.type === 'webhook') return;
+        if (!isPollingTrigger(trigger)) return;
         try {
           await this.temporal.upsertPollSchedule({
             workflowId: id,

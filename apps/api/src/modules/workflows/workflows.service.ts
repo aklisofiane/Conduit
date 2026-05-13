@@ -5,6 +5,7 @@ import {
   type OnModuleInit,
 } from '@nestjs/common';
 import {
+  isPollingTrigger,
   ticketLockFor,
   workflowDefinitionSchema,
   type TriggerEvent,
@@ -39,11 +40,11 @@ export class WorkflowsService implements OnModuleInit {
     const workflows = await this.prisma.workflow.findMany({
       select: { id: true, definition: true, isActive: true },
     });
-    const polling = workflows.filter((wf) => {
-      const trigger = (wf.definition as Partial<WorkflowDefinition> | null)
-        ?.triggers?.[0];
-      return trigger?.type !== undefined && trigger.type !== 'webhook';
-    });
+    const polling = workflows.filter((wf) =>
+      isPollingTrigger(
+        (wf.definition as Partial<WorkflowDefinition> | null)?.triggers?.[0],
+      ),
+    );
     await Promise.allSettled(
       polling.map((wf) => this.syncPollSchedule(wf.id, wf.definition, wf.isActive)),
     );
@@ -210,7 +211,7 @@ export class WorkflowsService implements OnModuleInit {
   ): Promise<void> {
     const trigger = (definition as Partial<WorkflowDefinition> | null)?.triggers?.[0];
     try {
-      if (trigger && trigger.type !== 'webhook') {
+      if (isPollingTrigger(trigger)) {
         await this.temporal.upsertPollSchedule({
           workflowId,
           intervalSec: trigger.intervalSec,

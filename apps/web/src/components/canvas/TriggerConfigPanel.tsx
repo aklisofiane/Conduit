@@ -1,4 +1,5 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
+import { offeredFilterFields } from '@conduit/shared';
 import type { ConnectionScope, TriggerConfig, TriggerFilter } from '@conduit/shared';
 import type { ProjectBoardSummary } from '@conduit/shared/platform';
 import {
@@ -59,11 +60,8 @@ export function TriggerConfigPanel({
     [allConnections, platform],
   );
 
-  const isWebhook = trigger.type === 'webhook';
-  const isIssues = trigger.type === 'issues';
-  const isPRs = trigger.type === 'pull_requests';
   const hasBoard = !!trigger.boardConnectionId;
-  const showsBoardSection = isIssues; // board section only for issues
+  const showsBoardSection = trigger.type === 'issues';
 
   const selectedBoardConnection = useMemo(
     () => boardConnections.find((c) => c.id === trigger.boardConnectionId),
@@ -93,9 +91,6 @@ export function TriggerConfigPanel({
     selectedBoardSummary?.fields.find((f) => f.name === 'Status')?.options ?? [];
   const labelOptions = labelsQuery.data?.map((l) => l.name) ?? [];
 
-  // Flip the variant. The store's `updateTrigger` action rebuilds the trigger
-  // from shared fields + this patch when `type` changes, so we just send the
-  // new variant's full shape (minus shared fields).
   const setType = (nextType: 'issues' | 'pull_requests') => {
     if (trigger.type === nextType) return;
     const prevInterval =
@@ -113,7 +108,6 @@ export function TriggerConfigPanel({
         type: 'pull_requests',
         intervalSec: prevInterval,
         filters: [],
-        // PRs don't use a board — clear it explicitly.
         boardConnectionId: undefined,
       });
     }
@@ -148,7 +142,7 @@ export function TriggerConfigPanel({
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 py-4">
-        {isWebhook ? (
+        {trigger.type === 'webhook' ? (
           <div className="space-y-3">
             <div className="rounded-[var(--radius)] border border-[var(--color-divider)] bg-[var(--color-pill-bg)] p-3">
               <div className="font-sans text-[12px] font-medium text-[var(--color-text)]">
@@ -201,13 +195,13 @@ export function TriggerConfigPanel({
             <Field label="Watch" hint="what fires this workflow">
               <div className="grid grid-cols-2 gap-2">
                 <TypeButton
-                  active={isIssues}
+                  active={trigger.type === 'issues'}
                   onClick={() => setType('issues')}
                   label="Issues"
                   hint={hasBoard ? 'from a project board' : 'open issues in the repo'}
                 />
                 <TypeButton
-                  active={isPRs}
+                  active={trigger.type === 'pull_requests'}
                   onClick={() => setType('pull_requests')}
                   label="Pull requests"
                   hint="open PRs in the repo"
@@ -314,12 +308,12 @@ export function TriggerConfigPanel({
             <Field label="Filters" hint="AND-combined — an event must pass all">
               <FilterEditor
                 filters={trigger.filters}
-                offeredFields={offeredFieldsFor(trigger)}
+                offeredFields={offeredFilterFields(trigger)}
                 statusOptions={statusOptions}
                 labelOptions={labelOptions}
                 onChange={(filters) => onChange({ filters } as Partial<TriggerConfig>)}
               />
-              {isIssues && !hasBoard && (
+              {trigger.type === 'issues' && !hasBoard && (
                 <div className="mt-2 font-mono text-[11px] text-[var(--color-text-muted)]">
                   Only `label` available — attach a board to unlock `status`.
                 </div>
@@ -379,20 +373,6 @@ function ConnectionSelect({
   );
 }
 
-/**
- * Filter fields offered for the trigger's current variant. `status` requires
- * a board attachment under `issues`; under repo-source `issues` there's no
- * Status column, so the field is hidden.
- */
-function offeredFieldsFor(trigger: TriggerConfig): Array<TriggerFilter['field']> {
-  if (trigger.type === 'pull_requests') return ['pr_state', 'label'];
-  if (trigger.type === 'issues') {
-    return trigger.boardConnectionId ? ['status', 'label'] : ['label'];
-  }
-  // webhook — kept for completeness; UI doesn't render this branch.
-  return ['status', 'label'];
-}
-
 const FIELD_LABELS: Record<TriggerFilter['field'], string> = {
   status: 'Status',
   label: 'Label',
@@ -417,10 +397,19 @@ function FilterEditor({
   labelOptions: string[];
   onChange: (filters: TriggerFilter[]) => void;
 }) {
-  const replaceAt = (i: number, next: TriggerFilter) =>
-    onChange(filters.map((f, idx) => (idx === i ? next : f)));
-  const removeAt = (i: number) => onChange(filters.filter((_, idx) => idx !== i));
-  const add = () => onChange([...filters, emptyFilter(offeredFields[0]!)]);
+  const replaceAt = useCallback(
+    (i: number, next: TriggerFilter) =>
+      onChange(filters.map((f, idx) => (idx === i ? next : f))),
+    [filters, onChange],
+  );
+  const removeAt = useCallback(
+    (i: number) => onChange(filters.filter((_, idx) => idx !== i)),
+    [filters, onChange],
+  );
+  const add = useCallback(
+    () => onChange([...filters, emptyFilter(offeredFields[0]!)]),
+    [filters, offeredFields, onChange],
+  );
 
   return (
     <div className="space-y-2">

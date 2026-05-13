@@ -71,6 +71,37 @@ export const triggerConfigSchema = z.discriminatedUnion('type', [
 export type TriggerConfig = z.infer<typeof triggerConfigSchema>;
 
 /**
+ * Opt-in predicate for trigger variants delivered via Temporal polling
+ * Schedules. New variants must explicitly opt in here — adding a future
+ * `scheduled` or push-source variant won't silently get a poll Schedule.
+ */
+export function isPollingTrigger(
+  trigger: Pick<TriggerConfig, 'type'> | null | undefined,
+): trigger is Extract<TriggerConfig, { type: 'issues' | 'pull_requests' }> {
+  return trigger?.type === 'issues' || trigger?.type === 'pull_requests';
+}
+
+/**
+ * Filter fields legally settable for a given trigger variant. Mirrors the
+ * per-variant `filters` discriminator in `triggerConfigSchema` so the UI
+ * (and any future non-web caller) doesn't have to re-derive the rule.
+ * `issues` exposes `status` only when a board is attached — without a board
+ * the source is repo issues, which have no project Status column.
+ */
+export function offeredFilterFields(
+  trigger: TriggerConfig,
+): Array<'status' | 'label' | 'pr_state'> {
+  switch (trigger.type) {
+    case 'pull_requests':
+      return ['pr_state', 'label'];
+    case 'issues':
+      return trigger.boardConnectionId ? ['status', 'label'] : ['label'];
+    case 'webhook':
+      return ['status', 'label', 'pr_state'];
+  }
+}
+
+/**
  * Backwards-compat type alias — the old `BoardRef` shape lives on as the
  * `github_projects_v2` connection scope. Re-exported here so call sites that
  * type-imported `BoardRef` keep compiling without a path change.

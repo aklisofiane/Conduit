@@ -42,6 +42,7 @@ export const useWorkflowEditor = create<WorkflowEditorState>((set) => ({
   updateTrigger: (id, patch) =>
     set((state) => {
       if (!state.draft) return {};
+      let changed = false;
       const triggers = state.draft.triggers.map((t) => {
         if (t.id !== id) return t;
         // Variant flip: when the patch changes `type`, the result must be a
@@ -49,6 +50,7 @@ export const useWorkflowEditor = create<WorkflowEditorState>((set) => ({
         // field in `patch`; we keep only the shared top-level slots from `t`
         // so stale fields (e.g. `event` on `webhook` → `issues`) don't leak.
         if (patch.type !== undefined && patch.type !== t.type) {
+          changed = true;
           return {
             id: t.id,
             name: t.name,
@@ -58,8 +60,15 @@ export const useWorkflowEditor = create<WorkflowEditorState>((set) => ({
             ...patch,
           } as TriggerConfig;
         }
+        const patchKeys = Object.keys(patch) as Array<keyof TriggerConfig>;
+        const isNoop = patchKeys.every(
+          (k) => (t as Record<string, unknown>)[k] === (patch as Record<string, unknown>)[k],
+        );
+        if (isNoop) return t;
+        changed = true;
         return { ...t, ...patch } as TriggerConfig;
       });
+      if (!changed) return {};
       return { draft: { ...state.draft, triggers }, dirty: true };
     }),
   addMcpServer: (server) =>
