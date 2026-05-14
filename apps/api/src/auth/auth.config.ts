@@ -5,6 +5,8 @@ import { Redis } from 'ioredis';
 import { Logger } from '@nestjs/common';
 import { prisma } from '@conduit/database';
 import { config } from '../config';
+import type { PrismaService } from '../common/prisma.service';
+import { CredentialsService } from '../modules/credentials/credentials.service';
 import { createBetterAuthRedisStorage } from '../redis/redis.service';
 import { AbuseSignalsService } from './abuse-signals';
 import { AuditLogService } from './audit-log.service';
@@ -105,10 +107,70 @@ const auditHookDeps = { auditLog: auditLogService, abuseSignals: abuseSignalsSer
 const auditAfterMiddleware = createAuditAfterMiddleware(auditHookDeps);
 const organizationAuditHooks = createOrganizationAuditHooks(auditHookDeps);
 
+// Module-level singleton, mirrors the auditLogService pattern: Better Auth's
+// `databaseHooks` fire from the Express middleware before Nest DI is available,
+// so we share an instance constructed against the singleton Prisma client.
+// `CredentialsService`'s constructor is typed against `PrismaService`, but it
+// uses the structural `PrismaClient` shape only — the singleton satisfies it.
+const credentialsService = new CredentialsService(prisma as unknown as PrismaService);
+const oauthMirrorLogger = new Logger('GithubOAuthMirror');
+
 const bootLogger = new Logger('AuthConfig');
 bootLogger.log(
   `Better Auth rate-limit mode=${config.deployment} storage=secondary-storage(redis)`,
 );
+
+/**
+ * Mirror a fresh GitHub OAuth `account` row into a Conduit `Credential` so
+ * downstream code (workers, MCP resolver, polling) keeps using the existing
+ * Connection → Credential resolution path. Failures are logged but never
+ * propagate — a sign-in succeeding without a mirror is recoverable (re-sign-in
+ * or manual PAT entry both work).
+ */
+async function mirrorGithubAccountToCredential(
+  account: { id?: unknown; userId?: unknown; accountId?: unknown; accessToken?: unknown; scope?: unknown },
+): Promise<void> {
+  try {
+    const accessToken = typeof account.accessToken === 'string' ? account.accessToken : null;
+    const accountRowId = typeof account.id === 'string' ? account.id : null;
+    const userId = typeof account.userId === 'string' ? account.userId : null;
+    const githubAccountId = typeof account.accountId === 'string' ? account.accountId : null;
+    if (!accessToken || !accountRowId || !userId || !githubAccountId) return;
+    const scopes =
+      typeof account.scope === 'string' && account.scope.length > 0
+        ? account.scope.split(',').map((s) => s.trim()).filter(Boolean)
+        : [];
+    const orgId = await ensurePersonalOrgFor(userId);
+    const res = await fetch('https://api.github.com/user', {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: 'application/vnd.github+json',
+        'User-Agent': 'conduit',
+      },
+    });
+    if (!res.ok) {
+      oauthMirrorLogger.warn(
+        `GitHub /user lookup failed (status=${res.status}); skipping mirror for account=${accountRowId}`,
+      );
+      return;
+    }
+    const profile = (await res.json()) as { login?: unknown };
+    const githubLogin = typeof profile.login === 'string' ? profile.login : githubAccountId;
+    await credentialsService.upsertOAuthDerived({
+      orgId,
+      accountRowId,
+      githubAccountId,
+      githubLogin,
+      accessToken,
+      scopes,
+    });
+  } catch (err) {
+    oauthMirrorLogger.error(
+      `Failed to mirror GitHub OAuth account to credential: ${(err as Error).message}`,
+      (err as Error).stack,
+    );
+  }
+}
 
 export const auth = betterAuth({
   database: prismaAdapter(prisma, { provider: 'postgresql' }),
@@ -128,6 +190,11 @@ export const auth = betterAuth({
         github: {
           clientId: githubOAuth.clientId,
           clientSecret: githubOAuth.clientSecret,
+          // `repo` (read+write code, contents, PRs), `project` (Projects v2
+          // read+write — workflows update item status, not just read), and
+          // `read:org` (Org-scoped lookups). Existing OAuth users see GitHub's
+          // consent screen on next sign-in for the expanded scope set.
+          scope: ['repo', 'project', 'read:org'],
         },
       }
     : {},
@@ -172,6 +239,24 @@ export const auth = betterAuth({
               activeOrganizationId: orgId,
             },
           };
+        },
+      },
+    },
+    // Mirror Better Auth's GitHub OAuth `account` row into a Conduit
+    // `Credential`. `create` fires on first sign-in; `update` fires on
+    // re-authorization (e.g. consent re-prompt after a scope change), at
+    // which point we refresh the encrypted secret + recorded scopes in place.
+    account: {
+      create: {
+        async after(account) {
+          if (account.providerId !== 'github') return;
+          await mirrorGithubAccountToCredential(account);
+        },
+      },
+      update: {
+        async after(account) {
+          if (account.providerId !== 'github') return;
+          await mirrorGithubAccountToCredential(account);
         },
       },
     },

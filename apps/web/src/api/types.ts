@@ -100,7 +100,11 @@ export interface CredentialRow {
   id: string;
   platform: 'GITHUB' | 'GITLAB' | 'JIRA' | 'SLACK' | 'DISCORD';
   name: string;
-  metadata: unknown;
+  metadata: {
+    source?: 'oauth' | 'manual';
+    githubLogin?: string;
+    scopes?: string[];
+  } | null;
   createdAt: string;
   updatedAt: string;
   connectionCount: number;

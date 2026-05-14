@@ -47,7 +47,7 @@ model Credential {
   name      String
   // Encrypted at rest (AES-256-GCM). See SECURITY.md.
   secret    String
-  metadata  Json?    // scopes, expiry, etc.
+  metadata  Json?    // provenance + scopes; see connections.md > OAuth-derived credentials
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

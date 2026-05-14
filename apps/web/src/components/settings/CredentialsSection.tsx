@@ -164,9 +164,18 @@ function CredentialRowView({ cred, onDelete }: { cred: CredentialRow; onDelete: 
       </span>
       <div>
         <div className="font-mono text-[13px] font-medium">{cred.name}</div>
-        <div className="font-mono text-[11px] text-[var(--color-text-3)]">
-          {cred.platform.toLowerCase()} · ••••{cred.suffix} · {cred.connectionCount} connection
-          {cred.connectionCount === 1 ? '' : 's'} · rotated {relativeFromNow(cred.updatedAt)}
+        <div className="flex items-center gap-1.5 font-mono text-[11px] text-[var(--color-text-3)]">
+          <span>{cred.platform.toLowerCase()}</span>
+          {cred.metadata?.source === 'oauth' && (
+            <span
+              className="rounded border border-[var(--color-line)] bg-[var(--color-bg-2)] px-1 py-px text-[10px] uppercase tracking-wide"
+              title="Created from your GitHub sign-in. Rotate with a PAT to convert to a manual credential."
+            >
+              oauth
+            </span>
+          )}
+          <span>· ••••{cred.suffix} · {cred.connectionCount} connection
+          {cred.connectionCount === 1 ? '' : 's'} · rotated {relativeFromNow(cred.updatedAt)}</span>
         </div>
         {rotating && (
           <div className="mt-2 flex items-center gap-2">

@@ -74,6 +74,16 @@ Verification format (AES-256-GCM ciphertext, HMAC-SHA256 over the raw body) is u
 
 The error response lists the blocking workflows by name so the user can detach or reassign them. A richer "show me which workflows" UI is a follow-up.
 
+## OAuth-derived credentials
+
+A `Credential` can be created manually (user pastes a PAT) or automatically when the user signs in with GitHub OAuth. Both produce the same row shape; the OAuth case stamps `metadata.source = 'oauth'` for provenance, with the Better Auth `account.id` carried as the upsert key. The OAuth mirror itself is driven from `auth.config.ts` — see [auth-integration.md > GitHub OAuth → Credential mirror](./auth-integration.md#github-oauth--credential-mirror).
+
+`CredentialsService.upsertOAuthDerived` is idempotent on the carried account id, so re-sign-in updates `secret` + scopes in place rather than spawning duplicates. The credential id is stable across re-auths, so existing Connection rows keep working.
+
+**PAT-rotation converts oauth → manual.** `CredentialsService.update` strips `source` (and the OAuth-only scope record) from `metadata` when the caller rotates the secret on an OAuth-derived row without supplying their own `metadata` patch — claiming OAuth provenance would be misleading once the token is no longer the OAuth access token. Caller-supplied `metadata` always wins. There is no reverse path.
+
+The Settings Credentials list renders an `oauth` badge when `metadata.source === 'oauth'`. Contract tests: `apps/api/test/contract/credentials-oauth-mirror.test.ts`.
+
 ## Inline creation from the canvas
 
 The canvas's trigger config panel (`apps/web/src/components/canvas/TriggerConfigPanel.tsx`) and MCP server picker (`apps/web/src/components/canvas/McpServerPicker.tsx`) filter the connection picker by platform and (for triggers) `scope.kind` — the Repo sub-row only shows `github_repo` connections, the Board sub-row only `github_projects_v2`. Both surfaces will gain inline "+ New connection" affordances that commit through `POST /api/connections` and auto-select the new id without leaving the editor; v1 shipped the data model and the management UI at `/settings/integrations` (Credentials + Connections stacked on one surface — see [FRONTEND.md > Screens](../FRONTEND.md#screens)), with the inline modal as a follow-up.

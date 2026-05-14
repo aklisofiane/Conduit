@@ -44,6 +44,8 @@ The webhook controller (`POST /api/hooks/:workflowId`) still receives the raw by
 | `betterAuth.baseURL` | `BETTER_AUTH_URL` | `http://localhost:${port}` | Public origin used for OAuth redirect URIs. |
 | `betterAuth.githubOAuth` | `GITHUB_CLIENT_ID` + `GITHUB_CLIENT_SECRET` | undefined | GitHub OAuth surfaces only when **both** halves are set, in either deployment mode. |
 
+When GitHub OAuth is enabled the provider requests `scope: ['repo', 'project', 'read:org']` — the same surface Conduit's workflows need from a manual PAT. Pre-existing OAuth users see GitHub's consent screen again on next sign-in.
+
 `auth.config.ts` wires those into Better Auth with the Prisma adapter, `emailAndPassword: { enabled: true, requireEmailVerification: false }`, `emailVerification.sendOnSignUp: false` (no email transport yet — tracked as a cross-cutting TODO), and the `organization()` plugin. The signup-time shim — `databaseHooks.user.create.after` creates a personal org, `databaseHooks.session.create.before` stamps `activeOrganizationId` onto new sessions — is **owned by tenant-partitioning** but lives in this same file because it's part of Better Auth config. See [tenant-partitioning.md](./tenant-partitioning.md#signup-time-shim).
 
 `oauthProviders` is computed once at module load: `['github']` when `githubOAuth` is set, `[]` otherwise. The auth controller returns it verbatim so the web client doesn't re-read env.
@@ -114,6 +116,14 @@ The Better Auth section of `packages/database/prisma/schema.prisma` is generated
 | `invitation` | org plugin | Pending org invitations. |
 
 See [data-model.md](../data-model.md) for the full schema text.
+
+## GitHub OAuth → Credential mirror
+
+Better Auth owns the `account` table; Conduit's runtime resolves tokens through `Connection → Credential` and never reads `account` directly. To avoid prompting for a PAT the user just signed in with, `auth.config.ts` mirrors the OAuth `account` row into a Conduit `Credential` via `databaseHooks.account.{create,update}.after`. The hook resolves the user's personal org, looks up the GitHub login for the credential name, and delegates the write to `CredentialsService.upsertOAuthDerived`. Failures are logged and swallowed — sign-in succeeding without a mirror is recoverable (re-sign-in or paste a PAT manually).
+
+The hooks run inside Better Auth's Express middleware, before Nest DI is wired, so `auth.config.ts` constructs a module-level `CredentialsService` against the singleton Prisma client — the same pattern used for `auditLogService` in the same file.
+
+The Credential side of this contract (provenance metadata, idempotency, PAT-rotation conversion) is documented in [connections.md > OAuth-derived credentials](./connections.md#oauth-derived-credentials).
 
 ## Handing off to next sub-features
 

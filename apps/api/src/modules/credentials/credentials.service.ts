@@ -42,6 +42,22 @@ export class CredentialsService {
   }
 
   async update(orgId: string, id: string, dto: UpdateCredentialDto) {
+    // PAT-rotation of an OAuth-derived row converts it to a manual credential.
+    // Strip `source` and `scopes` from existing metadata so the UI badge stops
+    // claiming OAuth provenance once the secret is no longer the OAuth token.
+    // Skipped if the caller already supplied `metadata` — caller intent wins.
+    let metadataPatch: object | undefined = dto.metadata as unknown as object | undefined;
+    if (dto.secret !== undefined && metadataPatch === undefined) {
+      const existing = await this.prisma.credential.findFirst({
+        where: { id, orgId },
+        select: { metadata: true },
+      });
+      const existingMeta = (existing?.metadata ?? null) as Record<string, unknown> | null;
+      if (existingMeta && existingMeta.source === 'oauth') {
+        const { source: _s, scopes: _sc, ...rest } = existingMeta;
+        metadataPatch = rest;
+      }
+    }
     // updateMany lets us scope the write by orgId in one round-trip; a
     // cross-org id returns 404 with no row leak (matches the contract used
     // in WorkflowsService.update).
@@ -50,7 +66,7 @@ export class CredentialsService {
       data: {
         name: dto.name,
         secret: dto.secret !== undefined ? encrypt(dto.secret) : undefined,
-        metadata: dto.metadata as unknown as object | undefined,
+        metadata: metadataPatch,
       },
     });
     if (result.count === 0) {
@@ -60,6 +76,57 @@ export class CredentialsService {
       where: { id },
       select: { id: true, name: true, platform: true, updatedAt: true },
     });
+  }
+
+  /**
+   * Mirror a Better Auth GitHub OAuth account into a Conduit `Credential`.
+   * Server-trusted: caller (Better Auth `account.*.after` hook) has already
+   * resolved `orgId` from the user id. Idempotent on `accountRowId` — the
+   * Better Auth `account.id` is unique, so re-sign-in updates `secret` +
+   * `metadata.scopes` in place rather than creating duplicates.
+   */
+  async upsertOAuthDerived(params: {
+    orgId: string;
+    accountRowId: string;
+    githubAccountId: string;
+    githubLogin: string;
+    accessToken: string;
+    scopes: string[];
+  }): Promise<{ id: string; created: boolean }> {
+    const { orgId, accountRowId, githubAccountId, githubLogin, accessToken, scopes } = params;
+    const encryptedSecret = encrypt(accessToken);
+    const metadata = {
+      source: 'oauth' as const,
+      accountRowId,
+      githubAccountId,
+      githubLogin,
+      scopes,
+    };
+    const existing = await this.prisma.credential.findFirst({
+      where: {
+        orgId,
+        platform: 'GITHUB',
+        metadata: { path: ['accountRowId'], equals: accountRowId },
+      },
+      select: { id: true },
+    });
+    if (existing) {
+      await this.prisma.credential.update({
+        where: { id: existing.id },
+        data: { secret: encryptedSecret, metadata },
+      });
+      return { id: existing.id, created: false };
+    }
+    const created = await this.prisma.credential.create({
+      data: {
+        orgId,
+        platform: 'GITHUB',
+        name: `${githubLogin} (oauth)`,
+        secret: encryptedSecret,
+        metadata,
+      },
+    });
+    return { id: created.id, created: true };
   }
 
   async delete(orgId: string, id: string) {
