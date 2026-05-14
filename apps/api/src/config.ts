@@ -6,7 +6,7 @@ export type Deployment = 'local' | 'hosted';
 const deployment: Deployment =
   process.env.CONDUIT_DEPLOYMENT === 'hosted' ? 'hosted' : 'local';
 
-const apiPort = Number.parseInt(process.env.API_PORT ?? '3001', 10);
+const apiPort = Number.parseInt(process.env.API_PORT ?? '3000', 10);
 
 /**
  * Central env reader. Call sites import typed helpers instead of

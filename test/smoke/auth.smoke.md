@@ -6,7 +6,7 @@ Locks the browser-side flow that `RequireAuth`, `RedirectIfAuthed`, and
 
 ## Setup
 
-- API at `http://localhost:3001`, web at `http://localhost:5173`.
+- API at `http://localhost:3000`, web at `http://localhost:5173`.
 - Use a fresh email per run (e.g. `smoke-${date}@conduit.test`).
 - Password: `smoke-password-123`.
 

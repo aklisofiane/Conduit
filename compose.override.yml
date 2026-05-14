@@ -1,0 +1,33 @@
+# Auto-loaded by `docker compose` alongside docker-compose.yml.
+# Purpose: layer .env.local on top of .env for every service so raw
+# `docker compose up` (bypassing `npm run infra:up`) still picks up
+# preflight-resolved port overrides. `.env.local` is gitignored and
+# optional; when absent, docker compose silently no-ops it.
+services:
+  postgres:
+    env_file:
+      - path: .env
+        required: true
+      - path: .env.local
+        required: false
+
+  temporal:
+    env_file:
+      - path: .env
+        required: true
+      - path: .env.local
+        required: false
+
+  temporal-ui:
+    env_file:
+      - path: .env
+        required: true
+      - path: .env.local
+        required: false
+
+  redis:
+    env_file:
+      - path: .env
+        required: true
+      - path: .env.local
+        required: false

@@ -11,7 +11,7 @@ services:
       # mount the named volume at /var/lib/postgresql and point PGDATA at a subdir.
       PGDATA: /var/lib/postgresql/data/pg
     ports:
-      - '5434:5432'
+      - '${POSTGRES_PORT:-5432}:5432'
     volumes:
       - conduit_pg_data:/var/lib/postgresql
     healthcheck:
@@ -51,7 +51,7 @@ services:
       - POSTGRES_PWD=temporal
       - POSTGRES_SEEDS=temporal-postgres
     ports:
-      - '7233:7233'
+      - '${TEMPORAL_PORT:-7233}:7233'
 
   temporal-ui:
     image: temporalio/ui:2.34.0
@@ -61,16 +61,16 @@ services:
       - temporal
     environment:
       - TEMPORAL_ADDRESS=temporal:7233
-      - TEMPORAL_CORS_ORIGINS=http://localhost:5173,http://localhost:3001
+      - TEMPORAL_CORS_ORIGINS=http://localhost:${WEB_PORT:-5173},http://localhost:${API_PORT:-3000}
     ports:
-      - '8080:8080'
+      - '${TEMPORAL_UI_PORT:-8080}:8080'
 
   redis:
     image: redis:8-alpine
     container_name: conduit-redis
     restart: unless-stopped
     ports:
-      - '6379:6379'
+      - '${REDIS_PORT:-6379}:6379'
     volumes:
       - conduit_redis_data:/data
     healthcheck:

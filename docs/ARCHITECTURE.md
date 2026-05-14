@@ -41,7 +41,7 @@
 | `apps/agent-runner` | `@anthropic-ai/claude-agent-sdk`, `@openai/codex-sdk`, `@conduit/agent` | One short-lived container per agent node. Reads `RunnerRequest` on stdin, drives the provider session (main → optional issue-writeback → final summary turn), streams `AgentEvent`s as JSON lines on stdout, emits a terminal `exit` carrying head/changedFiles/`.conduit/<NodeName>.md`. No DB, no Redis, no master KEK, no other runs' credentials. See [design-docs/agent-execution.md > Runner container model](./design-docs/agent-execution.md#runner-container-model) |
 
 **Infrastructure (via Docker Compose)**
-- Postgres 18 (port 5434)
+- Postgres 18 (port 5432; preflight auto-allocates a free port if 5432 is taken — see `scripts/preflight.ts`)
 - Temporal (port 7233) + Temporal UI (port 8080)
 - Redis (port 6379)
 

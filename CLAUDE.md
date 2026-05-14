@@ -36,7 +36,7 @@ npx vitest run path/to/file.test.ts
 npx vitest run -t "name pattern"
 
 # Per-app dev
-npm --workspace @conduit/api    dev    # :3001
+npm --workspace @conduit/api    dev    # :3000
 npm --workspace @conduit/worker dev    # Temporal worker
 npm --workspace @conduit/web    dev    # :5173
 ```
@@ -47,7 +47,7 @@ npm --workspace @conduit/web    dev    # :5173
 
 - **Workflow sandbox.** `apps/worker/src/workflows/agent-workflow.ts` runs in Temporal's V8 sandbox — no `node:*`, no Prisma, no Redis, no provider imports. All I/O belongs in `apps/worker/src/activities/`.
 - **`@conduit/shared` subpath exports.** Import from the narrow subpaths (`/agent`, `/trigger`, `/mcp`, `/workflow`, `/runtime`, `/temporal`, `/workspace`, `/skill`, `/platform`) rather than the root barrel — the web bundle tree-shakes `node:crypto` out only when consumers import narrowly.
-- **Single root `.env`.** API/worker read `../../.env`; web uses `VITE_*`; `packages/database/.env` is a copy for the Prisma CLI (root npm scripts forward via `dotenv-cli`).
+- **Single root `.env`.** API/worker read `../../.env`; web uses `VITE_*`. `.env.local` is a gitignored cache materialized by `scripts/preflight.ts` whenever ports collide; treat it like `node_modules/.cache/` (regenerate, never edit). Set `CONDUIT_PREFLIGHT=skip` to bypass when you know what you're doing.
 - **Provider selection.** `CONDUIT_PROVIDER=claude|codex|stub`. Tests use `stub` — it replays scripted events but exercises real tool execution, real workspaces, real `.conduit/` writes. No real LLM calls anywhere in the suite.
 
 ## Coding conventions

@@ -2,7 +2,10 @@ import 'reflect-metadata';
 import path from 'node:path';
 import dotenv from 'dotenv';
 
-// Load the monorepo root .env before any app code reads process.env.
+// Load the monorepo root env before any app code reads process.env. `.env.local`
+// is loaded first so its values win — dotenv keeps the first value it sees.
+// `.env.local` is materialized by scripts/preflight.ts when a port collides.
+dotenv.config({ path: path.resolve(__dirname, '../../../.env.local') });
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
 import { Logger } from '@nestjs/common';

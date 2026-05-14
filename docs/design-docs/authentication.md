@@ -95,7 +95,7 @@ Any member of an org (any role) can read and write any tenant-scoped row in that
 ## Cross-cutting status
 
 - **Email transport is OFF.** `requireEmailVerification: false`, `sendOnSignUp: false`, `sendInvitationEmail` not implemented. Until transport ships (Resend / Postmark / SMTP), invitations surface a copyable URL via [org-switching.md](./org-switching.md), password-reset request is a no-op end-to-end, and email-verification is not required. Single follow-up issue gates flipping all four to `true`.
-- **Cookie domain for hosted-prod** is unresolved. `local` and CI work on `localhost:5173 ↔ localhost:3001` with default `sameSite=lax`. Single-domain reverse-proxy vs. cross-subdomain `sameSite=lax` is decided when the hosted deployment is provisioned, not in this umbrella.
+- **Cookie domain for hosted-prod** is unresolved. `local` and CI work on `localhost:5173 ↔ localhost:3000` with default `sameSite=lax`. Single-domain reverse-proxy vs. cross-subdomain `sameSite=lax` is decided when the hosted deployment is provisioned, not in this umbrella.
 - **No per-org Temporal task queue** in v1. All orgs share the existing single queue; `agentWorkflowId` already disambiguates by `runId` / ticket key.
 - **Push credentials in `ticket-branch` workspaces** stay per-run-scoped — no org-level change to the existing model. The org boundary is enforced before run dispatch.
 

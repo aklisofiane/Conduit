@@ -31,7 +31,7 @@ Prerequisites: Node.js 22 (`nvm use`), npm 10+, Docker.
 nvm use
 npm install
 cp .env.example .env
-npm run infra:up                # Postgres (5434), Temporal (7233 / UI 8080), Redis (6379)
+npm run infra:up                # Postgres (5432), Temporal (7233 / UI 8080), Redis (6379) — preflight auto-allocates free ports if any default is taken
 npm run db:push                 # apply Prisma schema
 npm run build                   # builds TS dist + the agent-runner Docker image
 ```
@@ -59,7 +59,7 @@ Workspaces: `packages/*` (libraries) and `apps/*` (services). A single root `.en
 After `infra:up` and `db:push`, boot the three apps in separate terminals:
 
 ```bash
-npm --workspace @conduit/api dev        # Nest API + Socket.IO on :3001
+npm --workspace @conduit/api dev        # Nest API + Socket.IO on :3000
 npm --workspace @conduit/worker dev     # Temporal worker (task queue: conduit-workflows)
 npm --workspace @conduit/web dev        # Vite dev server on :5173
 ```

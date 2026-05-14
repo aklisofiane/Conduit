@@ -22,7 +22,6 @@ build/
 
 # Prisma (generated)
 packages/database/src/generated/
-packages/database/.env
 
 # Tests
 coverage/

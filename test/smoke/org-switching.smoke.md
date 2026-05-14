@@ -7,7 +7,7 @@ MCP against the dev stack (`npm run infra:up` + `npm run dev`).
 
 ## Setup
 
-- API at `http://localhost:3001`, web at `http://localhost:5173`.
+- API at `http://localhost:3000`, web at `http://localhost:5173`.
 - Two fresh emails per run (e.g. `userA-${date}@conduit.test`,
   `userB-${date}@conduit.test`).
 - Password: `smoke-password-123`.

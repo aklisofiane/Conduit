@@ -62,7 +62,7 @@ handleConnection(client)
 
 ### Web client
 
-`apps/web/src/hooks/use-run-updates.ts` passes `withCredentials: true` to `io()`. This is the WebSocket equivalent of `credentials: 'include'` on `fetch` — required for the dev `:5173` → `:3001` cross-origin cookie to reach the gateway. Production same-origin works without the flag, but it's harmless and we leave it on.
+`apps/web/src/hooks/use-run-updates.ts` passes `withCredentials: true` to `io()`. This is the WebSocket equivalent of `credentials: 'include'` on `fetch` — required for the dev `:5173` → `:3000` cross-origin cookie to reach the gateway. Production same-origin works without the flag, but it's harmless and we leave it on.
 
 The cors config on the gateway (`origin: config.corsOrigin, credentials: true`) is set in `runs.gateway.ts:20` and was already correct from earlier work.
 
