@@ -20,7 +20,7 @@ export function TopChrome() {
             to="/"
             className="flex items-center gap-2 font-sans text-[14px] font-semibold"
           >
-            <Logo size={20} color="var(--color-accent)" strokeWidth={1.8} />
+            <Logo size={20} color="var(--color-accent)" />
             <span>Conduit</span>
           </NavLink>
           <div
@@ -65,7 +65,7 @@ function NavIconLink({
         )
       }
     >
-      <IconComponent size={15} color="currentColor" strokeWidth={1.5} />
+      <IconComponent size={15} strokeWidth={1.5} />
     </NavLink>
   );
 }

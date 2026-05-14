@@ -10,7 +10,7 @@ interface LogoProps {
 export function Logo({
   size = 14,
   color = 'currentColor',
-  strokeWidth = 1.5,
+  strokeWidth = 1.8,
   className,
 }: LogoProps) {
   return (
@@ -51,7 +51,7 @@ export function ProviderGlyph({
         viewBox="0 0 24 24"
         fill="none"
         stroke={color}
-        strokeWidth="2.5"
+        strokeWidth={2.5}
         strokeLinecap="round"
         strokeLinejoin="round"
       >

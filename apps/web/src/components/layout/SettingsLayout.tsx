@@ -31,7 +31,7 @@ export function SettingsLayout() {
                   )
                 }
               >
-                <IconComponent size={14} color="currentColor" strokeWidth={1.5} />
+                <IconComponent size={14} strokeWidth={1.5} />
                 <span>{entry.label}</span>
               </NavLink>
             );

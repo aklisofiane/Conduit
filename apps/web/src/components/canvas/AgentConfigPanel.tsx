@@ -114,7 +114,7 @@ export function AgentConfigPanel({
           aria-label="Close inspector"
           className="ml-2 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-[var(--radius-sm)] text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-pill-bg)] hover:text-[var(--color-text)]"
         >
-          <X size={14} color="currentColor" strokeWidth={1.5} />
+          <X size={14} strokeWidth={1.5} />
         </button>
       </div>
 

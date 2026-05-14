@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Plus } from 'lucide-react';
 import { TemplatePickerDialog } from '../components/templates/TemplatePickerDialog.js';
 import { WorkflowRowItem } from '../components/workflow-list/WorkflowRowItem.js';
 import { useCreateWorkflow, useWorkflows } from '../api/hooks.js';
@@ -68,9 +69,7 @@ export function HomePage() {
               From template
             </button>
             <button className="btn primary" onClick={handleCreate} disabled={createWorkflow.isPending}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <path d="M12 5v14M5 12h14" />
-              </svg>
+              <Plus size={12} strokeWidth={2.5} />
               New workflow
             </button>
           </div>

@@ -12,7 +12,7 @@ export function AuthLayout() {
     <div className="flex min-h-screen flex-col items-center justify-center bg-[var(--color-bg)] px-4 py-10">
       <div className="flex w-full max-w-[400px] flex-col items-center gap-6">
         <div className="flex items-center gap-2 text-[var(--color-text)]">
-          <Logo size={22} color="var(--color-accent)" strokeWidth={1.8} />
+          <Logo size={22} color="var(--color-accent)" />
           <span className="font-sans text-[15px] font-semibold tracking-tight">Conduit</span>
         </div>
         <div className="w-full rounded-[var(--radius-lg)] border border-[var(--color-divider)] bg-[var(--color-bg-panel)] px-7 py-8 shadow-[0_1px_0_rgba(11,16,32,0.02)]">
