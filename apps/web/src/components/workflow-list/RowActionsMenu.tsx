@@ -28,7 +28,11 @@ export function RowActionsMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
-      <DropdownMenuContent align="end" aria-label="Workflow actions">
+      <DropdownMenuContent
+        align="end"
+        aria-label="Workflow actions"
+        onClick={(e) => e.stopPropagation()}
+      >
         <DropdownMenuItem onSelect={onRename}>
           <Pencil size={12} strokeWidth={1.5} />
           Rename
