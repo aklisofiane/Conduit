@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { agentProviderIdSchema } from '@conduit/shared';
 import type { ProviderConfig } from '../../api/types.js';
 import {
   useCreateProviderConfig,
@@ -10,9 +11,7 @@ import { ApiError } from '../../api/client.js';
 import { relativeFromNow } from '../../lib/time.js';
 import { Select } from '../common/Select.js';
 
-const PROVIDERS = ['claude', 'codex'] as const;
-
-const PROVIDER_OPTIONS = PROVIDERS.map((p) => ({ value: p, label: p }));
+const PROVIDER_OPTIONS = agentProviderIdSchema.options.map((p) => ({ value: p, label: p }));
 
 const BASE_URL_PLACEHOLDER: Record<ProviderConfig['providerId'], string> = {
   claude: 'https://api.anthropic.com',
@@ -257,20 +256,20 @@ function ProviderConfigRowView({
         )}
       </div>
       {!rotating && !editingBaseUrl && (
-        <button className="btn" onClick={() => setRotating(true)}>
-          Rotate
-        </button>
-      )}
-      {!rotating && !editingBaseUrl && (
-        <button
-          className="btn"
-          onClick={() => {
-            setNewBaseUrl(cfg.baseUrl ?? '');
-            setEditingBaseUrl(true);
-          }}
-        >
-          Edit base URL
-        </button>
+        <>
+          <button className="btn" onClick={() => setRotating(true)}>
+            Rotate
+          </button>
+          <button
+            className="btn"
+            onClick={() => {
+              setNewBaseUrl(cfg.baseUrl ?? '');
+              setEditingBaseUrl(true);
+            }}
+          >
+            Edit base URL
+          </button>
+        </>
       )}
       <button className="btn" onClick={onDelete} title="Delete">
         Delete

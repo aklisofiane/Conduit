@@ -1,5 +1,6 @@
 import type {
   AgentEvent,
+  AgentProviderId,
   ConnectionScope,
   ConnectionScopeKind,
   DiscoveredTool,
@@ -113,7 +114,7 @@ export interface CredentialRow {
 
 export interface ProviderConfig {
   id: string;
-  providerId: 'claude' | 'codex';
+  providerId: AgentProviderId;
   baseUrl: string | null;
   suffix: string;
   updatedAt: string;

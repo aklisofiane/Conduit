@@ -1,3 +1,4 @@
+import type { AgentProviderId } from '@conduit/shared';
 import { decryptSecret, loadEncryptionKey } from '@conduit/shared/crypto';
 import { prisma } from './prisma';
 
@@ -18,7 +19,7 @@ export interface ResolvedProviderConfig {
  */
 export async function loadProviderConfig(
   orgId: string,
-  providerId: string,
+  providerId: AgentProviderId,
 ): Promise<ResolvedProviderConfig | undefined> {
   const row = await prisma().providerConfig.findUnique({
     where: { orgId_providerId: { orgId, providerId } },

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { NotFoundException } from '@nestjs/common';
 import type { PrismaClient } from '@conduit/database';
 import { ProviderConfigsService } from '../../src/modules/provider-configs/provider-configs.service';
-import { encrypt } from '../../src/modules/provider-configs/crypto';
+import { encrypt } from '../../src/modules/credentials/crypto';
 import { PrismaService } from '../../src/common/prisma.service';
 import { seedTwoOrgs, type TwoOrgFixture } from '../../../../test/fixtures/orgs/two-orgs';
 import { clearTenantData, makePrisma } from './setup';

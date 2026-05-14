@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
-import { decrypt, encrypt, redactedSuffix } from './crypto';
+import { decrypt, encrypt, redactedSuffix } from '../credentials/crypto';
 import type {
   CreateProviderConfigDto,
   UpdateProviderConfigDto,
