@@ -6,7 +6,7 @@ import {
   tokens,
   type ProviderId,
 } from '../../styles/theme.js';
-import { ProviderGlyph } from './Icon.js';
+import { ProviderGlyph } from '../common/BrandGlyph.js';
 
 export interface AgentNodeData extends Record<string, unknown> {
   agent: AgentConfig;

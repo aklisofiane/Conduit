@@ -8,7 +8,7 @@ import type { WorkflowRow } from '../../api/types.js';
 import { cn } from '../../lib/cn.js';
 import { duration, relativeFromNow } from '../../lib/time.js';
 import { statusClass } from '../../lib/status.js';
-import { Icon } from '../canvas/Icon.js';
+import { MoreVertical } from 'lucide-react';
 import { InlineRename } from '../common/InlineRename.js';
 import { RowActionsMenu } from './RowActionsMenu.js';
 
@@ -143,7 +143,7 @@ export function WorkflowRowItem({
               }}
               className="flex h-6 w-6 items-center justify-center rounded text-[var(--color-text-3)] transition-colors hover:bg-[var(--color-bg-2)] hover:text-[var(--color-text)] data-[state=open]:bg-[var(--color-bg-2)] data-[state=open]:text-[var(--color-text)]"
             >
-              <Icon name="more-vertical" size={14} />
+              <MoreVertical size={14} strokeWidth={1.5} />
             </button>
           </RowActionsMenu>
         )}

@@ -15,7 +15,7 @@ import type { AgentPreset } from '../../api/types.js';
 import { cn } from '../../lib/cn.js';
 import { providerStyle } from '../../styles/theme.js';
 import { Select, type SelectItem } from '../common/Select.js';
-import { Icon } from './Icon.js';
+import { X } from 'lucide-react';
 import { McpServerPicker } from './McpServerPicker.js';
 
 const CUSTOM_PRESET_ID = '__custom__';
@@ -114,7 +114,7 @@ export function AgentConfigPanel({
           aria-label="Close inspector"
           className="ml-2 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-[var(--radius-sm)] text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-pill-bg)] hover:text-[var(--color-text)]"
         >
-          <Icon name="close" size={14} color="currentColor" />
+          <X size={14} color="currentColor" strokeWidth={1.5} />
         </button>
       </div>
 

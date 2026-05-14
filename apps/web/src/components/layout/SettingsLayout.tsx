@@ -1,6 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { cn } from '../../lib/cn.js';
-import { Icon } from '../canvas/Icon.js';
 import { SETTINGS_NAV } from '../settings/settings-nav.js';
 
 /**
@@ -17,23 +16,26 @@ export function SettingsLayout() {
           </h2>
         </div>
         <nav className="flex flex-col gap-0.5 px-2">
-          {SETTINGS_NAV.map((entry) => (
-            <NavLink
-              key={entry.key}
-              to={entry.path}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-2 rounded-[var(--radius)] px-3 py-1.5 font-mono text-[12px] transition-colors',
-                  isActive
-                    ? 'bg-[var(--color-pill-bg)] text-[var(--color-text)]'
-                    : 'text-[var(--color-text-2)] hover:bg-[var(--color-pill-bg)] hover:text-[var(--color-text)]',
-                )
-              }
-            >
-              <Icon name={entry.icon} size={14} color="currentColor" />
-              <span>{entry.label}</span>
-            </NavLink>
-          ))}
+          {SETTINGS_NAV.map((entry) => {
+            const IconComponent = entry.icon;
+            return (
+              <NavLink
+                key={entry.key}
+                to={entry.path}
+                className={({ isActive }) =>
+                  cn(
+                    'flex items-center gap-2 rounded-[var(--radius)] px-3 py-1.5 font-mono text-[12px] transition-colors',
+                    isActive
+                      ? 'bg-[var(--color-pill-bg)] text-[var(--color-text)]'
+                      : 'text-[var(--color-text-2)] hover:bg-[var(--color-pill-bg)] hover:text-[var(--color-text)]',
+                  )
+                }
+              >
+                <IconComponent size={14} color="currentColor" strokeWidth={1.5} />
+                <span>{entry.label}</span>
+              </NavLink>
+            );
+          })}
         </nav>
       </aside>
       <div className="min-w-0 flex-1">

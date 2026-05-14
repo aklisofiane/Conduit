@@ -1,7 +1,7 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import type { TriggerConfig } from '@conduit/shared';
 import { nodeSize, tokens } from '../../styles/theme.js';
-import { Icon } from './Icon.js';
+import { Clock } from 'lucide-react';
 
 export interface TriggerNodeData extends Record<string, unknown> {
   trigger: TriggerConfig;
@@ -31,7 +31,7 @@ export function TriggerNode({ data, selected }: NodeProps) {
           className="grid h-[18px] w-[18px] shrink-0 place-items-center rounded-[5px]"
           style={{ background: tokens.color.trigger }}
         >
-          <Icon name="clock" size={11} color="#FFFFFF" />
+          <Clock size={11} color="#FFFFFF" strokeWidth={1.5} />
         </span>
         <span
           className="font-sans text-[10px] font-semibold uppercase tracking-[0.06em]"

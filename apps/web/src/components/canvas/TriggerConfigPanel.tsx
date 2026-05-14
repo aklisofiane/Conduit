@@ -11,8 +11,8 @@ import { ApiError } from '../../api/client.js';
 import { cn } from '../../lib/cn.js';
 import { scopeSummary } from '../../lib/connection.js';
 import type { CredentialRow } from '../../api/types.js';
+import { X } from 'lucide-react';
 import { Select } from '../common/Select.js';
-import { Icon } from './Icon.js';
 
 interface TriggerConfigPanelProps {
   trigger: TriggerConfig;
@@ -139,7 +139,7 @@ export function TriggerConfigPanel({
           aria-label="Close inspector"
           className="ml-2 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-[var(--radius-sm)] text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-pill-bg)] hover:text-[var(--color-text)]"
         >
-          <Icon name="close" size={14} color="currentColor" />
+          <X size={14} color="currentColor" strokeWidth={1.5} />
         </button>
       </div>
 

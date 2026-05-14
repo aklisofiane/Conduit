@@ -2,6 +2,8 @@
 
 React 19 + Vite 8 + `@xyflow/react` + TanStack Query + Zustand + Tailwind v4. Headless primitives come from Radix UI (`@radix-ui/react-dialog`, `react-dropdown-menu`, `react-select`) — wrapped thinly in `apps/web/src/components/common/` (`Dialog`, `DropdownMenu`, `Select`) and styled with custom CSS in `apps/web/src/styles/globals.css`. No shadcn/ui — we use Radix directly so we don't carry a generated component layer.
 
+Icons come from `lucide-react`. Call sites import the specific component they need (`import { Pencil } from 'lucide-react'`); tree-shaking handles the bundle, TypeScript handles the typo gate. Brand identity marks — the Conduit `Logo` and the per-provider `ProviderGlyph` (Claude sparkle / Codex chevrons) — stay custom and live in `apps/web/src/components/common/BrandGlyph.tsx`. No `<Icon name="…">` string-union wrapper.
+
 ## Screens
 
 | Screen | Purpose |

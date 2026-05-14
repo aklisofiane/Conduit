@@ -1,10 +1,11 @@
-import type { IconName } from '../canvas/Icon.js';
+import type { LucideIcon } from 'lucide-react';
+import { Key, LayoutGrid } from 'lucide-react';
 
 interface SettingsNavEntry {
   key: string;
   label: string;
   path: string;
-  icon: IconName;
+  icon: LucideIcon;
 }
 
 export const SETTINGS_NAV: ReadonlyArray<SettingsNavEntry> = [
@@ -12,12 +13,12 @@ export const SETTINGS_NAV: ReadonlyArray<SettingsNavEntry> = [
     key: 'integrations',
     label: 'Integrations',
     path: '/settings/integrations',
-    icon: 'grid',
+    icon: LayoutGrid,
   },
   {
     key: 'api-keys',
     label: 'API keys',
     path: '/settings/api-keys',
-    icon: 'key',
+    icon: Key,
   },
 ];

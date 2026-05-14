@@ -20,7 +20,7 @@ import type { WorkflowRow } from '../../api/types.js';
 import { cn } from '../../lib/cn.js';
 import { relativeFromNow } from '../../lib/time.js';
 import { InlineRename } from '../common/InlineRename.js';
-import { Icon } from './Icon.js';
+import { ChevronDown, Plus } from 'lucide-react';
 
 const NAME_MAX_LENGTH = 120;
 
@@ -101,7 +101,7 @@ export function WorkflowHeaderPill({ workflowId }: WorkflowHeaderPillProps) {
                 popoverOpen && 'text-[var(--color-text)]',
               )}
             >
-              <Icon name="chevron-down" size={12} />
+              <ChevronDown size={12} strokeWidth={1.5} />
             </button>
           </>
         )}
@@ -272,7 +272,7 @@ function SwitcherPopover({ anchorEl, currentId, onClose }: SwitcherPopoverProps)
           disabled={create.isPending}
           className="flex w-full items-center gap-2 px-3 py-2 font-mono text-[11px] text-[var(--color-text-2)] transition-colors hover:bg-[var(--color-pill-bg)] hover:text-[var(--color-text)] disabled:cursor-not-allowed disabled:opacity-60"
         >
-          <Icon name="plus" size={12} />
+          <Plus size={12} strokeWidth={1.5} />
           {create.isPending ? 'Creating…' : 'New workflow'}
         </button>
       </div>

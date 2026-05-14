@@ -6,7 +6,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../common/DropdownMenu.js';
-import { Icon } from '../canvas/Icon.js';
+import { Copy, Pencil, Trash2 } from 'lucide-react';
 
 interface RowActionsMenuProps {
   onRename: () => void;
@@ -30,16 +30,16 @@ export function RowActionsMenu({
       <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
       <DropdownMenuContent align="end" aria-label="Workflow actions">
         <DropdownMenuItem onSelect={onRename}>
-          <Icon name="pencil" size={12} />
+          <Pencil size={12} strokeWidth={1.5} />
           Rename
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={onDuplicate} disabled={duplicating}>
-          <Icon name="copy" size={12} />
+          <Copy size={12} strokeWidth={1.5} />
           {duplicating ? 'Duplicating…' : 'Duplicate'}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={onDelete} disabled={deleting} tone="danger">
-          <Icon name="trash" size={12} />
+          <Trash2 size={12} strokeWidth={1.5} />
           {deleting ? 'Deleting…' : 'Delete'}
         </DropdownMenuItem>
       </DropdownMenuContent>

@@ -196,8 +196,11 @@ src/
     common/                            shared UI primitives — `Dialog`, `DropdownMenu`,
                                        `Select` (thin Radix wrappers, styled via
                                        `.dialog-*` / `.dropdown-*` / `.select-*` classes
-                                       in `globals.css`), plus `InlineRename`. The legacy
-                                       `ui/` folder is empty
+                                       in `globals.css`), `InlineRename`, and
+                                       `BrandGlyph.tsx` (the Conduit `Logo` + the
+                                       per-provider `ProviderGlyph` — Conduit identity
+                                       marks, distinct from the generic icons sourced
+                                       from `lucide-react`). The legacy `ui/` folder is empty
   api/
     client.ts, hooks.ts, types.ts      HTTP client (cookie-based, `credentials: 'include'`),
                                        TanStack Query hooks, response types

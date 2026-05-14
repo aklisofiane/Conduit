@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom';
+import { Home, Settings, type LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/cn.js';
-import { Icon } from '../canvas/Icon.js';
+import { Logo } from '../common/BrandGlyph.js';
 import { useTopbarSlotsStore } from '../../state/topbar-slots.js';
 import { UserMenuPill } from './UserMenuPill.js';
 
@@ -19,15 +20,15 @@ export function TopChrome() {
             to="/"
             className="flex items-center gap-2 font-sans text-[14px] font-semibold"
           >
-            <Icon name="logo" size={20} color="var(--color-accent)" strokeWidth={1.8} />
+            <Logo size={20} color="var(--color-accent)" strokeWidth={1.8} />
             <span>Conduit</span>
           </NavLink>
           <div
             aria-hidden
             className="mx-3 h-[18px] w-px bg-[var(--color-divider)]"
           />
-          <NavIconLink to="/" end label="Home — all workflows" icon="home" />
-          <NavIconLink to="/settings" label="Settings" icon="settings" />
+          <NavIconLink to="/" end label="Home — all workflows" icon={Home} />
+          <NavIconLink to="/settings" label="Settings" icon={Settings} />
         </div>
 
         <div className="flex items-center justify-center">{centerSlot}</div>
@@ -42,12 +43,12 @@ function NavIconLink({
   to,
   end,
   label,
-  icon,
+  icon: IconComponent,
 }: {
   to: string;
   end?: boolean;
   label: string;
-  icon: 'home' | 'settings';
+  icon: LucideIcon;
 }) {
   return (
     <NavLink
@@ -64,7 +65,7 @@ function NavIconLink({
         )
       }
     >
-      <Icon name={icon} size={15} color="currentColor" />
+      <IconComponent size={15} color="currentColor" strokeWidth={1.5} />
     </NavLink>
   );
 }

@@ -1,7 +1,8 @@
 import type { DragEvent as ReactDragEvent } from 'react';
 import type { AgentConfig } from '@conduit/shared';
 import { tokens, providerStyle, type ProviderId } from '../../styles/theme.js';
-import { Icon, ProviderGlyph } from './Icon.js';
+import { Clock } from 'lucide-react';
+import { ProviderGlyph } from '../common/BrandGlyph.js';
 
 export const PALETTE_DRAG_MIME = 'application/conduit-node';
 
@@ -83,7 +84,7 @@ function TriggerPaletteCard({ onClick }: { onClick: () => void }) {
         className="mt-[1px] grid h-[18px] w-[18px] shrink-0 place-items-center rounded-[5px]"
         style={{ background: tokens.color.trigger }}
       >
-        <Icon name="clock" size={11} color="#FFFFFF" />
+        <Clock size={11} color="#FFFFFF" strokeWidth={1.5} />
       </span>
       <span className="min-w-0">
         <span className="block font-sans text-[12px] font-medium text-[var(--color-text)]">

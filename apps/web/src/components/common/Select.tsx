@@ -1,6 +1,6 @@
 import * as RxSelect from '@radix-ui/react-select';
 import type { ReactNode } from 'react';
-import { Icon } from '../canvas/Icon.js';
+import { Check, ChevronDown } from 'lucide-react';
 import { cn } from '../../lib/cn.js';
 
 export type SelectOption = {
@@ -51,7 +51,7 @@ export function Select({
       >
         <RxSelect.Value placeholder={placeholder} />
         <RxSelect.Icon className="select-trigger-chevron">
-          <Icon name="chevron-down" size={12} />
+          <ChevronDown size={12} strokeWidth={1.5} />
         </RxSelect.Icon>
       </RxSelect.Trigger>
       <RxSelect.Portal>
@@ -91,7 +91,7 @@ function SelectItemRow({ option }: { option: SelectOption }) {
     >
       <RxSelect.ItemText>{option.label}</RxSelect.ItemText>
       <RxSelect.ItemIndicator className="select-item-indicator">
-        <Icon name="check" size={12} color="var(--color-accent)" />
+        <Check size={12} color="var(--color-accent)" strokeWidth={1.5} />
       </RxSelect.ItemIndicator>
     </RxSelect.Item>
   );

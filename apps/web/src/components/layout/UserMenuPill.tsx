@@ -17,7 +17,7 @@ import {
 } from '../../api/organization.js';
 import { useSession, signOut } from '../../lib/auth-client.js';
 import { cn } from '../../lib/cn.js';
-import { Icon } from '../canvas/Icon.js';
+import { ChevronDown, Plus } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -114,7 +114,7 @@ export function UserMenuPill() {
             <span className="max-w-[180px] truncate" title={label}>
               {label}
             </span>
-            <Icon name="chevron-down" size={12} />
+            <ChevronDown size={12} strokeWidth={1.5} />
           </button>
         </DropdownMenuTrigger>
       </div>
@@ -331,7 +331,7 @@ function OrganizationSection({
           onClick={() => setCreating(true)}
           className="mt-1 flex w-full items-center gap-1 px-1 py-1 text-left font-mono text-[11px] text-[var(--color-text-2)] transition-colors hover:text-[var(--color-text)]"
         >
-          <Icon name="plus" size={11} /> Create organization
+          <Plus size={11} strokeWidth={1.5} /> Create organization
         </button>
       )}
 
