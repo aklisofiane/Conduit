@@ -11,10 +11,14 @@ docs/            spec — INDEX.md for read order
 templates/       bundled workflow templates (JSON) — see docs/design-docs/templates.md
 agent-presets/   reusable agent prompts referenced by templates and the canvas — see
                  docs/design-docs/agent-presets.md
+scripts/         dev tooling — `preflight.ts` probes user-facing ports before
+                 `infra:up`/`dev`/`test:infra:up`, allocates free ports on collision,
+                 and writes `.env.local` for docker / API / worker / web / Prisma to
+                 layer over `.env`. `CONDUIT_PREFLIGHT=skip` bypasses it
 test/            cross-app test infra (e2e harness, fixtures, helpers)
 ```
 
-Root configs: `turbo.json`, `tsconfig.base.json`, `vitest.workspace.ts`, `vitest.shared.ts`, `eslint.config.mjs`, `docker-compose.yml`, `docker-compose.test.yml`, `.env`.
+Root configs: `turbo.json`, `tsconfig.base.json`, `vitest.workspace.ts`, `vitest.shared.ts`, `eslint.config.mjs`, `docker-compose.yml`, `docker-compose.test.yml`, `compose.override.yml` (preflight's `env_file: [.env, .env.local]` layering for raw `docker compose` users), `.env`.
 
 ## apps/api (NestJS — HTTP + WS)
 
