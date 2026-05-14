@@ -14,4 +14,10 @@ export const SETTINGS_NAV: ReadonlyArray<SettingsNavEntry> = [
     path: '/settings/integrations',
     icon: 'grid',
   },
+  {
+    key: 'api-keys',
+    label: 'API keys',
+    path: '/settings/api-keys',
+    icon: 'key',
+  },
 ];

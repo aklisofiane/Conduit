@@ -12,16 +12,16 @@ import type { AgentProvider } from './types';
  */
 export function resolveProvider(
   id: AgentProviderId,
-  opts: { anthropicApiKey?: string; openaiApiKey?: string } = {},
+  opts: { anthropicApiKey?: string; openaiApiKey?: string; baseUrl?: string } = {},
 ): AgentProvider {
   if (process.env.CONDUIT_PROVIDER === 'stub') {
     return new StubProvider(id);
   }
   switch (id) {
     case 'claude':
-      return new ClaudeProvider({ apiKey: opts.anthropicApiKey });
+      return new ClaudeProvider({ apiKey: opts.anthropicApiKey, baseUrl: opts.baseUrl });
     case 'codex':
-      return new CodexProvider({ apiKey: opts.openaiApiKey });
+      return new CodexProvider({ apiKey: opts.openaiApiKey, baseUrl: opts.baseUrl });
     default: {
       const _exhaustive: never = id;
       throw new Error(`Unknown provider: ${String(_exhaustive)}`);

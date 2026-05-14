@@ -11,6 +11,7 @@ import type {
   CredentialRow,
   DiscoveredSkill,
   ExecutionLogRow,
+  ProviderConfig,
   RunDetail,
   TemplateBinding,
   TemplateSummary,
@@ -162,6 +163,46 @@ export function useDeleteCredential() {
   return useMutation({
     mutationFn: (id: string) => api.delete<void>(`/credentials/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['credentials'] }),
+  });
+}
+
+const PROVIDER_CONFIGS = ['provider-configs'] as const;
+
+export function useProviderConfigs() {
+  return useQuery({
+    queryKey: PROVIDER_CONFIGS,
+    queryFn: () => api.get<ProviderConfig[]>('/provider-configs'),
+  });
+}
+
+export function useCreateProviderConfig() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: {
+      providerId: ProviderConfig['providerId'];
+      apiKey: string;
+      baseUrl?: string;
+    }) => api.post<ProviderConfig>('/provider-configs', body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: PROVIDER_CONFIGS }),
+  });
+}
+
+export function useUpdateProviderConfig() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: {
+      id: string;
+      body: { apiKey?: string; baseUrl?: string | null };
+    }) => api.put<ProviderConfig>(`/provider-configs/${args.id}`, args.body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: PROVIDER_CONFIGS }),
+  });
+}
+
+export function useDeleteProviderConfig() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete<void>(`/provider-configs/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: PROVIDER_CONFIGS }),
   });
 }
 

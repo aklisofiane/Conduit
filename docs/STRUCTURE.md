@@ -55,6 +55,11 @@ src/
     connections/                       global Connection CRUD over the typed scope union
                                        (github_repo / github_projects_v2 / none); refuses delete
                                        when any workflow's definition JSON references the row
+    provider-configs/                  per-org LLM provider API keys (claude / codex) consumed
+                                       directly by the agent runtime — distinct from Credential.
+                                       AES-256-GCM at rest (same crypto pipeline). Redacted
+                                       responses only; never returns plaintext. See
+                                       docs/data-model.md > ProviderConfig.
     trigger/                           POST /trigger/list-projects + /trigger/list-labels — top-level
                                        config-time helpers; resolve a Connection, decrypt token,
                                        call the GitHub Projects v2 / labels client
@@ -106,7 +111,10 @@ src/
                                        `ConnectionContext` the workspace manager needs — respects
                                        `CONDUIT_TEST_REMOTE_BASE` for E2E local bare repos — and
                                        `ticket-branch-store.ts`, the Prisma-backed `TicketBranchStore`
-                                       adapter that owns slug derivation on first upsert)
+                                       adapter that owns slug derivation on first upsert, and
+                                       `provider-config.ts` (`loadProviderConfig(orgId, providerId)`
+                                       — DB-row-wins lookup feeding `runAgentNode`'s runner request;
+                                       falls back to `config.{anthropic,openai}ApiKey` when absent)
   runtime/runner/                      runner-spawn primitive used by `runAgentNode` —
                                        `local-docker.ts` (LocalDockerSpawner: builds the
                                        `docker run` argv, pumps stdout via `json-line-iterator`,
@@ -151,9 +159,10 @@ src/
   main.tsx, routes/router.tsx
   pages/                               HomePage, CanvasPage, RunDetailPage, IntegrationsPage
                                        (Credentials + Connections combined under /settings —
-                                       see docs/FRONTEND.md > Screens), AccountSettingsPage,
-                                       SignInPage, SignUpPage, ForgotPasswordPage,
-                                       ResetPasswordPage (auth pages — see
+                                       see docs/FRONTEND.md > Screens), ApiKeysPage
+                                       (per-org LLM provider keys at /settings/api-keys),
+                                       AccountSettingsPage, SignInPage, SignUpPage,
+                                       ForgotPasswordPage, ResetPasswordPage (auth pages — see
                                        docs/design-docs/web-auth-ui.md)
   components/
     canvas/                            TriggerNode, AgentNode, NodePalette, AgentConfigPanel,
@@ -168,8 +177,11 @@ src/
                                        connection binding → POST /workflows/from-template/:id)
     settings/                          CredentialsSection + ConnectionsSection (extracted
                                        bodies of the old pages — composed by IntegrationsPage),
-                                       settings-nav.ts (sidebar config; add an entry here +
-                                       a child route in router.tsx to slot in API keys etc.)
+                                       ApiKeysSection (composed by ApiKeysPage — provider picker,
+                                       masked suffix + base URL per row, rotate / edit-base-URL /
+                                       delete inline actions), settings-nav.ts (sidebar config;
+                                       add an entry here + a child route in router.tsx to slot in
+                                       new sections)
     layout/                            TopChrome (global topbar shell, reads slot store; default
                                        actionsSlot is UserMenuPill), AppLayout, AuthLayout
                                        (unauthenticated centered-card shell), SettingsLayout

@@ -36,6 +36,20 @@ export const runnerRequestSchema = z.object({
      * `anthropicApiKey` (the SDK prefers whichever is set).
      */
     claudeCodeOauthToken: z.string().optional(),
+    /**
+     * Optional base URL override forwarded to the SDK. Lets self-hosted
+     * users point at LiteLLM / OpenAI-compatible proxies without redeploying
+     * the worker. Claude reads it from `ANTHROPIC_BASE_URL`; Codex takes it
+     * as a constructor option.
+     */
+    baseUrl: z.string().url().optional(),
+    /**
+     * Extra env vars exported into `process.env` before `resolveProvider`.
+     * Reserved for future Bedrock-style auth (`CLAUDE_CODE_USE_BEDROCK=1` +
+     * AWS access key + region). Same lifetime/trust boundary as the OAuth
+     * token write — container exits at end of run.
+     */
+    extraEnv: z.record(z.string()).optional(),
   }),
   /** Already-resolved `AgentRequest` — MCP transports have credentials substituted. */
   agent: agentRequestSchema,

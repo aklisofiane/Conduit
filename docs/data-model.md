@@ -9,7 +9,7 @@ Prisma schema spec for Conduit.
 - **Webhook secret lives on `Workflow`**, not on a connection. There's exactly one webhook URL per workflow (`POST /api/hooks/:workflowId`); the row that authenticates the inbound request is the workflow itself.
 - **`ExecutionLog`** for audit + live streaming replay.
 - **`TicketBranch`** is a naming cache for persistent `ticket-branch` workspaces — the branch state itself lives on the remote; this table just stores the stable slug so iteration N+1 finds the same branch as iteration N.
-- **Every business-data row carries `orgId`.** `Workflow`, `Connection`, `Credential`, `WorkflowRun`, `NodeRun`, `ExecutionLog`, `PollSnapshot`, and `TicketBranch` all have a non-nullable `orgId String` FK to `Organization.id`. Reads filter by it; writes stamp it. The column is denormalized onto every leaf row (NodeRun → WorkflowRun → Workflow could be joined, but the explicit `orgId` lets a missed filter fail closed instead of leaking sibling-org rows). See [tenant partitioning](#tenant-partitioning--orgid) below.
+- **Every business-data row carries `orgId`.** `Workflow`, `Connection`, `Credential`, `ProviderConfig`, `WorkflowRun`, `NodeRun`, `ExecutionLog`, `PollSnapshot`, and `TicketBranch` all have a non-nullable `orgId String` FK to `Organization.id`. Reads filter by it; writes stamp it. The column is denormalized onto every leaf row (NodeRun → WorkflowRun → Workflow could be joined, but the explicit `orgId` lets a missed filter fail closed instead of leaking sibling-org rows). See [tenant partitioning](#tenant-partitioning--orgid) below.
 - **`db:push` during dev**, migrations once schema stabilizes. Schema additions like `orgId` ship empty-DB-only — `npm run db:reset` is the path forward for anyone with existing dev data.
 
 ## Models
@@ -83,6 +83,29 @@ model Connection {
 
   @@index([credentialId])
   @@index([orgId, createdAt])
+}
+
+// Per-org LLM provider config consumed directly by the agent runtime — distinct
+// from Credential/Connection (never bound, never referenced from a workflow
+// definition). At most one row per (orgId, providerId). When present, the row
+// wins over the worker's process.env defaults; falls back to env when absent.
+// `extraEnv` is reserved (worker reads it into the runner's process.env; not
+// API-settable in v1).
+model ProviderConfig {
+  id              String   @id @default(cuid())
+  orgId           String
+  providerId      String   // 'claude' | 'codex' (subset of agentProviderIdSchema)
+  // Encrypted at rest (AES-256-GCM, same format as Credential.secret).
+  encryptedApiKey String
+  baseUrl         String?
+  extraEnv        Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, providerId])
+  @@index([orgId])
 }
 
 // Covers all platforms Conduit integrates with — both trigger sources (GitHub, GitLab, Jira)
@@ -430,7 +453,7 @@ The run history page uses `NodeRun` for per-node status; the run detail page use
 
 ## Tenant partitioning — `orgId`
 
-Every business-data row carries `orgId String` (FK to `Organization.id`, non-nullable, cascade-delete from the org). The eight tenant-scoped models are: `Workflow`, `Connection`, `Credential`, `WorkflowRun`, `NodeRun`, `ExecutionLog`, `PollSnapshot`, `TicketBranch`.
+Every business-data row carries `orgId String` (FK to `Organization.id`, non-nullable, cascade-delete from the org). The nine tenant-scoped models are: `Workflow`, `Connection`, `Credential`, `ProviderConfig`, `WorkflowRun`, `NodeRun`, `ExecutionLog`, `PollSnapshot`, `TicketBranch`.
 
 **Same-org invariant.** The writer is responsible for keeping derived rows in the same org as their parent:
 

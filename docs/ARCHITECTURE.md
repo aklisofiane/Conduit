@@ -165,6 +165,17 @@ All routes prefixed `/api`. Non-webhook routes require a Better Auth session coo
 | `PATCH` | `/connections/:id` | Update connection `{ credentialId?, name?, scope? }` |
 | `DELETE` | `/connections/:id` | Delete a connection. 409 if any workflow's `definition` JSON references it (trigger or MCP slot) — body lists the blocking workflows. |
 
+### Provider API keys
+
+Per-org Anthropic / OpenAI keys consumed directly by the agent runtime — separate from `Credential` / `Connection` (never bound, never referenced from a workflow definition). When a row exists for the run's `(orgId, providerId)` the worker uses it; otherwise it falls back to the env defaults on the worker process. See [data-model.md > ProviderConfig](./data-model.md#models).
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/provider-configs` | List rows for the active org. Redacted shape: `{ id, providerId, baseUrl, suffix, updatedAt }` — plaintext key never returned. |
+| `POST` | `/provider-configs` | `{ providerId, apiKey, baseUrl? }`. Upsert on `(orgId, providerId)` — replaces key + base URL atomically. |
+| `PUT` | `/provider-configs/:id` | `{ apiKey?, baseUrl? }`. Partial update; `baseUrl: null` clears, omitting leaves unchanged. |
+| `DELETE` | `/provider-configs/:id` | Clear the row. Worker falls back to env on the next run. |
+
 ### Workflow webhook secret
 
 | Method | Path | Description |

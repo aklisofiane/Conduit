@@ -7,6 +7,7 @@ import { ConnectionsModule } from './modules/connections/connections.module';
 import { CredentialsModule } from './modules/credentials/credentials.module';
 import { HealthModule } from './modules/health/health.module';
 import { McpModule } from './modules/mcp/mcp.module';
+import { ProviderConfigsModule } from './modules/provider-configs/provider-configs.module';
 import { RunsModule } from './modules/runs/runs.module';
 import { SkillsModule } from './modules/skills/skills.module';
 import { TemplatesModule } from './modules/templates/templates.module';
@@ -26,6 +27,7 @@ import { WorkflowsModule } from './modules/workflows/workflows.module';
     RunsModule,
     CredentialsModule,
     ConnectionsModule,
+    ProviderConfigsModule,
     SkillsModule,
     McpModule,
     TemplatesModule,

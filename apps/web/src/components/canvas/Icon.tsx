@@ -20,7 +20,8 @@ export type IconName =
   | 'more-vertical'
   | 'trash'
   | 'pencil'
-  | 'copy';
+  | 'copy'
+  | 'key';
 
 interface IconProps {
   name: IconName;
@@ -191,6 +192,15 @@ export function Icon({
         <svg {...common}>
           <rect x="9" y="9" width="11" height="11" rx="2" />
           <path d="M5 15V6a2 2 0 0 1 2-2h9" />
+        </svg>
+      );
+    case 'key':
+      return (
+        <svg {...common}>
+          <circle cx="7.5" cy="15.5" r="3.5" />
+          <path d="M10 13l9-9" />
+          <path d="M16 7l3 3" />
+          <path d="M19 4l2 2" />
         </svg>
       );
     default:

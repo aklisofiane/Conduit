@@ -6,6 +6,7 @@ import { RequireAuth } from '../components/layout/RequireAuth.js';
 import { SettingsLayout } from '../components/layout/SettingsLayout.js';
 import { AcceptInvitationPage } from '../pages/AcceptInvitationPage.js';
 import { AccountSettingsPage } from '../pages/AccountSettingsPage.js';
+import { ApiKeysPage } from '../pages/ApiKeysPage.js';
 import { CanvasPage } from '../pages/CanvasPage.js';
 import { ForgotPasswordPage } from '../pages/ForgotPasswordPage.js';
 import { HomePage } from '../pages/HomePage.js';
@@ -51,6 +52,7 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <Navigate to="/settings/integrations" replace /> },
           { path: 'integrations', element: <IntegrationsPage /> },
+          { path: 'api-keys', element: <ApiKeysPage /> },
         ],
       },
       { path: 'account', element: <AccountSettingsPage /> },

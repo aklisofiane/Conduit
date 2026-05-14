@@ -48,9 +48,15 @@ async function main(): Promise<void> {
     if (provider.claudeCodeOauthToken) {
       process.env.CLAUDE_CODE_OAUTH_TOKEN = provider.claudeCodeOauthToken;
     }
+    if (provider.extraEnv) {
+      for (const [key, value] of Object.entries(provider.extraEnv)) {
+        process.env[key] = value;
+      }
+    }
     const adapter = resolveProvider(provider.id, {
       anthropicApiKey: provider.anthropicApiKey,
       openaiApiKey: provider.openaiApiKey,
+      baseUrl: provider.baseUrl,
     });
     const agentRequest: AgentRequest = agent;
     const session = adapter.startSession(agentRequest, abort.signal);

@@ -39,6 +39,7 @@ import { makeCredentialLookup } from '../runtime/credential-lookup';
 import { publishRunUpdate } from '../runtime/event-bus';
 import { writeAgentEventLog, writeSystemLog } from '../runtime/log-writer';
 import { prisma } from '../runtime/prisma';
+import { loadProviderConfig } from '../runtime/provider-config';
 import { resolveRunnerSpawner } from '../runtime/runner';
 import { makeTicketBranchStore } from '../runtime/ticket-branch-store';
 
@@ -213,6 +214,11 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
       constraints: node.constraints ?? {},
     };
 
+    const providerConfig = await loadProviderConfig(orgId, node.provider);
+    const envApiKey =
+      node.provider === 'claude' ? config.anthropicApiKey : config.openaiApiKey;
+    const resolvedApiKey = providerConfig?.apiKey ?? envApiKey;
+
     const runnerRequest: RunnerRequest = {
       protocolVersion: 1,
       run: {
@@ -223,9 +229,11 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
       },
       provider: {
         id: node.provider,
-        anthropicApiKey: config.anthropicApiKey,
-        openaiApiKey: config.openaiApiKey,
+        anthropicApiKey: node.provider === 'claude' ? resolvedApiKey : undefined,
+        openaiApiKey: node.provider === 'codex' ? resolvedApiKey : undefined,
         claudeCodeOauthToken: config.claudeCodeOauthToken,
+        baseUrl: providerConfig?.baseUrl,
+        extraEnv: providerConfig?.extraEnv,
       },
       agent: agentRequest,
       prompts: {

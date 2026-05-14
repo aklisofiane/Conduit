@@ -21,24 +21,24 @@ datasource db {
 // -----------------------------------------------------------------------------
 
 model Workflow {
-  id          String   @id @default(cuid())
+  id            String   @id @default(cuid())
   // Tenant column — every business-data row belongs to exactly one
   // organization. Writers stamp this on create and never let it cross over;
   // readers filter by it. See docs/data-model.md for the same-org invariant.
-  orgId       String
-  name        String
-  description String?
+  orgId         String
+  name          String
+  description   String?
   // { trigger, nodes: Node[], edges: Edge[], mcpServers: WorkflowMcpServer[], ui: CanvasUI }
   // See @conduit/shared `WorkflowDefinition` for the Zod-validated shape.
-  definition  Json
-  isActive    Boolean  @default(true)
+  definition    Json
+  isActive      Boolean  @default(true)
   // Webhook signing secret for verifying inbound deliveries to this
   // workflow's webhook URL (`POST /api/hooks/:workflowId`). Encrypted at
   // rest (AES-256-GCM). Nullable — polling-only workflows don't need one.
   // Single-secret per workflow; rotating overwrites. See docs/SECURITY.md.
   webhookSecret String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   organization Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
   runs         WorkflowRun[]
@@ -106,6 +106,31 @@ enum Platform {
   JIRA
   SLACK
   DISCORD
+}
+
+// -----------------------------------------------------------------------------
+// Provider configs
+// -----------------------------------------------------------------------------
+
+// Per-org API key + optional base URL for an agent provider (`claude` | `codex`).
+// Consumed directly by the agent runtime — never bound to a Connection, never
+// referenced from a workflow definition. At most one row per (orgId, providerId).
+// `encryptedApiKey` uses the same AES-256-GCM envelope as `Credential.secret`
+// (see docs/SECURITY.md). `extraEnv` is reserved for future Bedrock-style auth.
+model ProviderConfig {
+  id              String   @id @default(cuid())
+  orgId           String
+  providerId      String
+  encryptedApiKey String
+  baseUrl         String?
+  extraEnv        Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, providerId])
+  @@index([orgId])
 }
 
 // -----------------------------------------------------------------------------
@@ -203,23 +228,23 @@ enum RunStatus {
 }
 
 model NodeRun {
-  id            String    @id @default(cuid())
+  id             String    @id @default(cuid())
   // Copied from WorkflowRun.orgId at upsert time.
-  orgId         String
-  runId         String
+  orgId          String
+  runId          String
   // Matches definition.nodes[i].name.
-  nodeName      String
-  nodeType      NodeType
-  status        RunStatus @default(PENDING)
-  startedAt     DateTime?
-  finishedAt    DateTime?
+  nodeName       String
+  nodeType       NodeType
+  status         RunStatus @default(PENDING)
+  startedAt      DateTime?
+  finishedAt     DateTime?
   // { files?: string[], workspacePath: string } — real output lives in .conduit/<nodeName>.md.
-  output        Json?
-  error         String?
+  output         Json?
+  error          String?
   // { inputTokens, outputTokens, toolCalls, turns } — agent nodes only.
-  usage         Json?
+  usage          Json?
   // Populated if inherited downstream.
-  workspacePath String?
+  workspacePath  String?
   // Snapshot of `.conduit/<nodeName>.md` captured at the end of the node run.
   // The workspace is deleted after the run — persisting the summary here lets
   // the run detail page show it after cleanup. Freeform markdown, no schema.
@@ -350,25 +375,26 @@ model Verification {
 }
 
 model Organization {
-  id          String       @id
-  name        String
-  slug        String
-  logo        String?
-  createdAt   DateTime
-  metadata    String?
-  members     Member[]
-  invitations Invitation[]
+  id              String           @id
+  name            String
+  slug            String
+  logo            String?
+  createdAt       DateTime
+  metadata        String?
+  members         Member[]
+  invitations     Invitation[]
   // Back-relations to tenant-scoped business data. Cascade-deletes in those
   // models clean up all org-owned rows when the org row is removed (deletion
   // is gated by Better Auth's organization plugin in v1; see SPEC out-of-scope).
-  workflows     Workflow[]
-  credentials   Credential[]
-  connections   Connection[]
-  pollSnapshots PollSnapshot[]
-  workflowRuns  WorkflowRun[]
-  nodeRuns      NodeRun[]
-  executionLogs ExecutionLog[]
-  ticketBranches TicketBranch[]
+  workflows       Workflow[]
+  credentials     Credential[]
+  connections     Connection[]
+  pollSnapshots   PollSnapshot[]
+  workflowRuns    WorkflowRun[]
+  nodeRuns        NodeRun[]
+  executionLogs   ExecutionLog[]
+  ticketBranches  TicketBranch[]
+  providerConfigs ProviderConfig[]
 
   @@unique([slug])
   @@map("organization")
@@ -414,25 +440,25 @@ model Invitation {
 // for retention/redaction. See docs/data-model.md and docs/SECURITY.md.
 
 model AuditLog {
-  id            String   @id @default(cuid())
+  id           String   @id @default(cuid())
   // Closed event taxonomy enforced in TypeScript (see audit-events.ts).
   // Stored as a plain string so future events can land without a migration.
-  event         String
+  event        String
   // Plain string — not an FK. Null for failed sign-ins where credentials did
   // not match any user row.
-  actorUserId   String?
+  actorUserId  String?
   // Snapshot at write time so failed-login spikes correlate by email even
   // when actorUserId is null.
-  actorEmail    String?
+  actorEmail   String?
   // Best-effort from req.ip / X-Forwarded-For; null for non-HTTP events.
-  actorIp       String?
+  actorIp      String?
   // Plain string — not an FK. Null for auth.* events that pre-date org
   // context (sign-up, sign-in).
-  orgId         String?
+  orgId        String?
   // Plain string — not an FK. Set for org.member.* events where actor != target.
-  targetUserId  String?
-  metadata      Json?
-  createdAt     DateTime @default(now())
+  targetUserId String?
+  metadata     Json?
+  createdAt    DateTime @default(now())
 
   @@index([orgId, createdAt(sort: Desc)])
   @@index([actorEmail, event, createdAt])

@@ -35,7 +35,7 @@ import type { AgentProvider, AgentSession } from './types';
 export class CodexProvider implements AgentProvider {
   readonly id = 'codex' as const;
 
-  constructor(private readonly opts: { apiKey?: string } = {}) {}
+  constructor(private readonly opts: { apiKey?: string; baseUrl?: string } = {}) {}
 
   getCapabilities(): ProviderCapabilities {
     return {
@@ -65,6 +65,7 @@ export class CodexProvider implements AgentProvider {
       const { Codex } = await loadCodexSdk();
       const codex = new Codex({
         apiKey: this.opts.apiKey,
+        baseUrl: this.opts.baseUrl,
         config: plan.config,
       });
       thread = codex.startThread({

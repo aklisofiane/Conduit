@@ -111,6 +111,14 @@ export interface CredentialRow {
   suffix: string;
 }
 
+export interface ProviderConfig {
+  id: string;
+  providerId: 'claude' | 'codex';
+  baseUrl: string | null;
+  suffix: string;
+  updatedAt: string;
+}
+
 export interface ConnectionRow {
   id: string;
   name: string;

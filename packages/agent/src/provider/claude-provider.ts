@@ -24,7 +24,7 @@ import type { AgentProvider, AgentSession } from './types';
 export class ClaudeProvider implements AgentProvider {
   readonly id = 'claude' as const;
 
-  constructor(private readonly opts: { apiKey?: string } = {}) {}
+  constructor(private readonly opts: { apiKey?: string; baseUrl?: string } = {}) {}
 
   getCapabilities(): ProviderCapabilities {
     return {
@@ -46,6 +46,16 @@ export class ClaudeProvider implements AgentProvider {
 
     const ensureIterator = async (): Promise<AsyncIterator<unknown>> => {
       if (iterator) return iterator;
+      // Same lifetime / trust boundary as the `CLAUDE_CODE_OAUTH_TOKEN`
+      // write in `agent-runner/src/main.ts` — the runner container exits at
+      // the end of the run. Set before the lazy SDK import so its env
+      // resolution picks these up.
+      if (this.opts.apiKey) {
+        process.env.ANTHROPIC_API_KEY = this.opts.apiKey;
+      }
+      if (this.opts.baseUrl) {
+        process.env.ANTHROPIC_BASE_URL = this.opts.baseUrl;
+      }
       const sdk = await loadClaudeSdk();
       const stream = sdk.query({
         prompt: input,
