@@ -29,3 +29,7 @@ Agent-first workflow automation for dev teams. Board-driven orchestration, atomi
 23. [RELIABILITY.md](./RELIABILITY.md) — retries, crash recovery, cancellation
 24. [VALIDATION.md](./VALIDATION.md) — testing strategy, E2E harness, `StubProvider`
 25. [PLANS.md](./PLANS.md) — phased rollout
+
+## Setup recipes
+
+- [setup-oauth.md](./setup-oauth.md) — register an OAuth app with GitHub (or future providers) and wire it into Conduit

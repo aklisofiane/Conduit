@@ -30,11 +30,13 @@ Prerequisites: Node.js 22 (`nvm use`), npm 10+, Docker.
 ```bash
 nvm use
 npm install
-cp .env.example .env
+cp .env.example .env            # then edit it — fill in the values flagged inline (at minimum BETTER_AUTH_SECRET and your agent provider key)
 npm run infra:up                # Postgres (5432), Temporal (7233 / UI 8080), Redis (6379) — preflight auto-allocates free ports if any default is taken
 npm run db:push                 # apply Prisma schema
 npm run build                   # builds TS dist + the agent-runner Docker image
 ```
+
+Sign-in works with email and password out of the box. To enable OAuth sign-in providers (GitHub today, others later), see [docs/setup-oauth.md](docs/setup-oauth.md).
 
 `apps/agent-runner` is the per-run container the worker spawns for every agent execution. Its `build` script chains `tsc` and `docker build -t agent-runner:dev`, so any workspace build keeps the image current. CI tags via `CONDUIT_RUNNER_IMAGE`. Force a clean image rebuild with `npm run docker:agent-runner:build`.
 
