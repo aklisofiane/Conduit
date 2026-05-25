@@ -1,0 +1,109 @@
+{
+  "id": "nightly-review",
+  "name": "Nightly Code Review",
+  "description": "Scheduled nightly review of recent changes. Scope agent identifies what changed, four parallel reviewers (Security, Quality, Refactor, Performance) analyze their domain, and Publisher creates one issue per finding routed by confidence to HumanReview or AIDev.",
+  "category": "review",
+  "workflows": [
+    {
+      "name": "Nightly Code Review",
+      "description": "Cron-triggered nightly. Scope identifies changed files, four parallel reviewers assess their domain, Publisher creates issues with confidence-based board status routing.",
+      "definition": {
+        "triggers": [
+          {
+            "id": "trigger-nightly",
+            "name": "NightlyTrigger",
+            "platform": "github",
+            "connectionId": "<github-repo>",
+            "boardConnectionId": "<github-board>",
+            "type": "cron",
+            "cron": "0 2 * * *",
+            "timezone": "UTC",
+            "branch": "main"
+          }
+        ],
+        "nodes": [
+          {
+            "id": "agent-scope",
+            "name": "Scope",
+            "presetId": "scope",
+            "instructionsAppend": "The review scopes for this pipeline are:\n- **Security**: auth, input validation, secrets, injection vectors, dependency changes, crypto\n- **Quality**: bugs, logic errors, dead code, missing error handling, test gaps, race conditions\n- **Refactor**: duplication, complexity, pattern violations, outdated abstractions, naming\n- **Performance**: N+1 queries, unnecessary allocations, missing caching, expensive loops, bundle size",
+            "mcpServers": [],
+            "skills": [],
+            "constraints": { "maxTurns": 15 }
+          },
+          {
+            "id": "agent-security",
+            "name": "Security",
+            "presetId": "code-analyst",
+            "instructionsAppend": "Your domain is **Security**. Read the ## Security section of `.conduit/Scope.md`.\n\nLook for:\n- Authentication/authorization bypasses\n- Input validation gaps (injection, XSS, path traversal)\n- Secrets or credentials in code\n- Insecure cryptographic usage\n- Dependency additions with known vulnerabilities\n- Race conditions with security implications\n- Unsafe deserialization",
+            "mcpServers": [],
+            "skills": []
+          },
+          {
+            "id": "agent-quality",
+            "name": "Quality",
+            "presetId": "code-analyst",
+            "instructionsAppend": "Your domain is **Quality**. Read the ## Quality section of `.conduit/Scope.md`.\n\nLook for:\n- Logic errors and bugs\n- Dead code or unreachable branches\n- Missing error handling (unhandled promises, uncaught exceptions)\n- Race conditions\n- Missing or inadequate test coverage for new code paths\n- Incorrect type usage or unsafe casts\n- Resource leaks (unclosed handles, missing cleanup)",
+            "mcpServers": [],
+            "skills": []
+          },
+          {
+            "id": "agent-refactor",
+            "name": "Refactor",
+            "presetId": "code-analyst",
+            "instructionsAppend": "Your domain is **Refactor**. Read the ## Refactor section of `.conduit/Scope.md`.\n\nLook for:\n- Code duplication (same logic in multiple places)\n- High cyclomatic complexity (deeply nested conditionals, long functions)\n- Violations of project conventions (check CLAUDE.md and nearby siblings)\n- Outdated abstractions that the new code works around instead of fixing\n- God objects or functions doing too many things\n- Missing extraction opportunities (repeated patterns that should be shared utilities)",
+            "mcpServers": [],
+            "skills": []
+          },
+          {
+            "id": "agent-performance",
+            "name": "Performance",
+            "presetId": "code-analyst",
+            "instructionsAppend": "Your domain is **Performance**. Read the ## Performance section of `.conduit/Scope.md`.\n\nLook for:\n- N+1 query patterns or missing batch operations\n- Unnecessary memory allocations in hot paths\n- Missing caching opportunities (repeated expensive computations)\n- Expensive operations inside loops\n- Bundle size regressions (large imports that could be lazy-loaded)\n- Missing pagination on unbounded queries\n- Synchronous blocking in async contexts",
+            "mcpServers": [],
+            "skills": []
+          },
+          {
+            "id": "agent-publisher",
+            "name": "Publisher",
+            "presetId": "issue-publisher",
+            "instructionsAppend": "The upstream reviewers for this pipeline are: Security, Quality, Refactor, Performance. Read `.conduit/Security.md`, `.conduit/Quality.md`, `.conduit/Refactor.md`, and `.conduit/Performance.md`.\n\nBoard status routing:\n- Confidence: high → status \"AIDev\"\n- Confidence: low → status \"HumanReview\"",
+            "mcpServers": [{ "serverId": "github-mcp" }],
+            "skills": [],
+            "constraints": { "maxTurns": 30 }
+          }
+        ],
+        "edges": [
+          { "from": "NightlyTrigger", "to": "Scope" },
+          { "from": "Scope", "to": "Security" },
+          { "from": "Scope", "to": "Quality" },
+          { "from": "Scope", "to": "Refactor" },
+          { "from": "Scope", "to": "Performance" },
+          { "from": "Security", "to": "Publisher" },
+          { "from": "Quality", "to": "Publisher" },
+          { "from": "Refactor", "to": "Publisher" },
+          { "from": "Performance", "to": "Publisher" }
+        ],
+        "mcpServers": [
+          {
+            "id": "github-mcp",
+            "presetId": "github",
+            "connectionId": "<github-repo>"
+          }
+        ],
+        "ui": {
+          "nodePositions": {
+            "NightlyTrigger": { "x": 60, "y": 280 },
+            "Scope": { "x": 280, "y": 280 },
+            "Security": { "x": 540, "y": 60 },
+            "Quality": { "x": 540, "y": 200 },
+            "Refactor": { "x": 540, "y": 340 },
+            "Performance": { "x": 540, "y": 480 },
+            "Publisher": { "x": 820, "y": 280 }
+          },
+          "viewport": { "x": 0, "y": 0, "zoom": 1 }
+        }
+      }
+    }
+  ]
+}
