@@ -53,10 +53,6 @@ export function SignUpPage() {
   const next = params.get('next');
   const safeNext = next && next.startsWith('/') ? next : '/';
 
-  useEffect(() => {
-    if (inviteOnly) navigate('/sign-in', { replace: true });
-  }, [inviteOnly, navigate]);
-
   const onSubmit = form.handleSubmit(async (values) => {
     await submitSignUp(values, {
       signUpEmail: signUp.email,

@@ -126,18 +126,16 @@ export function SignInPage() {
           {form.formState.isSubmitting ? 'Signing in…' : 'Sign in'}
         </button>
 
-        <div className={`flex font-mono text-[11px] ${inviteOnly ? 'justify-start' : 'items-center justify-between'}`}>
+        <div className="flex items-center justify-between font-mono text-[11px]">
           <Link to="/forgot-password" className="text-[var(--color-text-2)] hover:text-[var(--color-text)]">
             Forgot password?
           </Link>
-          {!inviteOnly && (
-            <Link
-              to={`/sign-up${next ? `?next=${encodeURIComponent(next)}` : ''}`}
-              className="text-[var(--color-text-2)] hover:text-[var(--color-text)]"
-            >
-              Create account
-            </Link>
-          )}
+          <Link
+            to={`/sign-up${next ? `?next=${encodeURIComponent(next)}` : ''}`}
+            className="text-[var(--color-text-2)] hover:text-[var(--color-text)]"
+          >
+            {inviteOnly ? 'Have an invitation?' : 'Create account'}
+          </Link>
         </div>
       </form>
 
