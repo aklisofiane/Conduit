@@ -21,6 +21,7 @@ export class CredentialsService {
       id: c.id,
       platform: c.platform,
       name: c.name,
+      hostUrl: c.hostUrl,
       metadata: c.metadata,
       createdAt: c.createdAt,
       updatedAt: c.updatedAt,
@@ -36,6 +37,7 @@ export class CredentialsService {
         platform: dto.platform,
         name: dto.name,
         secret: encrypt(dto.secret),
+        hostUrl: dto.hostUrl,
         metadata: dto.metadata as unknown as object | undefined,
       },
     });
@@ -117,7 +119,7 @@ export class CredentialsService {
     if (existing) {
       await this.prisma.credential.update({
         where: { id: existing.id },
-        data: { secret: encryptedSecret, metadata },
+        data: { secret: encryptedSecret, metadata, hostUrl },
       });
       return { id: existing.id, created: false };
     }

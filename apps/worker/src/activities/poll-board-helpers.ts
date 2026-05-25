@@ -37,6 +37,7 @@ export function itemPassesFilters(
 export function toTriggerEvent(
   item: ProjectBoardItem,
   scope: 'issues' | 'pull_requests',
+  platform: 'github' | 'gitlab' = 'github',
 ): TriggerEvent {
   const payload: Record<string, unknown> = {
     projectItemNodeId: item.itemNodeId,
@@ -54,7 +55,7 @@ export function toTriggerEvent(
   }
 
   const event: TriggerEvent = {
-    source: 'github',
+    source: platform,
     mode: 'polling',
     event: scope === 'pull_requests' ? 'pull_request.detected' : 'board.column.changed',
     payload,

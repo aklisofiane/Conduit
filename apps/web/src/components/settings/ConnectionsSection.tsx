@@ -123,7 +123,9 @@ function CreateConnectionForm({
 }) {
   const [name, setName] = useState('');
   const [credentialId, setCredentialId] = useState<string>(credentials[0]?.id ?? '');
-  const [scopeKind, setScopeKind] = useState<ConnectionScopeKind>('github_repo');
+  const [scopeKind, setScopeKind] = useState<ConnectionScopeKind>(
+    () => scopeKindsForPlatform(credentials[0]?.platform)[0]?.value ?? 'none',
+  );
   const [owner, setOwner] = useState('');
   const [repo, setRepo] = useState('');
   const [ownerType, setOwnerType] = useState<'user' | 'org'>('org');

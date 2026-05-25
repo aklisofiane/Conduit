@@ -258,7 +258,7 @@ describe('normalizeGitlabWebhook', () => {
       project: { path_with_namespace: 'acme/frontend/shop' },
       object_attributes: { id: 1, iid: 1, title: 'x', url: 'https://x', action: 'open' },
     });
-    expect(evt?.repo).toEqual({ owner: 'frontend', name: 'shop' });
+    expect(evt?.repo).toEqual({ owner: 'acme/frontend', name: 'shop' });
   });
 
   it('leaves repo undefined when project is missing', () => {

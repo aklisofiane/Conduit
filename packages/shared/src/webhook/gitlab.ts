@@ -125,8 +125,9 @@ interface GitlabWebhookPayload {
 
 /**
  * Derive `{ owner, name }` from `project.path_with_namespace`. GitLab paths
- * may include subgroups (`group/subgroup/project`); we take the last two
- * segments so "group/subgroup/repo" → `{ owner: 'subgroup', name: 'repo' }`.
+ * may include subgroups (`group/subgroup/api`); the last segment is `name`
+ * and everything before it is joined as `owner` — matching `splitProjectPath`
+ * in the polling client so both code paths produce the same shape.
  */
 function extractRepo(
   project: GitlabWebhookPayload['project'],
@@ -136,7 +137,7 @@ function extractRepo(
   const parts = full.split('/');
   if (parts.length < 2) return undefined;
   const name = parts[parts.length - 1]!;
-  const owner = parts[parts.length - 2]!;
+  const owner = parts.slice(0, -1).join('/');
   if (!owner || !name) return undefined;
   return { owner, name };
 }

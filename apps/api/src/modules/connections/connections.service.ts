@@ -18,7 +18,7 @@ export interface ConnectionRow {
   id: string;
   name: string;
   credentialId: string;
-  credential: { id: string; name: string; platform: Platform };
+  credential: { id: string; name: string; platform: Platform; hostUrl: string | null };
   scope: ConnectionScope;
   createdAt: Date;
   updatedAt: Date;
@@ -43,7 +43,7 @@ export class ConnectionsService {
         orgId,
         ...(filter.platform ? { credential: { platform: filter.platform } } : {}),
       },
-      include: { credential: { select: { id: true, name: true, platform: true } } },
+      include: { credential: { select: { id: true, name: true, platform: true, hostUrl: true } } },
       orderBy: { createdAt: 'desc' },
     });
     const parsed = rows.map(toRow);
@@ -56,7 +56,7 @@ export class ConnectionsService {
   async get(orgId: string, id: string): Promise<ConnectionRow> {
     const row = await this.prisma.connection.findFirst({
       where: { id, orgId },
-      include: { credential: { select: { id: true, name: true, platform: true } } },
+      include: { credential: { select: { id: true, name: true, platform: true, hostUrl: true } } },
     });
     if (!row) throw new NotFoundException(`Connection ${id} not found`);
     return toRow(row);
@@ -80,7 +80,7 @@ export class ConnectionsService {
         name: dto.name,
         scope: dto.scope as unknown as object,
       },
-      include: { credential: { select: { id: true, name: true, platform: true } } },
+      include: { credential: { select: { id: true, name: true, platform: true, hostUrl: true } } },
     });
     return toRow(created);
   }
@@ -177,7 +177,7 @@ function toRow(row: {
   scope: unknown;
   createdAt: Date;
   updatedAt: Date;
-  credential: { id: string; name: string; platform: Platform };
+  credential: { id: string; name: string; platform: Platform; hostUrl: string | null };
 }): ConnectionRow {
   return {
     id: row.id,

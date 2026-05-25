@@ -1,4 +1,6 @@
 import type { ConnectionScope, ConnectionScopeKind } from '@conduit/shared';
+import { isCloudHost } from '@conduit/shared/platform';
+import type { Platform } from '@conduit/shared/platform';
 
 export function scopeSummary(scope: ConnectionScope): string {
   switch (scope.kind) {
@@ -26,6 +28,7 @@ export function connectionLabel(c: {
   credential: { platform: string; hostUrl?: string | null };
 }): string {
   const host = c.credential.hostUrl;
-  const hostSuffix = host ? ` · ${host}` : '';
+  const showHost = host != null && !isCloudHost(c.credential.platform.toUpperCase() as Platform, host);
+  const hostSuffix = showHost ? ` · ${host}` : '';
   return `${c.name} · ${c.credential.platform.toLowerCase()}${hostSuffix}`;
 }

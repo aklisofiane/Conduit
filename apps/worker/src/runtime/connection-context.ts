@@ -27,35 +27,32 @@ export async function loadConnectionContext(
   if (!conn) return undefined;
   const scope = connectionScopeSchema.parse(conn.scope);
 
-  // Derive owner/repo from the scope. Currently supports `github_repo` and
-  // `gitlab_project` (string-compared — the `gitlab_project` variant will be
-  // typed once gitlab-api-client adds it to the scope union).
   let owner: string;
   let repo: string;
+  let repoPath: string;
   if (scope.kind === 'github_repo') {
     owner = scope.owner;
     repo = scope.repo;
-  } else if ((scope as { kind: string }).kind === 'gitlab_project') {
-    // GitLab project paths can be nested under subgroups
-    // (e.g. `group/subgroup/project`). Take the last two segments so
-    // `owner` maps to the immediate parent group and `repo` to the project.
-    const segments = ((scope as Record<string, string>).projectPath ?? '').split('/').slice(-2);
-    if (segments.length < 2 || !segments[0] || !segments[1]) return undefined;
-    [owner, repo] = segments;
+    repoPath = `${owner}/${repo}`;
+  } else if (scope.kind === 'gitlab_project') {
+    const parts = scope.projectPath.split('/');
+    if (parts.length < 2) return undefined;
+    repo = parts[parts.length - 1]!;
+    owner = parts.slice(0, -1).join('/');
+    if (!owner || !repo) return undefined;
+    repoPath = scope.projectPath;
   } else {
     return undefined;
   }
 
   const token = decryptSecret(conn.credential.secret, loadEncryptionKey());
   const platform = conn.credential.platform === 'GITLAB' ? 'gitlab' : 'github';
-  // Resolve host from the credential's persisted hostUrl, running through
-  // normalizeHostUrl for defense-in-depth (falls back to canonical cloud
-  // default if hostUrl is null — e.g. pre-migration rows).
-  const host = normalizeHostUrl(conn.credential.hostUrl, conn.credential.platform)!;
+  const host = normalizeHostUrl(conn.credential.hostUrl, conn.credential.platform);
+  if (!host) return undefined;
   const testBase = process.env.CONDUIT_TEST_REMOTE_BASE;
   const cloneUrl = testBase
     ? path.join(testBase, owner, `${repo}.git`)
-    : `https://${host}/${owner}/${repo}.git`;
+    : `https://${host}/${repoPath}.git`;
   return {
     id: conn.id,
     platform,

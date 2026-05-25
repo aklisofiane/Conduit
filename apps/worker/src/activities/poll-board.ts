@@ -85,6 +85,11 @@ export async function pollBoardActivity(
   const token = decryptSecret(sourceConn.credential.secret, loadEncryptionKey());
   const hostUrl = sourceConn.credential.hostUrl;
 
+  const platform = trigger.platform;
+  if (platform !== 'github' && platform !== 'gitlab') {
+    throw new Error(`Polling for platform "${platform}" not implemented`);
+  }
+
   // Fetch paths dispatched on platform + type + boardConnectionId:
   //
   // GitHub:
@@ -99,7 +104,7 @@ export async function pollBoardActivity(
   // All paths return the same `ProjectBoardItem` shape so the rest of the
   // pipeline (filter, dedup, event-build) doesn't care which one fired.
   let items;
-  if (trigger.platform === 'github') {
+  if (platform === 'github') {
     if (trigger.type === 'pull_requests') {
       const repoScope = expectScopeKind(sourceScope, 'github_repo');
       items = await fetchRepositoryPullRequests({
@@ -133,7 +138,7 @@ export async function pollBoardActivity(
         token,
       });
     }
-  } else if (trigger.platform === 'gitlab') {
+  } else {
     const glScope = expectScopeKind(sourceScope, 'gitlab_project');
     const glHost = hostUrl ?? 'gitlab.com';
     if (trigger.type === 'pull_requests') {
@@ -149,8 +154,6 @@ export async function pollBoardActivity(
         token,
       });
     }
-  } else {
-    throw new Error(`Polling for platform "${trigger.platform}" not implemented`);
   }
   const fetchedCount = items.length;
 
@@ -165,7 +168,7 @@ export async function pollBoardActivity(
   // Second gate: the platform query filters by the API's current view, but
   // `matchesTrigger` also enforces platform + filter-field parity against
   // the normalized event. Cheap belt-and-braces.
-  const candidateEvents = newItems.map((item) => toTriggerEvent(item, trigger.type));
+  const candidateEvents = newItems.map((item) => toTriggerEvent(item, trigger.type, platform));
   const eventsToStart = candidateEvents.filter((event) => matchesTrigger(event, trigger));
   const gatedOutCount = candidateEvents.length - eventsToStart.length;
 

@@ -71,13 +71,13 @@ describe('normalizeGitlabWebhook — real payload fixtures', () => {
     expect(evt).toBeNull();
   });
 
-  it('subgroup MR hook → repo uses last two path segments', () => {
+  it('subgroup MR hook → repo joins parent groups as owner', () => {
     const evt = normalizeGitlabWebhook(
       'Merge Request Hook',
       load('subgroup.merge_request_hook.opened.json'),
     );
     expect(evt?.event).toBe('pull_request.opened');
-    expect(evt?.repo).toEqual({ owner: 'frontend', name: 'shop' });
+    expect(evt?.repo).toEqual({ owner: 'acme/frontend', name: 'shop' });
     expect(evt?.issue?.key).toBe('3');
     expect(triggerEventSchema.safeParse(evt).success).toBe(true);
   });
