@@ -43,7 +43,7 @@ RUN npm prune --omit=dev
 FROM node:22-slim AS runtime
 
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ca-certificates openssl \
+ && apt-get install -y --no-install-recommends ca-certificates openssl curl \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/api
@@ -56,9 +56,13 @@ COPY --from=builder /build/packages/database/package.json ./node_modules/@condui
 COPY --from=builder /build/packages/agent/dist ./node_modules/@conduit/agent/dist
 COPY --from=builder /build/packages/agent/package.json ./node_modules/@conduit/agent/package.json
 
-# Prisma client + schema (needed by migrate deploy).
+# Prisma client + schema (needed by db push).
 COPY --from=builder /build/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /build/packages/database/prisma ./prisma
+
+# Deps npm didn't hoist to root (better-auth, set-cookie-parser).
+COPY --from=builder /build/apps/api/node_modules ./api-deps
+RUN cp -a api-deps/. node_modules/ && rm -rf api-deps
 
 COPY --from=builder /build/apps/api/dist ./dist
 COPY --from=builder /build/apps/api/package.json ./package.json
