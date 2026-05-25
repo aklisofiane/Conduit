@@ -14,9 +14,10 @@
             "name": "AnalyzeTrigger",
             "platform": "github",
             "connectionId": "<github-repo>",
-            "type": "webhook",
-            "event": "issues.opened",
-            "filters": []
+            "boardConnectionId": "<github-board>",
+            "type": "issues",
+            "intervalSec": 60,
+            "filters": [{ "field": "status", "value": "Todo" }]
           }
         ],
         "nodes": [
