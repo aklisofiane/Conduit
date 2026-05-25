@@ -58,7 +58,7 @@ export function NodePalette({
           onClick={() => onAddTrigger('pull_requests')}
         />
         <TriggerPaletteCard
-          name="Cron"
+          name="Schedule"
           description="time-driven runs on a branch"
           icon={<Clock size={11} color="#FFFFFF" strokeWidth={1.5} />}
           disabled={triggerSlotFilled}

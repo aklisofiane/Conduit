@@ -49,7 +49,7 @@ const prStateFilter = z.object({
 const CRON_ATOM = /(?:\*|\d+|\d+-\d+|[A-Za-z]{3}(?:-[A-Za-z]{3})?)/.source;
 const CRON_STEP = /(?:\/\d+)?/.source;
 const CRON_FIELD = `(?:${CRON_ATOM})${CRON_STEP}(?:,(?:${CRON_ATOM})${CRON_STEP})*`;
-const CRON_EXPRESSION_RE = new RegExp(`^${CRON_FIELD}(?: ${CRON_FIELD}){4}$`);
+export const CRON_EXPRESSION_RE = new RegExp(`^${CRON_FIELD}(?: ${CRON_FIELD}){4}$`);
 
 const sharedFields = {
   id: z.string().min(1),

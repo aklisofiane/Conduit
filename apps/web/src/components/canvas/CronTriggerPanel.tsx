@@ -2,6 +2,8 @@ import { useMemo } from 'react';
 import type { TriggerConfig } from '@conduit/shared';
 import { useConnections } from '../../api/hooks.js';
 import type { CredentialRow } from '../../api/types.js';
+import { Select } from '../common/Select.js';
+import { CronScheduleBuilder } from './CronScheduleBuilder.js';
 import {
   ActiveToggleField,
   ConnectionSelect,
@@ -9,6 +11,30 @@ import {
   PanelFooter,
   PanelHeader,
 } from './trigger-panel-common.js';
+
+const TIMEZONE_OPTIONS = [
+  { value: 'Pacific/Honolulu', label: '(GMT-10:00) Honolulu' },
+  { value: 'America/Anchorage', label: '(GMT-09:00) Anchorage' },
+  { value: 'America/Los_Angeles', label: '(GMT-08:00) Los Angeles' },
+  { value: 'America/Denver', label: '(GMT-07:00) Denver' },
+  { value: 'America/Chicago', label: '(GMT-06:00) Chicago' },
+  { value: 'America/New_York', label: '(GMT-05:00) New York' },
+  { value: 'America/Sao_Paulo', label: '(GMT-03:00) São Paulo' },
+  { value: 'UTC', label: '(GMT+00:00) UTC' },
+  { value: 'Europe/London', label: '(GMT+00:00) London' },
+  { value: 'Europe/Paris', label: '(GMT+01:00) Paris' },
+  { value: 'Europe/Berlin', label: '(GMT+01:00) Berlin' },
+  { value: 'Africa/Cairo', label: '(GMT+02:00) Cairo' },
+  { value: 'Europe/Istanbul', label: '(GMT+03:00) Istanbul' },
+  { value: 'Asia/Dubai', label: '(GMT+04:00) Dubai' },
+  { value: 'Asia/Kolkata', label: '(GMT+05:30) Mumbai' },
+  { value: 'Asia/Bangkok', label: '(GMT+07:00) Bangkok' },
+  { value: 'Asia/Singapore', label: '(GMT+08:00) Singapore' },
+  { value: 'Asia/Shanghai', label: '(GMT+08:00) Shanghai' },
+  { value: 'Asia/Tokyo', label: '(GMT+09:00) Tokyo' },
+  { value: 'Australia/Sydney', label: '(GMT+10:00) Sydney' },
+  { value: 'Pacific/Auckland', label: '(GMT+12:00) Auckland' },
+];
 
 type CronTrigger = Extract<TriggerConfig, { type: 'cron' }>;
 
@@ -47,7 +73,7 @@ export function CronTriggerPanel({
 
   return (
     <>
-      <PanelHeader trigger={trigger} isActive={isActive} title="cron" onClose={onClose} />
+      <PanelHeader trigger={trigger} isActive={isActive} title="schedule" onClose={onClose} />
 
       <div className="flex-1 overflow-y-auto px-5 py-4">
         <div className="space-y-5">
@@ -70,38 +96,17 @@ export function CronTriggerPanel({
             />
           </Field>
 
-          <Field
-            label="Cron expression"
-            hint={
-              <>
-                5-field POSIX (min hour dom month dow) ·{' '}
-                <a
-                  href="https://crontab.guru/"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-[var(--color-accent)] hover:underline"
-                >
-                  crontab.guru
-                </a>
-              </>
-            }
-          >
-            <input
-              className="field-input"
-              type="text"
-              placeholder="0 9 * * *"
-              value={trigger.cron}
-              onChange={(e) => onChange({ cron: e.target.value })}
-            />
-          </Field>
+          <CronScheduleBuilder
+            value={trigger.cron}
+            onChange={(cron) => onChange({ cron })}
+          />
 
-          <Field label="Timezone" hint="IANA name — e.g. UTC, America/Los_Angeles, Europe/Paris">
-            <input
-              className="field-input"
-              type="text"
-              placeholder="UTC"
+          <Field label="Timezone">
+            <Select
+              ariaLabel="Timezone"
               value={trigger.timezone}
-              onChange={(e) => onChange({ timezone: e.target.value })}
+              onValueChange={(tz) => onChange({ timezone: tz })}
+              options={TIMEZONE_OPTIONS}
             />
           </Field>
 

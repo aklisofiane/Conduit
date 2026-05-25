@@ -29,7 +29,7 @@ const TRIGGER_OPTIONS: Array<{
   },
   {
     type: 'cron',
-    label: 'Cron',
+    label: 'Schedule',
     description: 'Run on a time-based schedule',
     icon: <Clock size={14} color="#FFFFFF" strokeWidth={1.5} />,
   },

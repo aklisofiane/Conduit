@@ -531,7 +531,7 @@ function TriggerPanelByType({ trigger, onChange, ...rest }: TriggerPanelByTypePr
           </div>
           <div>event: {trigger.event}</div>
           <div>
-            No editor yet — delete this trigger and re-add an Issues, Pull requests, or Cron
+            No editor yet — delete this trigger and re-add an Issues, Pull requests, or Schedule
             trigger from the palette.
           </div>
           <button className="btn mt-2" onClick={rest.onClose}>
