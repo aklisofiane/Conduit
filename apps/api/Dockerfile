@@ -67,6 +67,12 @@ RUN cp -a api-deps/. node_modules/ && rm -rf api-deps
 COPY --from=builder /build/apps/api/dist ./dist
 COPY --from=builder /build/apps/api/package.json ./package.json
 
+# Static data dirs read at boot by template-loader and agent-preset-loader.
+# Both resolve to path.resolve(__dirname, '../../../../..', '<dir>'), which
+# from /opt/api/dist/modules/<mod> lands at /opt/api/../../../<dir> = /<dir>.
+COPY templates/ /templates/
+COPY agent-presets/ /agent-presets/
+
 EXPOSE 3000
 
 COPY apps/api/entrypoint.sh /entrypoint.sh
