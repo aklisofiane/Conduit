@@ -131,17 +131,13 @@ async function dispatch(ctx: AuditHookCtx, deps: AuditHookDeps): Promise<void> {
     if (isUnauthorizedShape(returned)) {
       const email = emailFromBody(ctx);
       if (email) {
-        // Independent reads/writes — fan out so the second DB query doesn't
-        // serialize behind the audit-row insert in the failed-login hot path.
-        await Promise.all([
-          deps.auditLog.record({
-            event: 'auth.signIn.failed',
-            actorEmail: email,
-            actorIp: ip,
-            metadata: { provider: 'email' },
-          }),
-          deps.abuseSignals.checkFailedLoginSpike({ actorEmail: email }),
-        ]);
+        await deps.auditLog.record({
+          event: 'auth.signIn.failed',
+          actorEmail: email,
+          actorIp: ip,
+          metadata: { provider: 'email' },
+        });
+        await deps.abuseSignals.checkFailedLoginSpike({ actorEmail: email });
       }
     }
     return;
