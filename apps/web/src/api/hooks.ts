@@ -44,8 +44,12 @@ export function useWorkflow(id: string | undefined) {
 export function useCreateWorkflow() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { name: string; description?: string; definition?: WorkflowDefinition }) =>
-      api.post<WorkflowRow>('/workflows', body),
+    mutationFn: (body: {
+      name: string;
+      description?: string;
+      definition?: WorkflowDefinition;
+      triggerType?: 'issues' | 'pull_requests' | 'cron';
+    }) => api.post<WorkflowRow>('/workflows', body),
     onSuccess: () => qc.invalidateQueries({ queryKey: WORKFLOWS }),
   });
 }

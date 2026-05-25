@@ -10,6 +10,7 @@ export const createWorkflowDtoSchema = z.object({
   name: z.string().min(1).max(120),
   description: z.string().optional(),
   definition: workflowDefinitionSchema.optional(),
+  triggerType: z.enum(['issues', 'pull_requests', 'cron']).optional(),
 });
 export type CreateWorkflowDto = z.infer<typeof createWorkflowDtoSchema>;
 

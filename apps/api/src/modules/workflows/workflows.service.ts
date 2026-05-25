@@ -78,7 +78,7 @@ export class WorkflowsService implements OnModuleInit {
   }
 
   async create(orgId: string, dto: CreateWorkflowDto) {
-    const definition = dto.definition ?? defaultDefinition();
+    const definition = dto.definition ?? defaultDefinition(dto.triggerType);
     assertDefinitionValid(definition);
     const wf = await this.prisma.workflow.create({
       data: {

@@ -1,28 +1,38 @@
 import type { WorkflowDefinition } from '@conduit/shared';
 
+export type InitialTriggerType = 'issues' | 'pull_requests' | 'cron';
+
 /**
- * A freshly-created workflow lands on the canvas with a single trigger
- * and no agents — the user clicks "+ Agent" to add the first node. This
- * shape is what the canvas loads on `/workflows/new`.
+ * Build a starter definition. When `triggerType` is provided (the normal
+ * path from the "New workflow" dialog), the canvas opens with the user's
+ * chosen trigger already placed. Without one, the canvas is blank.
  */
-export function defaultDefinition(): WorkflowDefinition {
+export function defaultDefinition(triggerType?: InitialTriggerType): WorkflowDefinition {
+  if (!triggerType) {
+    return {
+      triggers: [],
+      nodes: [],
+      edges: [],
+      mcpServers: [],
+      ui: { nodePositions: {}, viewport: { x: 0, y: 0, zoom: 1 } },
+    };
+  }
+
+  const id = `trigger_${Math.random().toString(36).slice(2, 10)}`;
+  const name = 'Trigger1';
+  const shared = { id, name, platform: 'github' as const, connectionId: '' };
+  const trigger =
+    triggerType === 'cron'
+      ? { ...shared, type: 'cron' as const, cron: '0 9 * * *', timezone: 'UTC', branch: 'main' }
+      : { ...shared, type: triggerType, intervalSec: 60, filters: [] as never[] };
+
   return {
-    triggers: [
-      {
-        id: 'trigger_default',
-        name: 'Trigger1',
-        platform: 'github',
-        connectionId: '',
-        type: 'issues',
-        intervalSec: 60,
-        filters: [],
-      },
-    ],
+    triggers: [trigger],
     nodes: [],
     edges: [],
     mcpServers: [],
     ui: {
-      nodePositions: { Trigger1: { x: 80, y: 120 } },
+      nodePositions: { [name]: { x: 80, y: 120 } },
       viewport: { x: 0, y: 0, zoom: 1 },
     },
   };

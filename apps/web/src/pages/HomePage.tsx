@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { TemplatePickerDialog } from '../components/templates/TemplatePickerDialog.js';
+import { CreateWorkflowDialog } from '../components/workflow-list/CreateWorkflowDialog.js';
+import type { PaletteTriggerType } from '../components/canvas/NodePalette.js';
 import { WorkflowRowItem } from '../components/workflow-list/WorkflowRowItem.js';
 import { useCreateWorkflow, useWorkflows } from '../api/hooks.js';
 
@@ -16,14 +18,16 @@ export function HomePage() {
   const navigate = useNavigate();
   const createWorkflow = useCreateWorkflow();
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
 
   const activeCount = workflows.filter((w) => w.isActive).length;
   const runningCount = workflows.filter((w) => w.runs[0]?.status === 'RUNNING').length;
   const failingCount = workflows.filter((w) => w.runs[0]?.status === 'FAILED').length;
 
-  const handleCreate = async () => {
-    const created = await createWorkflow.mutateAsync({ name: 'Untitled workflow' });
+  const handleCreate = async (name: string, triggerType: PaletteTriggerType) => {
+    const created = await createWorkflow.mutateAsync({ name, triggerType });
+    setShowCreateDialog(false);
     navigate(`/workflows/${created.id}`);
   };
 
@@ -68,7 +72,7 @@ export function HomePage() {
             <button className="btn" onClick={() => setShowTemplatePicker(true)}>
               From template
             </button>
-            <button className="btn primary" onClick={handleCreate} disabled={createWorkflow.isPending}>
+            <button className="btn primary" onClick={() => setShowCreateDialog(true)}>
               <Plus size={12} strokeWidth={2.5} />
               New workflow
             </button>
@@ -94,6 +98,13 @@ export function HomePage() {
 
       {showTemplatePicker && (
         <TemplatePickerDialog onClose={() => setShowTemplatePicker(false)} />
+      )}
+      {showCreateDialog && (
+        <CreateWorkflowDialog
+          onClose={() => setShowCreateDialog(false)}
+          onCreate={handleCreate}
+          isPending={createWorkflow.isPending}
+        />
       )}
     </div>
   );
