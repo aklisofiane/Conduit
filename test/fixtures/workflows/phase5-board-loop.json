@@ -10,7 +10,8 @@
           "platform": "github",
           "connectionId": "__placeholder_repo__",
           "boardConnectionId": "__placeholder_board__",
-          "mode": { "kind": "polling", "intervalSec": 3600, "scope": "issues", "source": "board" },
+          "type": "issues",
+          "intervalSec": 3600,
           "filters": [{ "field": "status", "value": "Dev" }]
         }
       ],
@@ -22,7 +23,8 @@
           "model": "stub-model",
           "instructions": "Worker node — commit and push to the conduit/<ticket> branch.",
           "mcpServers": [],
-          "skills": []        }
+          "skills": []
+        }
       ],
       "edges": [{ "from": "Phase5WorkerTrigger", "to": "Worker" }],
       "mcpServers": [],
@@ -46,7 +48,8 @@
           "platform": "github",
           "connectionId": "__placeholder_repo__",
           "boardConnectionId": "__placeholder_board__",
-          "mode": { "kind": "polling", "intervalSec": 3600, "scope": "issues", "source": "board" },
+          "type": "issues",
+          "intervalSec": 3600,
           "filters": [{ "field": "status", "value": "AIReview" }]
         }
       ],
@@ -58,7 +61,8 @@
           "model": "stub-model",
           "instructions": "Critic node — read the branch and file a review.",
           "mcpServers": [],
-          "skills": []        }
+          "skills": []
+        }
       ],
       "edges": [{ "from": "Phase5CriticTrigger", "to": "Critic" }],
       "mcpServers": [],

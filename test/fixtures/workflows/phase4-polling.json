@@ -9,7 +9,8 @@
         "platform": "github",
         "connectionId": "__placeholder_repo__",
         "boardConnectionId": "__placeholder_board__",
-        "mode": { "kind": "polling", "intervalSec": 3600, "scope": "issues", "source": "board" },
+        "type": "issues",
+        "intervalSec": 3600,
         "filters": [{ "field": "status", "value": "Dev" }]
       }
     ],

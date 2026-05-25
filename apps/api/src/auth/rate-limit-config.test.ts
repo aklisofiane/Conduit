@@ -7,13 +7,17 @@ import { rateLimitConfig } from './rate-limit-config';
  * objects so a future config drift surfaces here loudly.
  */
 describe('rateLimitConfig', () => {
-  it('local mode is lenient: every endpoint inherits the 100/min default (no overrides)', () => {
+  it('local mode overrides Better Auth special rules to 100/min', () => {
     const cfg = rateLimitConfig('local');
     expect(cfg.enabled).toBe(true);
     expect(cfg.storage).toBe('secondary-storage');
     expect(cfg.window).toBe(60);
     expect(cfg.max).toBe(100);
-    expect(cfg.customRules).toEqual({});
+    expect(cfg.customRules).toEqual({
+      '/sign-up/email': { window: 60, max: 100 },
+      '/sign-in/email': { window: 60, max: 100 },
+      '/request-password-reset': { window: 60, max: 100 },
+    });
   });
 
   it('hosted mode tightens per the spec table', () => {

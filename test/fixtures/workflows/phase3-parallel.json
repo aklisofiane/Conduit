@@ -8,7 +8,8 @@
         "name": "Phase3Trigger",
         "platform": "github",
         "connectionId": "__placeholder__",
-        "mode": { "kind": "webhook", "event": "issues.opened" },
+        "type": "webhook",
+        "event": "issues.opened",
         "filters": []
       }
     ],
@@ -20,7 +21,8 @@
         "model": "stub-model",
         "instructions": "Clone the repo and classify the issue.",
         "mcpServers": [],
-        "skills": []      },
+        "skills": []
+      },
       {
         "id": "agent-fix",
         "name": "Fix",
@@ -28,7 +30,8 @@
         "model": "stub-model",
         "instructions": "Propose a patch in src/fix.ts.",
         "mcpServers": [],
-        "skills": []      },
+        "skills": []
+      },
       {
         "id": "agent-doc",
         "name": "Doc",
@@ -36,7 +39,8 @@
         "model": "stub-model",
         "instructions": "Update the README for the bug fix.",
         "mcpServers": [],
-        "skills": []      },
+        "skills": []
+      },
       {
         "id": "agent-review",
         "name": "Review",
@@ -44,7 +48,8 @@
         "model": "stub-model",
         "instructions": "Review the merged branches and leave a summary.",
         "mcpServers": [],
-        "skills": []      }
+        "skills": []
+      }
     ],
     "edges": [
       { "from": "Phase3Trigger", "to": "Triage" },

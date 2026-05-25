@@ -176,7 +176,7 @@ describe('Phase 6 — create workflows from template', () => {
     });
     expect(res.status).toBe(400);
     const body = (await res.json()) as { message: string; missing: string[] };
-    expect(body.missing).toEqual(['github-repo']);
+    expect(body.missing).toEqual(['github-board', 'github-repo']);
   });
 
   it('creates a single-workflow template with no extra churn', async () => {
@@ -196,13 +196,27 @@ describe('Phase 6 — create workflows from template', () => {
             credentialId: cred.id,
             scope: { kind: 'github_repo', owner: 'acme', repo: 'shop' },
           },
+          'github-board': {
+            mode: 'new',
+            name: 'acme · project #1',
+            credentialId: cred.id,
+            scope: {
+              kind: 'github_projects_v2',
+              ownerType: 'org',
+              owner: 'acme',
+              number: 1,
+            },
+          },
         },
       },
     );
     expect(result.workflows).toHaveLength(1);
     const wf = await harness.http.get<WorkflowRow>(`/workflows/${result.workflows[0]!.id}`);
-    expect(wf.definition.triggers[0]!.type).toBe('webhook');
+    expect(wf.definition.triggers[0]!.type).toBe('issues');
     const handle = scheduleClient.getHandle(workflowScheduleId(wf.id));
-    await expect(handle.describe()).rejects.toBeDefined();
+    await waitFor(
+      () => handle.describe().then(() => true).catch(() => false),
+      15_000,
+    );
   }, 45_000);
 });

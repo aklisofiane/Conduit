@@ -8,7 +8,8 @@
         "name": "Phase2Trigger",
         "platform": "github",
         "connectionId": "__placeholder__",
-        "mode": { "kind": "webhook", "event": "issues.opened" },
+        "type": "webhook",
+        "event": "issues.opened",
         "filters": []
       }
     ],

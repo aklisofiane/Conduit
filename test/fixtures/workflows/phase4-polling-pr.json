@@ -8,7 +8,8 @@
         "name": "Phase4PrTrigger",
         "platform": "github",
         "connectionId": "__placeholder__",
-        "mode": { "kind": "polling", "intervalSec": 3600, "scope": "pull_requests" },
+        "type": "pull_requests",
+        "intervalSec": 3600,
         "filters": [{ "field": "pr_state", "value": "ready_for_review" }]
       }
     ],
