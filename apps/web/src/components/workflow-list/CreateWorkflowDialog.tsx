@@ -56,7 +56,7 @@ export function CreateWorkflowDialog({
     <Dialog
       open
       onOpenChange={(o) => {
-        if (!o) onClose();
+        if (!o && !isPending) onClose();
       }}
     >
       <DialogContent
@@ -75,7 +75,7 @@ export function CreateWorkflowDialog({
               Name it and pick a trigger to get started.
             </p>
           </div>
-          <button className="btn" onClick={onClose} aria-label="Close">
+          <button className="btn" onClick={onClose} aria-label="Close" disabled={isPending}>
             ✕
           </button>
         </header>

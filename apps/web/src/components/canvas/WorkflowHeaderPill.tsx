@@ -20,6 +20,8 @@ import type { WorkflowRow } from '../../api/types.js';
 import { cn } from '../../lib/cn.js';
 import { relativeFromNow } from '../../lib/time.js';
 import { InlineRename } from '../common/InlineRename.js';
+import { CreateWorkflowDialog } from '../workflow-list/CreateWorkflowDialog.js';
+import type { PaletteTriggerType } from './NodePalette.js';
 import { ChevronDown, Plus } from 'lucide-react';
 
 const NAME_MAX_LENGTH = 120;
@@ -134,6 +136,7 @@ function SwitcherPopover({ anchorEl, currentId, onClose }: SwitcherPopoverProps)
   const [query, setQuery] = useState('');
   const [cursor, setCursor] = useState(0);
   const [position, setPosition] = useState({ top: 0, left: 0 });
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   useLayoutEffect(() => {
     const rect = anchorEl.getBoundingClientRect();
@@ -178,18 +181,11 @@ function SwitcherPopover({ anchorEl, currentId, onClose }: SwitcherPopoverProps)
     navigate(`/workflows/${id}`);
   };
 
-  const handleNew = () => {
-    create.mutate(
-      { name: 'Untitled workflow' },
-      {
-        onSuccess: (created) => {
-          onClose();
-          navigate(`/workflows/${created.id}`);
-        },
-        onError: (err) =>
-          alert(err instanceof Error ? err.message : String(err)),
-      },
-    );
+  const handleNew = async (name: string, triggerType: PaletteTriggerType) => {
+    const created = await create.mutateAsync({ name, triggerType });
+    setShowCreateDialog(false);
+    onClose();
+    navigate(`/workflows/${created.id}`);
   };
 
   const handleKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -268,14 +264,20 @@ function SwitcherPopover({ anchorEl, currentId, onClose }: SwitcherPopoverProps)
       <div className="border-t border-[var(--color-divider)]">
         <button
           type="button"
-          onClick={handleNew}
-          disabled={create.isPending}
-          className="flex w-full items-center gap-2 px-3 py-2 font-mono text-[11px] text-[var(--color-text-2)] transition-colors hover:bg-[var(--color-pill-bg)] hover:text-[var(--color-text)] disabled:cursor-not-allowed disabled:opacity-60"
+          onClick={() => setShowCreateDialog(true)}
+          className="flex w-full items-center gap-2 px-3 py-2 font-mono text-[11px] text-[var(--color-text-2)] transition-colors hover:bg-[var(--color-pill-bg)] hover:text-[var(--color-text)]"
         >
           <Plus size={12} strokeWidth={1.5} />
-          {create.isPending ? 'Creating…' : 'New workflow'}
+          New workflow
         </button>
       </div>
+      {showCreateDialog && (
+        <CreateWorkflowDialog
+          onClose={() => setShowCreateDialog(false)}
+          onCreate={handleNew}
+          isPending={create.isPending}
+        />
+      )}
     </div>,
     document.body,
   );
