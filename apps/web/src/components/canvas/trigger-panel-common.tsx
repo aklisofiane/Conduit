@@ -60,17 +60,18 @@ export function PanelHeader({ trigger, isActive, title, onClose }: PanelHeaderPr
 export interface PanelFooterProps {
   saving: boolean;
   dirty: boolean;
+  valid?: boolean;
   onSave: () => void;
   onDiscard: () => void;
 }
 
-export function PanelFooter({ saving, dirty, onSave, onDiscard }: PanelFooterProps) {
+export function PanelFooter({ saving, dirty, valid = true, onSave, onDiscard }: PanelFooterProps) {
   return (
     <div className="flex gap-2 border-t border-[var(--color-divider)] bg-[var(--color-bg-panel)] px-5 py-4">
       <button className="btn flex-1" onClick={onDiscard} disabled={!dirty}>
         Discard
       </button>
-      <button className="btn primary flex-1" onClick={onSave} disabled={!dirty || saving}>
+      <button className="btn primary flex-1" onClick={onSave} disabled={!dirty || saving || !valid}>
         {saving ? 'Saving…' : 'Save changes'}
       </button>
     </div>

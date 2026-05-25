@@ -169,14 +169,20 @@ export function CronScheduleBuilder({ value, onChange }: CronScheduleBuilderProp
         return;
       }
       setIsCustom(false);
-      updateSchedule({ frequency: freq as Frequency });
+      const parsed = parseCron(value);
+      if (parsed) {
+        updateSchedule({ ...parsed, frequency: freq as Frequency });
+      } else {
+        updateSchedule({ frequency: freq as Frequency });
+      }
     },
-    [updateSchedule],
+    [value, updateSchedule],
   );
 
   const toggleDay = useCallback(
     (day: number) => {
       const current = schedule.daysOfWeek;
+      if (current.includes(day) && current.length === 1) return;
       const next = current.includes(day)
         ? current.filter((d) => d !== day)
         : [...current, day];

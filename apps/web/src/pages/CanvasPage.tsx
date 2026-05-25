@@ -469,6 +469,7 @@ function CanvasInner() {
       {selectedTrigger && (
         <InspectorShell width={panelWidth} onResizeStart={startPanelResize}>
           <TriggerPanelByType
+            key={selectedTrigger.id}
             trigger={selectedTrigger}
             isActive={Boolean(wf?.isActive)}
             onChange={(patch) => updateTrigger(selectedTrigger.id, patch)}

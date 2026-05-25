@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { TriggerConfig } from '@conduit/shared';
+import { CRON_EXPRESSION_RE, type TriggerConfig } from '@conduit/shared';
 import { useConnections } from '../../api/hooks.js';
 import type { CredentialRow } from '../../api/types.js';
 import { Select } from '../common/Select.js';
@@ -61,6 +61,17 @@ export function CronTriggerPanel({
   saving,
   dirty,
 }: CronTriggerPanelProps) {
+  const cronValid = CRON_EXPRESSION_RE.test(trigger.cron);
+  const timezoneOptions = useMemo(() => {
+    if (TIMEZONE_OPTIONS.some((o) => o.value === trigger.timezone)) {
+      return TIMEZONE_OPTIONS;
+    }
+    return [
+      { value: trigger.timezone, label: trigger.timezone },
+      ...TIMEZONE_OPTIONS,
+    ];
+  }, [trigger.timezone]);
+
   const platform = trigger.platform.toUpperCase() as CredentialRow['platform'];
   const { data: allConnections = [] } = useConnections();
   const repoConnections = useMemo(
@@ -106,7 +117,7 @@ export function CronTriggerPanel({
               ariaLabel="Timezone"
               value={trigger.timezone}
               onValueChange={(tz) => onChange({ timezone: tz })}
-              options={TIMEZONE_OPTIONS}
+              options={timezoneOptions}
             />
           </Field>
 
@@ -114,7 +125,7 @@ export function CronTriggerPanel({
         </div>
       </div>
 
-      <PanelFooter saving={saving} dirty={dirty} onSave={onSave} onDiscard={onDiscard} />
+      <PanelFooter saving={saving} dirty={dirty} valid={cronValid} onSave={onSave} onDiscard={onDiscard} />
     </>
   );
 }
