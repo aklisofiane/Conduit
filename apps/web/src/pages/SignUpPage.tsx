@@ -53,6 +53,10 @@ export function SignUpPage() {
   const next = params.get('next');
   const safeNext = next && next.startsWith('/') ? next : '/';
 
+  useEffect(() => {
+    if (inviteOnly) navigate('/sign-in', { replace: true });
+  }, [inviteOnly, navigate]);
+
   const onSubmit = form.handleSubmit(async (values) => {
     await submitSignUp(values, {
       signUpEmail: signUp.email,
@@ -141,8 +145,8 @@ export function SignUpPage() {
       {(showGithub || showGitlab) && (
         <>
           <Divider />
-          {showGithub && <OAuthButton provider="github" label="Continue with GitHub" callbackURL={safeNext} />}
-          {showGitlab && <OAuthButton provider="gitlab" label="Continue with GitLab" callbackURL={safeNext} />}
+          {showGithub && <OAuthButton provider="github" label="Continue with GitHub" callbackURL={safeNext} errorCallbackURL="/sign-in" />}
+          {showGitlab && <OAuthButton provider="gitlab" label="Continue with GitLab" callbackURL={safeNext} errorCallbackURL="/sign-in" />}
         </>
       )}
     </div>
@@ -181,12 +185,13 @@ function Divider() {
   );
 }
 
-function OAuthButton({ provider, label, callbackURL }: { provider: string; label: string; callbackURL: string }) {
+function OAuthButton({ provider, label, callbackURL, errorCallbackURL }: { provider: string; label: string; callbackURL: string; errorCallbackURL?: string }) {
   const handleClick = async () => {
     // Relative callbackURLs resolve against the API origin, not the SPA.
     await signIn.social({
       provider: provider as 'github',
       callbackURL: `${window.location.origin}${callbackURL}`,
+      errorCallbackURL: errorCallbackURL ? `${window.location.origin}${errorCallbackURL}` : undefined,
     });
   };
   return (

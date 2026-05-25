@@ -298,7 +298,7 @@ export const auth = betterAuth({
           );
           if (seeded) return;
           const invited = await prisma.invitation.findFirst({
-            where: { email, status: 'pending' },
+            where: { email, status: 'pending', expiresAt: { gt: new Date() } },
             select: { id: true },
           });
           if (invited) return;

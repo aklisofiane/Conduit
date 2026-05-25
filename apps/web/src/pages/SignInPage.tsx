@@ -51,6 +51,7 @@ export function SignInPage() {
 
   const next = params.get('next');
   const safeNext = next && next.startsWith('/') ? next : '/';
+  const oauthError = params.get('error');
 
   const onSubmit = form.handleSubmit(async (values) => {
     await submitSignIn(values, {
@@ -83,6 +84,12 @@ export function SignInPage() {
           Welcome back to Conduit.
         </p>
       </div>
+
+      {oauthError && (
+        <div role="alert" className="font-mono text-[11px] text-[var(--color-error)]">
+          {oauthError.includes('invitation') ? 'Registration is by invitation only.' : 'Authentication failed. Please try again.'}
+        </div>
+      )}
 
       <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
         <Field
@@ -137,8 +144,8 @@ export function SignInPage() {
       {(showGithub || showGitlab) && (
         <>
           <Divider />
-          {showGithub && <OAuthButton provider="github" label="Continue with GitHub" callbackURL={safeNext} />}
-          {showGitlab && <OAuthButton provider="gitlab" label="Continue with GitLab" callbackURL={safeNext} />}
+          {showGithub && <OAuthButton provider="github" label="Continue with GitHub" callbackURL={safeNext} errorCallbackURL="/sign-in" />}
+          {showGitlab && <OAuthButton provider="gitlab" label="Continue with GitLab" callbackURL={safeNext} errorCallbackURL="/sign-in" />}
         </>
       )}
     </div>
@@ -177,12 +184,13 @@ function Divider() {
   );
 }
 
-function OAuthButton({ provider, label, callbackURL }: { provider: string; label: string; callbackURL: string }) {
+function OAuthButton({ provider, label, callbackURL, errorCallbackURL }: { provider: string; label: string; callbackURL: string; errorCallbackURL?: string }) {
   const handleClick = async () => {
     // Relative callbackURLs resolve against the API origin, not the SPA.
     await signIn.social({
       provider: provider as 'github',
       callbackURL: `${window.location.origin}${callbackURL}`,
+      errorCallbackURL: errorCallbackURL ? `${window.location.origin}${errorCallbackURL}` : undefined,
     });
   };
   return (

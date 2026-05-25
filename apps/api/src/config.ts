@@ -11,7 +11,11 @@ const deployment: Deployment =
 const seedEmails: string[] = (process.env.CONDUIT_SEED_EMAILS ?? '')
   .split(',')
   .map((e) => e.trim().toLowerCase())
-  .filter(Boolean);
+  .filter((e) => {
+    if (!e) return false;
+    if (e.startsWith('@') && !e.slice(1).includes('.')) return false;
+    return true;
+  });
 
 const apiPort = Number.parseInt(process.env.API_PORT ?? '3000', 10);
 
