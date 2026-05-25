@@ -146,6 +146,12 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - conduit_home:/var/lib/conduit
+    healthcheck:
+      test: ['CMD-SHELL', 'kill -0 1 || exit 1']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
   web:
     build:
@@ -163,7 +169,8 @@ services:
       test: ['CMD-SHELL', 'wget -qO- http://localhost:80/ || exit 1']
       interval: 10s
       timeout: 5s
-      retries: 3
+      retries: 5
+      start_period: 10s
 
 volumes:
   conduit_pg_data:
