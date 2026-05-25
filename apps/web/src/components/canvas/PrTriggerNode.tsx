@@ -6,10 +6,11 @@ import { TriggerNodeShell } from './trigger-node-common.js';
 export interface PrTriggerNodeData extends Record<string, unknown> {
   trigger: Extract<TriggerConfig, { type: 'pull_requests' }>;
   filterCount: number;
+  host?: string;
 }
 
 export function PrTriggerNode({ data, selected }: NodeProps) {
-  const { trigger, filterCount } = data as PrTriggerNodeData;
+  const { trigger, filterCount, host } = data as PrTriggerNodeData;
   const meta = filterCount > 0 ? `${filterCount} filter${filterCount === 1 ? '' : 's'}` : undefined;
   return (
     <TriggerNodeShell
@@ -19,6 +20,7 @@ export function PrTriggerNode({ data, selected }: NodeProps) {
       detail={`every ${trigger.intervalSec}s`}
       meta={meta}
       platform={trigger.platform}
+      host={host}
     />
   );
 }

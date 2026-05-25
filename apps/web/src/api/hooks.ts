@@ -141,6 +141,7 @@ export function useCreateCredential() {
       platform: CredentialRow['platform'];
       name: string;
       secret: string;
+      hostUrl?: string;
       metadata?: Record<string, unknown>;
     }) =>
       api.post<{ id: string; name: string; platform: CredentialRow['platform'] }>(

@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { ConnectionScope } from '@conduit/shared';
+import type { ConnectionScope, ConnectionScopeKind } from '@conduit/shared';
+import { isCloudHost } from '@conduit/shared/platform';
+import type { Platform } from '@conduit/shared/platform';
 import { ApiError } from '../../api/client.js';
 import {
   useConnections,
@@ -88,13 +90,25 @@ export function ConnectionsSection() {
   );
 }
 
-const SCOPE_KINDS = [
-  { value: 'github_repo', label: 'GitHub repo' },
-  { value: 'github_projects_v2', label: 'GitHub Projects v2 board' },
-  { value: 'none', label: 'No specific scope' },
-] as const;
-
-type ScopeKind = (typeof SCOPE_KINDS)[number]['value'];
+function scopeKindsForPlatform(
+  platform: CredentialRow['platform'] | undefined,
+): { value: ConnectionScopeKind; label: string }[] {
+  switch (platform) {
+    case 'GITHUB':
+      return [
+        { value: 'github_repo', label: 'GitHub repo' },
+        { value: 'github_projects_v2', label: 'GitHub Projects v2 board' },
+        { value: 'none', label: 'No specific scope' },
+      ];
+    case 'GITLAB':
+      return [
+        { value: 'gitlab_project', label: 'GitLab project' },
+        { value: 'none', label: 'No specific scope' },
+      ];
+    default:
+      return [{ value: 'none', label: 'No specific scope' }];
+  }
+}
 
 function CreateConnectionForm({
   credentials,
@@ -109,11 +123,27 @@ function CreateConnectionForm({
 }) {
   const [name, setName] = useState('');
   const [credentialId, setCredentialId] = useState<string>(credentials[0]?.id ?? '');
-  const [scopeKind, setScopeKind] = useState<ScopeKind>('github_repo');
+  const [scopeKind, setScopeKind] = useState<ConnectionScopeKind>('github_repo');
   const [owner, setOwner] = useState('');
   const [repo, setRepo] = useState('');
   const [ownerType, setOwnerType] = useState<'user' | 'org'>('org');
   const [boardNumber, setBoardNumber] = useState('');
+  const [projectPath, setProjectPath] = useState('');
+  const [projectPathError, setProjectPathError] = useState<string | null>(null);
+
+  const selectedCredential = credentials.find((c) => c.id === credentialId);
+  const availableScopeKinds = useMemo(
+    () => scopeKindsForPlatform(selectedCredential?.platform),
+    [selectedCredential?.platform],
+  );
+
+  // Reset scope kind when credential changes and current kind isn't available
+  useEffect(() => {
+    const first = availableScopeKinds[0];
+    if (first && !availableScopeKinds.some((k) => k.value === scopeKind)) {
+      setScopeKind(first.value);
+    }
+  }, [availableScopeKinds, scopeKind]);
 
   const scope = useMemo<ConnectionScope | null>(() => {
     if (scopeKind === 'github_repo') {
@@ -130,8 +160,13 @@ function CreateConnectionForm({
         number: num,
       };
     }
+    if (scopeKind === 'gitlab_project') {
+      const trimmed = projectPath.trim();
+      if (!trimmed || !trimmed.includes('/')) return null;
+      return { kind: 'gitlab_project', projectPath: trimmed };
+    }
     return { kind: 'none' };
-  }, [scopeKind, owner, repo, ownerType, boardNumber]);
+  }, [scopeKind, owner, repo, ownerType, boardNumber, projectPath]);
 
   const saveBlocker = !credentialId
     ? 'Pick a credential'
@@ -187,8 +222,8 @@ function CreateConnectionForm({
         <Select
           ariaLabel="Scope kind"
           value={scopeKind}
-          onValueChange={(v) => setScopeKind(v as ScopeKind)}
-          options={SCOPE_KINDS.map((s) => ({ value: s.value, label: s.label }))}
+          onValueChange={(v) => setScopeKind(v as ConnectionScopeKind)}
+          options={availableScopeKinds}
         />
       </label>
 
@@ -229,6 +264,36 @@ function CreateConnectionForm({
           onOwner={setOwner}
           onBoardNumber={setBoardNumber}
         />
+      )}
+
+      {scopeKind === 'gitlab_project' && (
+        <label className="flex flex-col gap-1">
+          <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+            Project path
+          </span>
+          <input
+            className="field-input"
+            placeholder="group/subgroup/project"
+            value={projectPath}
+            onChange={(e) => {
+              setProjectPath(e.target.value);
+              if (projectPathError) setProjectPathError(null);
+            }}
+            onBlur={() => {
+              const trimmed = projectPath.trim();
+              if (trimmed && !trimmed.includes('/')) {
+                setProjectPathError('Project path must contain at least one "/" (e.g. group/project)');
+              } else {
+                setProjectPathError(null);
+              }
+            }}
+          />
+          {projectPathError && (
+            <span className="font-mono text-[11px] text-[var(--color-danger)]">
+              {projectPathError}
+            </span>
+          )}
+        </label>
       )}
 
       <div className="flex justify-end gap-2">
@@ -410,6 +475,9 @@ function ConnectionRowView({ conn, onDelete }: { conn: ConnectionRow; onDelete: 
         <div className="font-mono text-[13px] font-medium">{conn.name}</div>
         <div className="font-mono text-[11px] text-[var(--color-text-3)]">
           {conn.credential.name} · {conn.credential.platform.toLowerCase()}
+          {conn.credential.hostUrl &&
+            !isCloudHost(conn.credential.platform as Platform, conn.credential.hostUrl) &&
+            ` · ${conn.credential.hostUrl}`}
           {summary && ` · ${summary}`}
         </div>
       </div>

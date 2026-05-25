@@ -3,6 +3,7 @@ import { expectScopeKind } from '@conduit/shared';
 import {
   listProjectBoards,
   listRepoLabels,
+  listGitlabProjectLabels,
   type ProjectBoardSummary,
   type RepoLabel,
 } from '@conduit/shared/platform';
@@ -66,6 +67,32 @@ export class TriggerService {
       this.connections.assertInOrg(orgId, dto.connectionId),
       this.credentials.getConnectionBinding(dto.connectionId),
     ]);
+
+    if (binding.platform === 'GITLAB') {
+      let glScope;
+      try {
+        glScope = expectScopeKind(binding.scope, 'gitlab_project');
+      } catch {
+        throw new BadRequestException({
+          message: `Connection ${dto.connectionId} is not bound to a GitLab project (scope.kind = ${binding.scope.kind})`,
+        });
+      }
+      try {
+        return await listGitlabProjectLabels({
+          hostUrl: binding.hostUrl ?? 'gitlab.com',
+          projectPath: glScope.projectPath,
+          token: binding.token,
+        });
+      } catch (e: unknown) {
+        const message = errMessage(e);
+        this.logger.warn(
+          `List GitLab labels failed (${glScope.projectPath}): ${message}`,
+        );
+        throw new BadRequestException({ message });
+      }
+    }
+
+    // Default: GitHub (existing behavior).
     let repoScope;
     try {
       repoScope = expectScopeKind(binding.scope, 'github_repo');

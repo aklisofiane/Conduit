@@ -6,10 +6,11 @@ import { TriggerNodeShell } from './trigger-node-common.js';
 export interface IssuesTriggerNodeData extends Record<string, unknown> {
   trigger: Extract<TriggerConfig, { type: 'issues' }>;
   filterCount: number;
+  host?: string;
 }
 
 export function IssuesTriggerNode({ data, selected }: NodeProps) {
-  const { trigger, filterCount } = data as IssuesTriggerNodeData;
+  const { trigger, filterCount, host } = data as IssuesTriggerNodeData;
   const detail = trigger.boardConnectionId
     ? `board · every ${trigger.intervalSec}s`
     : `repo issues · every ${trigger.intervalSec}s`;
@@ -22,6 +23,7 @@ export function IssuesTriggerNode({ data, selected }: NodeProps) {
       detail={detail}
       meta={meta}
       platform={trigger.platform}
+      host={host}
     />
   );
 }

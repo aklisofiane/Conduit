@@ -7,6 +7,7 @@ import { TriggerNodeShell } from './trigger-node-common.js';
 
 export interface CronTriggerNodeData extends Record<string, unknown> {
   trigger: Extract<TriggerConfig, { type: 'cron' }>;
+  host?: string;
 }
 
 function describeCron(cron: string): string {
@@ -18,7 +19,7 @@ function describeCron(cron: string): string {
 }
 
 export function CronTriggerNode({ data, selected }: NodeProps) {
-  const { trigger } = data as CronTriggerNodeData;
+  const { trigger, host } = data as CronTriggerNodeData;
   const detail = useMemo(() => describeCron(trigger.cron), [trigger.cron]);
   return (
     <TriggerNodeShell
@@ -28,6 +29,7 @@ export function CronTriggerNode({ data, selected }: NodeProps) {
       detail={detail}
       meta={`${trigger.branch} · ${trigger.timezone}`}
       platform={trigger.platform}
+      host={host}
     />
   );
 }

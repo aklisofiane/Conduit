@@ -53,7 +53,8 @@ import { WorkflowHeaderPill } from '../components/canvas/WorkflowHeaderPill.js';
 import { WorkflowTabs, type WorkflowTabId } from '../components/layout/WorkflowTabs.js';
 import { WorkflowActions } from '../components/layout/WorkflowActions.js';
 import { WorkflowRunsList } from '../components/run/WorkflowRunsList.js';
-import { useUpdateWorkflow, useWorkflow } from '../api/hooks.js';
+import { useConnections, useUpdateWorkflow, useWorkflow } from '../api/hooks.js';
+import type { ConnectionRow } from '../api/types.js';
 import { useWorkflowEditor } from '../state/workflow-editor.js';
 import { useTopbarSlots } from '../state/topbar-slots.js';
 import { relativeFromNow } from '../lib/time.js';
@@ -108,6 +109,7 @@ function CanvasInner() {
   const { id } = useParams<{ id: string }>();
   const { data: wf, isLoading } = useWorkflow(id);
   const updateWorkflow = useUpdateWorkflow(id ?? '');
+  const { data: allConnections = [] } = useConnections();
   const rf = useReactFlow();
   const [activeTab, setActiveTab] = useState<WorkflowTabId>('build');
 
@@ -190,9 +192,9 @@ function CanvasInner() {
       setFlowEdges([]);
       return;
     }
-    setFlowNodes((prev) => buildFlowNodes(draft, prev));
+    setFlowNodes((prev) => buildFlowNodes(draft, prev, allConnections));
     setFlowEdges((prev) => buildFlowEdges(draft, prev));
-  }, [draft]);
+  }, [draft, allConnections]);
 
   useEffect(() => {
     setFlowNodes((prev) => {
@@ -603,14 +605,21 @@ function flowEdgesToDomain(edges: FlowEdge[], def: WorkflowDefinition): Edge[] {
   return result;
 }
 
-function buildFlowNodes(draft: WorkflowDefinition, prev: FlowNode[]): FlowNode[] {
+function buildFlowNodes(
+  draft: WorkflowDefinition,
+  prev: FlowNode[],
+  connections: ConnectionRow[] = [],
+): FlowNode[] {
   const prevById = new Map(prev.map((n) => [n.id, n]));
+  const connById = new Map(connections.map((c) => [c.id, c]));
   const triggerNodes: FlowNode[] = draft.triggers.map((trigger, i) => {
     const p = prevById.get(trigger.id);
     const position =
       draft.ui.nodePositions[trigger.name] ??
       draft.ui.nodePositions[trigger.id] ??
       p?.position ?? { x: 80, y: 120 + i * 160 };
+    const conn = connById.get(trigger.connectionId);
+    const host = conn?.credential.hostUrl ?? undefined;
     return {
       ...(p ?? {}),
       id: trigger.id,
@@ -619,6 +628,7 @@ function buildFlowNodes(draft: WorkflowDefinition, prev: FlowNode[]): FlowNode[]
       data: {
         trigger,
         filterCount: trigger.type === 'cron' ? 0 : trigger.filters.length,
+        host,
       },
     };
   });

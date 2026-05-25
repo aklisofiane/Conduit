@@ -1,0 +1,46 @@
+{
+  "object_kind": "merge_request",
+  "event_type": "merge_request",
+  "user": {
+    "id": 202,
+    "name": "Bob Dev",
+    "username": "bob",
+    "avatar_url": "https://gitlab.com/uploads/-/system/user/avatar/202/avatar.png",
+    "email": "[REDACTED]"
+  },
+  "project": {
+    "id": 5001,
+    "name": "shop",
+    "description": "E-commerce storefront",
+    "web_url": "https://gitlab.com/acme/shop",
+    "git_ssh_url": "git@gitlab.com:acme/shop.git",
+    "git_http_url": "https://gitlab.com/acme/shop.git",
+    "namespace": "acme",
+    "visibility_level": 0,
+    "path_with_namespace": "acme/shop",
+    "default_branch": "main",
+    "homepage": "https://gitlab.com/acme/shop"
+  },
+  "object_attributes": {
+    "id": 401,
+    "iid": 7,
+    "title": "Fix checkout crash on empty cart",
+    "description": "Closes #42. Guard against empty cart in the checkout controller.",
+    "state": "opened",
+    "action": "open",
+    "url": "https://gitlab.com/acme/shop/-/merge_requests/7",
+    "source_branch": "fix/checkout-empty-cart",
+    "target_branch": "main",
+    "source_project_id": 5001,
+    "target_project_id": 5001,
+    "created_at": "2026-04-19 11:30:00 UTC",
+    "updated_at": "2026-04-19 11:30:00 UTC"
+  },
+  "labels": [],
+  "repository": {
+    "name": "shop",
+    "url": "git@gitlab.com:acme/shop.git",
+    "description": "E-commerce storefront",
+    "homepage": "https://gitlab.com/acme/shop"
+  }
+}

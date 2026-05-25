@@ -3,6 +3,7 @@ import { offeredFilterFields } from '@conduit/shared';
 import type { TriggerConfig } from '@conduit/shared';
 import { useConnections, useListLabels } from '../../api/hooks.js';
 import type { CredentialRow } from '../../api/types.js';
+import { repoScopeKindFor } from '../../lib/connection.js';
 import {
   ActiveToggleField,
   ConnectionSelect,
@@ -42,9 +43,11 @@ export function PrTriggerPanel({
   const repoConnections = useMemo(
     () =>
       allConnections.filter(
-        (c) => c.scope.kind === 'github_repo' && c.credential.platform === platform,
+        (c) =>
+          c.scope.kind === repoScopeKindFor(trigger.platform) &&
+          c.credential.platform === platform,
       ),
-    [allConnections, platform],
+    [allConnections, platform, trigger.platform],
   );
 
   const labelsQuery = useListLabels({
@@ -59,12 +62,12 @@ export function PrTriggerPanel({
 
       <div className="flex-1 overflow-y-auto px-5 py-4">
         <div className="space-y-5">
-          <Field label="Repo" hint="source connection for events">
+          <Field label={trigger.platform === 'gitlab' ? 'Project' : 'Repo'} hint="source connection for events">
             <ConnectionSelect
               connections={repoConnections}
               value={trigger.connectionId}
               onChange={(id) => onChange({ connectionId: id })}
-              emptyHint="No repo connections yet — create one on the Connections page."
+              emptyHint={`No ${trigger.platform === 'gitlab' ? 'project' : 'repo'} connections yet — create one on the Connections page.`}
             />
           </Field>
 

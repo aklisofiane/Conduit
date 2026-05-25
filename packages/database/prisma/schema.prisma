@@ -62,6 +62,9 @@ model Credential {
   name      String
   // Encrypted at rest (AES-256-GCM). See docs/SECURITY.md.
   secret    String
+  // Bare hostname (no scheme, no trailing slash). VCS platforms only.
+  // Written once on first create; null for non-VCS platforms.
+  hostUrl   String?
   metadata  Json?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -169,6 +172,9 @@ model TicketBranch {
   // still converge on one row (the desired shared-naming property).
   orgId      String
   platform   Platform
+  // Bare hostname of the VCS instance (e.g. 'github.com', 'ghe.example.com').
+  // Part of the unique key so same-named repos on different hosts stay distinct.
+  hostUrl    String    @default("github.com")
   owner      String
   repo       String
   // TriggerEvent.issue.key — user-visible identifier as a string ("42" for GitHub,
@@ -183,7 +189,7 @@ model TicketBranch {
 
   organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
-  @@unique([orgId, platform, owner, repo, ticketId])
+  @@unique([orgId, platform, hostUrl, owner, repo, ticketId])
   @@index([platform, owner, repo])
 }
 

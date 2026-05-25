@@ -20,6 +20,8 @@ import {
   fetchProjectBoardItems,
   fetchRepositoryIssues,
   fetchRepositoryPullRequests,
+  fetchGitlabProjectIssues,
+  fetchGitlabProjectMergeRequests,
 } from '@conduit/shared/platform';
 import { getTemporalClient } from '../runtime/temporal-client';
 import { itemPassesFilters, toTriggerEvent } from './poll-board-helpers';
@@ -60,10 +62,6 @@ export async function pollBoardActivity(
     // cleans it up on next save.
     return emptyResult(workflowId, 'not-polling');
   }
-  if (trigger.platform !== 'github') {
-    throw new Error(`Polling for platform "${trigger.platform}" not implemented`);
-  }
-
   const needsBoard = trigger.type === 'issues' && !!trigger.boardConnectionId;
 
   // Source connection carries the credential for every path; board path also
@@ -85,46 +83,74 @@ export async function pollBoardActivity(
   }
   const sourceScope = connectionScopeSchema.parse(sourceConn.scope);
   const token = decryptSecret(sourceConn.credential.secret, loadEncryptionKey());
+  const hostUrl = sourceConn.credential.hostUrl;
 
-  // Three fetch paths, dispatched on `type` and `boardConnectionId` presence:
+  // Fetch paths dispatched on platform + type + boardConnectionId:
+  //
+  // GitHub:
   //   - `pull_requests` → repo PRs (a board adds nothing here).
   //   - `issues` + boardConnectionId → Projects v2 board items.
   //   - `issues` (no board) → repo open issues.
-  // All three return the same `ProjectBoardItem` shape so the rest of the
+  //
+  // GitLab:
+  //   - `pull_requests` → project merge requests.
+  //   - `issues` → project open issues (no board path in v1).
+  //
+  // All paths return the same `ProjectBoardItem` shape so the rest of the
   // pipeline (filter, dedup, event-build) doesn't care which one fired.
   let items;
-  if (trigger.type === 'pull_requests') {
-    const repoScope = expectScopeKind(sourceScope, 'github_repo');
-    items = await fetchRepositoryPullRequests({
-      owner: repoScope.owner,
-      name: repoScope.repo,
-      token,
-    });
-  } else if (needsBoard) {
-    if (!boardConn) {
-      throw new Error(
-        `Workflow ${workflowId} trigger references unknown board connection ${trigger.boardConnectionId}`,
+  if (trigger.platform === 'github') {
+    if (trigger.type === 'pull_requests') {
+      const repoScope = expectScopeKind(sourceScope, 'github_repo');
+      items = await fetchRepositoryPullRequests({
+        owner: repoScope.owner,
+        name: repoScope.repo,
+        token,
+      });
+    } else if (needsBoard) {
+      if (!boardConn) {
+        throw new Error(
+          `Workflow ${workflowId} trigger references unknown board connection ${trigger.boardConnectionId}`,
+        );
+      }
+      const boardScope = expectScopeKind(
+        connectionScopeSchema.parse(boardConn.scope),
+        'github_projects_v2',
       );
+      const boardItems = await fetchProjectBoardItems({
+        ownerType: boardScope.ownerType,
+        owner: boardScope.owner,
+        projectNumber: boardScope.number,
+        token,
+      });
+      // Drop PRs and DraftIssues so issue triggers only see real issues.
+      items = boardItems.filter((item) => item.contentType === 'Issue');
+    } else {
+      const repoScope = expectScopeKind(sourceScope, 'github_repo');
+      items = await fetchRepositoryIssues({
+        owner: repoScope.owner,
+        name: repoScope.repo,
+        token,
+      });
     }
-    const boardScope = expectScopeKind(
-      connectionScopeSchema.parse(boardConn.scope),
-      'github_projects_v2',
-    );
-    const boardItems = await fetchProjectBoardItems({
-      ownerType: boardScope.ownerType,
-      owner: boardScope.owner,
-      projectNumber: boardScope.number,
-      token,
-    });
-    // Drop PRs and DraftIssues so issue triggers only see real issues.
-    items = boardItems.filter((item) => item.contentType === 'Issue');
+  } else if (trigger.platform === 'gitlab') {
+    const glScope = expectScopeKind(sourceScope, 'gitlab_project');
+    const glHost = hostUrl ?? 'gitlab.com';
+    if (trigger.type === 'pull_requests') {
+      items = await fetchGitlabProjectMergeRequests({
+        hostUrl: glHost,
+        projectPath: glScope.projectPath,
+        token,
+      });
+    } else {
+      items = await fetchGitlabProjectIssues({
+        hostUrl: glHost,
+        projectPath: glScope.projectPath,
+        token,
+      });
+    }
   } else {
-    const repoScope = expectScopeKind(sourceScope, 'github_repo');
-    items = await fetchRepositoryIssues({
-      owner: repoScope.owner,
-      name: repoScope.repo,
-      token,
-    });
+    throw new Error(`Polling for platform "${trigger.platform}" not implemented`);
   }
   const fetchedCount = items.length;
 

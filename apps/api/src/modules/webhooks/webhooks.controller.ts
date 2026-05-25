@@ -26,10 +26,10 @@ export class WebhooksController {
 
   @Post(':workflowId')
   @HttpCode(200)
-  async github(
+  async handle(
     @Param('workflowId') workflowId: string,
     @Req() req: RawBodyRequest,
   ): Promise<WebhookResult> {
-    return this.svc.handleGithub(workflowId, req);
+    return this.svc.handle(workflowId, req);
   }
 }

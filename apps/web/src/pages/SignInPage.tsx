@@ -41,6 +41,7 @@ export function SignInPage() {
   const { data: authConfig } = useAuthConfig();
   const oauthProviders = authConfig?.oauthProviders ?? [];
   const showGithub = oauthProviders.includes('github');
+  const showGitlab = oauthProviders.includes('gitlab');
 
   const form = useForm<SignInValues>({
     resolver: zodResolver(schema),
@@ -130,10 +131,11 @@ export function SignInPage() {
         </div>
       </form>
 
-      {showGithub && (
+      {(showGithub || showGitlab) && (
         <>
           <Divider />
-          <GithubButton callbackURL={safeNext} />
+          {showGithub && <OAuthButton provider="github" label="Continue with GitHub" callbackURL={safeNext} />}
+          {showGitlab && <OAuthButton provider="gitlab" label="Continue with GitLab" callbackURL={safeNext} />}
         </>
       )}
     </div>
@@ -172,17 +174,17 @@ function Divider() {
   );
 }
 
-function GithubButton({ callbackURL }: { callbackURL: string }) {
+function OAuthButton({ provider, label, callbackURL }: { provider: string; label: string; callbackURL: string }) {
   const handleClick = async () => {
     // Relative callbackURLs resolve against the API origin, not the SPA.
     await signIn.social({
-      provider: 'github',
+      provider: provider as 'github',
       callbackURL: `${window.location.origin}${callbackURL}`,
     });
   };
   return (
     <button type="button" className="btn justify-center" onClick={handleClick}>
-      Continue with GitHub
+      {label}
     </button>
   );
 }

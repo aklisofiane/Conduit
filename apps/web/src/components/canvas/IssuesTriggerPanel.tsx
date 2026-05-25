@@ -7,6 +7,7 @@ import {
   useListProjectBoards,
 } from '../../api/hooks.js';
 import type { CredentialRow } from '../../api/types.js';
+import { repoScopeKindFor } from '../../lib/connection.js';
 import {
   ActiveToggleField,
   BoardPickerHint,
@@ -47,9 +48,11 @@ export function IssuesTriggerPanel({
   const repoConnections = useMemo(
     () =>
       allConnections.filter(
-        (c) => c.scope.kind === 'github_repo' && c.credential.platform === platform,
+        (c) =>
+          c.scope.kind === repoScopeKindFor(trigger.platform) &&
+          c.credential.platform === platform,
       ),
-    [allConnections, platform],
+    [allConnections, platform, trigger.platform],
   );
   const boardConnections = useMemo(
     () =>
@@ -95,63 +98,65 @@ export function IssuesTriggerPanel({
 
       <div className="flex-1 overflow-y-auto px-5 py-4">
         <div className="space-y-5">
-          <Field label="Repo" hint="source connection for events">
+          <Field label={trigger.platform === 'gitlab' ? 'Project' : 'Repo'} hint="source connection for events">
             <ConnectionSelect
               connections={repoConnections}
               value={trigger.connectionId}
               onChange={(id) => onChange({ connectionId: id })}
-              emptyHint="No repo connections yet — create one on the Connections page."
+              emptyHint={`No ${trigger.platform === 'gitlab' ? 'project' : 'repo'} connections yet — create one on the Connections page.`}
             />
           </Field>
 
-          <Field
-            label="Board (optional)"
-            hint={hasBoard ? 'board attached unlocks the status filter below' : undefined}
-          >
-            {hasBoard ? (
-              <div className="flex items-start gap-2">
-                <div className="min-w-0 flex-1">
-                  <ConnectionSelect
-                    connections={boardConnections}
-                    value={trigger.boardConnectionId ?? ''}
-                    onChange={(id) =>
-                      onChange({ boardConnectionId: id || undefined })
-                    }
-                    emptyHint="No Projects v2 connections yet — create one on the Connections page."
-                  />
+          {trigger.platform !== 'gitlab' && (
+            <Field
+              label="Board (optional)"
+              hint={hasBoard ? 'board attached unlocks the status filter below' : undefined}
+            >
+              {hasBoard ? (
+                <div className="flex items-start gap-2">
+                  <div className="min-w-0 flex-1">
+                    <ConnectionSelect
+                      connections={boardConnections}
+                      value={trigger.boardConnectionId ?? ''}
+                      onChange={(id) =>
+                        onChange({ boardConnectionId: id || undefined })
+                      }
+                      emptyHint="No Projects v2 connections yet — create one on the Connections page."
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    className="btn shrink-0"
+                    onClick={() => onChange({ boardConnectionId: undefined })}
+                    aria-label="Detach board"
+                    title="Detach board"
+                  >
+                    ×
+                  </button>
                 </div>
+              ) : boardConnections.length === 0 ? (
+                <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
+                  No Projects v2 connections yet — create one on the Connections page.
+                </div>
+              ) : (
                 <button
                   type="button"
-                  className="btn shrink-0"
-                  onClick={() => onChange({ boardConnectionId: undefined })}
-                  aria-label="Detach board"
-                  title="Detach board"
+                  className="btn w-full"
+                  onClick={() => {
+                    const first = boardConnections[0];
+                    if (first) onChange({ boardConnectionId: first.id });
+                  }}
                 >
-                  ×
+                  + Attach a board
                 </button>
-              </div>
-            ) : boardConnections.length === 0 ? (
-              <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
-                No Projects v2 connections yet — create one on the Connections page.
-              </div>
-            ) : (
-              <button
-                type="button"
-                className="btn w-full"
-                onClick={() => {
-                  const first = boardConnections[0];
-                  if (first) onChange({ boardConnectionId: first.id });
-                }}
-              >
-                + Attach a board
-              </button>
-            )}
-            {hasBoard && selectedBoardSummary && (
-              <div className="mt-2">
-                <BoardPickerHint query={boardsQuery} selectedBoard={selectedBoardSummary} />
-              </div>
-            )}
-          </Field>
+              )}
+              {hasBoard && selectedBoardSummary && (
+                <div className="mt-2">
+                  <BoardPickerHint query={boardsQuery} selectedBoard={selectedBoardSummary} />
+                </div>
+              )}
+            </Field>
+          )}
 
           <Field label="Poll every" hint="seconds between poll cycles">
             <div className="flex items-center gap-2">

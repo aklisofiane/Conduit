@@ -8,10 +8,10 @@ import { prisma } from './prisma';
  * different slug than the one persisted.
  *
  * Tenant-scoped — the unique key is
- * `(orgId, platform, owner, repo, ticketId)`. Within one org, a Worker and a
- * Critic pointing at the same ticket converge on one row; two orgs working
- * the same Github repo / ticket get distinct rows (and slugs) so naming
- * doesn't collide across tenants.
+ * `(orgId, platform, hostUrl, owner, repo, ticketId)`. Within one org, a
+ * Worker and a Critic pointing at the same ticket converge on one row; two
+ * orgs working the same Github repo / ticket get distinct rows (and slugs)
+ * so naming doesn't collide across tenants.
  */
 export function makeTicketBranchStore(): TicketBranchStore {
   return {
@@ -23,9 +23,10 @@ export function makeTicketBranchStore(): TicketBranchStore {
       // later runs must read back the row that iteration 1 created verbatim.
       const row = await prisma().ticketBranch.upsert({
         where: {
-          orgId_platform_owner_repo_ticketId: {
+          orgId_platform_hostUrl_owner_repo_ticketId: {
             orgId: input.orgId,
             platform,
+            hostUrl: input.hostUrl,
             owner: input.owner,
             repo: input.repo,
             ticketId: input.ticketId,
@@ -34,6 +35,7 @@ export function makeTicketBranchStore(): TicketBranchStore {
         create: {
           orgId: input.orgId,
           platform,
+          hostUrl: input.hostUrl,
           owner: input.owner,
           repo: input.repo,
           ticketId: input.ticketId,
@@ -57,6 +59,7 @@ export function makeTicketBranchStore(): TicketBranchStore {
 function toRow(row: {
   id: string;
   platform: 'GITHUB' | 'GITLAB' | 'JIRA' | 'SLACK' | 'DISCORD';
+  hostUrl: string;
   owner: string;
   repo: string;
   ticketId: string;
@@ -67,6 +70,7 @@ function toRow(row: {
   return {
     id: row.id,
     platform: row.platform === 'GITLAB' ? 'gitlab' : 'github',
+    hostUrl: row.hostUrl,
     owner: row.owner,
     repo: row.repo,
     ticketId: row.ticketId,

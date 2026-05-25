@@ -25,6 +25,12 @@ export const githubProjectsV2ScopeSchema = z.object({
 });
 export type GithubProjectsV2Scope = z.infer<typeof githubProjectsV2ScopeSchema>;
 
+export const gitlabProjectScopeSchema = z.object({
+  kind: z.literal('gitlab_project'),
+  projectPath: z.string().min(1), // e.g., "acme/api" or "group/subgroup/api"
+});
+export type GitlabProjectScope = z.infer<typeof gitlabProjectScopeSchema>;
+
 export const noneScopeSchema = z.object({
   kind: z.literal('none'),
 });
@@ -33,6 +39,7 @@ export type NoneScope = z.infer<typeof noneScopeSchema>;
 export const connectionScopeSchema = z.discriminatedUnion('kind', [
   githubRepoScopeSchema,
   githubProjectsV2ScopeSchema,
+  gitlabProjectScopeSchema,
   noneScopeSchema,
 ]);
 export type ConnectionScope = z.infer<typeof connectionScopeSchema>;

@@ -60,7 +60,7 @@ export async function resolveTicketBranchWorkspace(
   input: TicketBranchResolveInput,
 ): Promise<ResolvedWorkspace> {
   const { runId, nodeName, connection, orgId, ticket, store, pr } = input;
-  const bare = baseClonePath(connection.platform, connection.owner, connection.repo);
+  const bare = baseClonePath(connection.platform, connection.host, connection.owner, connection.repo);
   const target = nodeWorkspacePath(runId, nodeName);
 
   if (!pr && (!ticket || !store || !orgId)) {
@@ -108,6 +108,7 @@ export async function resolveTicketBranchWorkspace(
     const row = await store!.upsert({
       orgId: orgId!,
       platform: connection.platform,
+      hostUrl: connection.host,
       owner: connection.owner,
       repo: connection.repo,
       ticketId: ticket!.id,

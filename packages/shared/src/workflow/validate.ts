@@ -16,7 +16,8 @@ export interface WorkflowValidationIssue {
     | 'triggers-must-share-connection'
     | 'trigger-board-connection-required'
     | 'triggers-must-share-board-connection'
-    | 'cron-trigger-incompatible-workspace';
+    | 'cron-trigger-incompatible-workspace'
+    | 'gitlab-trigger-board-unsupported';
   message: string;
   /** Optional node name (or trigger name) the issue is attached to, for UI highlighting. */
   nodeName?: string;
@@ -83,6 +84,20 @@ export function validateWorkflowDefinition(
         code: 'trigger-board-connection-required',
         message:
           `Trigger "${trigger.name}" listens for board.column.changed but is missing a boardConnectionId.`,
+        nodeName: trigger.name,
+      });
+    }
+  }
+
+  // Rule: GitLab triggers do not support boards in this release. Reject
+  // boardConnectionId at save time so the worker never sees it.
+  for (const trigger of triggers) {
+    if (trigger.platform === 'gitlab' && trigger.boardConnectionId) {
+      issues.push({
+        code: 'gitlab-trigger-board-unsupported',
+        message:
+          `Trigger "${trigger.name}" is a GitLab trigger with a boardConnectionId. ` +
+          `GitLab triggers do not support boards in this release.`,
         nodeName: trigger.name,
       });
     }

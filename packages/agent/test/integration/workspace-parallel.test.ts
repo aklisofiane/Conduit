@@ -63,6 +63,7 @@ describe('parallel `inherit` + merge-back + .conduit copy', () => {
     connection = {
       id: 'conn-1',
       platform: 'github',
+      host: 'github.com',
       owner: 'acme',
       repo: 'shop',
       cloneUrl: remote,
@@ -83,6 +84,7 @@ describe('parallel `inherit` + merge-back + .conduit copy', () => {
       runId,
       nodeName: 'Triage',
       spec: { kind: 'ticket-branch' },
+      orgId: 'org_int_test',
       connection,
       ticket: { id: '11', title: 'parallel merge-back' },
       ticketBranchStore: makeFakeStore(),
@@ -180,6 +182,7 @@ describe('parallel `inherit` + merge-back + .conduit copy', () => {
       runId,
       nodeName: 'Triage',
       spec: { kind: 'ticket-branch' },
+      orgId: 'org_int_test',
       connection,
       ticket: { id: '12', title: 'conflict scenario' },
       ticketBranchStore: makeFakeStore(),
@@ -257,6 +260,7 @@ function makeFakeStore(): TicketBranchStore {
       const row: TicketBranchRow = {
         id: `tb_${rows.size + 1}`,
         platform: input.platform,
+        hostUrl: input.hostUrl,
         owner: input.owner,
         repo: input.repo,
         ticketId: input.ticketId,

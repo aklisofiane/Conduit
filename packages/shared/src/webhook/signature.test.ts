@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { verifyGithubSignature } from './signature';
+import { verifyGithubSignature, verifyGitlabToken } from './signature';
 
 function signed(secret: string, body: string): string {
   return `sha256=${createHmac('sha256', secret).update(body).digest('hex')}`;
@@ -42,5 +42,34 @@ describe('verifyGithubSignature', () => {
   it('is case-insensitive on the hex digest', () => {
     const sig = signed(secret, body).toUpperCase();
     expect(verifyGithubSignature(secret, body, sig)).toBe(true);
+  });
+});
+
+describe('verifyGitlabToken', () => {
+  const secret = 'my-gitlab-webhook-secret';
+
+  it('accepts an exact match', () => {
+    expect(verifyGitlabToken(secret, secret)).toBe(true);
+  });
+
+  it('rejects a wrong token', () => {
+    expect(verifyGitlabToken(secret, 'wrong-token-value!')).toBe(false);
+  });
+
+  it('rejects a missing header', () => {
+    expect(verifyGitlabToken(secret, undefined)).toBe(false);
+  });
+
+  it('rejects an empty secret', () => {
+    expect(verifyGitlabToken('', secret)).toBe(false);
+  });
+
+  it('rejects length mismatch', () => {
+    expect(verifyGitlabToken(secret, secret + 'x')).toBe(false);
+  });
+
+  it('rejects equal-length non-match', () => {
+    const other = 'x'.repeat(secret.length);
+    expect(verifyGitlabToken(secret, other)).toBe(false);
   });
 });

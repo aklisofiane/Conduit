@@ -26,3 +26,19 @@ export function verifyGithubSignature(
   if (a.length !== b.length) return false;
   return timingSafeEqual(a, b);
 }
+
+/**
+ * GitLab signs webhooks by plain shared-secret echo in the `X-Gitlab-Token`
+ * header — no HMAC, no body involvement. Constant-time compare so the secret
+ * can't be teased out byte-by-byte.
+ */
+export function verifyGitlabToken(
+  secret: string,
+  header: string | undefined,
+): boolean {
+  if (!secret || !header) return false;
+  const a = Buffer.from(secret, 'utf8');
+  const b = Buffer.from(header, 'utf8');
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}

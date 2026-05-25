@@ -1,0 +1,45 @@
+{
+  "object_kind": "issue",
+  "event_type": "issue",
+  "user": {
+    "id": 101,
+    "name": "Alice Dev",
+    "username": "alice",
+    "avatar_url": "https://gitlab.com/uploads/-/system/user/avatar/101/avatar.png",
+    "email": "[REDACTED]"
+  },
+  "project": {
+    "id": 5001,
+    "name": "shop",
+    "description": "E-commerce storefront",
+    "web_url": "https://gitlab.com/acme/shop",
+    "git_ssh_url": "git@gitlab.com:acme/shop.git",
+    "git_http_url": "https://gitlab.com/acme/shop.git",
+    "namespace": "acme",
+    "visibility_level": 0,
+    "path_with_namespace": "acme/shop",
+    "default_branch": "main",
+    "homepage": "https://gitlab.com/acme/shop"
+  },
+  "object_attributes": {
+    "id": 301,
+    "iid": 42,
+    "title": "Checkout crashes when cart is empty",
+    "description": "Steps to reproduce:\n1. Sign in\n2. Clear cart\n3. Click checkout\n\nExpected: redirect. Actual: 500.",
+    "state": "opened",
+    "action": "open",
+    "url": "https://gitlab.com/acme/shop/-/issues/42",
+    "created_at": "2026-04-19 10:00:00 UTC",
+    "updated_at": "2026-04-19 10:00:00 UTC"
+  },
+  "labels": [
+    { "id": 1, "title": "bug", "color": "#d73a4a" },
+    { "id": 2, "title": "priority::high", "color": "#b60205" }
+  ],
+  "repository": {
+    "name": "shop",
+    "url": "git@gitlab.com:acme/shop.git",
+    "description": "E-commerce storefront",
+    "homepage": "https://gitlab.com/acme/shop"
+  }
+}

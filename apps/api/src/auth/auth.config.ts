@@ -4,6 +4,7 @@ import { organization } from 'better-auth/plugins';
 import { Redis } from 'ioredis';
 import { Logger } from '@nestjs/common';
 import { prisma } from '@conduit/database';
+import type { Platform } from '@conduit/shared/platform';
 import { config } from '../config';
 import type { PrismaService } from '../common/prisma.service';
 import { CredentialsService } from '../modules/credentials/credentials.service';
@@ -14,8 +15,12 @@ import { createAuditAfterMiddleware, createOrganizationAuditHooks } from './audi
 import { rateLimitConfig } from './rate-limit-config';
 
 const githubOAuth = config.betterAuth.githubOAuth;
+const gitlabOAuth = config.betterAuth.gitlabOAuth;
 
-export const oauthProviders: readonly string[] = githubOAuth ? ['github'] : [];
+export const oauthProviders: readonly string[] = [
+  ...(githubOAuth ? ['github'] : []),
+  ...(gitlabOAuth ? ['gitlab'] : []),
+];
 
 /**
  * Derive a deterministic personal-org name + slug from the user's email.
@@ -113,7 +118,33 @@ const organizationAuditHooks = createOrganizationAuditHooks(auditHookDeps);
 // `CredentialsService`'s constructor is typed against `PrismaService`, but it
 // uses the structural `PrismaClient` shape only — the singleton satisfies it.
 const credentialsService = new CredentialsService(prisma as unknown as PrismaService);
-const oauthMirrorLogger = new Logger('GithubOAuthMirror');
+const oauthMirrorLogger = new Logger('OAuthMirror');
+
+// ---------------------------------------------------------------------------
+// Per-provider adapter table for the OAuth → Credential mirror
+// ---------------------------------------------------------------------------
+
+interface OAuthProviderAdapter {
+  platform: Platform;
+  hostUrl: string;
+  profileUrl: string;
+  parseLogin: (json: Record<string, unknown>) => string | null;
+}
+
+const OAUTH_PROVIDER_ADAPTERS: Record<string, OAuthProviderAdapter> = {
+  github: {
+    platform: 'GITHUB',
+    hostUrl: 'github.com',
+    profileUrl: 'https://api.github.com/user',
+    parseLogin: (json) => (typeof json.login === 'string' ? json.login : null),
+  },
+  gitlab: {
+    platform: 'GITLAB',
+    hostUrl: 'gitlab.com',
+    profileUrl: 'https://gitlab.com/api/v4/user',
+    parseLogin: (json) => (typeof json.username === 'string' ? json.username : null),
+  },
+};
 
 const bootLogger = new Logger('AuthConfig');
 bootLogger.log(
@@ -121,52 +152,60 @@ bootLogger.log(
 );
 
 /**
- * Mirror a fresh GitHub OAuth `account` row into a Conduit `Credential` so
+ * Mirror a fresh OAuth `account` row into a Conduit `Credential` so
  * downstream code (workers, MCP resolver, polling) keeps using the existing
- * Connection → Credential resolution path. Failures are logged but never
- * propagate — a sign-in succeeding without a mirror is recoverable (re-sign-in
- * or manual PAT entry both work).
+ * Connection → Credential resolution path. Dispatches on `account.providerId`
+ * via the `OAUTH_PROVIDER_ADAPTERS` table — unknown providers are a no-op.
+ * Failures are logged but never propagate — a sign-in succeeding without a
+ * mirror is recoverable (re-sign-in or manual PAT entry both work).
  */
-async function mirrorGithubAccountToCredential(
-  account: { id?: unknown; userId?: unknown; accountId?: unknown; accessToken?: unknown; scope?: unknown },
+async function mirrorOAuthAccountToCredential(
+  account: { id?: unknown; userId?: unknown; accountId?: unknown; accessToken?: unknown; scope?: unknown; providerId?: unknown },
 ): Promise<void> {
   try {
+    const providerId = typeof account.providerId === 'string' ? account.providerId : null;
+    if (!providerId) return;
+    const adapter = OAUTH_PROVIDER_ADAPTERS[providerId];
+    if (!adapter) return; // Unknown provider — no-op.
+
     const accessToken = typeof account.accessToken === 'string' ? account.accessToken : null;
     const accountRowId = typeof account.id === 'string' ? account.id : null;
     const userId = typeof account.userId === 'string' ? account.userId : null;
-    const githubAccountId = typeof account.accountId === 'string' ? account.accountId : null;
-    if (!accessToken || !accountRowId || !userId || !githubAccountId) return;
+    const providerAccountId = typeof account.accountId === 'string' ? account.accountId : null;
+    if (!accessToken || !accountRowId || !userId || !providerAccountId) return;
     const scopes =
       typeof account.scope === 'string' && account.scope.length > 0
         ? account.scope.split(',').map((s) => s.trim()).filter(Boolean)
         : [];
     const orgId = await ensurePersonalOrgFor(userId);
-    const res = await fetch('https://api.github.com/user', {
+    const res = await fetch(adapter.profileUrl, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
-        Accept: 'application/vnd.github+json',
+        Accept: 'application/json',
         'User-Agent': 'conduit',
       },
     });
     if (!res.ok) {
       oauthMirrorLogger.warn(
-        `GitHub /user lookup failed (status=${res.status}); skipping mirror for account=${accountRowId}`,
+        `${providerId} profile lookup failed (status=${res.status}); skipping mirror for account=${accountRowId}`,
       );
       return;
     }
-    const profile = (await res.json()) as { login?: unknown };
-    const githubLogin = typeof profile.login === 'string' ? profile.login : githubAccountId;
+    const profile = (await res.json()) as Record<string, unknown>;
+    const providerLogin = adapter.parseLogin(profile) ?? providerAccountId;
     await credentialsService.upsertOAuthDerived({
       orgId,
       accountRowId,
-      githubAccountId,
-      githubLogin,
+      providerAccountId,
+      providerLogin,
       accessToken,
       scopes,
+      platform: adapter.platform,
+      hostUrl: adapter.hostUrl,
     });
   } catch (err) {
     oauthMirrorLogger.error(
-      `Failed to mirror GitHub OAuth account to credential: ${(err as Error).message}`,
+      `Failed to mirror OAuth account to credential: ${(err as Error).message}`,
       (err as Error).stack,
     );
   }
@@ -185,19 +224,39 @@ export const auth = betterAuth({
   emailVerification: {
     sendOnSignUp: false,
   },
-  socialProviders: githubOAuth
-    ? {
-        github: {
-          clientId: githubOAuth.clientId,
-          clientSecret: githubOAuth.clientSecret,
-          // `repo` (read+write code, contents, PRs), `project` (Projects v2
-          // read+write — workflows update item status, not just read), and
-          // `read:org` (Org-scoped lookups). Existing OAuth users see GitHub's
-          // consent screen on next sign-in for the expanded scope set.
-          scope: ['repo', 'project', 'read:org'],
-        },
-      }
-    : {},
+  socialProviders: {
+    ...(githubOAuth
+      ? {
+          github: {
+            clientId: githubOAuth.clientId,
+            clientSecret: githubOAuth.clientSecret,
+            // `repo` (read+write code, contents, PRs), `project` (Projects v2
+            // read+write — workflows update item status, not just read), and
+            // `read:org` (Org-scoped lookups). Existing OAuth users see GitHub's
+            // consent screen on next sign-in for the expanded scope set.
+            scope: ['repo', 'project', 'read:org'],
+          },
+        }
+      : {}),
+    ...(gitlabOAuth
+      ? {
+          gitlab: {
+            clientId: gitlabOAuth.clientId,
+            clientSecret: gitlabOAuth.clientSecret,
+            // `api` is the broad read+write API scope (equivalent in role to
+            // GitHub's `repo + project`); `read_user` lets the profile-lookup
+            // succeed.
+            scope: ['api', 'read_user'],
+          },
+        }
+      : {}),
+  },
+  account: {
+    accountLinking: {
+      enabled: true,
+      trustedProviders: ['github', 'gitlab'],
+    },
+  },
   // Redis-backed shared storage for rate-limit counters (and Better Auth's
   // session-cache reads, when the latter is enabled). Hosted deployments
   // running multiple API processes need a shared store so a flood across
@@ -242,21 +301,20 @@ export const auth = betterAuth({
         },
       },
     },
-    // Mirror Better Auth's GitHub OAuth `account` row into a Conduit
-    // `Credential`. `create` fires on first sign-in; `update` fires on
-    // re-authorization (e.g. consent re-prompt after a scope change), at
-    // which point we refresh the encrypted secret + recorded scopes in place.
+    // Mirror Better Auth OAuth `account` rows into Conduit `Credential` rows.
+    // `create` fires on first sign-in; `update` fires on re-authorization
+    // (e.g. consent re-prompt after a scope change), at which point we
+    // refresh the encrypted secret + recorded scopes in place. The adapter
+    // table handles unknown providers (no-op), so no providerId filter needed.
     account: {
       create: {
         async after(account) {
-          if (account.providerId !== 'github') return;
-          await mirrorGithubAccountToCredential(account);
+          await mirrorOAuthAccountToCredential(account);
         },
       },
       update: {
         async after(account) {
-          if (account.providerId !== 'github') return;
-          await mirrorGithubAccountToCredential(account);
+          await mirrorOAuthAccountToCredential(account);
         },
       },
     },

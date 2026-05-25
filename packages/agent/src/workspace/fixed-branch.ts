@@ -33,7 +33,7 @@ export async function resolveFixedBranchWorkspace(
   input: FixedBranchResolveInput,
 ): Promise<ResolvedWorkspace> {
   const { runId, nodeName, connection, branch } = input;
-  const bare = baseClonePath(connection.platform, connection.owner, connection.repo);
+  const bare = baseClonePath(connection.platform, connection.host, connection.owner, connection.repo);
   const target = nodeWorkspacePath(runId, nodeName);
 
   return withPathLock(bare, async () => {

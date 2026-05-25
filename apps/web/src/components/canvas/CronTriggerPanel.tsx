@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { CRON_EXPRESSION_RE, type TriggerConfig } from '@conduit/shared';
 import { useConnections } from '../../api/hooks.js';
 import type { CredentialRow } from '../../api/types.js';
+import { repoScopeKindFor } from '../../lib/connection.js';
 import { Select } from '../common/Select.js';
 import { CronScheduleBuilder } from './CronScheduleBuilder.js';
 import {
@@ -77,9 +78,11 @@ export function CronTriggerPanel({
   const repoConnections = useMemo(
     () =>
       allConnections.filter(
-        (c) => c.scope.kind === 'github_repo' && c.credential.platform === platform,
+        (c) =>
+          c.scope.kind === repoScopeKindFor(trigger.platform) &&
+          c.credential.platform === platform,
       ),
-    [allConnections, platform],
+    [allConnections, platform, trigger.platform],
   );
 
   return (
@@ -88,7 +91,7 @@ export function CronTriggerPanel({
 
       <div className="flex-1 overflow-y-auto px-5 py-4">
         <div className="space-y-5">
-          <Field label="Repo" hint="branch lives on this connection">
+          <Field label={trigger.platform === 'gitlab' ? 'Project' : 'Repo'} hint="branch lives on this connection">
             <ConnectionSelect
               connections={repoConnections}
               value={trigger.connectionId}

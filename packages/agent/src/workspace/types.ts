@@ -10,9 +10,11 @@ export type { WorkspaceSpec };
 export interface ConnectionContext {
   id: string;
   platform: 'github' | 'gitlab';
+  /** Bare hostname of the VCS instance (e.g. 'github.com', 'ghe.example.com'). */
+  host: string;
   owner: string;
   repo: string;
-  /** https://github.com/<owner>/<repo>.git — token never included. */
+  /** https://<host>/<owner>/<repo>.git — token never included. */
   cloneUrl: string;
   /** Platform access token used only for fetch/clone; stripped from remote afterward. */
   token?: string;
@@ -111,6 +113,7 @@ export interface PrContext {
 export interface TicketBranchRow {
   id: string;
   platform: ConnectionContext['platform'];
+  hostUrl: string;
   owner: string;
   repo: string;
   ticketId: string;
@@ -133,12 +136,14 @@ export interface TicketBranchStore {
   upsert(input: {
     /**
      * Tenant scope — the Prisma row's unique key is
-     * `(orgId, platform, owner, repo, ticketId)`, so two orgs with
+     * `(orgId, platform, hostUrl, owner, repo, ticketId)`, so two orgs with
      * overlapping Github coords stay isolated. Within an org, Worker +
      * Critic on the same ticket still converge on one row.
      */
     orgId: string;
     platform: ConnectionContext['platform'];
+    /** Bare hostname of the VCS instance (e.g. 'github.com'). */
+    hostUrl: string;
     owner: string;
     repo: string;
     ticketId: string;

@@ -46,6 +46,7 @@ describe('WorkspaceManager retry idempotency', () => {
     connection = {
       id: 'conn_test',
       platform: 'github',
+      host: 'github.com',
       owner: 'acme',
       repo: 'shop',
       cloneUrl: remote,
@@ -150,7 +151,7 @@ describe('WorkspaceManager retry idempotency', () => {
       ticketBranchStore: store,
     });
 
-    const bare = path.join(conduitHome, 'base-clones', 'github', 'acme', 'shop.git');
+    const bare = path.join(conduitHome, 'base-clones', 'github', 'github.com', 'acme', 'shop.git');
     expect(await listBareWorktreeNames(bare)).not.toEqual([]);
 
     await manager.cleanupRun(runId);
@@ -180,7 +181,7 @@ describe('WorkspaceManager retry idempotency', () => {
       ticketBranchStore: store,
     });
     const branchName = wsA.branchName!;
-    const bare = path.join(conduitHome, 'base-clones', 'github', 'acme', 'shop.git');
+    const bare = path.join(conduitHome, 'base-clones', 'github', 'github.com', 'acme', 'shop.git');
     // Simulate `fetch --prune` deleting the local-only branch ref while
     // the worktree still names it. `git update-ref -d` refuses for an
     // in-use branch, so we drop the loose ref file directly — same end
@@ -230,6 +231,7 @@ function makeFakeStore(): TicketBranchStore {
       const row: TicketBranchRow = {
         id: `tb_${rows.size + 1}`,
         platform: input.platform,
+        hostUrl: input.hostUrl,
         owner: input.owner,
         repo: input.repo,
         ticketId: input.ticketId,

@@ -21,7 +21,7 @@ export default defineConfig(({ mode }) => {
     envDir,
     resolve: {
       alias: {
-        '@conduit/shared': path.resolve(__dirname, '../../packages/shared/src/index.ts'),
+        '@conduit/shared': path.resolve(__dirname, '../../packages/shared/src'),
         '@': path.resolve(__dirname, 'src'),
       },
     },

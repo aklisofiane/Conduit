@@ -33,10 +33,12 @@ describe('CredentialsService OAuth mirror', () => {
     const result = await svc.upsertOAuthDerived({
       orgId: fixture.orgA.id,
       accountRowId: 'acct_row_1',
-      githubAccountId: '12345',
-      githubLogin: 'octocat',
+      providerAccountId: '12345',
+      providerLogin: 'octocat',
       accessToken: 'gho_token_v1',
       scopes: ['repo', 'project', 'read:org'],
+      platform: 'GITHUB',
+      hostUrl: 'github.com',
     });
     expect(result.created).toBe(true);
 
@@ -44,32 +46,96 @@ describe('CredentialsService OAuth mirror', () => {
     expect(row.orgId).toBe(fixture.orgA.id);
     expect(row.platform).toBe('GITHUB');
     expect(row.name).toBe('octocat (oauth)');
+    expect(row.hostUrl).toBe('github.com');
     expect(decrypt(row.secret)).toBe('gho_token_v1');
     expect(row.metadata).toEqual({
       source: 'oauth',
       accountRowId: 'acct_row_1',
-      githubAccountId: '12345',
-      githubLogin: 'octocat',
+      providerAccountId: '12345',
+      providerLogin: 'octocat',
       scopes: ['repo', 'project', 'read:org'],
     });
+  });
+
+  it('creates a GITLAB credential with correct platform and hostUrl', async () => {
+    const result = await svc.upsertOAuthDerived({
+      orgId: fixture.orgA.id,
+      accountRowId: 'acct_row_gl_1',
+      providerAccountId: '67890',
+      providerLogin: 'gl-user',
+      accessToken: 'glpat_token_v1',
+      scopes: ['api', 'read_user'],
+      platform: 'GITLAB',
+      hostUrl: 'gitlab.com',
+    });
+    expect(result.created).toBe(true);
+
+    const row = await prisma.credential.findUniqueOrThrow({ where: { id: result.id } });
+    expect(row.orgId).toBe(fixture.orgA.id);
+    expect(row.platform).toBe('GITLAB');
+    expect(row.name).toBe('gl-user (oauth)');
+    expect(row.hostUrl).toBe('gitlab.com');
+    expect(decrypt(row.secret)).toBe('glpat_token_v1');
+    expect(row.metadata).toEqual({
+      source: 'oauth',
+      accountRowId: 'acct_row_gl_1',
+      providerAccountId: '67890',
+      providerLogin: 'gl-user',
+      scopes: ['api', 'read_user'],
+    });
+  });
+
+  it('creates separate Credential rows for github and gitlab under the same user', async () => {
+    const gh = await svc.upsertOAuthDerived({
+      orgId: fixture.orgA.id,
+      accountRowId: 'acct_row_gh_multi',
+      providerAccountId: '111',
+      providerLogin: 'multi-user',
+      accessToken: 'gho_token',
+      scopes: ['repo'],
+      platform: 'GITHUB',
+      hostUrl: 'github.com',
+    });
+    const gl = await svc.upsertOAuthDerived({
+      orgId: fixture.orgA.id,
+      accountRowId: 'acct_row_gl_multi',
+      providerAccountId: '222',
+      providerLogin: 'multi-user',
+      accessToken: 'glpat_token',
+      scopes: ['api'],
+      platform: 'GITLAB',
+      hostUrl: 'gitlab.com',
+    });
+    expect(gh.created).toBe(true);
+    expect(gl.created).toBe(true);
+    expect(gh.id).not.toBe(gl.id);
+
+    const ghRow = await prisma.credential.findUniqueOrThrow({ where: { id: gh.id } });
+    const glRow = await prisma.credential.findUniqueOrThrow({ where: { id: gl.id } });
+    expect(ghRow.platform).toBe('GITHUB');
+    expect(glRow.platform).toBe('GITLAB');
   });
 
   it('updates secret and scopes in place on re-authorization (same accountRowId)', async () => {
     const first = await svc.upsertOAuthDerived({
       orgId: fixture.orgA.id,
       accountRowId: 'acct_row_2',
-      githubAccountId: '12345',
-      githubLogin: 'octocat',
+      providerAccountId: '12345',
+      providerLogin: 'octocat',
       accessToken: 'gho_token_v1',
       scopes: ['repo'],
+      platform: 'GITHUB',
+      hostUrl: 'github.com',
     });
     const second = await svc.upsertOAuthDerived({
       orgId: fixture.orgA.id,
       accountRowId: 'acct_row_2',
-      githubAccountId: '12345',
-      githubLogin: 'octocat',
+      providerAccountId: '12345',
+      providerLogin: 'octocat',
       accessToken: 'gho_token_v2',
       scopes: ['repo', 'project', 'read:org'],
+      platform: 'GITHUB',
+      hostUrl: 'github.com',
     });
     expect(second.created).toBe(false);
     expect(second.id).toBe(first.id);
@@ -87,10 +153,12 @@ describe('CredentialsService OAuth mirror', () => {
     const { id } = await svc.upsertOAuthDerived({
       orgId: fixture.orgA.id,
       accountRowId: 'acct_row_3',
-      githubAccountId: '99',
-      githubLogin: 'gh-user',
+      providerAccountId: '99',
+      providerLogin: 'gh-user',
       accessToken: 'gho_oauth_token',
       scopes: ['repo'],
+      platform: 'GITHUB',
+      hostUrl: 'github.com',
     });
 
     await svc.update(fixture.orgA.id, id, { secret: 'ghp_manual_pat' });
@@ -101,7 +169,7 @@ describe('CredentialsService OAuth mirror', () => {
     expect(meta.scopes).toBeUndefined();
     // Identity fields are kept so a future re-OAuth still finds the row.
     expect(meta.accountRowId).toBe('acct_row_3');
-    expect(meta.githubLogin).toBe('gh-user');
+    expect(meta.providerLogin).toBe('gh-user');
     expect(decrypt(row.secret)).toBe('ghp_manual_pat');
   });
 
@@ -109,10 +177,12 @@ describe('CredentialsService OAuth mirror', () => {
     const { id } = await svc.upsertOAuthDerived({
       orgId: fixture.orgA.id,
       accountRowId: 'acct_row_4',
-      githubAccountId: '42',
-      githubLogin: 'someone',
+      providerAccountId: '42',
+      providerLogin: 'someone',
       accessToken: 'gho_keep_me',
       scopes: ['repo', 'project'],
+      platform: 'GITHUB',
+      hostUrl: 'github.com',
     });
 
     await svc.update(fixture.orgA.id, id, { name: 'renamed' });

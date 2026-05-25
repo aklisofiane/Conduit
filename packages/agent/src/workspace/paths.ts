@@ -22,7 +22,7 @@ export function nodeWorkspacePath(runId: string, nodeName: string): string {
   return path.join(runDir(runId), nodeName);
 }
 
-/** Absolute path of the bare base clone for `<platform>/<owner>/<repo>`. */
-export function baseClonePath(platform: string, owner: string, repo: string): string {
-  return path.join(baseClonesRoot(), platform, owner, `${repo}.git`);
+/** Absolute path of the bare base clone for `<platform>/<host>/<owner>/<repo>`. */
+export function baseClonePath(platform: string, host: string, owner: string, repo: string): string {
+  return path.join(baseClonesRoot(), platform, host, owner, `${repo}.git`);
 }

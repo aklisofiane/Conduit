@@ -2,6 +2,8 @@ import { DEFAULT_TEMPORAL_TASK_QUEUE } from '@conduit/shared';
 
 const githubClientId = process.env.GITHUB_CLIENT_ID ?? '';
 const githubClientSecret = process.env.GITHUB_CLIENT_SECRET ?? '';
+const gitlabClientId = process.env.GITLAB_CLIENT_ID ?? '';
+const gitlabClientSecret = process.env.GITLAB_CLIENT_SECRET ?? '';
 export type Deployment = 'local' | 'hosted';
 const deployment: Deployment =
   process.env.CONDUIT_DEPLOYMENT === 'hosted' ? 'hosted' : 'local';
@@ -35,6 +37,11 @@ export const config = {
     githubOAuth:
       githubClientId && githubClientSecret
         ? { clientId: githubClientId, clientSecret: githubClientSecret }
+        : undefined,
+    // GitLab OAuth — same conditional shape as GitHub.
+    gitlabOAuth:
+      gitlabClientId && gitlabClientSecret
+        ? { clientId: gitlabClientId, clientSecret: gitlabClientSecret }
         : undefined,
   },
 } as const;

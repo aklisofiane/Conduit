@@ -101,6 +101,7 @@ export interface CredentialRow {
   id: string;
   platform: 'GITHUB' | 'GITLAB' | 'JIRA' | 'SLACK' | 'DISCORD';
   name: string;
+  hostUrl: string | null;
   metadata: {
     source?: 'oauth' | 'manual';
     githubLogin?: string;
@@ -128,6 +129,7 @@ export interface ConnectionRow {
     id: string;
     name: string;
     platform: 'GITHUB' | 'GITLAB' | 'JIRA' | 'SLACK' | 'DISCORD';
+    hostUrl: string | null;
   };
   scope: ConnectionScope;
   createdAt: string;

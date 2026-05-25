@@ -45,6 +45,7 @@ describe('resolveTicketBranchWorkspace', () => {
     connection = {
       id: 'conn_test',
       platform: 'github',
+      host: 'github.com',
       owner: 'acme',
       repo: 'shop',
       cloneUrl: remote,
@@ -243,6 +244,7 @@ function makeFakeStore(): TicketBranchStore & { _rows(): TicketBranchRow[] } {
       const row: TicketBranchRow = {
         id: `tb_${rows.size + 1}`,
         platform: input.platform,
+        hostUrl: input.hostUrl,
         owner: input.owner,
         repo: input.repo,
         ticketId: input.ticketId,

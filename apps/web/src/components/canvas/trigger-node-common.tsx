@@ -1,5 +1,7 @@
 import { Handle, Position } from '@xyflow/react';
 import type { ReactNode } from 'react';
+import { isCloudHost } from '@conduit/shared/platform';
+import type { Platform } from '@conduit/shared/platform';
 import { nodeSize, tokens } from '../../styles/theme.js';
 
 /**
@@ -15,6 +17,7 @@ export function TriggerNodeShell({
   detail,
   meta,
   platform,
+  host,
 }: {
   selected: boolean | undefined;
   icon: ReactNode;
@@ -22,7 +25,10 @@ export function TriggerNodeShell({
   detail: string;
   meta?: string;
   platform: string;
+  host?: string;
 }) {
+  const showHost =
+    host != null && !isCloudHost(platform.toUpperCase() as Platform, host);
   return (
     <div
       className="rounded-[var(--radius)] px-3 py-[10px] transition-all"
@@ -63,6 +69,14 @@ export function TriggerNodeShell({
           {platform}
         </span>
       </div>
+      {showHost && (
+        <div
+          className="mt-[2px] truncate font-mono text-[9px]"
+          style={{ color: tokens.color.textMuted }}
+        >
+          {host}
+        </div>
+      )}
       <div
         className="mt-[6px] truncate font-medium"
         style={{ color: tokens.color.text }}

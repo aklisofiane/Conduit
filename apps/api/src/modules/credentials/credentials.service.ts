@@ -1,5 +1,6 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { connectionScopeSchema, type ConnectionScope } from '@conduit/shared';
+import type { Platform } from '@conduit/shared/platform';
 import { PrismaService } from '../../common/prisma.service';
 import type { CreateCredentialDto, UpdateCredentialDto } from './dto';
 import { decrypt, encrypt, redactedSuffix } from './crypto';
@@ -79,33 +80,36 @@ export class CredentialsService {
   }
 
   /**
-   * Mirror a Better Auth GitHub OAuth account into a Conduit `Credential`.
+   * Mirror a Better Auth OAuth account into a Conduit `Credential`.
    * Server-trusted: caller (Better Auth `account.*.after` hook) has already
    * resolved `orgId` from the user id. Idempotent on `accountRowId` — the
-   * Better Auth `account.id` is unique, so re-sign-in updates `secret` +
-   * `metadata.scopes` in place rather than creating duplicates.
+   * Better Auth `account.id` is unique across providers, so re-sign-in
+   * updates `secret` + `metadata.scopes` in place rather than creating
+   * duplicates.
    */
   async upsertOAuthDerived(params: {
     orgId: string;
     accountRowId: string;
-    githubAccountId: string;
-    githubLogin: string;
+    providerAccountId: string;
+    providerLogin: string;
     accessToken: string;
     scopes: string[];
+    platform: Platform;
+    hostUrl: string;
   }): Promise<{ id: string; created: boolean }> {
-    const { orgId, accountRowId, githubAccountId, githubLogin, accessToken, scopes } = params;
+    const { orgId, accountRowId, providerAccountId, providerLogin, accessToken, scopes, platform, hostUrl } = params;
     const encryptedSecret = encrypt(accessToken);
     const metadata = {
       source: 'oauth' as const,
       accountRowId,
-      githubAccountId,
-      githubLogin,
+      providerAccountId,
+      providerLogin,
       scopes,
     };
     const existing = await this.prisma.credential.findFirst({
       where: {
         orgId,
-        platform: 'GITHUB',
+        platform,
         metadata: { path: ['accountRowId'], equals: accountRowId },
       },
       select: { id: true },
@@ -120,9 +124,10 @@ export class CredentialsService {
     const created = await this.prisma.credential.create({
       data: {
         orgId,
-        platform: 'GITHUB',
-        name: `${githubLogin} (oauth)`,
+        platform,
+        name: `${providerLogin} (oauth)`,
         secret: encryptedSecret,
+        hostUrl,
         metadata,
       },
     });
@@ -174,7 +179,12 @@ export class CredentialsService {
    */
   async getConnectionBinding(
     connectionId: string,
-  ): Promise<{ scope: ConnectionScope; token: string }> {
+  ): Promise<{
+    scope: ConnectionScope;
+    token: string;
+    platform: string;
+    hostUrl: string | null;
+  }> {
     const conn = await this.prisma.connection.findUnique({
       where: { id: connectionId },
       include: { credential: true },
@@ -186,6 +196,8 @@ export class CredentialsService {
     return {
       scope,
       token: decrypt(conn.credential.secret),
+      platform: conn.credential.platform,
+      hostUrl: conn.credential.hostUrl,
     };
   }
 
