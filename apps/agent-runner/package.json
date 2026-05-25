@@ -8,8 +8,8 @@
     "agent-runner": "./dist/main.js"
   },
   "scripts": {
-    "build": "tsc --build && docker build -t agent-runner:dev -f Dockerfile ../..",
-    "build:ts": "tsc --build",
+    "build": "tsc --build",
+    "build:image": "docker build -t agent-runner:dev -f Dockerfile ../..",
     "dev": "tsc --build --watch --preserveWatchOutput",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",

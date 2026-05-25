@@ -41,13 +41,9 @@ COPY apps/agent-runner/ apps/agent-runner/
 
 # Build only what the runner needs — shared, agent, runner. Avoids dragging in
 # api/web/worker tsconfigs and Prisma codegen.
-# `agent-runner`'s top-level `build` chains `docker build` after `tsc` so any
-# workspace build keeps the image current; inside the image we only need the
-# `tsc` half (`build:ts`), and shelling out to `docker` from a build stage
-# would recurse anyway.
 RUN npm run build --workspace @conduit/shared \
  && npm run build --workspace @conduit/agent \
- && npm run build:ts --workspace @conduit/agent-runner
+ && npm run build --workspace @conduit/agent-runner
 
 # Drop devDependencies for the runtime image.
 # `npm prune` reconciles `node_modules` against the lockfile, so the rm of
