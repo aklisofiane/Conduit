@@ -116,14 +116,14 @@ export async function cronFireActivity(input: CronWorkflowInput): Promise<CronFi
         error: errMsg,
         finishedAt: new Date(),
       },
-    });
+    }).catch(() => undefined);
     await writeSystemLog(
       run.id,
       wf.orgId,
       null,
       `cronFireActivity: failed to start agentWorkflow: ${errMsg}`,
       'ERROR',
-    );
-    return { workflowId, startedRunId: null, error: errMsg };
+    ).catch(() => undefined);
+    throw err;
   }
 }

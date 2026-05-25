@@ -211,20 +211,39 @@ function CanvasInner() {
     (changes: NodeChange[]) => {
       setFlowNodes((current) => {
         const next = applyNodeChanges(changes, current);
+        if (!draft) return next;
+
+        let updated = draft;
+        let dirty = false;
+
+        const removed = changes.filter((c) => c.type === 'remove');
+        if (removed.length > 0) {
+          const ids = new Set(removed.map((c) => c.id));
+          updated = {
+            ...updated,
+            triggers: updated.triggers.filter((t) => !ids.has(t.id)),
+            nodes: updated.nodes.filter((n) => !ids.has(n.id)),
+          };
+          dirty = true;
+        }
+
         const dropped = changes.filter(
           (c): c is NodeChange & { type: 'position'; id: string } =>
             c.type === 'position' && c.dragging === false,
         );
-        if (dropped.length > 0 && draft) {
-          const positions = { ...draft.ui.nodePositions };
+        if (dropped.length > 0) {
+          const positions = { ...updated.ui.nodePositions };
           for (const change of dropped) {
             const node = next.find((n) => n.id === change.id);
             if (!node) continue;
-            const key = nameForFlowId(draft, node.id) ?? node.id;
+            const key = nameForFlowId(updated, node.id) ?? node.id;
             positions[key] = { x: node.position.x, y: node.position.y };
           }
-          setDraft({ ...draft, ui: { ...draft.ui, nodePositions: positions } });
+          updated = { ...updated, ui: { ...updated.ui, nodePositions: positions } };
+          dirty = true;
         }
+
+        if (dirty) setDraft(updated);
         return next;
       });
     },
@@ -436,7 +455,7 @@ function CanvasInner() {
           <AgentConfigPanel
             agent={selectedAgent}
             workflowId={id}
-            githubTrigger={draft.triggers.find((t) => t.platform === 'github')}
+            githubTrigger={draft.triggers.find((t) => t.platform === 'github' && t.type !== 'cron')}
             onChange={(patch) => updateAgent(selectedAgent.id, patch)}
             onSave={handleSave}
             onDiscard={() => wf && reset(wf.definition)}

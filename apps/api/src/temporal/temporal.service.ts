@@ -217,7 +217,7 @@ function buildScheduleDefinition(opts: WorkflowScheduleOptions) {
   return {
     spec: {
       cronExpressions: [opts.cron],
-      timezoneName: opts.timezone,
+      timezone: opts.timezone,
     },
     action: {
       type: 'startWorkflow' as const,

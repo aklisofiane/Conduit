@@ -42,11 +42,13 @@ const prStateFilter = z.object({
 });
 
 // 5-field POSIX cron: minute hour dom month dow. Each field is one of:
-//   `*`, a comma-separated list, a range, `*/N`, or a list/range step.
-// Loose enough to accept anything Temporal's parser will (Temporal does the
-// final validation at schedule create time); tight enough to bounce typos
-// like missing fields or stray spaces.
-const CRON_FIELD = /(?:\*|\d+|\d+-\d+)(?:\/\d+)?(?:,(?:\*|\d+|\d+-\d+)(?:\/\d+)?)*/.source;
+//   `*`, a number, a range (1-5), a 3-letter name (MON, JAN), a name
+//   range (MON-FRI), any of those with a `/N` step, or comma-separated
+//   lists. Temporal does the final semantic validation at schedule create
+//   time; this regex catches structural typos like missing fields.
+const CRON_ATOM = /(?:\*|\d+|\d+-\d+|[A-Za-z]{3}(?:-[A-Za-z]{3})?)/.source;
+const CRON_STEP = /(?:\/\d+)?/.source;
+const CRON_FIELD = `(?:${CRON_ATOM})${CRON_STEP}(?:,(?:${CRON_ATOM})${CRON_STEP})*`;
 const CRON_EXPRESSION_RE = new RegExp(`^${CRON_FIELD}(?: ${CRON_FIELD}){4}$`);
 
 const sharedFields = {

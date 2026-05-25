@@ -96,8 +96,9 @@ async function warnOnUnpushedTicketBranchCommits(runId: string, orgId: string): 
       runId,
       orgId,
       node.nodeName,
-      `${kind}: ${unpushed} commit${unpushed === 1 ? '' : 's'} on ${output.branchName} ` +
-        `past the resolved base — if no agent ran \`git push\`, this work is lost on the next iteration.`,
+      kind === 'fixed-branch'
+        ? `fixed-branch: ${unpushed} commit${unpushed === 1 ? '' : 's'} on ${output.branchName} past the resolved base — verify the agent pushed.`
+        : `ticket-branch: ${unpushed} commit${unpushed === 1 ? '' : 's'} on ${output.branchName} past the resolved base — if no agent ran \`git push\`, this work is lost on the next iteration.`,
       'WARN',
     );
   }
