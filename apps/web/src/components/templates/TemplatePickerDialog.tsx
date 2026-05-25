@@ -15,7 +15,7 @@ import type {
   TemplateSummary,
 } from '../../api/types.js';
 import { connectionLabel } from '../../lib/connection.js';
-import { Dialog, DialogContent } from '../common/Dialog.js';
+import { Dialog, DialogContent, DialogTitle } from '../common/Dialog.js';
 import { Select, type SelectOption } from '../common/Select.js';
 
 export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
@@ -76,17 +76,16 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
       }}
     >
       <DialogContent
-        aria-label="Create workflow from template"
         className="flex max-h-[85vh] w-[680px] max-w-[94vw] flex-col overflow-hidden rounded-xl border border-[var(--color-line)] bg-[var(--color-bg-1)] p-0 shadow-none"
       >
         <header className="flex items-center justify-between border-b border-[var(--color-line)] px-5 py-4">
           <div>
-            <h2
+            <DialogTitle
               className="text-[22px] font-semibold tracking-tight text-[var(--color-text)]"
               style={{ fontFamily: 'var(--font-serif)' }}
             >
               {selected ? `Configure ${selected.name}` : 'Start from a template'}
-            </h2>
+            </DialogTitle>
             <p className="mt-0.5 font-mono text-[11px] text-[var(--color-text-3)]">
               {selected
                 ? `${selected.workflowCount} workflow${selected.workflowCount === 1 ? '' : 's'} · ${selected.placeholders.length} connection${selected.placeholders.length === 1 ? '' : 's'} to bind`

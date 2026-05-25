@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { CircleDot, Clock, GitPullRequest } from 'lucide-react';
-import { Dialog, DialogContent } from '../common/Dialog.js';
+import { Dialog, DialogContent, DialogTitle } from '../common/Dialog.js';
 import type { PaletteTriggerType } from '../canvas/NodePalette.js';
 
 interface CreateWorkflowDialogProps {
@@ -60,17 +60,16 @@ export function CreateWorkflowDialog({
       }}
     >
       <DialogContent
-        aria-label="Create a new workflow"
         className="flex max-h-[85vh] w-[480px] max-w-[94vw] flex-col overflow-hidden rounded-xl border border-[var(--color-line)] bg-[var(--color-bg-1)] p-0 shadow-none"
       >
         <header className="flex items-center justify-between border-b border-[var(--color-line)] px-5 py-4">
           <div>
-            <h2
+            <DialogTitle
               className="text-[22px] font-semibold tracking-tight text-[var(--color-text)]"
               style={{ fontFamily: 'var(--font-serif)' }}
             >
               New workflow
-            </h2>
+            </DialogTitle>
             <p className="mt-0.5 font-mono text-[11px] text-[var(--color-text-3)]">
               Name it and pick a trigger to get started.
             </p>
