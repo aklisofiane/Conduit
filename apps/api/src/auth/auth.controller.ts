@@ -11,10 +11,15 @@ import { oauthProviders } from './auth.config';
 @Controller('auth-config')
 export class AuthController {
   @Get()
-  get(): { deployment: 'local' | 'hosted'; oauthProviders: readonly string[] } {
+  get(): {
+    deployment: 'local' | 'hosted';
+    oauthProviders: readonly string[];
+    registrationMode: 'open' | 'invite-only';
+  } {
     return {
       deployment: config.deployment,
       oauthProviders,
+      registrationMode: config.deployment === 'hosted' ? 'invite-only' : 'open',
     };
   }
 }

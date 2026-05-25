@@ -24,6 +24,7 @@ export default async function setup(): Promise<() => Promise<void>> {
   // `local`-mode lenience is verified by the unit test against
   // `rateLimitConfig()` so we don't need a separate contract run for it.
   process.env.CONDUIT_DEPLOYMENT ??= 'hosted';
+  process.env.CONDUIT_SEED_EMAILS ??= '@example.com';
   process.env.BETTER_AUTH_SECRET ??= 'contract-test-secret';
   process.env.BETTER_AUTH_URL ??= 'http://localhost';
   return async () => {

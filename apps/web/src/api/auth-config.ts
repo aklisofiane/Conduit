@@ -4,6 +4,7 @@ import { api } from './client.js';
 export interface AuthConfig {
   deployment: 'local' | 'hosted';
   oauthProviders: readonly string[];
+  registrationMode: 'open' | 'invite-only';
 }
 
 export function useAuthConfig() {

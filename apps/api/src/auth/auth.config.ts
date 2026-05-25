@@ -1,4 +1,4 @@
-import { betterAuth } from 'better-auth';
+import { betterAuth, APIError } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { organization } from 'better-auth/plugins';
 import { Redis } from 'ioredis';
@@ -288,6 +288,26 @@ export const auth = betterAuth({
   // very first cookie the client receives carries an active org and
   // `@OrgId()` resolves on the first authenticated request.
   databaseHooks: {
+    user: {
+      create: {
+        async before(user) {
+          if (config.deployment !== 'hosted') return;
+          const email = (typeof user.email === 'string' ? user.email : '').toLowerCase();
+          const seeded = config.seedEmails.some((s) =>
+            s.startsWith('@') ? email.endsWith(s) : s === email,
+          );
+          if (seeded) return;
+          const invited = await prisma.invitation.findFirst({
+            where: { email, status: 'pending' },
+            select: { id: true },
+          });
+          if (invited) return;
+          throw new APIError('FORBIDDEN', {
+            message: 'Registration is by invitation only',
+          });
+        },
+      },
+    },
     session: {
       create: {
         async before(session) {

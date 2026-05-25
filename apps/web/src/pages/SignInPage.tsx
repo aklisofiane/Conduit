@@ -42,6 +42,7 @@ export function SignInPage() {
   const oauthProviders = authConfig?.oauthProviders ?? [];
   const showGithub = oauthProviders.includes('github');
   const showGitlab = oauthProviders.includes('gitlab');
+  const inviteOnly = authConfig?.registrationMode === 'invite-only';
 
   const form = useForm<SignInValues>({
     resolver: zodResolver(schema),
@@ -118,16 +119,18 @@ export function SignInPage() {
           {form.formState.isSubmitting ? 'Signing in…' : 'Sign in'}
         </button>
 
-        <div className="flex items-center justify-between font-mono text-[11px]">
+        <div className={`flex font-mono text-[11px] ${inviteOnly ? 'justify-start' : 'items-center justify-between'}`}>
           <Link to="/forgot-password" className="text-[var(--color-text-2)] hover:text-[var(--color-text)]">
             Forgot password?
           </Link>
-          <Link
-            to={`/sign-up${next ? `?next=${encodeURIComponent(next)}` : ''}`}
-            className="text-[var(--color-text-2)] hover:text-[var(--color-text)]"
-          >
-            Create account
-          </Link>
+          {!inviteOnly && (
+            <Link
+              to={`/sign-up${next ? `?next=${encodeURIComponent(next)}` : ''}`}
+              className="text-[var(--color-text-2)] hover:text-[var(--color-text)]"
+            >
+              Create account
+            </Link>
+          )}
         </div>
       </form>
 

@@ -8,6 +8,11 @@ export type Deployment = 'local' | 'hosted';
 const deployment: Deployment =
   process.env.CONDUIT_DEPLOYMENT === 'hosted' ? 'hosted' : 'local';
 
+const seedEmails: string[] = (process.env.CONDUIT_SEED_EMAILS ?? '')
+  .split(',')
+  .map((e) => e.trim().toLowerCase())
+  .filter(Boolean);
+
 const apiPort = Number.parseInt(process.env.API_PORT ?? '3000', 10);
 
 /**
@@ -17,6 +22,7 @@ const apiPort = Number.parseInt(process.env.API_PORT ?? '3000', 10);
 export const config = {
   port: apiPort,
   deployment,
+  seedEmails,
   corsOrigin: process.env.CONDUIT_CORS_ORIGIN ?? 'http://localhost:5173',
   temporal: {
     address: process.env.TEMPORAL_ADDRESS ?? 'localhost:7233',

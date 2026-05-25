@@ -43,6 +43,7 @@ export function SignUpPage() {
   const oauthProviders = authConfig?.oauthProviders ?? [];
   const showGithub = oauthProviders.includes('github');
   const showGitlab = oauthProviders.includes('gitlab');
+  const inviteOnly = authConfig?.registrationMode === 'invite-only';
 
   const form = useForm<SignUpValues>({
     resolver: zodResolver(schema),
@@ -79,7 +80,7 @@ export function SignUpPage() {
           Create account<em className="text-[var(--color-claude)] not-italic">.</em>
         </h1>
         <p className="font-mono text-[11.5px] text-[var(--color-text-2)]">
-          Spin up workflows in minutes.
+          {inviteOnly ? 'Registration is by invitation only.' : 'Spin up workflows in minutes.'}
         </p>
       </div>
 
