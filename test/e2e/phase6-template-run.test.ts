@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Connection, ScheduleClient } from '@temporalio/client';
-import { pollScheduleId, type WorkflowDefinition } from '@conduit/shared';
+import { workflowScheduleId, type WorkflowDefinition } from '@conduit/shared';
 import { startHarness, type Harness } from './harness';
 import { TEST_STACK_ENV } from './stack';
 
@@ -157,7 +157,7 @@ describe('Phase 6 — create workflows from template', () => {
     }
 
     for (const { id } of result.workflows) {
-      const handle = scheduleClient.getHandle(pollScheduleId(id));
+      const handle = scheduleClient.getHandle(workflowScheduleId(id));
       await waitFor(
         () => handle.describe().then(() => true).catch(() => false),
         15_000,
@@ -202,7 +202,7 @@ describe('Phase 6 — create workflows from template', () => {
     expect(result.workflows).toHaveLength(1);
     const wf = await harness.http.get<WorkflowRow>(`/workflows/${result.workflows[0]!.id}`);
     expect(wf.definition.triggers[0]!.type).toBe('webhook');
-    const handle = scheduleClient.getHandle(pollScheduleId(wf.id));
+    const handle = scheduleClient.getHandle(workflowScheduleId(wf.id));
     await expect(handle.describe()).rejects.toBeDefined();
   }, 45_000);
 });

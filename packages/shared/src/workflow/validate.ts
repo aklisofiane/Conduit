@@ -1,3 +1,4 @@
+import { deriveWorkspaces } from './derive-workspace';
 import type { WorkflowDefinition } from './definition';
 
 /**
@@ -14,7 +15,8 @@ export interface WorkflowValidationIssue {
     | 'trigger-requires-issue-or-pr'
     | 'triggers-must-share-connection'
     | 'trigger-board-connection-required'
-    | 'triggers-must-share-board-connection';
+    | 'triggers-must-share-board-connection'
+    | 'cron-trigger-incompatible-workspace';
   message: string;
   /** Optional node name (or trigger name) the issue is attached to, for UI highlighting. */
   nodeName?: string;
@@ -111,6 +113,46 @@ export function validateWorkflowDefinition(
       code: 'triggers-must-share-board-connection',
       message: `All triggers in a workflow must reference the same boardConnectionId — found ${distinctBoardConnectionIds.size} distinct board connections.`,
     });
+  }
+
+  // Rule: a cron upstream produces a `fixed-branch` workspace; any node
+  // downstream that's still saved as `ticket-branch` is incoherent.
+  // `deriveWorkspaces` fixes this for fresh definitions; this catches
+  // legacy or hand-edited JSON where the workspace was authored by hand.
+  const triggerNames = new Set(triggers.map((t) => t.name));
+  const cronTriggerNames = new Set(
+    triggers.filter((t) => t.type === 'cron').map((t) => t.name),
+  );
+  if (cronTriggerNames.size > 0) {
+    const derived = deriveWorkspaces(definition);
+    const cronEntryNodes = new Set<string>();
+    for (const edge of definition.edges) {
+      if (cronTriggerNames.has(edge.from)) cronEntryNodes.add(edge.to);
+    }
+    for (const node of derived.nodes) {
+      if (!cronEntryNodes.has(node.name)) continue;
+      // Skip if any *non-cron* trigger also feeds this node — mixed-trigger
+      // setups are rejected elsewhere (shared-connection rule), and the
+      // workspace shape they pick is unsupported anyway.
+      const upstreamTriggerNames = definition.edges
+        .filter((e) => e.to === node.name && triggerNames.has(e.from))
+        .map((e) => e.from);
+      const hasNonCronTrigger = upstreamTriggerNames.some(
+        (name) => !cronTriggerNames.has(name),
+      );
+      if (hasNonCronTrigger) continue;
+      // The legacy/hand-edited check: stored workspace is ticket-branch
+      // despite a cron upstream.
+      if (node.workspace?.kind === 'ticket-branch') {
+        issues.push({
+          code: 'cron-trigger-incompatible-workspace',
+          message:
+            `Node "${node.name}" has workspace kind "ticket-branch" but its upstream is a cron trigger. ` +
+            `Cron triggers produce "fixed-branch" workspaces; remove the workspace override so it derives from the trigger.`,
+          nodeName: node.name,
+        });
+      }
+    }
   }
 
   return issues;

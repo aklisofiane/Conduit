@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import {
   connectionScopeSchema,
-  isPollingTrigger,
+  isScheduledTrigger,
   resolveTemplate,
   type ConnectionScopeKind,
   type TemplatePlaceholder,
@@ -126,16 +126,27 @@ export class TemplatesService implements OnModuleInit {
     await Promise.allSettled(
       created.map(async ({ id, definition, isActive }) => {
         const trigger = definition.triggers[0];
-        if (!isPollingTrigger(trigger)) return;
+        if (!isScheduledTrigger(trigger)) return;
         try {
-          await this.temporal.upsertPollSchedule({
-            workflowId: id,
-            intervalSec: trigger.intervalSec,
-            active: isActive,
-          });
+          if (trigger.type === 'cron') {
+            await this.temporal.upsertWorkflowSchedule({
+              kind: 'cron',
+              workflowId: id,
+              cron: trigger.cron,
+              timezone: trigger.timezone,
+              active: isActive,
+            });
+          } else {
+            await this.temporal.upsertWorkflowSchedule({
+              kind: 'polling',
+              workflowId: id,
+              intervalSec: trigger.intervalSec,
+              active: isActive,
+            });
+          }
         } catch (err) {
           this.logger.warn(
-            `Upserting poll schedule for ${id} failed: ${errMessage(err)}`,
+            `Upserting schedule for ${id} failed: ${errMessage(err)}`,
           );
         }
       }),

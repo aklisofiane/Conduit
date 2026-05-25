@@ -91,9 +91,12 @@ src/
     agent-workflow.ts                  sandboxed — NO node:* / Prisma / Redis imports
     poll-workflow.ts                   sandboxed shell that calls pollBoardActivity; scheduled
                                        by the API via Temporal Schedule
+    cron-workflow.ts                   sandboxed shell for cron triggers — one tick per
+                                       Temporal Schedule fire
     topo-sort.ts                       pure graph ordering
   activities/
     run-agent-node.ts                  invokes provider, streams events via heartbeat + Redis
+    cron-fire.ts                       one cron tick — build TriggerEvent, start agentWorkflow
     load-graph.ts, cleanup-run.ts
     merge-worktree.ts                  clean-merge parallel branched worktree back into upstream
                                        (throws MergeConflictError on conflict — aborts the run)
@@ -165,10 +168,10 @@ src/
                                        ForgotPasswordPage, ResetPasswordPage (auth pages — see
                                        docs/design-docs/web-auth-ui.md)
   components/
-    canvas/                            TriggerNode, AgentNode, NodePalette, AgentConfigPanel,
-                                       TriggerConfigPanel (platform / stacked Repo + Board
-                                       connection sub-rows / mode toggle / event / interval /
-                                       filter builder), McpServerPicker
+    canvas/                            Typed trigger nodes + panels per variant (Issues /
+                                       PullRequests / Cron / Webhook placeholder), shared
+                                       trigger chrome (trigger-node-common, trigger-panel-common),
+                                       AgentNode, NodePalette, AgentConfigPanel, McpServerPicker
     run/                               RunTimeline (live trace), NodeSummary (.conduit/ body),
                                        ChangedFiles (workspace diff), NodeError (failure details) —
                                        tabs on the run detail page
@@ -234,9 +237,9 @@ src/
               the API for connection CRUD validation and by the worker for
               runtime narrowing (poll-board source vs board lookup,
               repo-clone workspace owner/repo). Web-bundle safe.
-  trigger/    TriggerEvent + TriggerConfig (named `connectionId` +
-              optional `boardConnectionId` slots — no inline BoardRef),
-              filter/match logic, `poll.ts` (PollWorkflowInput + PollCycleResult)
+  trigger/    TriggerEvent + TriggerConfig (issues / pull_requests / cron /
+              webhook), filter/match logic, `poll.ts` (PollWorkflowInput +
+              PollCycleResult)
   mcp/        MCP server config + tool schemas
   workflow/   Workflow.definition JSON schema (nodes, edges, ui) + `identity.ts`
               (isTicketBranchWorkflow / ticketLockFor) + `validate.ts`
@@ -254,8 +257,9 @@ src/
   agent-preset/ AgentPreset file schema — id, name, category, provider, model,
               instructions (+ optional suggestedConstraints). Catalog data
               referenced by templates (via presetId) and the canvas picker
-  workspace/  workspace kind schemas (inherit, ticket-branch — derived from
-              edges by `workflow/derive-workspace.ts`, not user-authored)
+  workspace/  workspace kind schemas (inherit, ticket-branch, fixed-branch —
+              derived from edges + trigger kind by `workflow/derive-workspace.ts`,
+              not user-authored)
   skill/      skill manifest types
   platform/   Platform enum + per-platform connection shapes. Under `github/`,
               shared HTTP plumbing (`http.ts` — lazy URL/header helpers, web-bundle
@@ -264,9 +268,9 @@ src/
               issue-writeback picker)
   runtime/    AgentEvent → ExecutionLogKind mapping, Redis channel name
   temporal/   task queue name + workflow-type constants (AGENT_WORKFLOW_TYPE,
-              POLL_WORKFLOW_TYPE) + deterministic id helpers (`pollScheduleId`,
-              `pollWorkflowId`, `agentWorkflowId(runId, ticketLock?)` — the
-              ticket-branch dedup id `run-<wfId>-<ticketKey>` flows through here)
+              POLL_WORKFLOW_TYPE, CRON_WORKFLOW_TYPE) + deterministic id
+              helpers (`workflowScheduleId`, `pollWorkflowId`,
+              `cronWorkflowId`, `agentWorkflowId`)
   crypto/     AES-256-GCM helpers                              backend-only subpath
   webhook/    HMAC signature verify + GitHub event normalizer  backend-only subpath
               (handles issues.opened / pull_request.opened / issue_comment.created /
@@ -297,12 +301,15 @@ src/
     constraints.ts
   workspace/
     index.ts                           barrel — every workspace export the worker needs
-    manager.ts                         top-level orchestration (seed / branch / resolve)
+    manager.ts                         top-level orchestration — dispatches ticket-branch,
+                                       fixed-branch, or inherit
     git.ts, paths.ts                   worktree seeding, path derivation
     conduit-folder.ts                  .conduit/<NodeName>.md reads/writes + cross-worktree copy
     merge.ts                           mergeBranchedWorktree + MergeConflictError (clean-merge path)
     ticket-branch.ts                   resolveTicketBranchWorkspace — check-then-create
                                        conduit/<ticket-id>-<slug> worktrees off the base clone
+    fixed-branch.ts                    resolveFixedBranchWorkspace — cron triggers; branch
+                                       must exist on remote
     slug.ts                            deriveSlug + formatBranchName — branch naming primitives
     lock.ts                            withPathLock — in-process base-clone mutex (one worker only)
     push-auth.ts                       installPushCredentials — per-run git credential helper

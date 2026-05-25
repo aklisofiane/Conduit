@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Connection, ScheduleClient } from '@temporalio/client';
-import { pollScheduleId, type WorkflowDefinition } from '@conduit/shared';
+import { workflowScheduleId, type WorkflowDefinition } from '@conduit/shared';
 import { loadWorkflowFixture } from '../helpers/temporal';
 import { startHarness, type Harness } from './harness';
 import {
@@ -140,7 +140,7 @@ describe('Phase 4 PR scope — repo polling fires runs on PR set-diff', () => {
       isActive: true,
     });
 
-    const scheduleHandle = scheduleClient.getHandle(pollScheduleId(created.id));
+    const scheduleHandle = scheduleClient.getHandle(workflowScheduleId(created.id));
     await waitFor(async () => {
       try {
         await scheduleHandle.describe();

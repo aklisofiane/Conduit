@@ -35,9 +35,9 @@
 
 | App | Stack | Responsibility |
 |---|---|---|
-| `apps/api` | NestJS 11, Socket.IO, Prisma | Webhook ingestion + signature verify, workflow CRUD, trigger matching, Temporal client, WS gateway for live run updates. Owns polling-trigger `Schedule` lifecycle (create / update / delete on workflow save + boot-time reconcile) via `TemporalService.upsertPollSchedule` |
-| `apps/web` | React 19, Vite 8, `@xyflow/react`, TanStack Query, Zustand, Tailwind v4, Radix UI primitives (wrapped in `components/common/`), react-hook-form + Zod | Canvas editor (design only), agent config UI, trigger config UI (single `Watch` picker — Issues / Pull requests — with progressively-disclosed Board attachment under issues; webhook variant hidden in v1), filter builder, run history + dedicated run detail page with streaming logs |
-| `apps/worker` | Temporal TS SDK | Executes `agentWorkflow` — loads nodes, topo sorts, invokes the orchestrator activity per node. The activity spawns a fresh `agent-runner` container, writes a `RunnerRequest` to its stdin, and translates each returned `RunnerEvent` back into Prisma writes + Redis publishes + Temporal heartbeats. Also executes `pollWorkflow` → `pollBoardActivity` when a Temporal Schedule fires — dispatches on the trigger's `type` and `boardConnectionId` presence (board issues, repo issues, or repo PRs), diffs the matching set against `PollSnapshot`, and starts `agentWorkflow`s for new matches. **Provider SDKs no longer live here** — they're baked into the runner image |
+| `apps/api` | NestJS 11, Socket.IO, Prisma | Webhook ingestion + signature verify, workflow CRUD, trigger matching, Temporal client, WS gateway for live run updates. Owns the schedule lifecycle for all schedule-backed triggers (polling + cron) — one Temporal Schedule per workflow, updated in place when the trigger kind changes |
+| `apps/web` | React 19, Vite 8, `@xyflow/react`, TanStack Query, Zustand, Tailwind v4, Radix UI primitives (wrapped in `components/common/`), react-hook-form + Zod | Canvas editor (design only), agent config UI, typed trigger nodes + panels per variant (Issues, Pull requests, Cron; webhook placeholder for legacy data), filter builder, run history + dedicated run detail page with streaming logs |
+| `apps/worker` | Temporal TS SDK | Executes `agentWorkflow` — loads nodes, topo sorts, invokes the orchestrator activity per node. The activity spawns a fresh `agent-runner` container, writes a `RunnerRequest` to its stdin, and translates each returned `RunnerEvent` back into Prisma writes + Redis publishes + Temporal heartbeats. Also executes `pollWorkflow` → `pollBoardActivity` when a Temporal Schedule fires — dispatches on the trigger's `type` and `boardConnectionId` presence (board issues, repo issues, or repo PRs), diffs the matching set against `PollSnapshot`, and starts `agentWorkflow`s for new matches. `cronWorkflow` handles cron triggers — one tick per schedule fire, builds a `mode: 'scheduled'` event, starts the agent workflow. **Provider SDKs no longer live here** — they're baked into the runner image |
 | `apps/agent-runner` | `@anthropic-ai/claude-agent-sdk`, `@openai/codex-sdk`, `@conduit/agent` | One short-lived container per agent node. Reads `RunnerRequest` on stdin, drives the provider session (main → optional issue-writeback → final summary turn), streams `AgentEvent`s as JSON lines on stdout, emits a terminal `exit` carrying head/changedFiles/`.conduit/<NodeName>.md`. No DB, no Redis, no master KEK, no other runs' credentials. See [design-docs/agent-execution.md > Runner container model](./design-docs/agent-execution.md#runner-container-model) |
 
 **Infrastructure (via Docker Compose)**
@@ -53,7 +53,7 @@
 |---|---|
 | `@conduit/shared` | Types + Zod schemas, plus the cross-process contracts API/worker/web all import (AES-256-GCM crypto, Redis run-updates channel, Temporal task queue name, `AgentEvent → ExecutionLogKind` mapping). `"sideEffects": false` so Vite tree-shakes `node:crypto` out of the web bundle. |
 | `@conduit/database` | Prisma schema + `PrismaClient` re-export. See [data-model.md](./data-model.md). |
-| `@conduit/agent` | Agent provider abstraction (`AgentProvider` interface), Claude + Codex providers, workspace manager (`ticket-branch` worktree resolution + parallel-`inherit` branched worktrees + merge-back), MCP config resolution (decrypt credentials, substitute `{{credential}}`, hand to SDK). **Core of the system.** |
+| `@conduit/agent` | Agent provider abstraction (`AgentProvider` interface), Claude + Codex providers, workspace manager (`ticket-branch` worktree resolution + `fixed-branch` checkout for cron triggers + parallel-`inherit` branched worktrees + merge-back), MCP config resolution (decrypt credentials, substitute `{{credential}}`, hand to SDK). **Core of the system.** |
 
 ## Dependency graph
 
@@ -66,7 +66,7 @@
 ## Data flow: webhook → live UI
 
 1. **Webhook arrives** → `POST /api/hooks/:workflowId` → signature verified (HMAC-SHA256).
-2. **Event normalized** → platform-specific mapper produces a `TriggerEvent` (stable shape across all platforms). Polling triggers skip steps 1–2 — `pollBoardActivity` synthesizes the `TriggerEvent` directly off the GraphQL response.
+2. **Event normalized** → platform-specific mapper produces a `TriggerEvent` (stable shape across all platforms). Polling triggers skip steps 1–2 — `pollBoardActivity` synthesizes the `TriggerEvent` directly off the GraphQL response. Cron triggers skip 1–3 — the activity builds a `mode: 'scheduled'` event with `repo` but no `issue`/`pr`.
 3. **Trigger match** → `WebhooksService.matchesTrigger()` compares event against the workflow's trigger config.
 4. **Run created** → `WorkflowRun` row in Postgres → Temporal workflow `agentWorkflow` started with `{ workflowId, runId, triggerEvent }`.
 5. **Workflow executes** → loads node graph, topo sorts, for each node invokes `runAgentNode` activity. Parallel groups run via `Promise.all`.

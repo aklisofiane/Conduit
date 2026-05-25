@@ -13,7 +13,9 @@ export const nodeOutputSchema = z.object({
   files: z.array(z.string()).optional(),
   workspacePath: z.string().min(1),
   head: z.string().optional(),
-  workspaceKind: z.enum(['fresh-tmpdir', 'repo-clone', 'inherit', 'ticket-branch']).optional(),
+  workspaceKind: z
+    .enum(['fresh-tmpdir', 'repo-clone', 'inherit', 'ticket-branch', 'fixed-branch'])
+    .optional(),
   isBranchedWorktree: z.boolean().optional(),
   /**
    * Ref name the workspace was provisioned on. Populated for `repo-clone`

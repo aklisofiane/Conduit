@@ -11,10 +11,13 @@ import {
 } from '@temporalio/client';
 import {
   AGENT_WORKFLOW_TYPE,
+  CRON_WORKFLOW_TYPE,
   POLL_WORKFLOW_TYPE,
   agentWorkflowId,
-  pollScheduleId,
+  cronWorkflowId,
   pollWorkflowId,
+  workflowScheduleId,
+  type CronWorkflowInput,
   type PollWorkflowInput,
   type TicketLock,
   type TriggerEvent,
@@ -52,17 +55,27 @@ export interface StartAgentWorkflowOptions {
   ticketLock?: TicketLock;
 }
 
-export interface PollScheduleOptions {
-  workflowId: string;
-  intervalSec: number;
-  /** When false, the schedule is created/updated in a paused state. */
-  active: boolean;
-}
+export type WorkflowScheduleOptions =
+  | {
+      kind: 'polling';
+      workflowId: string;
+      intervalSec: number;
+      /** When false, the schedule is created/updated in a paused state. */
+      active: boolean;
+    }
+  | {
+      kind: 'cron';
+      workflowId: string;
+      cron: string;
+      timezone: string;
+      /** When false, the schedule is created/updated in a paused state. */
+      active: boolean;
+    };
 
 /**
  * Thin wrapper around Temporal's `@temporalio/client`. Also owns the
- * polling-trigger Schedule lifecycle (upsert/delete) so a single
- * Temporal Schedule tracks each polling workflow.
+ * schedule lifecycle (upsert/delete) so a single Temporal Schedule tracks
+ * each workflow whose trigger is schedule-backed (polling or cron).
  */
 @Injectable()
 export class TemporalService implements OnModuleInit, OnModuleDestroy {
@@ -135,28 +148,25 @@ export class TemporalService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Create or update the Temporal Schedule backing a polling workflow. Safe
-   * to call repeatedly. `overlap = SKIP` ensures a slow poll cycle never
-   * overlaps its successor.
+   * Create or update the Temporal Schedule backing a schedule-driven
+   * workflow. Safe to call repeatedly. `overlap = SKIP` ensures a slow
+   * tick never overlaps its successor.
+   *
+   * Two variants share one Schedule shape:
+   *   - `polling` → `intervals` spec; action workflow type = `POLL_WORKFLOW_TYPE`.
+   *   - `cron`    → `cronExpressions` calendar with `timezoneName`; action
+   *                 workflow type = `CRON_WORKFLOW_TYPE`.
+   *
+   * The schedule id (`workflowScheduleId`) is variant-agnostic so flipping
+   * a workflow's trigger from polling to cron updates the same Temporal
+   * Schedule in place.
    */
-  async upsertPollSchedule(opts: PollScheduleOptions): Promise<void> {
+  async upsertWorkflowSchedule(opts: WorkflowScheduleOptions): Promise<void> {
     if (!this.schedules) {
       throw new Error('Temporal client not initialized — check TEMPORAL_ADDRESS');
     }
-    const scheduleId = pollScheduleId(opts.workflowId);
-    const args: [PollWorkflowInput] = [{ workflowId: opts.workflowId }];
-    const intervalMs = opts.intervalSec * 1000;
-    const scheduleDef = {
-      spec: { intervals: [{ every: intervalMs }] },
-      action: {
-        type: 'startWorkflow' as const,
-        workflowType: POLL_WORKFLOW_TYPE,
-        args,
-        taskQueue: config.temporal.taskQueue,
-        workflowId: pollWorkflowId(opts.workflowId),
-      },
-      policies: { overlap: ScheduleOverlapPolicy.SKIP },
-    };
+    const scheduleId = workflowScheduleId(opts.workflowId);
+    const scheduleDef = buildScheduleDefinition(opts);
 
     try {
       await this.schedules.create({
@@ -177,15 +187,47 @@ export class TemporalService implements OnModuleInit, OnModuleDestroy {
    * Delete the schedule. Idempotent — 404 from Temporal is swallowed so
    * calling on a workflow that never had a schedule is a no-op.
    */
-  async deletePollSchedule(workflowId: string): Promise<void> {
+  async deleteWorkflowSchedule(workflowId: string): Promise<void> {
     if (!this.schedules) return;
     try {
-      await this.schedules.getHandle(pollScheduleId(workflowId)).delete();
+      await this.schedules.getHandle(workflowScheduleId(workflowId)).delete();
     } catch (err) {
       if (isScheduleNotFound(err)) return;
       throw err;
     }
   }
+}
+
+function buildScheduleDefinition(opts: WorkflowScheduleOptions) {
+  if (opts.kind === 'polling') {
+    const args: [PollWorkflowInput] = [{ workflowId: opts.workflowId }];
+    return {
+      spec: { intervals: [{ every: opts.intervalSec * 1000 }] },
+      action: {
+        type: 'startWorkflow' as const,
+        workflowType: POLL_WORKFLOW_TYPE,
+        args,
+        taskQueue: config.temporal.taskQueue,
+        workflowId: pollWorkflowId(opts.workflowId),
+      },
+      policies: { overlap: ScheduleOverlapPolicy.SKIP },
+    };
+  }
+  const args: [CronWorkflowInput] = [{ workflowId: opts.workflowId }];
+  return {
+    spec: {
+      cronExpressions: [opts.cron],
+      timezoneName: opts.timezone,
+    },
+    action: {
+      type: 'startWorkflow' as const,
+      workflowType: CRON_WORKFLOW_TYPE,
+      args,
+      taskQueue: config.temporal.taskQueue,
+      workflowId: cronWorkflowId(opts.workflowId),
+    },
+    policies: { overlap: ScheduleOverlapPolicy.SKIP },
+  };
 }
 
 function isScheduleAlreadyRunning(err: unknown): boolean {

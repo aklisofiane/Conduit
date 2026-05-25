@@ -3,7 +3,7 @@ import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Connection, ScheduleClient } from '@temporalio/client';
 import {
-  pollScheduleId,
+  workflowScheduleId,
   workflowDefinitionSchema,
   type WorkflowDefinition,
 } from '@conduit/shared';
@@ -264,8 +264,8 @@ describe('Phase 5 — board loop (Worker ↔ Critic) over ticket-branch', () => 
       isActive: true,
     });
 
-    const workerSchedule = scheduleClient.getHandle(pollScheduleId(worker.id));
-    const criticSchedule = scheduleClient.getHandle(pollScheduleId(critic.id));
+    const workerSchedule = scheduleClient.getHandle(workflowScheduleId(worker.id));
+    const criticSchedule = scheduleClient.getHandle(workflowScheduleId(critic.id));
     await waitFor(() => workerSchedule.describe().then(() => true).catch(() => false), 15_000);
     await waitFor(() => criticSchedule.describe().then(() => true).catch(() => false), 15_000);
 

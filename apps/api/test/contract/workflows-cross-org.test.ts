@@ -78,8 +78,8 @@ describe('WorkflowsService cross-org isolation', () => {
 
 function fakeTemporal() {
   return {
-    upsertPollSchedule: async () => undefined,
-    deletePollSchedule: async () => undefined,
+    upsertWorkflowSchedule: async () => undefined,
+    deleteWorkflowSchedule: async () => undefined,
     cancelAgentWorkflow: async () => undefined,
     startAgentWorkflow: async () => ({
       temporalWorkflowId: 'fake-tw',

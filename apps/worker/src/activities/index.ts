@@ -4,3 +4,4 @@ export { cleanupRunActivity } from './cleanup-run';
 export { mergeWorktreeActivity } from './merge-worktree';
 export { copyConduitFilesActivity } from './copy-conduit-files';
 export { pollBoardActivity } from './poll-board';
+export { cronFireActivity } from './cron-fire';

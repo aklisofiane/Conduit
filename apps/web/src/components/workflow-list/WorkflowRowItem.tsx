@@ -176,6 +176,8 @@ function triggerSummary(def: WorkflowRow['definition']): string {
       return `polling · every ${trigger.intervalSec}s`;
     case 'pull_requests':
       return `polling · every ${trigger.intervalSec}s · prs`;
+    case 'cron':
+      return `cron · ${trigger.cron} · ${trigger.timezone}`;
     case 'webhook':
       return trigger.event;
   }

@@ -1,11 +1,12 @@
 import {
+  BadRequestException,
   Injectable,
   Logger,
   NotFoundException,
   type OnModuleInit,
 } from '@nestjs/common';
 import {
-  isPollingTrigger,
+  isScheduledTrigger,
   ticketLockFor,
   workflowDefinitionSchema,
   type TriggerEvent,
@@ -33,20 +34,20 @@ export class WorkflowsService implements OnModuleInit {
    * inconsistent schedules recover on next save or restart.
    */
   onModuleInit(): void {
-    void this.reconcilePollSchedules();
+    void this.reconcileWorkflowSchedules();
   }
 
-  private async reconcilePollSchedules(): Promise<void> {
+  private async reconcileWorkflowSchedules(): Promise<void> {
     const workflows = await this.prisma.workflow.findMany({
       select: { id: true, definition: true, isActive: true },
     });
-    const polling = workflows.filter((wf) =>
-      isPollingTrigger(
+    const scheduled = workflows.filter((wf) =>
+      isScheduledTrigger(
         (wf.definition as Partial<WorkflowDefinition> | null)?.triggers?.[0],
       ),
     );
     await Promise.allSettled(
-      polling.map((wf) => this.syncPollSchedule(wf.id, wf.definition, wf.isActive)),
+      scheduled.map((wf) => this.syncWorkflowSchedule(wf.id, wf.definition, wf.isActive)),
     );
   }
 
@@ -88,12 +89,29 @@ export class WorkflowsService implements OnModuleInit {
         isActive: false,
       },
     });
-    await this.syncPollSchedule(wf.id, wf.definition, wf.isActive);
+    await this.syncWorkflowSchedule(wf.id, wf.definition, wf.isActive);
     return wf;
   }
 
   async update(orgId: string, id: string, dto: UpdateWorkflowDto) {
     if (dto.definition) assertDefinitionValid(dto.definition);
+
+    // Gate activation before the DB write so the user gets a clean 400 with
+    // a precise message rather than a downstream schedule error. We have to
+    // peek at the *resulting* definition: the DTO may carry one, otherwise
+    // fall back to what's already stored.
+    if (dto.isActive === true) {
+      const existing = await this.prisma.workflow.findFirst({
+        where: { id, orgId },
+        select: { definition: true },
+      });
+      if (!existing) throw new NotFoundException(`Workflow ${id} not found`);
+      const effective =
+        (dto.definition as WorkflowDefinition | undefined) ??
+        (existing.definition as WorkflowDefinition);
+      this.assertActivatable(effective);
+    }
+
     // updateMany returns count rather than throwing on miss — gives us the
     // 404-on-cross-org shape the spec requires (no 403 leak).
     const result = await this.prisma.workflow.updateMany({
@@ -110,9 +128,26 @@ export class WorkflowsService implements OnModuleInit {
     }
     const wf = await this.prisma.workflow.findUniqueOrThrow({ where: { id } });
     if (dto.isActive !== undefined || dto.definition !== undefined) {
-      await this.syncPollSchedule(wf.id, wf.definition, wf.isActive);
+      await this.syncWorkflowSchedule(wf.id, wf.definition, wf.isActive);
     }
     return wf;
+  }
+
+  /**
+   * Activation requires exactly one trigger. The Zod schema allows zero
+   * (legal in-flight while the user is swapping kinds by delete-then-add),
+   * so the gate lives here — at the API boundary — to produce a clearer
+   * error than a schema mismatch on save.
+   */
+  private assertActivatable(definition: WorkflowDefinition | undefined | null): void {
+    const triggerCount = definition?.triggers?.length ?? 0;
+    if (triggerCount !== 1) {
+      throw new BadRequestException(
+        triggerCount === 0
+          ? 'Cannot activate a workflow with no trigger — add one from the palette first.'
+          : `Cannot activate a workflow with ${triggerCount} triggers — only one is allowed.`,
+      );
+    }
   }
 
   async delete(orgId: string, id: string) {
@@ -126,10 +161,10 @@ export class WorkflowsService implements OnModuleInit {
     // would fire against a missing workflow and self-recover at next reconcile.
     // Don't promote a Temporal error to a 500 after the DB delete succeeded.
     try {
-      await this.temporal.deletePollSchedule(id);
+      await this.temporal.deleteWorkflowSchedule(id);
     } catch (err) {
       this.logger.warn(
-        `Deleting poll schedule for workflow ${id} failed: ${errMessage(err)}`,
+        `Deleting schedule for workflow ${id} failed: ${errMessage(err)}`,
       );
     }
   }
@@ -160,7 +195,7 @@ export class WorkflowsService implements OnModuleInit {
       },
     });
 
-    await this.syncPollSchedule(created.id, created.definition, created.isActive);
+    await this.syncWorkflowSchedule(created.id, created.definition, created.isActive);
     return created;
   }
 
@@ -197,28 +232,41 @@ export class WorkflowsService implements OnModuleInit {
   /**
    * Keep Temporal's Schedule in sync with the workflow's current trigger:
    *
-   *   - polling + isActive    → schedule exists + unpaused
+   *   - polling + isActive    → schedule exists + unpaused (interval spec)
    *   - polling + !isActive   → schedule exists + paused
-   *   - webhook               → no schedule (delete if it existed)
+   *   - cron + isActive       → schedule exists + unpaused (calendar spec)
+   *   - cron + !isActive      → schedule exists + paused
+   *   - webhook / no trigger  → no schedule (delete if it existed)
    *
    * Schedule failures are logged but never block the workflow write — an
    * inconsistent schedule will be re-reconciled on next save or boot.
    */
-  private async syncPollSchedule(
+  private async syncWorkflowSchedule(
     workflowId: string,
     definition: unknown,
     isActive: boolean,
   ): Promise<void> {
     const trigger = (definition as Partial<WorkflowDefinition> | null)?.triggers?.[0];
     try {
-      if (isPollingTrigger(trigger)) {
-        await this.temporal.upsertPollSchedule({
+      if (!isScheduledTrigger(trigger)) {
+        await this.temporal.deleteWorkflowSchedule(workflowId);
+        return;
+      }
+      if (trigger.type === 'cron') {
+        await this.temporal.upsertWorkflowSchedule({
+          kind: 'cron',
+          workflowId,
+          cron: trigger.cron,
+          timezone: trigger.timezone,
+          active: isActive,
+        });
+      } else {
+        await this.temporal.upsertWorkflowSchedule({
+          kind: 'polling',
           workflowId,
           intervalSec: trigger.intervalSec,
           active: isActive,
         });
-      } else {
-        await this.temporal.deletePollSchedule(workflowId);
       }
     } catch (err) {
       this.logger.warn(

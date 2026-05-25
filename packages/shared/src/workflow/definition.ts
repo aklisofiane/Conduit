@@ -20,11 +20,14 @@ export const workflowDefinitionSchema = z
     ui: canvasUiSchema,
   })
   .superRefine((def, ctx) => {
-    if (def.triggers.length !== 1) {
+    // Zero triggers is a legal in-flight state during the swap-by-delete UX
+    // — the API gate (workflows.service.assertActivatable) prevents an
+    // empty workflow from being activated, so the runtime never sees one.
+    if (def.triggers.length > 1) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['triggers'],
-        message: 'A workflow must have exactly one trigger',
+        message: 'A workflow can have at most one trigger',
       });
     }
 

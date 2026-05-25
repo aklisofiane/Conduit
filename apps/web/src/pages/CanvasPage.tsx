@@ -29,6 +29,7 @@ import {
   type AgentConfig,
   type AgentProviderId,
   type Edge,
+  type TriggerConfig,
   type WorkflowDefinition,
 } from '@conduit/shared';
 import { AgentNode } from '../components/canvas/AgentNode.js';
@@ -38,9 +39,15 @@ import {
   NodePalette,
   PALETTE_DRAG_MIME,
   type PaletteDragPayload,
+  type PaletteTriggerType,
 } from '../components/canvas/NodePalette.js';
-import { TriggerConfigPanel } from '../components/canvas/TriggerConfigPanel.js';
-import { TriggerNode } from '../components/canvas/TriggerNode.js';
+import { IssuesTriggerNode } from '../components/canvas/IssuesTriggerNode.js';
+import { PrTriggerNode } from '../components/canvas/PrTriggerNode.js';
+import { CronTriggerNode } from '../components/canvas/CronTriggerNode.js';
+import { WebhookTriggerPlaceholderNode } from '../components/canvas/WebhookTriggerPlaceholderNode.js';
+import { IssuesTriggerPanel } from '../components/canvas/IssuesTriggerPanel.js';
+import { PrTriggerPanel } from '../components/canvas/PrTriggerPanel.js';
+import { CronTriggerPanel } from '../components/canvas/CronTriggerPanel.js';
 import { WorkflowEdge } from '../components/canvas/WorkflowEdge.js';
 import { WorkflowHeaderPill } from '../components/canvas/WorkflowHeaderPill.js';
 import { WorkflowTabs, type WorkflowTabId } from '../components/layout/WorkflowTabs.js';
@@ -51,9 +58,33 @@ import { useWorkflowEditor } from '../state/workflow-editor.js';
 import { useTopbarSlots } from '../state/topbar-slots.js';
 import { relativeFromNow } from '../lib/time.js';
 
-const NODE_TYPES = { agent: AgentNode, trigger: TriggerNode } as const;
+const NODE_TYPES = {
+  agent: AgentNode,
+  'trigger-issues': IssuesTriggerNode,
+  'trigger-pull-requests': PrTriggerNode,
+  'trigger-cron': CronTriggerNode,
+  'trigger-webhook': WebhookTriggerPlaceholderNode,
+} as const;
 const EDGE_TYPES = { workflow: WorkflowEdge } as const;
 const WORKFLOW_EDGE_TYPE = 'workflow';
+
+/**
+ * React Flow node-type name for a given trigger variant. Webhook is a
+ * stored-only legacy variant; it gets a placeholder rendering until a
+ * dedicated `WebhookTriggerNode` ships (out of scope here).
+ */
+function flowTypeForTrigger(type: TriggerConfig['type']): string {
+  switch (type) {
+    case 'issues':
+      return 'trigger-issues';
+    case 'pull_requests':
+      return 'trigger-pull-requests';
+    case 'cron':
+      return 'trigger-cron';
+    case 'webhook':
+      return 'trigger-webhook';
+  }
+}
 
 const PANEL_WIDTH_KEY = 'conduit:canvas:inspector-width';
 const PANEL_DEFAULT_WIDTH = 320;
@@ -258,14 +289,30 @@ function CanvasInner() {
     [draft, rf, setDraft, setSelected],
   );
 
-  const handleSelectTrigger = useCallback(() => {
-    if (!draft) return;
-    const trigger = draft.triggers[0];
-    if (!trigger) return;
-    const pos = draft.ui.nodePositions[trigger.name] ?? { x: 80, y: 120 };
-    rf.setCenter(pos.x + 150, pos.y + 20, { zoom: 1, duration: 400 });
-    setSelected(trigger.id);
-  }, [draft, rf, setSelected]);
+  const handleAddTrigger = useCallback(
+    (triggerType: PaletteTriggerType, position?: { x: number; y: number }) => {
+      if (!draft) return;
+      // Swap-by-delete: the palette disables the typed cards when a trigger
+      // exists, so this only fires from a clean slate.
+      if (draft.triggers.length > 0) return;
+      const name = uniqueNodeName(draft, 'Trigger');
+      const triggerId = `trigger_${Math.random().toString(36).slice(2, 10)}`;
+      const drop =
+        position ??
+        rf.screenToFlowPosition({
+          x: window.innerWidth / 2,
+          y: window.innerHeight / 2,
+        });
+      const trigger = makeDefaultTrigger(triggerType, triggerId, name);
+      const ui = {
+        ...draft.ui,
+        nodePositions: { ...draft.ui.nodePositions, [name]: drop },
+      };
+      setDraft({ ...draft, triggers: [trigger], ui });
+      setSelected(triggerId);
+    },
+    [draft, rf, setDraft, setSelected],
+  );
 
   const handleDragOver = useCallback((event: ReactDragEvent<HTMLDivElement>) => {
     if (event.dataTransfer.types.includes(PALETTE_DRAG_MIME)) {
@@ -290,17 +337,10 @@ function CanvasInner() {
       if (payload.kind === 'agent') {
         handleAddAgent(payload.provider, point);
       } else {
-        const trigger = draft.triggers[0];
-        if (!trigger) return;
-        const ui = {
-          ...draft.ui,
-          nodePositions: { ...draft.ui.nodePositions, [trigger.name]: point },
-        };
-        setDraft({ ...draft, ui });
-        setSelected(trigger.id);
+        handleAddTrigger(payload.triggerType, point);
       }
     },
-    [draft, rf, handleAddAgent, setDraft, setSelected],
+    [draft, rf, handleAddAgent, handleAddTrigger],
   );
 
   const handleSave = useCallback(async () => {
@@ -350,7 +390,11 @@ function CanvasInner() {
 
   return (
     <div className="flex flex-1 min-h-0">
-      <NodePalette onAddAgent={handleAddAgent} onSelectTrigger={handleSelectTrigger} />
+      <NodePalette
+        onAddAgent={handleAddAgent}
+        onAddTrigger={handleAddTrigger}
+        triggerSlotFilled={draft.triggers.length > 0}
+      />
       <div className="flex min-w-0 flex-1 flex-col">
         <div
           className="relative flex-1"
@@ -405,7 +449,7 @@ function CanvasInner() {
 
       {selectedTrigger && (
         <InspectorShell width={panelWidth} onResizeStart={startPanelResize}>
-          <TriggerConfigPanel
+          <TriggerPanelByType
             trigger={selectedTrigger}
             isActive={Boolean(wf?.isActive)}
             onChange={(patch) => updateTrigger(selectedTrigger.id, patch)}
@@ -422,11 +466,95 @@ function CanvasInner() {
   );
 }
 
+interface TriggerPanelByTypeProps {
+  trigger: TriggerConfig;
+  isActive: boolean;
+  onChange: (patch: Partial<TriggerConfig>) => void;
+  onActiveChange: (next: boolean) => void;
+  onSave: () => void;
+  onDiscard: () => void;
+  onClose: () => void;
+  saving: boolean;
+  dirty: boolean;
+}
+
+function TriggerPanelByType({ trigger, onChange, ...rest }: TriggerPanelByTypeProps) {
+  switch (trigger.type) {
+    case 'issues':
+      return (
+        <IssuesTriggerPanel
+          trigger={trigger}
+          onChange={(patch) => onChange(patch)}
+          {...rest}
+        />
+      );
+    case 'pull_requests':
+      return (
+        <PrTriggerPanel
+          trigger={trigger}
+          onChange={(patch) => onChange(patch)}
+          {...rest}
+        />
+      );
+    case 'cron':
+      return (
+        <CronTriggerPanel
+          trigger={trigger}
+          onChange={(patch) => onChange(patch)}
+          {...rest}
+        />
+      );
+    case 'webhook':
+      return (
+        <div className="flex flex-1 flex-col gap-3 px-5 py-4 font-mono text-[11px] text-[var(--color-text-muted)]">
+          <div className="font-sans text-[12px] font-medium text-[var(--color-text)]">
+            Webhook trigger
+          </div>
+          <div>event: {trigger.event}</div>
+          <div>
+            No editor yet — delete this trigger and re-add an Issues, Pull requests, or Cron
+            trigger from the palette.
+          </div>
+          <button className="btn mt-2" onClick={rest.onClose}>
+            Close
+          </button>
+        </div>
+      );
+  }
+}
+
 function nameForFlowId(def: WorkflowDefinition, id: string): string | undefined {
   return (
     def.nodes.find((n) => n.id === id)?.name ??
     def.triggers.find((t) => t.id === id)?.name
   );
+}
+
+function makeDefaultTrigger(
+  triggerType: PaletteTriggerType,
+  id: string,
+  name: string,
+): TriggerConfig {
+  const shared = {
+    id,
+    name,
+    platform: 'github' as const,
+    connectionId: '',
+  };
+  switch (triggerType) {
+    case 'issues':
+      return { ...shared, type: 'issues', intervalSec: 60, filters: [] };
+    case 'pull_requests':
+      return { ...shared, type: 'pull_requests', intervalSec: 60, filters: [] };
+    case 'cron':
+      return {
+        ...shared,
+        type: 'cron',
+        cron: '0 9 * * *',
+        timezone: 'UTC',
+        branch: 'main',
+      };
+  }
 }
 
 function uniqueNodeName(def: WorkflowDefinition, prefix: string): string {
@@ -466,9 +594,12 @@ function buildFlowNodes(draft: WorkflowDefinition, prev: FlowNode[]): FlowNode[]
     return {
       ...(p ?? {}),
       id: trigger.id,
-      type: 'trigger',
+      type: flowTypeForTrigger(trigger.type),
       position,
-      data: { trigger, filterCount: trigger.filters.length },
+      data: {
+        trigger,
+        filterCount: trigger.type === 'cron' ? 0 : trigger.filters.length,
+      },
     };
   });
   const agents: FlowNode[] = draft.nodes.map((agent, i) => {

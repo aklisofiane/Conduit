@@ -2,8 +2,8 @@ import { z } from 'zod';
 import { triggerSourceSchema } from '../platform/index';
 
 /**
- * Normalized event produced by every trigger mode (webhook, polling).
- * Passed to every downstream node as `AgentContext.trigger`.
+ * Normalized event produced by every trigger mode (webhook, polling,
+ * scheduled). Passed to every downstream node as `AgentContext.trigger`.
  *
  * `issue.id` is the platform's opaque identifier (e.g. GitHub `node_id`).
  * `issue.key` is the user-visible identifier as a string — `"42"` for GitHub,
@@ -18,10 +18,14 @@ import { triggerSourceSchema } from '../platform/index';
  * deriving a `conduit/<id>-<slug>` name. `issue` continues to be populated
  * for PR events so trigger filters that key on `issue.key` keep working
  * unchanged.
+ *
+ * `mode: 'scheduled'` is reserved for cron-driven runs and guarantees both
+ * `issue` and `pr` are absent — downstream agents see `ticket: undefined`
+ * and run against a `fixed-branch` workspace named by the trigger config.
  */
 export const triggerEventSchema = z.object({
   source: triggerSourceSchema,
-  mode: z.enum(['webhook', 'polling']),
+  mode: z.enum(['webhook', 'polling', 'scheduled']),
   event: z.string().min(1),
   payload: z.record(z.unknown()),
   repo: z

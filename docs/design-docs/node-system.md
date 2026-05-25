@@ -27,6 +27,8 @@ type TriggerVariant =
   | { type: 'issues';        intervalSec: number; filters: Array<LabelFilter | StatusFilter> }
   // Polling-delivered, repo-sourced. `boardConnectionId` is allowed but ignored.
   | { type: 'pull_requests'; intervalSec: number; filters: Array<LabelFilter | PrStateFilter> }
+  // Schedule-delivered. Fires against a user-selected branch on a cron cadence. No event source, no filters.
+  | { type: 'cron';          cron: string; timezone: string; branch: string }
   // Platform-pushed. Preserved in the schema for the dormant `WebhooksController` — NOT exposed in the UI today.
   | { type: 'webhook';       event: string;       filters: Array<LabelFilter | StatusFilter | PrStateFilter> };
 
@@ -48,6 +50,8 @@ type PrStateFilter = { field: 'pr_state'; value: 'draft' | 'ready_for_review' | 
 // as a type alias from `@conduit/shared/trigger` for legacy call sites.
 type BoardRef = Omit<GithubProjectsV2Scope, 'kind'>;
 ```
+
+**`type: 'cron'`**: a Temporal Schedule fires on a calendar cadence (5-field POSIX cron + IANA timezone). Each tick produces a `TriggerEvent { mode: 'scheduled', event: 'cron.fired' }` with `repo` populated but `issue` and `pr` absent. No filtering, no set-diff dedup — `overlap = SKIP` on the schedule prevents a slow run from overlapping the next tick. Workspace derivation produces `{ kind: 'fixed-branch', branch }` from the trigger config; the branch must exist on the remote.
 
 **`type: 'webhook'`**: platform sends an event to `POST /api/hooks/:workflowId`. Conduit verifies the signature, normalizes the event, checks filters, and starts a run if matched. GitHub webhooks currently normalize four events: `issues.opened`, `pull_request.opened`, `issue_comment.created` (PR-scoped), and `board.column.changed` (from `projects_v2_item.edited` single-select field moves). The `board.column.changed` webhook carries only the Projects v2 item's `content_node_id` — no issue number — so it can't drive a workflow on its own; the `'issues'` variant with a board connection is the supported shape for board-driven flows. The webhook variant is preserved in the schema but **has no UI on-ramp today** — the `WebhooksController` is mounted and `matchesTrigger` honors the `event` name, but no picker creates a webhook trigger. Default-created workflows land on `type: 'issues'`.
 
@@ -72,8 +76,8 @@ Both trigger modes produce the same `TriggerEvent` shape, passed to every downst
 ```ts
 type TriggerEvent = {
   source: 'github' | 'gitlab' | 'jira';
-  mode: 'webhook' | 'polling';            // how the run was triggered
-  event: string;                          // e.g. 'status.changed', 'issues.opened'
+  mode: 'webhook' | 'polling' | 'scheduled'; // how the run was triggered
+  event: string;                          // e.g. 'status.changed', 'issues.opened', 'cron.fired'
   payload: Record<string, unknown>;       // platform-specific fields, normalized by mapper
   repo?: { owner: string; name: string }; // present for repo-scoped events
   issue?: { id: string; key: string; title: string; url: string }; // present for issue-scoped events — `key` is the user-visible identifier as a string
@@ -81,11 +85,16 @@ type TriggerEvent = {
 };
 ```
 
-Each platform has its own mapper that normalizes the raw event/API response into this shape. The Zod schema in `@conduit/shared` is the source of truth for `payload` shapes per platform.
+Each platform has its own mapper that normalizes the raw event/API response into this shape. The Zod schema in `@conduit/shared` is the source of truth for `payload` shapes per platform. `mode: 'scheduled'` guarantees `issue` and `pr` are absent (cron-only).
 
 `issue.id` is the platform's opaque identifier (e.g., GitHub's `node_id`) — used for API calls. `issue.key` is the user-visible identifier as a string: `"42"` for GitHub, `"PROJ-123"` for Jira (matches Jira's native "issue key" term). Downstream code that needs a stable, human-readable ticket identifier (branch names, DB keys, Temporal workflow IDs) reads `issue.key`, never `issue.id`.
 
-**UI**: one node at the top of the canvas, no input handles, one output handle. Config panel shows: platform picker → **Watch** picker (Issues · Pull requests) → Repo connection picker → under `'issues'`, an optional Board attachment that progressively unlocks the `status` filter when set → poll-interval input → filter builder. Filter options are gated visibly by `(type, hasBoard)` — attaching/detaching a board toggles `status` filter availability inline; no schema-flip cascade and no dropped-filter toast (filter validity tracks a reversible user action, not a hidden mode change). Legacy `type: 'webhook'` data renders a read-only banner with the event name — there's no creation path for it in v1.
+**UI**: each trigger variant gets its own React Flow node type (`trigger-issues`, `trigger-pull-requests`, `trigger-cron`, `trigger-webhook` placeholder) and focused config panel. Trigger kind is chosen from the `NodePalette` at creation; swapping means delete-then-add. One trigger per workflow — palette cards disable when a trigger exists.
+
+- **Issues panel**: Repo connection → optional Board → interval → filter builder.
+- **PR panel**: Repo connection → interval → filter builder (`pr_state` / `label`).
+- **Cron panel**: Repo connection → branch (free-text) → cron expression → timezone → active toggle. No filters.
+- **Webhook**: read-only placeholder for legacy data — no creation path.
 
 ## 2. Agent node
 
@@ -118,12 +127,14 @@ type McpServerRef = {
 
 type WorkspaceSpec =
   | { kind: 'inherit'; fromNode: string }   // reuse upstream agent's workspace (sequential or parallel-branched)
-  | { kind: 'ticket-branch' };              // entry kind — issue trigger ⇒ conduit/<id>-<slug>; PR trigger ⇒ pr.headRef
+  | { kind: 'ticket-branch' }              // entry kind — issue trigger ⇒ conduit/<id>-<slug>; PR trigger ⇒ pr.headRef
+  | { kind: 'fixed-branch'; branch: string }; // entry kind — cron trigger ⇒ user-selected branch
 ```
 
 **Workspaces are graph-derived.** The user never picks a kind on the canvas — `deriveWorkspaces` computes the shape from edges every time the definition is read at runtime:
 
-- A node connected to a trigger → `{ kind: 'ticket-branch' }`. The connection is the workflow's single trigger connection (validated at save-time).
+- A node connected to a cron trigger → `{ kind: 'fixed-branch', branch: <triggerConfig.branch> }`.
+- A node connected to an issue/PR trigger → `{ kind: 'ticket-branch' }`.
 - A node with one agent upstream → `{ kind: 'inherit', fromNode: <upstream> }`.
 - A node with multiple agent upstreams → `{ kind: 'inherit', fromNode: <topo-latest common ancestor> }`. For `develop.json`'s QA (depends on Dev/Tests/Docs, all sharing Seed) the ancestor is Seed — matching the runtime's parallel merge-back where sibling worktrees converge into Seed before any downstream node reads from it.
 
@@ -181,7 +192,7 @@ Rule: `inherit` always points at the trigger-connected entry node or another `in
 
 ### `ticket-branch` workspaces
 
-The sole entry kind. Two arms inside the resolver, dispatched by the trigger event:
+One of two entry kinds. Two arms inside the resolver, dispatched by the trigger event:
 
 - **Issue trigger** (`issues.opened` webhook, polling on board status): persists a branch `conduit/<ticket-id>-<slug>` across runs on the same ticket. The slug is derived from the issue title on first create and cached in the `TicketBranch` row, so iteration N+1 reads the same branch name. Each run adds a worktree from the current remote branch state, so iteration N+1 sees iteration N's commits.
 - **PR trigger** (`pull_request.opened` webhook or `pull_request.detected` from PR-scope polling): lands directly on `pr.headRef`. No row is created — the head ref is the canonical name. For Conduit-internal flows where a Worker pushed and opened a PR, this naturally lands the Reviewer on the same `conduit/<id>-<slug>` branch the Worker built; for external/human-opened PRs, on whatever branch the contributor opened from.
@@ -189,6 +200,10 @@ The sole entry kind. Two arms inside the resolver, dispatched by the trigger eve
 The agent commits and pushes via normal git; runtime sets up the push auth in-env at activity start. See [branch-management.md](./branch-management.md) for ownership, lifecycle, and concurrency.
 
 Agents inheriting from a `ticket-branch` upstream — sequentially or via parallel fan-out — receive the same push env and credential helper; any agent in the chain can `git push`. Convention is that the agent responsible for the final commit also pushes, typically after reading upstream `.conduit/` summaries and handling ticket/comment updates. The runtime does not enforce which agent pushes — DAGs with multiple terminal agents work fine (fast-forward push is idempotent) — and the unpushed-commits check at run end surfaces the "nobody pushed" footgun. Save-time enforcement of a single designated pusher is deferred; see [PLANS.md](../PLANS.md).
+
+### `fixed-branch` workspaces
+
+Entry kind for cron triggers. The trigger config names the branch; the resolver checks out a worktree on it. The branch must already exist on the remote. No `TicketBranch` row, no slug derivation, no per-tick ephemeral branch in v1 — agents work directly on the user-selected branch. Downstream `inherit` behaves identically to `ticket-branch` inheritance.
 
 ### Skills
 
@@ -275,7 +290,7 @@ type NodeOutput = {
 
 ## Validation rules (enforced at save)
 
-1. Exactly one trigger (`triggers.length === 1` in v1; the schema is plural so this becomes a soft cap when multi-trigger lands).
+1. At most one trigger (`triggers.length > 1` is rejected; zero is a legal in-flight state during the swap-by-delete UX — the API gate `assertActivatable` prevents an empty-trigger workflow from activating).
 2. Trigger and agent names are unique within their combined namespace and are valid identifiers (`^[A-Za-z_][A-Za-z0-9_]*$`). A name collision between a trigger and an agent is rejected.
 3. Every `Edge.from` references a known trigger or agent; every `Edge.to` references an agent (triggers can't be edge destinations).
 4. No cycles within a single workflow graph. Cross-run cycles — via board transitions that re-trigger the same workflow — are the intended loop mechanism; see "Cross-run iteration" below.
@@ -284,7 +299,9 @@ type NodeOutput = {
 7. All triggers in a workflow share the same `connectionId` (and the same `boardConnectionId`, when present). v1 has a single trigger today; multi-trigger workflows must still target a single repo + at most one board connection.
 8. Every `mcpServers[].serverId` references a server defined at the workflow level.
 9. MCP servers with a `connectionId` must reference a valid `Connection`.
-10. `boardConnectionId` is required only for `type: 'webhook'` with `event === 'board.column.changed'` — the validator emits `trigger-board-connection-required` in that case. `type: 'issues'` does **not** require a board: with no `boardConnectionId` the poller takes the repo path; attaching one progressively unlocks the board-aware semantics (Status filter, column-change detection). `type: 'pull_requests'` derives owner/repo from the source `Connection` (`scope.kind: 'github_repo'`) and ignores the board slot. See [connections.md](./connections.md).
+10. Cron expression validated as 5-field POSIX; `timezone` and `branch` must be non-empty. Temporal validates IANA timezone at schedule create time.
+11. `cron-trigger-incompatible-workspace`: a cron-triggered node cannot have `workspace.kind === 'ticket-branch'` (catches legacy/hand-edited JSON).
+12. `boardConnectionId` is required only for `type: 'webhook'` with `event === 'board.column.changed'` — the validator emits `trigger-board-connection-required` in that case. `type: 'issues'` does **not** require a board: with no `boardConnectionId` the poller takes the repo path; attaching one progressively unlocks the board-aware semantics (Status filter, column-change detection). `type: 'pull_requests'` derives owner/repo from the source `Connection` (`scope.kind: 'github_repo'`) and ignores the board slot. See [connections.md](./connections.md).
 
 ## Cross-run iteration
 

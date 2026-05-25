@@ -12,6 +12,16 @@ export const pollWorkflowInputSchema = z.object({
 export type PollWorkflowInput = z.infer<typeof pollWorkflowInputSchema>;
 
 /**
+ * Input for the cron workflow / activity. Same minimal shape as
+ * `PollWorkflowInput` — the trigger config (cron expression, branch,
+ * connection) is re-read from the DB on each tick.
+ */
+export const cronWorkflowInputSchema = z.object({
+  workflowId: z.string().min(1),
+});
+export type CronWorkflowInput = z.infer<typeof cronWorkflowInputSchema>;
+
+/**
  * One row in the poll-cycle summary written to `ExecutionLog` for audit.
  * Surfaced as the `pollWorkflow` return value so each tick's "Result" tab
  * in the Temporal UI tells the full story of which gate dropped events.

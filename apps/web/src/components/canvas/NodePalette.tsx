@@ -1,21 +1,37 @@
-import type { DragEvent as ReactDragEvent } from 'react';
+import type { DragEvent as ReactDragEvent, ReactNode } from 'react';
 import type { AgentConfig } from '@conduit/shared';
 import { tokens, providerStyle, type ProviderId } from '../../styles/theme.js';
-import { Clock } from 'lucide-react';
+import { CircleDot, Clock, GitPullRequest } from 'lucide-react';
 import { ProviderGlyph } from '../common/BrandGlyph.js';
 
 export const PALETTE_DRAG_MIME = 'application/conduit-node';
 
+/**
+ * Drag payload contract between the palette and the canvas drop handler.
+ * Triggers are typed at drag time so the canvas knows which default
+ * config to materialize. Adding a future webhook card means extending the
+ * `triggerType` union here and adding a corresponding case in the drop
+ * handler.
+ */
+export type PaletteTriggerType = 'issues' | 'pull_requests' | 'cron';
+
 export type PaletteDragPayload =
   | { kind: 'agent'; provider: AgentConfig['provider'] }
-  | { kind: 'trigger' };
+  | { kind: 'trigger'; triggerType: PaletteTriggerType };
 
 interface NodePaletteProps {
   onAddAgent: (provider: AgentConfig['provider']) => void;
-  onSelectTrigger: () => void;
+  onAddTrigger: (triggerType: PaletteTriggerType) => void;
+  /** Whether a trigger already exists — disables the typed cards so the
+   *  user is funnelled through delete-then-add to swap kinds. */
+  triggerSlotFilled: boolean;
 }
 
-export function NodePalette({ onAddAgent, onSelectTrigger }: NodePaletteProps) {
+export function NodePalette({
+  onAddAgent,
+  onAddTrigger,
+  triggerSlotFilled,
+}: NodePaletteProps) {
   return (
     <aside
       className="flex w-[240px] shrink-0 flex-col gap-4 border-r px-[14px] py-4 text-[var(--color-text)]"
@@ -25,7 +41,35 @@ export function NodePalette({ onAddAgent, onSelectTrigger }: NodePaletteProps) {
       }}
     >
       <PaletteSection title="Triggers">
-        <TriggerPaletteCard onClick={onSelectTrigger} />
+        <TriggerPaletteCard
+          name="Issues"
+          description="github issues — board or repo"
+          icon={<CircleDot size={11} color="#FFFFFF" strokeWidth={1.5} />}
+          disabled={triggerSlotFilled}
+          payload={{ kind: 'trigger', triggerType: 'issues' }}
+          onClick={() => onAddTrigger('issues')}
+        />
+        <TriggerPaletteCard
+          name="Pull requests"
+          description="open prs in the repo"
+          icon={<GitPullRequest size={11} color="#FFFFFF" strokeWidth={1.5} />}
+          disabled={triggerSlotFilled}
+          payload={{ kind: 'trigger', triggerType: 'pull_requests' }}
+          onClick={() => onAddTrigger('pull_requests')}
+        />
+        <TriggerPaletteCard
+          name="Cron"
+          description="time-driven runs on a branch"
+          icon={<Clock size={11} color="#FFFFFF" strokeWidth={1.5} />}
+          disabled={triggerSlotFilled}
+          payload={{ kind: 'trigger', triggerType: 'cron' }}
+          onClick={() => onAddTrigger('cron')}
+        />
+        {triggerSlotFilled && (
+          <div className="px-[2px] font-mono text-[10px] leading-[1.3] text-[var(--color-text-muted)]">
+            Delete the existing trigger to add a different kind.
+          </div>
+        )}
       </PaletteSection>
 
       <PaletteSection title="Agents">
@@ -66,15 +110,29 @@ function PaletteSection({
   );
 }
 
-function TriggerPaletteCard({ onClick }: { onClick: () => void }) {
-  const payload: PaletteDragPayload = { kind: 'trigger' };
+function TriggerPaletteCard({
+  name,
+  description,
+  icon,
+  payload,
+  disabled,
+  onClick,
+}: {
+  name: string;
+  description: string;
+  icon: ReactNode;
+  payload: PaletteDragPayload;
+  disabled: boolean;
+  onClick: () => void;
+}) {
   return (
     <button
       type="button"
-      draggable
-      onDragStart={onPaletteDragStart(payload)}
-      onClick={onClick}
-      className="flex w-full items-start gap-[10px] rounded-[var(--radius)] border px-[10px] py-2 text-left transition-colors active:cursor-grabbing"
+      draggable={!disabled}
+      onDragStart={disabled ? undefined : onPaletteDragStart(payload)}
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      className="flex w-full items-start gap-[10px] rounded-[var(--radius)] border px-[10px] py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50 active:cursor-grabbing"
       style={{
         background: tokens.color.triggerBg,
         borderColor: tokens.color.triggerBorder,
@@ -84,17 +142,17 @@ function TriggerPaletteCard({ onClick }: { onClick: () => void }) {
         className="mt-[1px] grid h-[18px] w-[18px] shrink-0 place-items-center rounded-[5px]"
         style={{ background: tokens.color.trigger }}
       >
-        <Clock size={11} color="#FFFFFF" strokeWidth={1.5} />
+        {icon}
       </span>
       <span className="min-w-0">
         <span className="block font-sans text-[12px] font-medium text-[var(--color-text)]">
-          Trigger
+          {name}
         </span>
         <span
           className="block font-mono text-[11px]"
           style={{ color: tokens.color.textMuted }}
         >
-          drag to place · click to focus
+          {description}
         </span>
       </span>
     </button>

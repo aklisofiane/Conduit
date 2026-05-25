@@ -53,10 +53,11 @@ export async function pollBoardActivity(
   if (!trigger) {
     return emptyResult(workflowId, 'not-polling');
   }
-  if (trigger.type === 'webhook') {
-    // Webhook triggers are delivered by the webhooks controller, not the
-    // poll loop. A schedule firing here means a stale Temporal schedule —
-    // drop cleanly so reconcile cleans it up on next save.
+  if (trigger.type === 'webhook' || trigger.type === 'cron') {
+    // Non-polling triggers are delivered by their own surface — webhooks
+    // controller or the cron workflow. A schedule firing here means a
+    // stale Temporal schedule of the wrong type — drop cleanly so reconcile
+    // cleans it up on next save.
     return emptyResult(workflowId, 'not-polling');
   }
   if (trigger.platform !== 'github') {

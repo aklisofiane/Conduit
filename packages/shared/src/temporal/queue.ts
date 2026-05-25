@@ -12,13 +12,16 @@ export const DEFAULT_TEMPORAL_TASK_QUEUE = 'conduit-workflows';
  */
 export const AGENT_WORKFLOW_TYPE = 'agentWorkflow';
 export const POLL_WORKFLOW_TYPE = 'pollWorkflow';
+export const CRON_WORKFLOW_TYPE = 'cronWorkflow';
 
 /**
- * Deterministic id for the Temporal Schedule driving a polling workflow.
- * One schedule per Conduit workflow. Used by both the API (to create/update/
- * delete) and ops (to find the schedule in the Temporal UI).
+ * Deterministic id for the Temporal Schedule driving any schedule-backed
+ * workflow (polling or cron). One schedule per Conduit workflow — the
+ * action (poll vs cron) is chosen at upsert time by the trigger variant.
+ * The `poll-` prefix is preserved for backwards compatibility with any
+ * schedules already in the Temporal namespace.
  */
-export function pollScheduleId(workflowId: string): string {
+export function workflowScheduleId(workflowId: string): string {
   return `poll-${workflowId}`;
 }
 
@@ -29,6 +32,15 @@ export function pollScheduleId(workflowId: string): string {
  */
 export function pollWorkflowId(workflowId: string): string {
   return `poll-run-${workflowId}`;
+}
+
+/**
+ * Deterministic Temporal workflow id for a cron tick. Same shape as
+ * `pollWorkflowId` so the schedule overlap policy (SKIP) prevents a slow
+ * agent run from overlapping its successor tick.
+ */
+export function cronWorkflowId(workflowId: string): string {
+  return `cron-run-${workflowId}`;
 }
 
 /**

@@ -22,6 +22,10 @@ export function matchesTrigger(event: TriggerEvent, trigger: TriggerConfig): boo
     if (event.event !== trigger.event) return false;
   }
 
+  // Cron has no filters and no event-name match — every scheduled tick
+  // produces an unconditionally-matching event.
+  if (trigger.type === 'cron') return true;
+
   const view = flattenEventForFilters(event);
   return trigger.filters.every((f) => applyFilter(view, f));
 }

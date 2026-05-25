@@ -38,14 +38,14 @@ Created workflows are paused — the user reviews the generated canvas before ac
 
 ## Canvas
 
-React Flow with a small palette. Two node types.
+React Flow with a small palette. Five node types (`agent`, `trigger-issues`, `trigger-pull-requests`, `trigger-cron`, `trigger-webhook`).
 
 ### Palette
 
-Left rail (`apps/web/src/components/canvas/NodePalette.tsx`). Every card is both click-to-add and HTML5-draggable onto the canvas; the drag payload is a JSON-encoded `PaletteDragPayload` carried via the `application/conduit-node` MIME type so stray OS drags are ignored.
+Left rail (`apps/web/src/components/canvas/NodePalette.tsx`). Every card is both click-to-add and HTML5-draggable onto the canvas; the drag payload is a JSON-encoded `PaletteDragPayload` (extended to `{ kind: 'trigger'; triggerType: 'issues' | 'pull_requests' | 'cron' }`) carried via the `application/conduit-node` MIME type so stray OS drags are ignored.
 
 - **Agent cards** (`Claude`, `Codex`) — click adds a new agent at canvas center; drag drops at the pointer. The drop handler in `CanvasPage` converts screen → flow coordinates via `rf.screenToFlowPosition` before inserting the node.
-- **Trigger card** — singleton. Click re-centers the existing trigger (`rf.setCenter`) and opens its config panel; drag repositions the same trigger to the cursor. Dragging the trigger card never creates a second trigger.
+- **Trigger cards** — three typed cards (Issues, Pull requests, Cron). All disable when a trigger exists — swap is delete-then-add. Click adds at canvas center; drag drops at the pointer.
 
 Node positions are persisted to `Workflow.definition.ui.nodePositions` on drag-end only — see the `State` section below for the split between React Flow's measured layout and the persisted draft.
 
@@ -55,7 +55,7 @@ Edges are drawn by a custom `WorkflowEdge` (`apps/web/src/components/canvas/Work
 
 ### Node components
 
-- **`TriggerNode`** — pill-shaped, platform icon, event label, filter count. Output handle only.
+- **Typed trigger nodes** — one per variant, sharing a pill-shaped visual shell (`trigger-node-common.tsx`). Issues shows board/repo + interval + filter count; PR shows interval + filter count; Cron shows expression + branch + timezone; Webhook placeholder shows event name (legacy, read-only). Output handle only.
 - **`AgentNode`** — large card. Visual style varies by provider for quick at-a-glance identification via distinct accent colors and a letter glyph (e.g., "C" for Claude in warm amber, "X" for Codex in cool teal) paired with the plain-text provider name.
   - Header: name, provider label ("Claude" / "Codex"), model
   - Body: instructions preview (first 2 lines), MCP server chips (up to 4 + "+N more"), skill chips. (Workspace kind is derived from graph topology — not surfaced on the canvas.)
@@ -68,7 +68,7 @@ Visual tokens (palette, per-provider color/font/label, radii, the `providerStyle
 
 Opens on node click. Form driven by Zod schema from `@conduit/shared`.
 
-- **Trigger panel**: platform picker → **Watch** picker (Issues · Pull requests) → **Connections** group with stacked sub-rows (always **Repo**; **Board** is shown under `type: 'issues'` only, starting as a "+ Attach a board" CTA when unset and as a select + `×` detach button when set); each sub-row's picker filters by scope kind (`github_repo` for Repo, `github_projects_v2` for Board) → poll-interval input → readout for the resolved board's title/url/Status fields (when attached) → filter builder. Webhook-typed triggers (legacy data — no creation path in v1) render a read-only banner with the event name and skip the rest. The filter row's left-side dropdown is gated on `(type, hasBoard)`: `type: 'issues'` with a board offers `Status | Label`, `type: 'issues'` without a board offers `Label` only, `type: 'pull_requests'` offers `PR state | Label`. Attaching or detaching a board toggles `Status` availability inline — there's no schema-flip cascade and no dropped-filter toast, since filter validity tracks a reversible user action visible right above. Right-side values stay live-sourced — Status from the selected board's Status column, Label from the source connection's repo via `useListLabels`, and PR state from a fixed `draft / ready_for_review / any` enum. The board list is fetched via `useListProjectBoards` (TanStack Query, keyed on `(connectionId, ownerType, owner)`, 30s `staleTime`); `ownerType` and `owner` come from the selected board connection's parsed `scope`, not user input. `<FilterEditor>`, `<FilterRow>`, `<OptionsValueInput>`, and `<ConnectionSubRow>` all live next to `TriggerConfigPanel` in `apps/web/src/components/canvas/TriggerConfigPanel.tsx`. When the user flips `Watch`, the editor store (`useWorkflowEditor.updateTrigger` in `apps/web/src/state/workflow-editor.ts`) detects the variant change and rebuilds the trigger object — preserving shared fields (`id`, `name`, `platform`, `connectionId`, `boardConnectionId`) and dropping stale variant-specific keys (`event` when leaving webhook; `intervalSec` when entering it).
+- **Trigger panels**: dispatched by `trigger.type`, sharing common chrome from `trigger-panel-common.tsx`. **Issues**: Repo connection → optional Board → interval → filter builder. **PR**: Repo connection → interval → filters (`pr_state` / `label`). **Cron**: Repo connection → branch (free-text) → cron expression → timezone → active toggle; no filters. **Webhook**: no panel (read-only placeholder node).
 - **Agent panel**: name field (identifier validation), preset picker (see below), provider + model dropdown, instructions textarea (monospace, generous height), **Web search** checkbox (off by default — toggles the provider's built-in web search/fetch; see [agent-execution.md](./design-docs/agent-execution.md#web-search)), **Issue writeback** control (opt-in checkbox + pill-toggle groups for allowed statuses + labels — see below), MCP server picker (presets with one-click add + custom server config), skill picker (see below), constraints (collapsible). No workspace picker — workspace is derived from graph position (see [node-system.md](./design-docs/node-system.md#workspace-inheritance)).
 
 ### Agent preset picker

@@ -158,12 +158,12 @@ describe('validateWorkflowDefinition', () => {
 });
 
 describe('workflowDefinitionSchema', () => {
-  it('rejects zero triggers', () => {
+  it('accepts zero triggers (in-flight state during swap-by-delete)', () => {
     const result = workflowDefinitionSchema.safeParse({
       ...baseDefinition(),
       triggers: [],
     });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
   });
 
   it('rejects two triggers', () => {

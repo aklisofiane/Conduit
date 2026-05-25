@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Connection, ScheduleClient } from '@temporalio/client';
-import { pollScheduleId, type WorkflowDefinition } from '@conduit/shared';
+import { workflowScheduleId, type WorkflowDefinition } from '@conduit/shared';
 import { loadWorkflowFixture } from '../helpers/temporal';
 import { startHarness, type Harness } from './harness';
 import {
@@ -41,7 +41,7 @@ function sleep(ms: number): Promise<void> {
  * Verifies the full polling pipeline without hitting GitHub:
  *
  *   1. A workflow saved with a polling trigger registers a Temporal Schedule
- *      (the schedule id is deterministic — `pollScheduleId(workflowId)`).
+ *      (the schedule id is deterministic — `workflowScheduleId(workflowId)`).
  *   2. Each schedule tick runs `pollBoardActivity`, which queries the
  *      platform (redirected to our mock via `GITHUB_GRAPHQL_URL`).
  *   3. `PollSnapshot` set-diff only starts `agentWorkflow`s for items that
@@ -159,7 +159,7 @@ describe('Phase 4 — polling trigger fires runs on board set-diff', () => {
     // try to grab its handle. The upsert is fire-and-forget from the write
     // path (by design — schedule sync doesn't block the DB update), so a
     // short poll is the right shape here.
-    const scheduleHandle = scheduleClient.getHandle(pollScheduleId(created.id));
+    const scheduleHandle = scheduleClient.getHandle(workflowScheduleId(created.id));
     await waitFor(async () => {
       try {
         await scheduleHandle.describe();
@@ -277,7 +277,7 @@ describe('Phase 4 — polling trigger fires runs on board set-diff', () => {
       definition: fixture.definition,
     });
 
-    const handle = scheduleClient.getHandle(pollScheduleId(created.id));
+    const handle = scheduleClient.getHandle(workflowScheduleId(created.id));
     // Schedule should appear after the create path completes its sync.
     await waitFor(
       () =>

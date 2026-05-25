@@ -86,8 +86,9 @@ async function warnOnUnpushedTicketBranchCommits(runId: string, orgId: string): 
       branchName?: string;
       head?: string;
     } | null;
-    if (output?.workspaceKind !== 'ticket-branch') continue;
-    if (!node.workspacePath || !output.head || !output.branchName) continue;
+    const kind = output?.workspaceKind;
+    if (kind !== 'ticket-branch' && kind !== 'fixed-branch') continue;
+    if (!node.workspacePath || !output?.head || !output.branchName) continue;
 
     const unpushed = await countCommitsAhead(node.workspacePath, output.head);
     if (unpushed === null || unpushed === 0) continue;
@@ -95,7 +96,7 @@ async function warnOnUnpushedTicketBranchCommits(runId: string, orgId: string): 
       runId,
       orgId,
       node.nodeName,
-      `ticket-branch: ${unpushed} commit${unpushed === 1 ? '' : 's'} on ${output.branchName} ` +
+      `${kind}: ${unpushed} commit${unpushed === 1 ? '' : 's'} on ${output.branchName} ` +
         `past the resolved base — if no agent ran \`git push\`, this work is lost on the next iteration.`,
       'WARN',
     );

@@ -117,34 +117,37 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
   });
 
   try {
-    const ticketBranch = await resolveTicketBranchInputs(node, triggers, triggerEvent);
+    const entryInputs = await resolveEntryWorkspaceInputs(node, triggers, triggerEvent);
 
     const workspace = await workspaceManager.resolve({
       runId,
       nodeName: node.name,
       spec: node.workspace,
       orgId,
-      connection: ticketBranch?.connection,
+      connection: entryInputs?.connection,
       upstreamPath: upstreamWorkspacePath,
       upstreamHead,
       parallelBranch,
-      ticket: ticketBranch?.ticket,
-      ticketBranchStore: ticketBranch?.store,
-      pr: ticketBranch?.pr,
+      ticket: entryInputs?.ticket,
+      ticketBranchStore: entryInputs?.store,
+      pr: entryInputs?.pr,
     });
 
     if (workspace.ticketBranchId) {
-      await ticketBranch?.store?.markRunStart(workspace.ticketBranchId);
+      await entryInputs?.store?.markRunStart(workspace.ticketBranchId);
     }
 
     // Installed on the shared .git/config so inherit-chain children pick it
     // up automatically; cleanupRunActivity wipes the run dir after.
-    if (workspace.kind === 'ticket-branch' && ticketBranch?.connection?.token) {
+    const entryWithToken =
+      (workspace.kind === 'ticket-branch' || workspace.kind === 'fixed-branch') &&
+      entryInputs?.connection?.token;
+    if (entryWithToken && entryInputs?.connection?.token) {
       await installPushCredentials({
         runId,
         nodeName: node.name,
         worktreePath: workspace.path,
-        token: ticketBranch.connection.token,
+        token: entryInputs.connection.token,
       });
     }
 
@@ -374,7 +377,7 @@ export async function cleanupConduitFolder(workspacePath: string): Promise<void>
   await clearConduitFolder(workspacePath);
 }
 
-interface TicketBranchInputs {
+interface EntryWorkspaceInputs {
   connection?: ConnectionContext;
   ticket?: TicketContext;
   store?: TicketBranchStore;
@@ -382,22 +385,31 @@ interface TicketBranchInputs {
 }
 
 /**
- * Gather the per-run inputs needed by the `ticket-branch` workspace resolver.
- * The connection comes from the workflow's first trigger — save-time
- * validation enforces that all triggers share a connectionId.
+ * Gather the per-run inputs needed by entry-kind workspace resolvers
+ * (`ticket-branch` and `fixed-branch`). The connection comes from the
+ * workflow's first trigger — save-time validation enforces that all
+ * triggers share a connectionId.
+ *
+ * For `fixed-branch` (cron-driven), only the connection is populated;
+ * the branch lives on the workspace spec itself, and cron carries neither
+ * ticket nor PR.
  */
-async function resolveTicketBranchInputs(
+async function resolveEntryWorkspaceInputs(
   node: AgentConfigWithWorkspace,
   triggers: TriggerConfig[],
   triggerEvent: TriggerEvent,
-): Promise<TicketBranchInputs | undefined> {
-  if (node.workspace.kind !== 'ticket-branch') return undefined;
+): Promise<EntryWorkspaceInputs | undefined> {
+  const kind = node.workspace.kind;
+  if (kind !== 'ticket-branch' && kind !== 'fixed-branch') return undefined;
   const connectionId = triggers[0]?.connectionId;
   const connection = connectionId ? await loadConnectionContext(connectionId) : undefined;
   if (connectionId && !connection) {
     throw new Error(
-      `ticket-branch workspace on node "${node.name}" references unknown connection ${connectionId}`,
+      `${kind} workspace on node "${node.name}" references unknown connection ${connectionId}`,
     );
+  }
+  if (kind === 'fixed-branch') {
+    return { connection };
   }
   return {
     connection,

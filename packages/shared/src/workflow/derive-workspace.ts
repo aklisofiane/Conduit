@@ -1,5 +1,6 @@
 import type { AgentConfig } from '../agent/index';
 import type { Edge } from './edge';
+import type { TriggerConfig } from '../trigger/index';
 import type { WorkspaceSpec } from '../workspace/index';
 import type { WorkflowDefinition } from './definition';
 
@@ -24,15 +25,18 @@ export interface DerivedWorkflowDefinition extends WorkflowDefinition {
  * before iterating nodes.
  *
  * Rules:
- *   1. A node whose immediate upstreams include a trigger → `ticket-branch`.
- *   2. A node with a single agent upstream → `inherit { fromNode: that }`.
- *   3. A node with multiple agent upstreams → `inherit { fromNode: <lca> }`,
+ *   1. A node whose immediate upstreams include a cron trigger →
+ *      `fixed-branch { branch }` using the cron trigger's `branch` field.
+ *   2. A node whose immediate upstreams include an issue/PR trigger →
+ *      `ticket-branch`.
+ *   3. A node with a single agent upstream → `inherit { fromNode: that }`.
+ *   4. A node with multiple agent upstreams → `inherit { fromNode: <lca> }`,
  *      where `<lca>` is the topo-latest common ancestor of those upstreams.
  *      For `develop.json`'s QA (depends on Dev/Tests/Docs, which all share
  *      Seed), this resolves to Seed — matching the runtime's parallel-merge
  *      semantics where sibling worktrees merge back into Seed before a
  *      downstream agent reads from it.
- *   4. An orphan agent (no upstream of any kind) → `ticket-branch`. These
+ *   5. An orphan agent (no upstream of any kind) → `ticket-branch`. These
  *      don't execute (topo-sort skips them) so the kind is incidental.
  *
  * If a node already has a workspace (legacy stored JSON predating this
@@ -42,9 +46,9 @@ export interface DerivedWorkflowDefinition extends WorkflowDefinition {
 export function deriveWorkspaces(
   definition: WorkflowDefinition,
 ): DerivedWorkflowDefinition {
-  const triggerNames = new Set(definition.triggers.map((t) => t.name));
+  const triggersByName = new Map(definition.triggers.map((t) => [t.name, t]));
   const nodeNames = new Set(definition.nodes.map((n) => n.name));
-  const incoming = buildIncomingMap(definition.edges, nodeNames, triggerNames);
+  const incoming = buildIncomingMap(definition.edges, nodeNames, triggersByName);
   const topoIndex = topoIndexMap(definition.nodes, definition.edges, nodeNames);
 
   const nodes: AgentConfigWithWorkspace[] = definition.nodes.map((node) => {
@@ -56,24 +60,25 @@ export function deriveWorkspaces(
 }
 
 interface NodeIncoming {
-  fromTriggers: Set<string>;
+  fromTriggers: TriggerConfig[];
   fromAgents: Set<string>;
 }
 
 function buildIncomingMap(
   edges: Edge[],
   agentNames: Set<string>,
-  triggerNames: Set<string>,
+  triggersByName: Map<string, TriggerConfig>,
 ): Map<string, NodeIncoming> {
   const map = new Map<string, NodeIncoming>();
   for (const name of agentNames) {
-    map.set(name, { fromTriggers: new Set(), fromAgents: new Set() });
+    map.set(name, { fromTriggers: [], fromAgents: new Set() });
   }
   for (const edge of edges) {
     const bucket = map.get(edge.to);
     if (!bucket) continue;
-    if (triggerNames.has(edge.from)) {
-      bucket.fromTriggers.add(edge.from);
+    const trigger = triggersByName.get(edge.from);
+    if (trigger) {
+      bucket.fromTriggers.push(trigger);
     } else if (agentNames.has(edge.from)) {
       bucket.fromAgents.add(edge.from);
     }
@@ -88,7 +93,13 @@ function deriveOne(
 ): WorkspaceSpec {
   const inc = incoming.get(nodeName);
   if (!inc) return { kind: 'ticket-branch' };
-  if (inc.fromTriggers.size > 0) return { kind: 'ticket-branch' };
+  if (inc.fromTriggers.length > 0) {
+    // A cron upstream forces fixed-branch — even if a non-cron trigger also
+    // feeds in, the validator rejects mixed kinds, so picking either is fine.
+    const cron = inc.fromTriggers.find((t) => t.type === 'cron');
+    if (cron && cron.type === 'cron') return { kind: 'fixed-branch', branch: cron.branch };
+    return { kind: 'ticket-branch' };
+  }
   if (inc.fromAgents.size === 0) return { kind: 'ticket-branch' };
   const agents = [...inc.fromAgents];
   if (agents.length === 1) {

@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { WorkspaceError } from '../errors/index';
 import { cloneConduitFolder } from './conduit-folder';
+import { resolveFixedBranchWorkspace } from './fixed-branch';
 import { git } from './git';
 import { nodeWorkspacePath, runDir } from './paths';
 import { resolveTicketBranchWorkspace } from './ticket-branch';
@@ -9,11 +10,13 @@ import type { ResolvedWorkspace, WorkspaceResolveInput } from './types';
 import { dropConflictingWorktrees } from './worktree-cleanup';
 
 /**
- * Resolves a workspace spec into a concrete on-disk path. Two arms:
+ * Resolves a workspace spec into a concrete on-disk path. Three arms:
  *
- *   - `ticket-branch` — entry kind. Issue triggers derive a persistent
- *                       `conduit/<id>-<slug>` branch; PR triggers anchor
- *                       directly on `pr.headRef`.
+ *   - `ticket-branch` — entry kind for issue/PR triggers. Issue triggers
+ *                       derive a persistent `conduit/<id>-<slug>` branch;
+ *                       PR triggers anchor directly on `pr.headRef`.
+ *   - `fixed-branch`  — entry kind for cron triggers. The trigger config
+ *                       names the branch; the agent works on it directly.
  *   - `inherit`       — sequential pass-through of the upstream worktree,
  *                       or a branched detached worktree off the upstream
  *                       HEAD when this node is one of several siblings
@@ -68,6 +71,19 @@ export class WorkspaceManager {
           ticket: input.ticket,
           store: input.ticketBranchStore,
           pr: input.pr,
+        });
+      }
+      case 'fixed-branch': {
+        if (!input.connection) {
+          throw new WorkspaceError(
+            `fixed-branch workspace requires a connection for node "${nodeName}"`,
+          );
+        }
+        return resolveFixedBranchWorkspace({
+          runId,
+          nodeName,
+          connection: input.connection,
+          branch: spec.branch,
         });
       }
       default: {

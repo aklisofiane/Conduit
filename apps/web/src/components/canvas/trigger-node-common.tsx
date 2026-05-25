@@ -1,15 +1,28 @@
-import { Handle, Position, type NodeProps } from '@xyflow/react';
-import type { TriggerConfig } from '@conduit/shared';
+import { Handle, Position } from '@xyflow/react';
+import type { ReactNode } from 'react';
 import { nodeSize, tokens } from '../../styles/theme.js';
-import { Clock } from 'lucide-react';
 
-export interface TriggerNodeData extends Record<string, unknown> {
-  trigger: TriggerConfig;
-  filterCount: number;
-}
-
-export function TriggerNode({ data, selected }: NodeProps) {
-  const { trigger, filterCount } = data as TriggerNodeData;
+/**
+ * Shared chrome for the typed trigger nodes (`IssuesTriggerNode`,
+ * `PrTriggerNode`, `CronTriggerNode`). Each typed node just supplies its
+ * own icon, label, and detail line; selection, sizing, and the source
+ * handle live here so the three nodes stay visually consistent.
+ */
+export function TriggerNodeShell({
+  selected,
+  icon,
+  label,
+  detail,
+  meta,
+  platform,
+}: {
+  selected: boolean | undefined;
+  icon: ReactNode;
+  label: string;
+  detail: string;
+  meta?: string;
+  platform: string;
+}) {
   return (
     <div
       className="rounded-[var(--radius)] px-3 py-[10px] transition-all"
@@ -31,13 +44,13 @@ export function TriggerNode({ data, selected }: NodeProps) {
           className="grid h-[18px] w-[18px] shrink-0 place-items-center rounded-[5px]"
           style={{ background: tokens.color.trigger }}
         >
-          <Clock size={11} color="#FFFFFF" strokeWidth={1.5} />
+          {icon}
         </span>
         <span
           className="font-sans text-[10px] font-semibold uppercase tracking-[0.06em]"
           style={{ color: tokens.color.textMuted }}
         >
-          Trigger
+          {label}
         </span>
         <span
           className="ml-auto rounded-[var(--radius-sm)] px-[6px] py-[1px] font-mono text-[9px] uppercase tracking-[0.06em]"
@@ -47,35 +60,24 @@ export function TriggerNode({ data, selected }: NodeProps) {
             border: `1px solid ${tokens.color.pillBorder}`,
           }}
         >
-          {trigger.platform}
+          {platform}
         </span>
       </div>
       <div
         className="mt-[6px] truncate font-medium"
         style={{ color: tokens.color.text }}
       >
-        {triggerLabel(trigger)}
+        {detail}
       </div>
-      {filterCount > 0 && (
+      {meta && (
         <div
-          className="mt-1 font-mono text-[10px]"
+          className="mt-1 truncate font-mono text-[10px]"
           style={{ color: tokens.color.textMuted }}
         >
-          {filterCount} filter{filterCount === 1 ? '' : 's'}
+          {meta}
         </div>
       )}
       <Handle type="source" position={Position.Right} className="!h-2 !w-2" />
     </div>
   );
-}
-
-function triggerLabel(t: TriggerConfig): string {
-  switch (t.type) {
-    case 'issues':
-      return `every ${t.intervalSec}s`;
-    case 'pull_requests':
-      return `every ${t.intervalSec}s · prs`;
-    case 'webhook':
-      return t.event;
-  }
 }
