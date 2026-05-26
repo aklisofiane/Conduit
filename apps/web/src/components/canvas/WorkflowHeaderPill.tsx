@@ -181,8 +181,8 @@ function SwitcherPopover({ anchorEl, currentId, onClose }: SwitcherPopoverProps)
     navigate(`/workflows/${id}`);
   };
 
-  const handleNew = async (name: string, triggerType: PaletteTriggerType, connectionId?: string) => {
-    const created = await create.mutateAsync({ name, triggerType, connectionId });
+  const handleNew = async (name: string, triggerType: PaletteTriggerType, connectionId?: string, platform?: 'github' | 'gitlab') => {
+    const created = await create.mutateAsync({ name, triggerType, connectionId, platform });
     setShowCreateDialog(false);
     onClose();
     navigate(`/workflows/${created.id}`);

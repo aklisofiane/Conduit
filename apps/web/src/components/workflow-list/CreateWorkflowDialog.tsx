@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { CircleDot, Clock, GitPullRequest } from 'lucide-react';
 import { useConnections } from '../../api/hooks.js';
-import type { ConnectionRow } from '../../api/types.js';
 import { scopeSummary } from '../../lib/connection.js';
 import { Dialog, DialogContent, DialogTitle } from '../common/Dialog.js';
 import { Select } from '../common/Select.js';
@@ -9,7 +8,7 @@ import type { PaletteTriggerType } from '../canvas/NodePalette.js';
 
 interface CreateWorkflowDialogProps {
   onClose: () => void;
-  onCreate: (name: string, triggerType: PaletteTriggerType, connectionId?: string) => void;
+  onCreate: (name: string, triggerType: PaletteTriggerType, connectionId?: string, platform?: 'github' | 'gitlab') => void;
   isPending: boolean;
 }
 
@@ -59,7 +58,9 @@ export function CreateWorkflowDialog({
 
   const handleCreate = () => {
     if (!canCreate || !triggerType) return;
-    onCreate(name.trim(), triggerType, connectionId || undefined);
+    const conn = repoConnections.find((c) => c.id === connectionId);
+    const platform = conn?.credential.platform === 'GITLAB' ? 'gitlab' as const : 'github' as const;
+    onCreate(name.trim(), triggerType, connectionId || undefined, connectionId ? platform : undefined);
   };
 
   return (

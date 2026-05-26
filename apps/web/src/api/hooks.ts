@@ -56,12 +56,14 @@ export function useCreateWorkflow() {
       definition?: WorkflowDefinition;
       triggerType?: 'issues' | 'pull_requests' | 'cron';
       connectionId?: string;
+      platform?: 'github' | 'gitlab';
     }) => {
-      const { connectionId, ...rest } = body;
+      const { connectionId, platform: plat, ...rest } = body;
       if (connectionId && rest.triggerType && !rest.definition) {
         const id = `trigger_${Math.random().toString(36).slice(2, 10)}`;
         const name = 'Trigger1';
-        const shared = { id, name, platform: 'github' as const, connectionId };
+        const platform = plat ?? 'github';
+        const shared = { id, name, platform, connectionId };
         const trigger =
           rest.triggerType === 'cron'
             ? { ...shared, type: 'cron' as const, cron: '0 9 * * *', timezone: 'UTC', branch: 'main' }

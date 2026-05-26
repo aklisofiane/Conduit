@@ -131,7 +131,7 @@ function CreateConnectionForm({
   );
   const [owner, setOwner] = useState('');
   const [repo, setRepo] = useState('');
-  const [ownerType, setOwnerType] = useState<'user' | 'org'>('user');
+  const [ownerType, setOwnerType] = useState<'user' | 'org'>('org');
   const [boardNumber, setBoardNumber] = useState('');
   const [projectPath, setProjectPath] = useState('');
 
@@ -235,6 +235,8 @@ function CreateConnectionForm({
         <RepoScopeRow
           credentialId={credentialId}
           platform={selectedCredential?.platform}
+          owner={owner}
+          repo={repo}
           onSelect={(o, r) => { setOwner(o); setRepo(r); }}
         />
       )}
@@ -255,6 +257,7 @@ function CreateConnectionForm({
       {scopeKind === 'gitlab_project' && (
         <GitlabProjectScopeRow
           credentialId={credentialId}
+          projectPath={projectPath}
           onSelect={setProjectPath}
         />
       )}
@@ -279,10 +282,14 @@ function CreateConnectionForm({
 function RepoScopeRow({
   credentialId,
   platform,
+  owner,
+  repo,
   onSelect,
 }: {
   credentialId: string;
   platform: CredentialRow['platform'] | undefined;
+  owner: string;
+  repo: string;
   onSelect: (owner: string, repo: string) => void;
 }) {
   const [selected, setSelected] = useState('');
@@ -314,6 +321,8 @@ function RepoScopeRow({
     });
   }, [repos, isGitlab]);
 
+  const manualValue = owner && repo ? `${owner}/${repo}` : owner || '';
+
   return (
     <div className="flex flex-col gap-2">
       <label className="flex flex-col gap-1">
@@ -336,10 +345,15 @@ function RepoScopeRow({
           <input
             className="field-input"
             placeholder="owner/repo"
+            value={manualValue}
             onChange={(e) => {
               const v = e.target.value.trim();
               const slash = v.indexOf('/');
-              if (slash > 0) onSelect(v.slice(0, slash), v.slice(slash + 1));
+              if (slash > 0) {
+                onSelect(v.slice(0, slash), v.slice(slash + 1));
+              } else {
+                onSelect(v, '');
+              }
             }}
           />
         )}
@@ -357,9 +371,11 @@ function RepoScopeRow({
 
 function GitlabProjectScopeRow({
   credentialId,
+  projectPath,
   onSelect,
 }: {
   credentialId: string;
+  projectPath: string;
   onSelect: (projectPath: string) => void;
 }) {
   const [selected, setSelected] = useState('');
@@ -397,6 +413,7 @@ function GitlabProjectScopeRow({
           <input
             className="field-input"
             placeholder="group/project"
+            value={projectPath}
             onChange={(e) => onSelect(e.target.value.trim())}
           />
         )}
@@ -444,11 +461,18 @@ function BoardScopeRow({
     : null;
   const showOwnerDropdown = orgs.length > 0 && !orgsError;
 
+  const trimmedOwner = owner.trim();
+  const [debouncedOwner, setDebouncedOwner] = useState(trimmedOwner);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedOwner(trimmedOwner), 400);
+    return () => clearTimeout(t);
+  }, [trimmedOwner]);
+
   const boardsQuery = useListProjectBoards({
     credentialId,
     ownerType,
-    owner,
-    enabled: !!credentialId && !!owner,
+    owner: debouncedOwner,
+    enabled: !!credentialId && !!debouncedOwner,
   });
 
   const boards = boardsQuery.data ?? [];
@@ -461,12 +485,12 @@ function BoardScopeRow({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="grid grid-cols-2 gap-3">
-        <label className="flex min-w-0 flex-col gap-1">
-          <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
-            Owner
-          </span>
-          {showOwnerDropdown ? (
+      <div className={showOwnerDropdown ? 'grid grid-cols-2 gap-3' : 'grid grid-cols-[110px_minmax(0,1fr)_minmax(0,1.4fr)] gap-3'}>
+        {showOwnerDropdown ? (
+          <label className="flex min-w-0 flex-col gap-1">
+            <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+              Owner
+            </span>
             <Select
               ariaLabel="Owner"
               value={owner}
@@ -480,15 +504,36 @@ function BoardScopeRow({
                 label: o.ownerType === 'user' ? `${o.login} (you)` : o.login,
               }))}
             />
-          ) : (
-            <input
-              className="field-input"
-              placeholder="acme"
-              value={owner}
-              onChange={(e) => onOwner(e.target.value)}
-            />
-          )}
-        </label>
+          </label>
+        ) : (
+          <>
+            <label className="flex min-w-0 flex-col gap-1">
+              <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+                Owner type
+              </span>
+              <Select
+                ariaLabel="Owner type"
+                value={ownerType}
+                onValueChange={(v) => onOwnerType(v as 'user' | 'org')}
+                options={[
+                  { value: 'org', label: 'Org' },
+                  { value: 'user', label: 'User' },
+                ]}
+              />
+            </label>
+            <label className="flex min-w-0 flex-col gap-1">
+              <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+                Owner
+              </span>
+              <input
+                className="field-input"
+                placeholder="acme"
+                value={owner}
+                onChange={(e) => onOwner(e.target.value)}
+              />
+            </label>
+          </>
+        )}
         <label className="flex min-w-0 flex-col gap-1">
           <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
             Project

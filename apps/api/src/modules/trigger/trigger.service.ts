@@ -96,10 +96,8 @@ export class TriggerService {
     orgId: string,
     credentialId: string,
   ): Promise<{ token: string; platform: string; hostUrl: string | null }> {
-    const [token, info] = await Promise.all([
-      this.credentials.decryptForOrgCredential(orgId, credentialId),
-      this.credentials.getOrgCredentialInfo(orgId, credentialId),
-    ]);
+    const info = await this.credentials.getOrgCredentialInfo(orgId, credentialId);
+    const token = await this.credentials.decryptForOrgCredential(orgId, credentialId);
     return { token, platform: info.platform, hostUrl: info.hostUrl };
   }
 
