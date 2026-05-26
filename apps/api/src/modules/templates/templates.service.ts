@@ -71,9 +71,7 @@ export class TemplatesService implements OnModuleInit {
       const aliasToConnId: Record<string, string> = {};
       for (const placeholder of loaded.placeholderDetails) {
         const binding = dto.bindings[placeholder.alias];
-        if (!binding) {
-          throw new BadRequestException(`Missing binding for <${placeholder.alias}>`);
-        }
+        if (!binding) continue;
         if (binding.mode === 'existing') {
           aliasToConnId[placeholder.alias] = binding.connectionId;
         } else {
@@ -162,7 +160,14 @@ export class TemplatesService implements OnModuleInit {
     loaded: LoadedTemplate,
     bindings: Record<string, TemplateBinding>,
   ): void {
-    const missing = loaded.placeholders.filter((p) => !bindings[p]);
+    const boardAliases = new Set(
+      loaded.placeholderDetails
+        .filter((p) => p.expectedScopeKinds.includes('github_projects_v2'))
+        .map((p) => p.alias),
+    );
+    const missing = loaded.placeholders.filter(
+      (p) => !bindings[p] && !boardAliases.has(p),
+    );
     if (missing.length > 0) {
       throw new BadRequestException({
         message: `Missing connection bindings for placeholders: ${missing.map((m) => `<${m}>`).join(', ')}`,

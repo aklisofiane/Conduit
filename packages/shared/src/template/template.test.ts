@@ -125,7 +125,7 @@ describe('template placeholders', () => {
   it('reports per-slot expected scope kinds via collectTemplatePlaceholderDetails', () => {
     const details = collectTemplatePlaceholderDetails(BOARD_TEMPLATE);
     const byAlias = new Map(details.map((d) => [d.alias, d.expectedScopeKinds]));
-    expect(byAlias.get('github-repo')).toEqual(['github_repo']);
+    expect(byAlias.get('github-repo')).toEqual(['any']);
     expect(byAlias.get('github-board')).toEqual(['github_projects_v2']);
   });
 });
@@ -151,6 +151,14 @@ describe('resolveTemplate', () => {
     })[0]!;
     expect(resolved.definition.triggers[0]!.connectionId).toBe('conn_repo');
     expect(resolved.definition.triggers[0]!.boardConnectionId).toBe('conn_board');
+  });
+
+  it('clears boardConnectionId when board binding is omitted', () => {
+    const resolved = resolveTemplate(BOARD_TEMPLATE, {
+      'github-repo': 'conn_repo',
+    })[0]!;
+    expect(resolved.definition.triggers[0]!.connectionId).toBe('conn_repo');
+    expect(resolved.definition.triggers[0]!.boardConnectionId).toBeUndefined();
   });
 
   it('throws when a placeholder has no binding', () => {

@@ -70,6 +70,10 @@ function resolveOne(
     if (!alias) continue;
     const connId = bindings[alias];
     if (!connId) {
+      if (slot.optional) {
+        slot.clear?.();
+        continue;
+      }
       throw new Error(
         `Template workflow "${wf.name}" references placeholder <${alias}> but no binding was provided.`,
       );
@@ -82,7 +86,9 @@ function resolveOne(
 interface ConnectionSlot {
   value: string | undefined;
   expectedScopeKind: ExpectedSlotKind;
+  optional?: boolean;
   set: (v: string) => void;
+  clear?: () => void;
 }
 
 function* enumerateConnectionSlots(
@@ -91,18 +97,24 @@ function* enumerateConnectionSlots(
   for (const trigger of def.triggers) {
     yield {
       value: trigger.connectionId,
-      expectedScopeKind: 'github_repo',
+      expectedScopeKind: 'any',
       set: (v) => {
         trigger.connectionId = v;
       },
     };
-    yield {
-      value: trigger.boardConnectionId,
-      expectedScopeKind: 'github_projects_v2',
-      set: (v) => {
-        trigger.boardConnectionId = v;
-      },
-    };
+    if (trigger.boardConnectionId != null) {
+      yield {
+        value: trigger.boardConnectionId,
+        expectedScopeKind: 'github_projects_v2',
+        optional: true,
+        set: (v) => {
+          trigger.boardConnectionId = v;
+        },
+        clear: () => {
+          trigger.boardConnectionId = undefined;
+        },
+      };
+    }
   }
   for (const server of def.mcpServers) {
     yield {

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { ConnectionScope } from '@conduit/shared';
 import { ApiError } from '../../api/client.js';
@@ -22,6 +22,81 @@ import { Dialog, DialogContent, DialogTitle } from '../common/Dialog.js';
 import { SearchSelect } from '../common/SearchSelect.js';
 import { Select, type SelectOption } from '../common/Select.js';
 
+function isBoardAlias(alias: string): boolean {
+  return /board/.test(alias);
+}
+
+function findBoardAlias(placeholders: string[]): string | undefined {
+  return placeholders.find(isBoardAlias);
+}
+
+function credentialPlatform(
+  credentialId: string,
+  credentials: CredentialRow[],
+): 'GITHUB' | 'GITLAB' | undefined {
+  const cred = credentials.find((c) => c.id === credentialId);
+  if (!cred) return undefined;
+  return cred.platform === 'GITLAB' ? 'GITLAB' : 'GITHUB';
+}
+
+function defaultRepoScope(platform: 'GITHUB' | 'GITLAB' | undefined): ConnectionScope {
+  if (platform === 'GITLAB') return { kind: 'gitlab_project', projectPath: '' };
+  return { kind: 'github_repo', owner: '', repo: '' };
+}
+
+function defaultBoardScope(): ConnectionScope {
+  return { kind: 'github_projects_v2', ownerType: 'org', owner: '', number: 1 };
+}
+
+function newBindingForRepo(
+  alias: string,
+  credentialId: string,
+  platform: 'GITHUB' | 'GITLAB' | undefined,
+): TemplateBinding {
+  return {
+    mode: 'new',
+    name: alias,
+    credentialId,
+    scope: defaultRepoScope(platform),
+  };
+}
+
+function newBindingForBoard(alias: string, credentialId: string): TemplateBinding {
+  return {
+    mode: 'new',
+    name: alias,
+    credentialId,
+    scope: defaultBoardScope(),
+  };
+}
+
+function defaultBindingForRepo(
+  alias: string,
+  credentials: CredentialRow[],
+  connections: ConnectionRow[],
+): TemplateBinding {
+  const eligible = connections.filter(
+    (c) => c.scope.kind === 'github_repo' || c.scope.kind === 'gitlab_project',
+  );
+  const only = eligible.length === 1 ? eligible[0] : undefined;
+  if (eligible.length > 0) {
+    return { mode: 'existing', connectionId: only?.id ?? '' };
+  }
+  return newBindingForRepo(alias, credentials[0]?.id ?? '', undefined);
+}
+
+function defaultBindingForBoard(
+  _alias: string,
+  _credentials: CredentialRow[],
+  connections: ConnectionRow[],
+): TemplateBinding {
+  const eligible = connections.filter(
+    (c) => c.scope.kind === 'github_projects_v2',
+  );
+  const only = eligible.length === 1 ? eligible[0] : undefined;
+  return { mode: 'existing', connectionId: only?.id ?? '' };
+}
+
 export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
   const { data: templates = [], isLoading } = useTemplates();
   const { data: credentials = [] } = useCredentials();
@@ -33,23 +108,60 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
   const [bindings, setBindings] = useState<Record<string, TemplateBinding>>({});
   const [error, setError] = useState<string | null>(null);
 
+  const repoAliases = useMemo(
+    () => (selected?.placeholders ?? []).filter((p) => !isBoardAlias(p)),
+    [selected],
+  );
+  const boardAlias = selected ? findBoardAlias(selected.placeholders) : undefined;
+
+  const repoBinding = repoAliases[0] ? bindings[repoAliases[0]] : undefined;
+  const repoPlatform =
+    repoBinding?.mode === 'new'
+      ? credentialPlatform(repoBinding.credentialId, credentials)
+      : repoBinding?.mode === 'existing'
+        ? (() => {
+            const conn = connections.find((c) => c.id === repoBinding.connectionId);
+            if (!conn) return undefined;
+            return conn.credential.platform === 'GITLAB' ? 'GITLAB' as const : 'GITHUB' as const;
+          })()
+        : undefined;
+  const showBoard = boardAlias != null && repoPlatform === 'GITHUB';
+
+  useEffect(() => {
+    if (showBoard && boardAlias && !bindings[boardAlias]) {
+      setBindings((prev) => ({
+        ...prev,
+        [boardAlias]: defaultBindingForBoard(boardAlias, credentials, connections),
+      }));
+    }
+  }, [showBoard, boardAlias, bindings, credentials, connections]);
+
   const canCreate =
     !!selected &&
-    selected.placeholders.every((p) => {
+    repoAliases.every((p) => {
       const b = bindings[p];
       if (!b) return false;
       if (b.mode === 'existing') return Boolean(b.connectionId);
       return Boolean(b.name && b.credentialId && b.scope);
-    });
+    }) &&
+    (!showBoard ||
+      (() => {
+        const b = bindings[boardAlias!];
+        if (!b) return true;
+        if (b.mode === 'existing') return Boolean(b.connectionId);
+        return Boolean(b.name && b.credentialId && b.scope);
+      })());
 
   const handlePick = (t: TemplateSummary) => {
     setSelected(t);
     setBindings(
       Object.fromEntries(
-        t.placeholders.map<[string, TemplateBinding]>((alias) => [
-          alias,
-          defaultBindingForAlias(alias, credentials, connections),
-        ]),
+        t.placeholders
+          .filter((alias) => !isBoardAlias(alias))
+          .map<[string, TemplateBinding]>((alias) => [
+            alias,
+            defaultBindingForRepo(alias, credentials, connections),
+          ]),
       ),
     );
     setError(null);
@@ -58,10 +170,14 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
   const handleCreate = async () => {
     if (!selected) return;
     setError(null);
+    const finalBindings = { ...bindings };
+    if (boardAlias && !showBoard) {
+      delete finalBindings[boardAlias];
+    }
     try {
       const result = await createFromTemplate.mutateAsync({
         templateId: selected.id,
-        bindings,
+        bindings: finalBindings,
       });
       onClose();
       if (result.workflows[0]) {
@@ -71,6 +187,12 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
       setError(err instanceof ApiError ? err.message : String(err));
     }
   };
+
+  const orderedAliases = useMemo(() => {
+    const result = [...repoAliases];
+    if (showBoard && boardAlias) result.push(boardAlias);
+    return result;
+  }, [repoAliases, showBoard, boardAlias]);
 
   return (
     <Dialog
@@ -92,7 +214,7 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
             </DialogTitle>
             <p className="mt-0.5 font-mono text-[11px] text-[var(--color-text-3)]">
               {selected
-                ? `${selected.workflowCount} workflow${selected.workflowCount === 1 ? '' : 's'} · ${selected.placeholders.length} connection${selected.placeholders.length === 1 ? '' : 's'} to bind`
+                ? `${selected.workflowCount} workflow${selected.workflowCount === 1 ? '' : 's'} · ${orderedAliases.length} connection${orderedAliases.length === 1 ? '' : 's'} to bind`
                 : 'Pre-built workflow blueprints you can copy and edit.'}
             </p>
           </div>
@@ -123,16 +245,17 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
               <p className="font-mono text-[12px] text-[var(--color-text-2)]">
                 {selected.description}
               </p>
-              {selected.placeholders.length === 0 ? (
+              {orderedAliases.length === 0 ? (
                 <div className="rounded-md border border-[var(--color-line)] bg-[var(--color-bg-2)] px-3 py-2 font-mono text-[12px] text-[var(--color-text-2)]">
                   No connection bindings needed.
                 </div>
               ) : (
                 <div className="flex flex-col gap-3">
-                  {selected.placeholders.map((alias) => (
+                  {orderedAliases.map((alias) => (
                     <BindingRow
                       key={alias}
                       alias={alias}
+                      isBoard={isBoardAlias(alias)}
                       binding={bindings[alias]}
                       credentials={credentials}
                       connections={connections}
@@ -207,81 +330,52 @@ function TemplateCard({
   );
 }
 
-/**
- * Map a placeholder alias to a sensible default scope. Aliases follow the
- * `<github-repo>` / `<github-board>` convention; anything else falls back
- * to `github_repo` until templates demand richer kinds.
- */
-function defaultScopeForAlias(alias: string): ConnectionScope {
-  if (/board/.test(alias)) {
-    return { kind: 'github_projects_v2', ownerType: 'org', owner: '', number: 1 };
-  }
-  return { kind: 'github_repo', owner: '', repo: '' };
-}
-
-function newBindingForAlias(alias: string, credentialId: string): TemplateBinding {
-  return {
-    mode: 'new',
-    name: alias,
-    credentialId,
-    scope: defaultScopeForAlias(alias),
-  };
-}
-
-function defaultBindingForAlias(
-  alias: string,
-  credentials: CredentialRow[],
-  connections: ConnectionRow[],
-): TemplateBinding {
-  const expectedKind = defaultScopeForAlias(alias).kind;
-  const eligible = connections.filter((c) => c.scope.kind === expectedKind);
-  const only = eligible.length === 1 ? eligible[0] : undefined;
-  if (eligible.length > 0) {
-    return { mode: 'existing', connectionId: only?.id ?? '' };
-  }
-  return newBindingForAlias(alias, credentials[0]?.id ?? '');
-}
-
 function BindingRow({
   alias,
+  isBoard,
   binding,
   credentials,
   connections,
   onChange,
 }: {
   alias: string;
+  isBoard: boolean;
   binding: TemplateBinding | undefined;
   credentials: CredentialRow[];
   connections: ConnectionRow[];
   onChange: (b: TemplateBinding) => void;
 }) {
   const mode = binding?.mode ?? 'new';
-  const expectedKind = defaultScopeForAlias(alias).kind;
-  const eligibleConnections = connections.filter(
-    (c) => c.scope.kind === expectedKind,
-  );
+  const eligibleConnections = isBoard
+    ? connections.filter((c) => c.scope.kind === 'github_projects_v2')
+    : connections.filter(
+        (c) => c.scope.kind === 'github_repo' || c.scope.kind === 'gitlab_project',
+      );
+
+  const handleNewClick = () => {
+    const credId =
+      (binding?.mode === 'new' ? binding.credentialId : '') ||
+      credentials[0]?.id ||
+      '';
+    if (isBoard) {
+      onChange(newBindingForBoard(alias, credId));
+    } else {
+      const platform = credentialPlatform(credId, credentials);
+      onChange(newBindingForRepo(alias, credId, platform));
+    }
+  };
 
   return (
     <div className="rounded-md border border-[var(--color-line)] bg-[var(--color-bg-2)] p-3">
       <div className="flex items-center justify-between">
         <div className="font-mono text-[12px] text-[var(--color-text)]">
           <span className="text-[var(--color-claude)]">&lt;{alias}&gt;</span>{' '}
-          <span className="text-[var(--color-text-3)]">connection</span>
+          <span className="text-[var(--color-text-3)]">
+            connection{isBoard ? ' · optional' : ''}
+          </span>
         </div>
         <div className="flex gap-1 rounded-md border border-[var(--color-line)] p-0.5">
-          <ModeButton
-            active={mode === 'new'}
-            onClick={() =>
-              onChange(
-                newBindingForAlias(
-                  alias,
-                  (binding?.mode === 'new' ? binding.credentialId : '') ||
-                    credentials[0]?.id ||
-                    '',
-                ),
-              )
-            }
-          >
+          <ModeButton active={mode === 'new'} onClick={handleNewClick}>
             New
           </ModeButton>
           <ModeButton
@@ -301,6 +395,7 @@ function BindingRow({
 
       {binding?.mode === 'new' && (
         <NewBindingFields
+          isBoard={isBoard}
           binding={binding}
           credentials={credentials}
           onChange={onChange}
@@ -315,7 +410,7 @@ function BindingRow({
             onChange={(v) => onChange({ ...binding, connectionId: v })}
             placeholder={
               eligibleConnections.length === 0
-                ? `No ${expectedKind} connections yet`
+                ? `No ${isBoard ? 'board' : 'repo'} connections yet`
                 : 'Pick one…'
             }
             options={eligibleConnections.map((c) => ({
@@ -330,15 +425,37 @@ function BindingRow({
 }
 
 function NewBindingFields({
+  isBoard,
   binding,
   credentials,
   onChange,
 }: {
+  isBoard: boolean;
   binding: Extract<TemplateBinding, { mode: 'new' }>;
   credentials: CredentialRow[];
   onChange: (b: TemplateBinding) => void;
 }) {
   const setScope = (scope: ConnectionScope) => onChange({ ...binding, scope });
+
+  const handleCredentialChange = (credId: string) => {
+    if (isBoard) {
+      onChange({ ...binding, credentialId: credId });
+      return;
+    }
+    const platform = credentialPlatform(credId, credentials);
+    const currentIsGitlab = binding.scope.kind === 'gitlab_project';
+    const newIsGitlab = platform === 'GITLAB';
+    if (currentIsGitlab !== newIsGitlab) {
+      onChange({
+        ...binding,
+        credentialId: credId,
+        scope: defaultRepoScope(platform),
+      });
+    } else {
+      onChange({ ...binding, credentialId: credId });
+    }
+  };
+
   return (
     <div className="mt-3 grid grid-cols-2 gap-3">
       <LabeledInput
@@ -349,7 +466,7 @@ function NewBindingFields({
       <LabeledSelect
         label="Credential"
         value={binding.credentialId}
-        onChange={(v) => onChange({ ...binding, credentialId: v })}
+        onChange={handleCredentialChange}
         placeholder={credentials.length === 0 ? 'No credentials yet' : 'Pick one…'}
         options={credentials.map((c) => ({
           value: c.id,
@@ -358,7 +475,15 @@ function NewBindingFields({
       />
 
       {binding.scope.kind === 'github_repo' && (
-        <RepoScopeFields
+        <GithubRepoScopeFields
+          credentialId={binding.credentialId}
+          scope={binding.scope}
+          setScope={setScope}
+        />
+      )}
+
+      {binding.scope.kind === 'gitlab_project' && (
+        <GitlabProjectScopeFields
           credentialId={binding.credentialId}
           scope={binding.scope}
           setScope={setScope}
@@ -376,7 +501,7 @@ function NewBindingFields({
   );
 }
 
-function RepoScopeFields({
+function GithubRepoScopeFields({
   credentialId,
   scope,
   setScope,
@@ -435,6 +560,56 @@ function RepoScopeFields({
         onChange={(v) => setScope({ ...scope, repo: v })}
       />
     </>
+  );
+}
+
+function GitlabProjectScopeFields({
+  credentialId,
+  scope,
+  setScope,
+}: {
+  credentialId: string;
+  scope: Extract<ConnectionScope, { kind: 'gitlab_project' }>;
+  setScope: (s: ConnectionScope) => void;
+}) {
+  const projectsQuery = useListViewerRepos({
+    credentialId,
+    enabled: !!credentialId,
+  });
+  const projects = (projectsQuery.data ?? []) as Array<{ path: string }>;
+  const options = useMemo(
+    () => projects.map((p) => ({ value: p.path, label: p.path })),
+    [projects],
+  );
+
+  if (projects.length > 0) {
+    return (
+      <div className="col-span-2">
+        <label className="flex flex-col gap-1">
+          <span className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-3)]">
+            Project
+          </span>
+          <SearchSelect
+            ariaLabel="Project"
+            value={scope.projectPath}
+            onValueChange={(v) => setScope({ ...scope, projectPath: v })}
+            placeholder={projectsQuery.isFetching ? 'Loading…' : '— pick a project —'}
+            options={options}
+          />
+        </label>
+      </div>
+    );
+  }
+
+  return (
+    <div className="col-span-2">
+      <LabeledInput
+        label="Project path"
+        value={scope.projectPath}
+        onChange={(v) => setScope({ ...scope, projectPath: v })}
+        placeholder="group/project"
+      />
+    </div>
   );
 }
 

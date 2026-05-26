@@ -81,7 +81,12 @@ export class TriggerService {
     orgId: string,
     dto: ListViewerOrgsDto,
   ): Promise<ViewerOrgEntry[]> {
-    const { token } = await this.resolveCredentialInfo(orgId, dto.credentialId);
+    const { token, platform } = await this.resolveCredentialInfo(
+      orgId,
+      dto.credentialId,
+    );
+
+    if (platform === 'GITLAB') return [];
 
     try {
       return await listViewerOrganizations(token);
