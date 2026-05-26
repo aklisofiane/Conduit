@@ -80,6 +80,18 @@ services:
       timeout: 3s
       retries: 10
 
+  # ---------- Agent runner (build-only) ----------
+  # The worker spawns agent-runner containers at runtime via the Docker socket.
+  # This service only exists so `docker compose build` produces the image on the
+  # host — it never runs as a long-lived service.
+  agent-runner:
+    build:
+      context: .
+      dockerfile: apps/agent-runner/Dockerfile
+    image: conduit-agent-runner:latest
+    entrypoint: ['true']
+    restart: 'no'
+
   # ---------- Application ----------
 
   api:
@@ -149,6 +161,7 @@ services:
       CONDUIT_AGENT_AUTH: ${CONDUIT_AGENT_AUTH:-api-key}
       CONDUIT_ENCRYPTION_KEY: ${CONDUIT_ENCRYPTION_KEY}
       CONDUIT_HOME: /var/lib/conduit
+      CONDUIT_RUNNER_IMAGE: conduit-agent-runner:latest
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - conduit_home:/var/lib/conduit
