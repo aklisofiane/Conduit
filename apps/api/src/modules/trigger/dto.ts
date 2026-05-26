@@ -13,6 +13,16 @@ export const listProjectsDtoSchema = z
   );
 export type ListProjectsDto = z.infer<typeof listProjectsDtoSchema>;
 
+export const listViewerReposDtoSchema = z.object({
+  credentialId: z.string().min(1),
+});
+export type ListViewerReposDto = z.infer<typeof listViewerReposDtoSchema>;
+
+export const listViewerOrgsDtoSchema = z.object({
+  credentialId: z.string().min(1),
+});
+export type ListViewerOrgsDto = z.infer<typeof listViewerOrgsDtoSchema>;
+
 export const listLabelsDtoSchema = z.object({
   connectionId: z.string().min(1),
 });

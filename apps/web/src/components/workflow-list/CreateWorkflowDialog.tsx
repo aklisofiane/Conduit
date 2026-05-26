@@ -1,11 +1,15 @@
 import { useState } from 'react';
 import { CircleDot, Clock, GitPullRequest } from 'lucide-react';
+import { useConnections } from '../../api/hooks.js';
+import type { ConnectionRow } from '../../api/types.js';
+import { scopeSummary } from '../../lib/connection.js';
 import { Dialog, DialogContent, DialogTitle } from '../common/Dialog.js';
+import { Select } from '../common/Select.js';
 import type { PaletteTriggerType } from '../canvas/NodePalette.js';
 
 interface CreateWorkflowDialogProps {
   onClose: () => void;
-  onCreate: (name: string, triggerType: PaletteTriggerType) => void;
+  onCreate: (name: string, triggerType: PaletteTriggerType, connectionId?: string) => void;
   isPending: boolean;
 }
 
@@ -44,12 +48,18 @@ export function CreateWorkflowDialog({
   const [triggerType, setTriggerType] = useState<PaletteTriggerType | null>(
     null,
   );
+  const [connectionId, setConnectionId] = useState('');
+  const { data: connections = [] } = useConnections();
+
+  const repoConnections = connections.filter(
+    (c) => c.scope.kind === 'github_repo' || c.scope.kind === 'gitlab_project',
+  );
 
   const canCreate = name.trim().length > 0 && triggerType !== null;
 
   const handleCreate = () => {
     if (!canCreate || !triggerType) return;
-    onCreate(name.trim(), triggerType);
+    onCreate(name.trim(), triggerType, connectionId || undefined);
   };
 
   return (
@@ -145,6 +155,29 @@ export function CreateWorkflowDialog({
               ))}
             </div>
           </div>
+
+          {triggerType && repoConnections.length > 0 && (
+            <div className="mt-4">
+              <span className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-3)]">
+                Connection <span className="normal-case tracking-normal">(optional)</span>
+              </span>
+              <div className="mt-1.5">
+                <Select
+                  ariaLabel="Connection"
+                  value={connectionId}
+                  onValueChange={setConnectionId}
+                  placeholder="— pick a connection —"
+                  options={repoConnections.map((c) => ({
+                    value: c.id,
+                    label: `${c.name} · ${scopeSummary(c.scope) ?? c.credential.platform.toLowerCase()}`,
+                  }))}
+                />
+              </div>
+              <p className="mt-1 font-mono text-[10.5px] text-[var(--color-text-3)]">
+                Pre-wires the trigger to this repo. You can change it on the canvas.
+              </p>
+            </div>
+          )}
         </div>
 
         <footer className="flex items-center justify-end border-t border-[var(--color-line)] px-5 py-3">

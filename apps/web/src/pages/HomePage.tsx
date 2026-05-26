@@ -25,8 +25,8 @@ export function HomePage() {
   const runningCount = workflows.filter((w) => w.runs[0]?.status === 'RUNNING').length;
   const failingCount = workflows.filter((w) => w.runs[0]?.status === 'FAILED').length;
 
-  const handleCreate = async (name: string, triggerType: PaletteTriggerType) => {
-    const created = await createWorkflow.mutateAsync({ name, triggerType });
+  const handleCreate = async (name: string, triggerType: PaletteTriggerType, connectionId?: string) => {
+    const created = await createWorkflow.mutateAsync({ name, triggerType, connectionId });
     setShowCreateDialog(false);
     navigate(`/workflows/${created.id}`);
   };

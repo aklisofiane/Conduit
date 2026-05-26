@@ -203,6 +203,14 @@ export class CredentialsService {
     };
   }
 
+  async getOrgCredentialInfo(
+    orgId: string,
+    credentialId: string,
+  ): Promise<{ platform: string; hostUrl: string | null }> {
+    const cred = await this.findOrThrow(orgId, credentialId);
+    return { platform: cred.platform, hostUrl: cred.hostUrl };
+  }
+
   private async findOrThrow(orgId: string, id: string) {
     const cred = await this.prisma.credential.findFirst({ where: { id, orgId } });
     if (!cred) throw new NotFoundException(`Credential ${id} not found`);

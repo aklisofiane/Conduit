@@ -401,6 +401,130 @@ function forkHeadRepo(
   return { owner: headOwner, name: headName };
 }
 
+// ── Repository listing (viewer-scoped) ─────────────────────────────────
+
+export interface RepositorySummary {
+  owner: string;
+  name: string;
+  url: string;
+  isPrivate: boolean;
+}
+
+const VIEWER_REPOS_QUERY = /* GraphQL */ `
+  query ConduitViewerRepos($first: Int!) {
+    viewer {
+      repositories(first: $first, orderBy: { field: NAME, direction: ASC }) {
+        nodes {
+          name
+          url
+          isPrivate
+          owner { login }
+        }
+      }
+    }
+  }
+`;
+
+interface ViewerReposResponse {
+  viewer?: {
+    repositories?: {
+      nodes: Array<{
+        name: string;
+        url: string;
+        isPrivate: boolean;
+        owner: { login: string };
+      } | null>;
+    } | null;
+  } | null;
+}
+
+export async function listViewerRepositories(
+  token: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<RepositorySummary[]> {
+  const payload: GraphQLResponse<ViewerReposResponse> = await callGraphQL(
+    { query: VIEWER_REPOS_QUERY, variables: { first: 100 } },
+    token,
+    fetchImpl,
+  );
+
+  if (payload.errors?.length) {
+    throw new Error(
+      `GitHub GraphQL error: ${payload.errors.map((e) => e.message).join('; ')}`,
+    );
+  }
+
+  const repos: RepositorySummary[] = [];
+  for (const node of payload.data?.viewer?.repositories?.nodes ?? []) {
+    if (!node) continue;
+    repos.push({
+      owner: node.owner.login,
+      name: node.name,
+      url: node.url,
+      isPrivate: node.isPrivate,
+    });
+  }
+  return repos;
+}
+
+// ── Viewer organizations (for board owner picker) ──────────────────────
+
+export interface ViewerOrgEntry {
+  login: string;
+  ownerType: 'user' | 'org';
+}
+
+const VIEWER_ORGS_QUERY = /* GraphQL */ `
+  query ConduitViewerOrgs {
+    viewer {
+      login
+      organizations(first: 100) {
+        nodes { login }
+      }
+    }
+  }
+`;
+
+interface ViewerOrgsResponse {
+  viewer?: {
+    login?: string;
+    organizations?: {
+      nodes: Array<{ login: string } | null>;
+    } | null;
+  } | null;
+}
+
+export async function listViewerOrganizations(
+  token: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<ViewerOrgEntry[]> {
+  const payload: GraphQLResponse<ViewerOrgsResponse> = await callGraphQL(
+    { query: VIEWER_ORGS_QUERY, variables: {} },
+    token,
+    fetchImpl,
+  );
+
+  if (payload.errors?.length) {
+    throw new Error(
+      `GitHub GraphQL error: ${payload.errors.map((e) => e.message).join('; ')}`,
+    );
+  }
+
+  const viewer = payload.data?.viewer;
+  const entries: ViewerOrgEntry[] = [];
+
+  if (viewer?.login) {
+    entries.push({ login: viewer.login, ownerType: 'user' });
+  }
+  for (const node of viewer?.organizations?.nodes ?? []) {
+    if (!node) continue;
+    entries.push({ login: node.login, ownerType: 'org' });
+  }
+  return entries;
+}
+
+// ── Repository content fetching ────────────────────────────────────────
+
 export interface RepoQuery {
   owner: string;
   name: string;

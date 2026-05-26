@@ -9,9 +9,12 @@ import {
   useCredentials,
   useDeleteConnection,
   useListProjectBoards,
+  useListViewerRepos,
+  useListViewerOrgs,
 } from '../../api/hooks.js';
 import type { ConnectionRow, CredentialRow } from '../../api/types.js';
 import { scopeSummary } from '../../lib/connection.js';
+import { SearchSelect } from '../common/SearchSelect.js';
 import { Select } from '../common/Select.js';
 
 type CreateBody = {
@@ -128,10 +131,9 @@ function CreateConnectionForm({
   );
   const [owner, setOwner] = useState('');
   const [repo, setRepo] = useState('');
-  const [ownerType, setOwnerType] = useState<'user' | 'org'>('org');
+  const [ownerType, setOwnerType] = useState<'user' | 'org'>('user');
   const [boardNumber, setBoardNumber] = useState('');
   const [projectPath, setProjectPath] = useState('');
-  const [projectPathError, setProjectPathError] = useState<string | null>(null);
 
   const selectedCredential = credentials.find((c) => c.id === credentialId);
   const availableScopeKinds = useMemo(
@@ -230,30 +232,11 @@ function CreateConnectionForm({
       </label>
 
       {scopeKind === 'github_repo' && (
-        <div className="grid grid-cols-2 gap-3">
-          <label className="flex flex-col gap-1">
-            <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
-              Owner / org
-            </span>
-            <input
-              className="field-input"
-              placeholder="acme"
-              value={owner}
-              onChange={(e) => setOwner(e.target.value)}
-            />
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
-              Repository
-            </span>
-            <input
-              className="field-input"
-              placeholder="shop"
-              value={repo}
-              onChange={(e) => setRepo(e.target.value)}
-            />
-          </label>
-        </div>
+        <RepoScopeRow
+          credentialId={credentialId}
+          platform={selectedCredential?.platform}
+          onSelect={(o, r) => { setOwner(o); setRepo(r); }}
+        />
       )}
 
       {scopeKind === 'github_projects_v2' && (
@@ -265,37 +248,15 @@ function CreateConnectionForm({
           onOwnerType={setOwnerType}
           onOwner={setOwner}
           onBoardNumber={setBoardNumber}
+          onOwnerSelect={(login, type) => { setOwner(login); setOwnerType(type); }}
         />
       )}
 
       {scopeKind === 'gitlab_project' && (
-        <label className="flex flex-col gap-1">
-          <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
-            Project path
-          </span>
-          <input
-            className="field-input"
-            placeholder="group/subgroup/project"
-            value={projectPath}
-            onChange={(e) => {
-              setProjectPath(e.target.value);
-              if (projectPathError) setProjectPathError(null);
-            }}
-            onBlur={() => {
-              const trimmed = projectPath.trim();
-              if (trimmed && !trimmed.includes('/')) {
-                setProjectPathError('Project path must contain at least one "/" (e.g. group/project)');
-              } else {
-                setProjectPathError(null);
-              }
-            }}
-          />
-          {projectPathError && (
-            <span className="font-mono text-[11px] text-[var(--color-danger)]">
-              {projectPathError}
-            </span>
-          )}
-        </label>
+        <GitlabProjectScopeRow
+          credentialId={credentialId}
+          onSelect={setProjectPath}
+        />
       )}
 
       <div className="flex justify-end gap-2">
@@ -315,6 +276,142 @@ function CreateConnectionForm({
   );
 }
 
+function RepoScopeRow({
+  credentialId,
+  platform,
+  onSelect,
+}: {
+  credentialId: string;
+  platform: CredentialRow['platform'] | undefined;
+  onSelect: (owner: string, repo: string) => void;
+}) {
+  const [selected, setSelected] = useState('');
+  const reposQuery = useListViewerRepos({
+    credentialId,
+    enabled: !!credentialId,
+  });
+
+  const isGitlab = platform === 'GITLAB';
+  const repos = (reposQuery.data ?? []) as Array<{ owner?: string; name?: string; path?: string }>;
+  const errorMessage = reposQuery.error
+    ? reposQuery.error instanceof ApiError
+      ? reposQuery.error.message
+      : String(reposQuery.error)
+    : null;
+  const showDropdown = repos.length > 0 && !errorMessage;
+
+  const options = useMemo(() => {
+    if (isGitlab) {
+      return repos.map((r) => {
+        const path = (r as { path: string }).path;
+        return { value: path, label: path };
+      });
+    }
+    return repos.map((r) => {
+      const gh = r as { owner: string; name: string };
+      const fullName = `${gh.owner}/${gh.name}`;
+      return { value: fullName, label: fullName };
+    });
+  }, [repos, isGitlab]);
+
+  return (
+    <div className="flex flex-col gap-2">
+      <label className="flex flex-col gap-1">
+        <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+          Repository
+        </span>
+        {showDropdown ? (
+          <SearchSelect
+            ariaLabel="Repository"
+            value={selected}
+            onValueChange={(v) => {
+              setSelected(v);
+              const slash = v.indexOf('/');
+              if (slash > 0) onSelect(v.slice(0, slash), v.slice(slash + 1));
+            }}
+            placeholder="— pick a repo —"
+            options={options}
+          />
+        ) : (
+          <input
+            className="field-input"
+            placeholder="owner/repo"
+            onChange={(e) => {
+              const v = e.target.value.trim();
+              const slash = v.indexOf('/');
+              if (slash > 0) onSelect(v.slice(0, slash), v.slice(slash + 1));
+            }}
+          />
+        )}
+      </label>
+      <AutoLoadHint
+        credentialId={credentialId}
+        isLoading={reposQuery.isFetching}
+        errorMessage={errorMessage}
+        itemCount={repos.length}
+        itemLabel="repositories"
+      />
+    </div>
+  );
+}
+
+function GitlabProjectScopeRow({
+  credentialId,
+  onSelect,
+}: {
+  credentialId: string;
+  onSelect: (projectPath: string) => void;
+}) {
+  const [selected, setSelected] = useState('');
+  const projectsQuery = useListViewerRepos({
+    credentialId,
+    enabled: !!credentialId,
+  });
+
+  const projects = (projectsQuery.data ?? []) as Array<{ path: string }>;
+  const errorMessage = projectsQuery.error
+    ? projectsQuery.error instanceof ApiError
+      ? projectsQuery.error.message
+      : String(projectsQuery.error)
+    : null;
+  const showDropdown = projects.length > 0 && !errorMessage;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <label className="flex flex-col gap-1">
+        <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+          Project
+        </span>
+        {showDropdown ? (
+          <SearchSelect
+            ariaLabel="Project"
+            value={selected}
+            onValueChange={(v) => { setSelected(v); onSelect(v); }}
+            placeholder="— pick a project —"
+            options={projects.map((p) => ({
+              value: p.path,
+              label: p.path,
+            }))}
+          />
+        ) : (
+          <input
+            className="field-input"
+            placeholder="group/project"
+            onChange={(e) => onSelect(e.target.value.trim())}
+          />
+        )}
+      </label>
+      <AutoLoadHint
+        credentialId={credentialId}
+        isLoading={projectsQuery.isFetching}
+        errorMessage={errorMessage}
+        itemCount={projects.length}
+        itemLabel="projects"
+      />
+    </div>
+  );
+}
+
 function BoardScopeRow({
   credentialId,
   ownerType,
@@ -323,6 +420,7 @@ function BoardScopeRow({
   onOwnerType,
   onOwner,
   onBoardNumber,
+  onOwnerSelect,
 }: {
   credentialId: string;
   ownerType: 'user' | 'org';
@@ -331,64 +429,72 @@ function BoardScopeRow({
   onOwnerType: (v: 'user' | 'org') => void;
   onOwner: (v: string) => void;
   onBoardNumber: (v: string) => void;
+  onOwnerSelect: (login: string, ownerType: 'user' | 'org') => void;
 }) {
-  const trimmedOwner = owner.trim();
-  // Debounce so each keystroke doesn't fire a GitHub API call.
-  const [debouncedOwner, setDebouncedOwner] = useState(trimmedOwner);
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedOwner(trimmedOwner), 400);
-    return () => clearTimeout(t);
-  }, [trimmedOwner]);
+  const orgsQuery = useListViewerOrgs({
+    credentialId,
+    enabled: !!credentialId,
+  });
+
+  const orgs = orgsQuery.data ?? [];
+  const orgsError = orgsQuery.error
+    ? orgsQuery.error instanceof ApiError
+      ? orgsQuery.error.message
+      : String(orgsQuery.error)
+    : null;
+  const showOwnerDropdown = orgs.length > 0 && !orgsError;
 
   const boardsQuery = useListProjectBoards({
     credentialId,
     ownerType,
-    owner: debouncedOwner,
-    enabled: !!credentialId && !!debouncedOwner,
+    owner,
+    enabled: !!credentialId && !!owner,
   });
 
   const boards = boardsQuery.data ?? [];
-  const errorMessage = boardsQuery.error
+  const boardsError = boardsQuery.error
     ? boardsQuery.error instanceof ApiError
       ? boardsQuery.error.message
       : String(boardsQuery.error)
     : null;
-  const showDropdown = boards.length > 0 && !errorMessage;
+  const showBoardDropdown = boards.length > 0 && !boardsError;
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="grid grid-cols-[110px_minmax(0,1fr)_minmax(0,1.4fr)] gap-3">
-        <label className="flex min-w-0 flex-col gap-1">
-          <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
-            Owner type
-          </span>
-          <Select
-            ariaLabel="Owner type"
-            value={ownerType}
-            onValueChange={(v) => onOwnerType(v as 'user' | 'org')}
-            options={[
-              { value: 'org', label: 'Org' },
-              { value: 'user', label: 'User' },
-            ]}
-          />
-        </label>
+      <div className="grid grid-cols-2 gap-3">
         <label className="flex min-w-0 flex-col gap-1">
           <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
             Owner
           </span>
-          <input
-            className="field-input"
-            placeholder="acme"
-            value={owner}
-            onChange={(e) => onOwner(e.target.value)}
-          />
+          {showOwnerDropdown ? (
+            <Select
+              ariaLabel="Owner"
+              value={owner}
+              onValueChange={(login) => {
+                const entry = orgs.find((o) => o.login === login);
+                if (entry) onOwnerSelect(entry.login, entry.ownerType);
+              }}
+              placeholder="— pick an owner —"
+              options={orgs.map((o) => ({
+                value: o.login,
+                label: o.ownerType === 'user' ? `${o.login} (you)` : o.login,
+              }))}
+            />
+          ) : (
+            <input
+              className="field-input"
+              placeholder="acme"
+              value={owner}
+              onChange={(e) => onOwner(e.target.value)}
+            />
+          )}
         </label>
         <label className="flex min-w-0 flex-col gap-1">
           <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
             Project
           </span>
-          {showDropdown ? (
-            <Select
+          {showBoardDropdown ? (
+            <SearchSelect
               ariaLabel="Project"
               value={boardNumber}
               onValueChange={onBoardNumber}
@@ -410,56 +516,49 @@ function BoardScopeRow({
           )}
         </label>
       </div>
-      <BoardLoadHint
+      <AutoLoadHint
         credentialId={credentialId}
-        owner={debouncedOwner}
-        isLoading={boardsQuery.isFetching}
-        errorMessage={errorMessage}
-        boardCount={boards.length}
+        isLoading={orgsQuery.isFetching || boardsQuery.isFetching}
+        errorMessage={orgsError ?? boardsError}
+        itemCount={owner ? boards.length : orgs.length}
+        itemLabel={owner ? 'projects' : 'owners'}
       />
     </div>
   );
 }
 
-function BoardLoadHint({
+function AutoLoadHint({
   credentialId,
-  owner,
   isLoading,
   errorMessage,
-  boardCount,
+  itemCount,
+  itemLabel,
 }: {
   credentialId: string;
-  owner: string;
   isLoading: boolean;
   errorMessage: string | null;
-  boardCount: number;
+  itemCount: number;
+  itemLabel: string;
 }) {
   if (!credentialId) return null;
-  if (!owner) {
-    return (
-      <span className="font-mono text-[11px] text-[var(--color-text-3)]">
-        Enter an owner to load available projects.
-      </span>
-    );
-  }
   if (isLoading) {
     return (
       <span className="font-mono text-[11px] text-[var(--color-text-3)]">
-        Loading projects…
+        Loading {itemLabel}…
       </span>
     );
   }
   if (errorMessage) {
     return (
       <span className="font-mono text-[11px] text-[var(--color-danger,#d54c4c)]">
-        Couldn't load projects ({errorMessage}). Enter the number manually.
+        Couldn't load {itemLabel} ({errorMessage}). You can type manually.
       </span>
     );
   }
-  if (boardCount === 0) {
+  if (itemCount === 0) {
     return (
       <span className="font-mono text-[11px] text-[var(--color-text-3)]">
-        No Projects v2 boards found for "{owner}". Enter the number manually.
+        No {itemLabel} found. You can type manually.
       </span>
     );
   }

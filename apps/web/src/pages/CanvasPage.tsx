@@ -109,7 +109,8 @@ function CanvasInner() {
   const { id } = useParams<{ id: string }>();
   const { data: wf, isLoading } = useWorkflow(id);
   const updateWorkflow = useUpdateWorkflow(id ?? '');
-  const { data: allConnections = [] } = useConnections();
+  const connectionsQuery = useConnections();
+  const allConnections = useMemo(() => connectionsQuery.data ?? [], [connectionsQuery.data]);
   const rf = useReactFlow();
   const [activeTab, setActiveTab] = useState<WorkflowTabId>('build');
 

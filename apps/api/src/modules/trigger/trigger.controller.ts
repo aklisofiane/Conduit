@@ -5,8 +5,12 @@ import { ZodBodyPipe } from '../../common/zod-body.pipe';
 import {
   type ListLabelsDto,
   type ListProjectsDto,
+  type ListViewerReposDto,
+  type ListViewerOrgsDto,
   listLabelsDtoSchema,
   listProjectsDtoSchema,
+  listViewerReposDtoSchema,
+  listViewerOrgsDtoSchema,
 } from './dto';
 import { TriggerService } from './trigger.service';
 
@@ -26,6 +30,22 @@ export class TriggerController {
     @Body(new ZodBodyPipe(listProjectsDtoSchema)) dto: ListProjectsDto,
   ) {
     return this.svc.listProjects(orgId, dto);
+  }
+
+  @Post('list-viewer-repos')
+  listViewerRepos(
+    @OrgId() orgId: string,
+    @Body(new ZodBodyPipe(listViewerReposDtoSchema)) dto: ListViewerReposDto,
+  ) {
+    return this.svc.listViewerRepos(orgId, dto);
+  }
+
+  @Post('list-viewer-orgs')
+  listViewerOrgs(
+    @OrgId() orgId: string,
+    @Body(new ZodBodyPipe(listViewerOrgsDtoSchema)) dto: ListViewerOrgsDto,
+  ) {
+    return this.svc.listViewerOrgs(orgId, dto);
   }
 
   @Post('list-labels')

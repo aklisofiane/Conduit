@@ -1,6 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { DiscoveredTool, McpTransport, WorkflowDefinition } from '@conduit/shared';
-import type { ProjectBoardSummary, RepoLabel } from '@conduit/shared/platform';
+import type {
+  ProjectBoardSummary,
+  RepoLabel,
+  RepositorySummary,
+  GitlabProjectSummary,
+  ViewerOrgEntry,
+} from '@conduit/shared/platform';
 import { api } from './client.js';
 import type {
   AgentPreset,
@@ -49,7 +55,27 @@ export function useCreateWorkflow() {
       description?: string;
       definition?: WorkflowDefinition;
       triggerType?: 'issues' | 'pull_requests' | 'cron';
-    }) => api.post<WorkflowRow>('/workflows', body),
+      connectionId?: string;
+    }) => {
+      const { connectionId, ...rest } = body;
+      if (connectionId && rest.triggerType && !rest.definition) {
+        const id = `trigger_${Math.random().toString(36).slice(2, 10)}`;
+        const name = 'Trigger1';
+        const shared = { id, name, platform: 'github' as const, connectionId };
+        const trigger =
+          rest.triggerType === 'cron'
+            ? { ...shared, type: 'cron' as const, cron: '0 9 * * *', timezone: 'UTC', branch: 'main' }
+            : { ...shared, type: rest.triggerType, intervalSec: 60, filters: [] as never[] };
+        rest.definition = {
+          triggers: [trigger],
+          nodes: [],
+          edges: [],
+          mcpServers: [],
+          ui: { nodePositions: { [name]: { x: 80, y: 120 } }, viewport: { x: 0, y: 0, zoom: 1 } },
+        };
+      }
+      return api.post<WorkflowRow>('/workflows', rest);
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: WORKFLOWS }),
   });
 }
@@ -301,6 +327,38 @@ export function useListProjectBoards(
         owner,
       }),
     enabled: enabled && !!tokenId && !!owner,
+    staleTime: 30_000,
+    retry: false,
+  });
+}
+
+export function useListViewerRepos(args: {
+  credentialId: string;
+  enabled: boolean;
+}) {
+  const { credentialId, enabled } = args;
+  return useQuery({
+    queryKey: ['repos', credentialId] as const,
+    queryFn: () =>
+      api.post<RepositorySummary[] | GitlabProjectSummary[]>('/trigger/list-viewer-repos', {
+        credentialId,
+      }),
+    enabled: enabled && !!credentialId,
+    staleTime: 30_000,
+    retry: false,
+  });
+}
+
+export function useListViewerOrgs(args: {
+  credentialId: string;
+  enabled: boolean;
+}) {
+  const { credentialId, enabled } = args;
+  return useQuery({
+    queryKey: ['viewer-orgs', credentialId] as const,
+    queryFn: () =>
+      api.post<ViewerOrgEntry[]>('/trigger/list-viewer-orgs', { credentialId }),
+    enabled: enabled && !!credentialId,
     staleTime: 30_000,
     retry: false,
   });

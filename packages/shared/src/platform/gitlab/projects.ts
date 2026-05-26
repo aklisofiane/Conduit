@@ -127,6 +127,46 @@ export async function fetchGitlabProjectMergeRequests(
   return items;
 }
 
+// ── Project listing (membership-based, no owner input needed) ──────────
+
+export interface GitlabProjectSummary {
+  path: string;
+  url: string;
+}
+
+interface RawGitlabProject {
+  path_with_namespace: string;
+  web_url: string;
+}
+
+export async function listAccessibleGitlabProjects(
+  q: { hostUrl: string; token: string; fetchImpl?: typeof fetch },
+): Promise<GitlabProjectSummary[]> {
+  const f = q.fetchImpl ?? fetch;
+  const base = gitlabApiUrl(q.hostUrl);
+  const items: GitlabProjectSummary[] = [];
+
+  for (let page = 1; page <= MAX_PAGES; page += 1) {
+    const url = `${base}/projects?membership=true&per_page=${PAGE_SIZE}&order_by=name&sort=asc&page=${page}`;
+    const resp = await f(url, {
+      method: 'GET',
+      headers: gitlabAuthHeaders(q.token),
+    });
+    if (!resp.ok) {
+      throw new Error(
+        `GitLab REST HTTP ${resp.status}: ${await resp.text().catch(() => '')}`,
+      );
+    }
+    const batch = (await resp.json()) as RawGitlabProject[];
+    for (const raw of batch) {
+      items.push({ path: raw.path_with_namespace, url: raw.web_url });
+    }
+    if (batch.length < PAGE_SIZE) return items;
+  }
+
+  return items;
+}
+
 // ── Helpers ─────────────────────────────────────────────────────────────
 
 /**

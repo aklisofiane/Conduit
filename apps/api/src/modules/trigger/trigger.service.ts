@@ -2,15 +2,21 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { expectScopeKind } from '@conduit/shared';
 import {
   listProjectBoards,
+  listViewerRepositories,
+  listViewerOrganizations,
   listRepoLabels,
   listGitlabProjectLabels,
+  listAccessibleGitlabProjects,
   type ProjectBoardSummary,
+  type RepositorySummary,
+  type ViewerOrgEntry,
+  type GitlabProjectSummary,
   type RepoLabel,
 } from '@conduit/shared/platform';
 import { errMessage } from '../../common/err-message';
 import { ConnectionsService } from '../connections/connections.service';
 import { CredentialsService } from '../credentials/credentials.service';
-import type { ListLabelsDto, ListProjectsDto } from './dto';
+import type { ListLabelsDto, ListProjectsDto, ListViewerReposDto, ListViewerOrgsDto } from './dto';
 
 /**
  * Trigger-config-time helpers. Failures (bad token, missing scope, unknown
@@ -45,6 +51,56 @@ export class TriggerService {
       );
       throw new BadRequestException({ message });
     }
+  }
+
+  async listViewerRepos(
+    orgId: string,
+    dto: ListViewerReposDto,
+  ): Promise<RepositorySummary[] | GitlabProjectSummary[]> {
+    const { token, platform, hostUrl } = await this.resolveCredentialInfo(
+      orgId,
+      dto.credentialId,
+    );
+
+    try {
+      if (platform === 'GITLAB') {
+        return await listAccessibleGitlabProjects({
+          hostUrl: hostUrl ?? 'gitlab.com',
+          token,
+        });
+      }
+      return await listViewerRepositories(token);
+    } catch (e: unknown) {
+      const message = errMessage(e);
+      this.logger.warn(`List viewer repos failed (${platform}): ${message}`);
+      throw new BadRequestException({ message });
+    }
+  }
+
+  async listViewerOrgs(
+    orgId: string,
+    dto: ListViewerOrgsDto,
+  ): Promise<ViewerOrgEntry[]> {
+    const { token } = await this.resolveCredentialInfo(orgId, dto.credentialId);
+
+    try {
+      return await listViewerOrganizations(token);
+    } catch (e: unknown) {
+      const message = errMessage(e);
+      this.logger.warn(`List viewer orgs failed: ${message}`);
+      throw new BadRequestException({ message });
+    }
+  }
+
+  private async resolveCredentialInfo(
+    orgId: string,
+    credentialId: string,
+  ): Promise<{ token: string; platform: string; hostUrl: string | null }> {
+    const [token, info] = await Promise.all([
+      this.credentials.decryptForOrgCredential(orgId, credentialId),
+      this.credentials.getOrgCredentialInfo(orgId, credentialId),
+    ]);
+    return { token, platform: info.platform, hostUrl: info.hostUrl };
   }
 
   private async resolveToken(orgId: string, dto: ListProjectsDto): Promise<string> {

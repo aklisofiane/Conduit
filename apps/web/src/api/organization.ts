@@ -71,6 +71,8 @@ export const ORG_SCOPED_QUERY_KEYS: readonly (readonly unknown[])[] = [
   ['agent-presets'],
   ['skills'],
   ['project-boards'],
+  ['repos'],
+  ['viewer-orgs'],
   ['labels'],
 ];
 

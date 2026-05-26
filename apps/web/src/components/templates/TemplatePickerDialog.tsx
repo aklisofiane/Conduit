@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { ConnectionScope } from '@conduit/shared';
 import { ApiError } from '../../api/client.js';
@@ -6,6 +6,9 @@ import {
   useConnections,
   useCreateFromTemplate,
   useCredentials,
+  useListProjectBoards,
+  useListViewerOrgs,
+  useListViewerRepos,
   useTemplates,
 } from '../../api/hooks.js';
 import type {
@@ -16,6 +19,7 @@ import type {
 } from '../../api/types.js';
 import { connectionLabel } from '../../lib/connection.js';
 import { Dialog, DialogContent, DialogTitle } from '../common/Dialog.js';
+import { SearchSelect } from '../common/SearchSelect.js';
 import { Select, type SelectOption } from '../common/Select.js';
 
 export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
@@ -354,23 +358,70 @@ function NewBindingFields({
       />
 
       {binding.scope.kind === 'github_repo' && (
-        <RepoScopeFields scope={binding.scope} setScope={setScope} />
+        <RepoScopeFields
+          credentialId={binding.credentialId}
+          scope={binding.scope}
+          setScope={setScope}
+        />
       )}
 
       {binding.scope.kind === 'github_projects_v2' && (
-        <BoardScopeFields scope={binding.scope} setScope={setScope} />
+        <BoardScopeFields
+          credentialId={binding.credentialId}
+          scope={binding.scope}
+          setScope={setScope}
+        />
       )}
     </div>
   );
 }
 
 function RepoScopeFields({
+  credentialId,
   scope,
   setScope,
 }: {
+  credentialId: string;
   scope: Extract<ConnectionScope, { kind: 'github_repo' }>;
   setScope: (s: ConnectionScope) => void;
 }) {
+  const reposQuery = useListViewerRepos({
+    credentialId,
+    enabled: !!credentialId,
+  });
+  const repos = (reposQuery.data ?? []) as Array<{ owner: string; name: string }>;
+  const options = useMemo(
+    () =>
+      repos.map((r) => {
+        const full = `${r.owner}/${r.name}`;
+        return { value: full, label: full };
+      }),
+    [repos],
+  );
+  const selected = scope.owner && scope.repo ? `${scope.owner}/${scope.repo}` : '';
+
+  if (repos.length > 0) {
+    return (
+      <div className="col-span-2">
+        <label className="flex flex-col gap-1">
+          <span className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-3)]">
+            Repository
+          </span>
+          <SearchSelect
+            ariaLabel="Repository"
+            value={selected}
+            onValueChange={(v) => {
+              const slash = v.indexOf('/');
+              if (slash > 0) setScope({ ...scope, owner: v.slice(0, slash), repo: v.slice(slash + 1) });
+            }}
+            placeholder={reposQuery.isFetching ? 'Loading…' : '— pick a repo —'}
+            options={options}
+          />
+        </label>
+      </div>
+    );
+  }
+
   return (
     <>
       <LabeledInput
@@ -388,40 +439,87 @@ function RepoScopeFields({
 }
 
 function BoardScopeFields({
+  credentialId,
   scope,
   setScope,
 }: {
+  credentialId: string;
   scope: Extract<ConnectionScope, { kind: 'github_projects_v2' }>;
   setScope: (s: ConnectionScope) => void;
 }) {
+  const orgsQuery = useListViewerOrgs({
+    credentialId,
+    enabled: !!credentialId,
+  });
+  const orgs = orgsQuery.data ?? [];
+
+  const boardsQuery = useListProjectBoards({
+    credentialId,
+    ownerType: scope.ownerType,
+    owner: scope.owner,
+    enabled: !!credentialId && !!scope.owner,
+  });
+  const boards = boardsQuery.data ?? [];
+
   return (
     <>
-      <LabeledSelect
-        label="Owner type"
-        value={scope.ownerType}
-        onChange={(v) =>
-          setScope({ ...scope, ownerType: v as 'user' | 'org' })
-        }
-        options={[
-          { value: 'org', label: 'Org' },
-          { value: 'user', label: 'User' },
-        ]}
-      />
-      <LabeledInput
-        label="Owner"
-        value={scope.owner}
-        onChange={(v) => setScope({ ...scope, owner: v })}
-      />
-      <LabeledInput
-        label="Project #"
-        value={String(scope.number)}
-        onChange={(v) => {
-          const num = Number(v);
-          if (Number.isInteger(num) && num > 0) {
-            setScope({ ...scope, number: num });
-          }
-        }}
-      />
+      {orgs.length > 0 ? (
+        <LabeledSelect
+          label="Owner"
+          value={scope.owner}
+          onChange={(login) => {
+            const entry = orgs.find((o) => o.login === login);
+            if (entry) setScope({ ...scope, owner: entry.login, ownerType: entry.ownerType });
+          }}
+          placeholder="— pick an owner —"
+          options={orgs.map((o) => ({
+            value: o.login,
+            label: o.ownerType === 'user' ? `${o.login} (you)` : o.login,
+          }))}
+        />
+      ) : (
+        <>
+          <LabeledSelect
+            label="Owner type"
+            value={scope.ownerType}
+            onChange={(v) =>
+              setScope({ ...scope, ownerType: v as 'user' | 'org' })
+            }
+            options={[
+              { value: 'org', label: 'Org' },
+              { value: 'user', label: 'User' },
+            ]}
+          />
+          <LabeledInput
+            label="Owner"
+            value={scope.owner}
+            onChange={(v) => setScope({ ...scope, owner: v })}
+          />
+        </>
+      )}
+      {boards.length > 0 ? (
+        <LabeledSelect
+          label="Project"
+          value={scope.number > 0 ? String(scope.number) : ''}
+          onChange={(v) => setScope({ ...scope, number: Number(v) })}
+          placeholder="— pick a project —"
+          options={boards.map((b) => ({
+            value: String(b.number),
+            label: `#${b.number} · ${b.title}`,
+          }))}
+        />
+      ) : (
+        <LabeledInput
+          label="Project #"
+          value={scope.number > 0 ? String(scope.number) : ''}
+          onChange={(v) => {
+            const num = Number(v);
+            if (Number.isInteger(num) && num > 0) {
+              setScope({ ...scope, number: num });
+            }
+          }}
+        />
+      )}
     </>
   );
 }
