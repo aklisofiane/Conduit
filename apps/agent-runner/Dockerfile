@@ -47,14 +47,14 @@ RUN npm run build --workspace @conduit/shared \
 
 # Drop devDependencies for the runtime image.
 # `npm prune` reconciles `node_modules` against the lockfile, so the rm of
-# the musl native binary has to happen *after* prune — otherwise prune
-# re-installs it from the lockfile's optional-deps list. `claude-agent-sdk`
-# ships glibc and musl variants as `optionalDependencies`; npm 10's `--libc`
-# flag is documented but not enforced. We run on debian-slim/glibc and
-# never load the musl variant — drop it to save ~233 MB. If the base image
-# ever switches to alpine, swap which variant is removed.
+# the musl native binaries has to happen *after* prune — otherwise prune
+# re-installs them from the lockfile's optional-deps list. `claude-agent-sdk`
+# ships glibc and musl variants as `optionalDependencies`; the lockfile
+# lacks `libc` selectors so npm installs both. The SDK tries musl first on
+# Linux — a musl ELF on glibc ENOENT's looking for the musl dynamic linker.
+# Drop all musl variants (x64 and arm64) since we run on debian-slim/glibc.
 RUN npm prune --omit=dev \
- && rm -rf node_modules/@anthropic-ai/claude-agent-sdk-linux-x64-musl
+ && rm -rf node_modules/@anthropic-ai/claude-agent-sdk-linux-*-musl
 
 # ---- runtime ---------------------------------------------------------------
 FROM node:22-slim AS runtime
