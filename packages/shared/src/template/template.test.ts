@@ -125,7 +125,7 @@ describe('template placeholders', () => {
   it('reports per-slot expected scope kinds via collectTemplatePlaceholderDetails', () => {
     const details = collectTemplatePlaceholderDetails(BOARD_TEMPLATE);
     const byAlias = new Map(details.map((d) => [d.alias, d.expectedScopeKinds]));
-    expect(byAlias.get('github-repo')).toEqual(['any']);
+    expect(byAlias.get('github-repo')).toEqual(['repo']);
     expect(byAlias.get('github-board')).toEqual(['github_projects_v2']);
   });
 });

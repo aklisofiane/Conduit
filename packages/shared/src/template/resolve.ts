@@ -3,8 +3,8 @@ import type { ConnectionScopeKind } from '../connection/scope';
 import type { TemplateFile, TemplateWorkflow } from './schema';
 import { placeholderAlias } from './placeholder';
 
-/** Per-slot expected scope; `'any'` means "any platform-matched scope". */
-export type ExpectedSlotKind = ConnectionScopeKind | 'any';
+/** Per-slot expected scope; `'repo'` = github_repo | gitlab_project; `'any'` = skip check. */
+export type ExpectedSlotKind = ConnectionScopeKind | 'any' | 'repo';
 
 export interface TemplatePlaceholder {
   alias: string;
@@ -97,7 +97,7 @@ function* enumerateConnectionSlots(
   for (const trigger of def.triggers) {
     yield {
       value: trigger.connectionId,
-      expectedScopeKind: 'any',
+      expectedScopeKind: 'repo',
       set: (v) => {
         trigger.connectionId = v;
       },

@@ -176,7 +176,7 @@ describe('Phase 6 — create workflows from template', () => {
     });
     expect(res.status).toBe(400);
     const body = (await res.json()) as { message: string; missing: string[] };
-    expect(body.missing).toEqual(['github-board', 'github-repo']);
+    expect(body.missing).toEqual(['github-repo']);
   });
 
   it('creates a single-workflow template with no extra churn', async () => {

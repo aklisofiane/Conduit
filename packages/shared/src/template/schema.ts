@@ -155,5 +155,7 @@ export const templateSummarySchema = z.object({
   workflowCount: z.number().int().positive(),
   /** Unique connection placeholders across all workflows in the bundle. */
   placeholders: z.array(z.string()),
+  /** Placeholders that resolve to board-type scopes (optional bindings). */
+  boardAliases: z.array(z.string()),
 });
 export type TemplateSummary = z.infer<typeof templateSummarySchema>;

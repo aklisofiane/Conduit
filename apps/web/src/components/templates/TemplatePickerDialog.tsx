@@ -22,14 +22,6 @@ import { Dialog, DialogContent, DialogTitle } from '../common/Dialog.js';
 import { SearchSelect } from '../common/SearchSelect.js';
 import { Select, type SelectOption } from '../common/Select.js';
 
-function isBoardAlias(alias: string): boolean {
-  return /board/.test(alias);
-}
-
-function findBoardAlias(placeholders: string[]): string | undefined {
-  return placeholders.find(isBoardAlias);
-}
-
 function credentialPlatform(
   credentialId: string,
   credentials: CredentialRow[],
@@ -86,15 +78,18 @@ function defaultBindingForRepo(
 }
 
 function defaultBindingForBoard(
-  _alias: string,
-  _credentials: CredentialRow[],
+  alias: string,
+  credentials: CredentialRow[],
   connections: ConnectionRow[],
 ): TemplateBinding {
   const eligible = connections.filter(
     (c) => c.scope.kind === 'github_projects_v2',
   );
   const only = eligible.length === 1 ? eligible[0] : undefined;
-  return { mode: 'existing', connectionId: only?.id ?? '' };
+  if (eligible.length > 0) {
+    return { mode: 'existing', connectionId: only?.id ?? '' };
+  }
+  return newBindingForBoard(alias, credentials[0]?.id ?? '');
 }
 
 export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
@@ -108,23 +103,33 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
   const [bindings, setBindings] = useState<Record<string, TemplateBinding>>({});
   const [error, setError] = useState<string | null>(null);
 
-  const repoAliases = useMemo(
-    () => (selected?.placeholders ?? []).filter((p) => !isBoardAlias(p)),
+  const boardAliasSet = useMemo(
+    () => new Set(selected?.boardAliases ?? []),
     [selected],
   );
-  const boardAlias = selected ? findBoardAlias(selected.placeholders) : undefined;
+  const repoAliases = useMemo(
+    () => (selected?.placeholders ?? []).filter((p) => !boardAliasSet.has(p)),
+    [selected, boardAliasSet],
+  );
+  const boardAlias = selected?.boardAliases?.[0];
 
-  const repoBinding = repoAliases[0] ? bindings[repoAliases[0]] : undefined;
-  const repoPlatform =
-    repoBinding?.mode === 'new'
-      ? credentialPlatform(repoBinding.credentialId, credentials)
-      : repoBinding?.mode === 'existing'
-        ? (() => {
-            const conn = connections.find((c) => c.id === repoBinding.connectionId);
-            if (!conn) return undefined;
-            return conn.credential.platform === 'GITLAB' ? 'GITLAB' as const : 'GITHUB' as const;
-          })()
-        : undefined;
+  const repoPlatform = (() => {
+    let found: 'GITHUB' | 'GITLAB' | undefined;
+    for (const alias of repoAliases) {
+      const b = bindings[alias];
+      if (!b) continue;
+      let p: 'GITHUB' | 'GITLAB' | undefined;
+      if (b.mode === 'new') {
+        p = credentialPlatform(b.credentialId, credentials);
+      } else if (b.mode === 'existing') {
+        const conn = connections.find((c) => c.id === b.connectionId);
+        if (conn) p = conn.credential.platform === 'GITLAB' ? 'GITLAB' : 'GITHUB';
+      }
+      if (p === 'GITHUB') return 'GITHUB' as const;
+      if (p) found = p;
+    }
+    return found;
+  })();
   const showBoard = boardAlias != null && repoPlatform === 'GITHUB';
 
   useEffect(() => {
@@ -147,17 +152,18 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
     (!showBoard ||
       (() => {
         const b = bindings[boardAlias!];
-        if (!b) return true;
+        if (!b) return false;
         if (b.mode === 'existing') return Boolean(b.connectionId);
         return Boolean(b.name && b.credentialId && b.scope);
       })());
 
   const handlePick = (t: TemplateSummary) => {
     setSelected(t);
+    const boards = new Set(t.boardAliases);
     setBindings(
       Object.fromEntries(
         t.placeholders
-          .filter((alias) => !isBoardAlias(alias))
+          .filter((alias) => !boards.has(alias))
           .map<[string, TemplateBinding]>((alias) => [
             alias,
             defaultBindingForRepo(alias, credentials, connections),
@@ -255,7 +261,7 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
                     <BindingRow
                       key={alias}
                       alias={alias}
-                      isBoard={isBoardAlias(alias)}
+                      isBoard={boardAliasSet.has(alias)}
                       binding={bindings[alias]}
                       credentials={credentials}
                       connections={connections}
