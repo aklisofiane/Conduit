@@ -182,19 +182,32 @@ export async function pollBoardActivity(
     .filter((o): o is Extract<StartOutcome, { ok: false }> => !o.ok)
     .map(({ reason, error, issueKey }) => ({ reason, error, issueKey }));
 
+  // Exclude gated-out new items from the snapshot so they're retried on
+  // the next tick instead of being permanently marked as "seen."
+  const startedEventSet = new Set(eventsToStart);
+  const gatedOutIds = new Set<string>();
+  for (let i = 0; i < candidateEvents.length; i++) {
+    if (!startedEventSet.has(candidateEvents[i]!)) {
+      gatedOutIds.add(newItems[i]!.itemNodeId);
+    }
+  }
+  const snapshotIds = gatedOutIds.size > 0
+    ? matchingIds.filter((id) => !gatedOutIds.has(id))
+    : matchingIds;
+
   const snapshotChanged =
     startedRunIds.length > 0 ||
-    matchingIds.length !== previousIds.length ||
-    matchingIds.some((id, i) => id !== previousIds[i]);
+    snapshotIds.length !== previousIds.length ||
+    snapshotIds.some((id, i) => id !== previousIds[i]);
   if (snapshotChanged) {
     await prisma().pollSnapshot.upsert({
       where: { workflowId },
       create: {
         workflowId,
         orgId: wf.orgId,
-        matchingIds: matchingIds as unknown as object,
+        matchingIds: snapshotIds as unknown as object,
       },
-      update: { matchingIds: matchingIds as unknown as object, polledAt: new Date() },
+      update: { matchingIds: snapshotIds as unknown as object, polledAt: new Date() },
     });
   }
 

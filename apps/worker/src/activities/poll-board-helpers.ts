@@ -50,6 +50,9 @@ export function toTriggerEvent(
   if (item.singleSelectValues.Status) {
     payload.status = item.singleSelectValues.Status;
   }
+  if (item.labels.length > 0) {
+    payload.labels = item.labels;
+  }
   if (item.pr) {
     payload.prState = item.pr.state;
   }

@@ -62,6 +62,12 @@ function flattenEventForFilters(event: TriggerEvent): FilterView {
 }
 
 function getLabels(payload: Record<string, unknown>): string[] {
+  // Polling events surface labels as a flat string[] directly on the payload.
+  const direct = payload.labels;
+  if (Array.isArray(direct)) {
+    return direct.filter((v): v is string => typeof v === 'string');
+  }
+  // Webhook events carry labels nested under `issue` or `pull_request`.
   const issue = (payload.issue ?? payload.pull_request) as
     | { labels?: Array<{ name?: string }> }
     | undefined;
