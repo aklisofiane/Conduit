@@ -164,7 +164,14 @@ services:
       CONDUIT_RUNNER_IMAGE: conduit-agent-runner:latest
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - conduit_home:/var/lib/conduit
+      # Bind mount (NOT a named volume). The worker spawns agent-runner
+      # containers via the host Docker socket with same-path bind mounts
+      # (-v /var/lib/conduit/runs/<id>:/var/lib/conduit/runs/<id>). The
+      # Docker daemon resolves those against the HOST filesystem, so the
+      # worker's CONDUIT_HOME must be a real host directory — a named
+      # volume would live under /var/lib/docker/volumes/ and the paths
+      # would not match.
+      - /var/lib/conduit:/var/lib/conduit
     healthcheck:
       test: ['CMD-SHELL', 'kill -0 1 || exit 1']
       interval: 30s
@@ -200,4 +207,3 @@ volumes:
   conduit_pg_data:
   temporal_pg_data:
   conduit_redis_data:
-  conduit_home:
