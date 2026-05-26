@@ -62,3 +62,9 @@ export function expectScopeKind<K extends ConnectionScopeKind>(
   }
   return scope as Extract<ConnectionScope, { kind: K }>;
 }
+
+export function platformForScopeKind(kind: ConnectionScopeKind): 'github' | 'gitlab' | undefined {
+  if (kind === 'github_repo' || kind === 'github_projects_v2') return 'github';
+  if (kind === 'gitlab_project') return 'gitlab';
+  return undefined;
+}

@@ -23,12 +23,7 @@ const CUSTOM_PRESET_ID = '__custom__';
 interface AgentConfigPanelProps {
   agent: AgentConfig;
   workflowId: string;
-  /**
-   * The workflow's GitHub trigger, when present. Drives the issue-writeback
-   * pickers (project Status options + repo labels). Undefined disables the
-   * writeback field with a hint.
-   */
-  githubTrigger?: TriggerConfig;
+  repoTrigger?: TriggerConfig;
   onChange: (patch: Partial<AgentConfig>) => void;
   onSave: () => void;
   onDiscard: () => void;
@@ -40,7 +35,7 @@ interface AgentConfigPanelProps {
 export function AgentConfigPanel({
   agent,
   workflowId,
-  githubTrigger,
+  repoTrigger,
   onChange,
   onSave,
   onDiscard,
@@ -201,7 +196,7 @@ export function AgentConfigPanel({
             hint="set status / apply labels at end of run"
           >
             <IssueWritebackControl
-              trigger={githubTrigger}
+              trigger={repoTrigger}
               value={agent.issueWriteback}
               onChange={(next) => onChange({ issueWriteback: next })}
             />
@@ -350,7 +345,7 @@ function IssueWritebackControl({
   if (!trigger) {
     return (
       <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
-        Add a GitHub trigger to enable issue writeback.
+        Add a trigger to enable issue writeback.
       </div>
     );
   }

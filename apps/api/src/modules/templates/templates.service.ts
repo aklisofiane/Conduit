@@ -8,6 +8,7 @@ import {
 import {
   connectionScopeSchema,
   isScheduledTrigger,
+  platformForScopeKind,
   resolveTemplate,
   type ConnectionScopeKind,
   type TemplatePlaceholder,
@@ -101,6 +102,18 @@ export class TemplatesService implements OnModuleInit {
           aliasToConnId,
         );
         const resolvedDefinition = resolved[0]!.definition;
+        for (const trigger of resolvedDefinition.triggers) {
+          if (!trigger.connectionId) continue;
+          const conn = await tx.connection.findUnique({
+            where: { id: trigger.connectionId },
+            select: { scope: true },
+          });
+          if (conn) {
+            const parsed = connectionScopeSchema.parse(conn.scope);
+            const derived = platformForScopeKind(parsed.kind);
+            if (derived) trigger.platform = derived;
+          }
+        }
         assertDefinitionValid(resolvedDefinition);
 
         const finalWf = await tx.workflow.create({
@@ -249,6 +262,14 @@ export class TemplatesService implements OnModuleInit {
   ): void {
     for (const expected of placeholder.expectedScopeKinds) {
       if (expected === 'any') continue;
+      if (expected === 'repo') {
+        if (actualKind !== 'github_repo' && actualKind !== 'gitlab_project') {
+          throw new BadRequestException(
+            `Binding for <${placeholder.alias}> has scope kind "${actualKind}", but the template requires a repo-type scope (github_repo or gitlab_project).`,
+          );
+        }
+        continue;
+      }
       if (expected !== actualKind) {
         throw new BadRequestException(
           `Binding for <${placeholder.alias}> has scope kind "${actualKind}", but the template requires "${expected}" for at least one slot.`,
@@ -266,6 +287,9 @@ function toSummary(t: LoadedTemplate): TemplateSummary {
     category: t.file.category,
     workflowCount: t.file.workflows.length,
     placeholders: t.placeholders,
+    boardAliases: t.placeholderDetails
+      .filter((p) => p.expectedScopeKinds.includes('github_projects_v2'))
+      .map((p) => p.alias),
   };
 }
 

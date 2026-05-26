@@ -8,6 +8,7 @@ import {
   type CronWorkflowInput,
   type TriggerEvent,
 } from '@conduit/shared';
+import { splitProjectPath } from '@conduit/shared/platform';
 import { config } from '../config';
 import { prisma } from '../runtime/prisma';
 import { writeSystemLog } from '../runtime/log-writer';
@@ -59,13 +60,21 @@ export async function cronFireActivity(input: CronWorkflowInput): Promise<CronFi
       `Workflow ${workflowId} cron trigger references unknown connection ${trigger.connectionId}`,
     );
   }
-  const scope = expectScopeKind(
-    connectionScopeSchema.parse(conn.scope),
-    'github_repo',
-  );
+  const platform = trigger.platform;
+  const parsedScope = connectionScopeSchema.parse(conn.scope);
+
+  let repo: TriggerEvent['repo'];
+  if (platform === 'gitlab') {
+    const scope = expectScopeKind(parsedScope, 'gitlab_project');
+    const { owner, name } = splitProjectPath(scope.projectPath);
+    repo = { owner, name };
+  } else {
+    const scope = expectScopeKind(parsedScope, 'github_repo');
+    repo = { owner: scope.owner, name: scope.repo };
+  }
 
   const triggerEvent: TriggerEvent = {
-    source: 'github',
+    source: platform,
     mode: 'scheduled',
     event: 'cron.fired',
     payload: {
@@ -73,7 +82,7 @@ export async function cronFireActivity(input: CronWorkflowInput): Promise<CronFi
       timezone: trigger.timezone,
       branch: trigger.branch,
     },
-    repo: { owner: scope.owner, name: scope.repo },
+    repo,
   };
 
   const run = await prisma().workflowRun.create({

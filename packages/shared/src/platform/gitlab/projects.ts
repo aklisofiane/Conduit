@@ -175,7 +175,7 @@ export async function listAccessibleGitlabProjects(
  * joined back as `owner` — mirrors the two-part `{ owner, name }` shape
  * used by `ProjectBoardItem.repo`.
  */
-function splitProjectPath(projectPath: string): { owner: string; name: string } {
+export function splitProjectPath(projectPath: string): { owner: string; name: string } {
   const parts = projectPath.split('/');
   if (parts.length < 2) return { owner: '', name: projectPath };
   return {

@@ -458,7 +458,7 @@ function CanvasInner() {
           <AgentConfigPanel
             agent={selectedAgent}
             workflowId={id}
-            githubTrigger={draft.triggers.find((t) => t.platform === 'github' && t.type !== 'cron')}
+            repoTrigger={draft.triggers.find((t) => t.type !== 'cron')}
             onChange={(patch) => updateAgent(selectedAgent.id, patch)}
             onSave={handleSave}
             onDiscard={() => wf && reset(wf.definition)}

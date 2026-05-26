@@ -2,8 +2,6 @@ import { useMemo } from 'react';
 import { offeredFilterFields } from '@conduit/shared';
 import type { TriggerConfig } from '@conduit/shared';
 import { useConnections, useListLabels } from '../../api/hooks.js';
-import type { CredentialRow } from '../../api/types.js';
-import { repoScopeKindFor } from '../../lib/connection.js';
 import {
   ActiveToggleField,
   ConnectionSelect,
@@ -38,16 +36,13 @@ export function PrTriggerPanel({
   saving,
   dirty,
 }: PrTriggerPanelProps) {
-  const platform = trigger.platform.toUpperCase() as CredentialRow['platform'];
   const { data: allConnections = [] } = useConnections();
   const repoConnections = useMemo(
     () =>
       allConnections.filter(
-        (c) =>
-          c.scope.kind === repoScopeKindFor(trigger.platform) &&
-          c.credential.platform === platform,
+        (c) => c.scope.kind === 'github_repo' || c.scope.kind === 'gitlab_project',
       ),
-    [allConnections, platform, trigger.platform],
+    [allConnections],
   );
 
   const labelsQuery = useListLabels({
@@ -66,7 +61,11 @@ export function PrTriggerPanel({
             <ConnectionSelect
               connections={repoConnections}
               value={trigger.connectionId}
-              onChange={(id) => onChange({ connectionId: id })}
+              onChange={(id) => {
+                const conn = allConnections.find((c) => c.id === id);
+                const derived = conn?.scope.kind === 'gitlab_project' ? 'gitlab' as const : 'github' as const;
+                onChange({ connectionId: id, platform: derived });
+              }}
               emptyHint={`No ${trigger.platform === 'gitlab' ? 'project' : 'repo'} connections yet — create one on the Connections page.`}
             />
           </Field>

@@ -6,8 +6,6 @@ import {
   useListLabels,
   useListProjectBoards,
 } from '../../api/hooks.js';
-import type { CredentialRow } from '../../api/types.js';
-import { repoScopeKindFor } from '../../lib/connection.js';
 import {
   ActiveToggleField,
   BoardPickerHint,
@@ -43,24 +41,17 @@ export function IssuesTriggerPanel({
   saving,
   dirty,
 }: IssuesTriggerPanelProps) {
-  const platform = trigger.platform.toUpperCase() as CredentialRow['platform'];
   const { data: allConnections = [] } = useConnections();
   const repoConnections = useMemo(
     () =>
       allConnections.filter(
-        (c) =>
-          c.scope.kind === repoScopeKindFor(trigger.platform) &&
-          c.credential.platform === platform,
+        (c) => c.scope.kind === 'github_repo' || c.scope.kind === 'gitlab_project',
       ),
-    [allConnections, platform, trigger.platform],
+    [allConnections],
   );
   const boardConnections = useMemo(
-    () =>
-      allConnections.filter(
-        (c) =>
-          c.scope.kind === 'github_projects_v2' && c.credential.platform === platform,
-      ),
-    [allConnections, platform],
+    () => allConnections.filter((c) => c.scope.kind === 'github_projects_v2'),
+    [allConnections],
   );
 
   const hasBoard = !!trigger.boardConnectionId;
@@ -102,7 +93,15 @@ export function IssuesTriggerPanel({
             <ConnectionSelect
               connections={repoConnections}
               value={trigger.connectionId}
-              onChange={(id) => onChange({ connectionId: id })}
+              onChange={(id) => {
+                const conn = allConnections.find((c) => c.id === id);
+                const derived = conn?.scope.kind === 'gitlab_project' ? 'gitlab' as const : 'github' as const;
+                onChange({
+                  connectionId: id,
+                  platform: derived,
+                  ...(derived === 'gitlab' ? { boardConnectionId: undefined } : {}),
+                });
+              }}
               emptyHint={`No ${trigger.platform === 'gitlab' ? 'project' : 'repo'} connections yet — create one on the Connections page.`}
             />
           </Field>
