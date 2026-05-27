@@ -62,6 +62,23 @@ export const MCP_PRESETS: readonly McpPreset[] = [
       },
     },
   },
+  {
+    id: 'gitlab',
+    name: 'GitLab',
+    description:
+      'Read and write GitLab issues, merge requests, pipelines, wikis, and projects via the @zereight/mcp-gitlab server.',
+    platform: 'GITLAB',
+    credentialHint: 'Personal access token with api scope.',
+    transport: {
+      kind: 'stdio',
+      command: 'npx',
+      args: ['-y', '@zereight/mcp-gitlab'],
+      env: {
+        GITLAB_PERSONAL_ACCESS_TOKEN: CREDENTIAL_PLACEHOLDER_VALUE,
+        GITLAB_API_URL: 'https://gitlab.com/api/v4',
+      },
+    },
+  },
 ];
 
 /** Lookup by id. Returns undefined for ids the client doesn't know. */
