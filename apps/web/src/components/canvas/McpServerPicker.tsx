@@ -480,6 +480,57 @@ function PresetPicker({
   );
 }
 
+function KeyValueEditor({
+  entries,
+  onChange,
+  keyPlaceholder = 'KEY',
+  valuePlaceholder = 'value',
+}: {
+  entries: [string, string][];
+  onChange: (next: [string, string][]) => void;
+  keyPlaceholder?: string;
+  valuePlaceholder?: string;
+}) {
+  const update = (i: number, col: 0 | 1, value: string) => {
+    const next = entries.map((row, j) =>
+      j === i ? ([col === 0 ? value : row[0], col === 1 ? value : row[1]] as [string, string]) : row,
+    );
+    onChange(next);
+  };
+
+  const remove = (i: number) => onChange(entries.filter((_, j) => j !== i));
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      {entries.map(([k, v], i) => (
+        <div key={i} className="flex items-center gap-1.5">
+          <input
+            className="field-input flex-1 font-mono text-[11px]"
+            placeholder={keyPlaceholder}
+            value={k}
+            onChange={(e) => update(i, 0, e.target.value)}
+          />
+          <input
+            className="field-input flex-[2] font-mono text-[11px]"
+            placeholder={valuePlaceholder}
+            value={v}
+            onChange={(e) => update(i, 1, e.target.value)}
+          />
+          <button className="btn" onClick={() => remove(i)} title="Remove">
+            ✕
+          </button>
+        </div>
+      ))}
+      <button
+        className="btn self-start"
+        onClick={() => onChange([...entries, ['', '']])}
+      >
+        + Add
+      </button>
+    </div>
+  );
+}
+
 function CustomServerForm({
   connections,
   onAdd,
@@ -492,6 +543,8 @@ function CustomServerForm({
   const [command, setCommand] = useState('');
   const [args, setArgs] = useState('');
   const [url, setUrl] = useState('');
+  const [envEntries, setEnvEntries] = useState<[string, string][]>([]);
+  const [headerEntries, setHeaderEntries] = useState<[string, string][]>([]);
   const [connectionId, setConnectionId] = useState<string>('');
 
   const canSave =
@@ -501,6 +554,16 @@ function CustomServerForm({
   const handleAdd = () => {
     if (!canSave) return;
     const id = `mcp_${Math.random().toString(36).slice(2, 10)}`;
+
+    const toRecord = (entries: [string, string][]) => {
+      const obj: Record<string, string> = {};
+      for (const [k, v] of entries) {
+        const key = k.trim();
+        if (key) obj[key] = v;
+      }
+      return Object.keys(obj).length > 0 ? obj : undefined;
+    };
+
     const transport: McpTransport =
       kind === 'stdio'
         ? {
@@ -510,8 +573,9 @@ function CustomServerForm({
               .split(/\s+/)
               .map((a) => a.trim())
               .filter(Boolean),
+            env: toRecord(envEntries),
           }
-        : { kind, url: url.trim() };
+        : { kind, url: url.trim(), headers: toRecord(headerEntries) };
     onAdd({ id, name: name.trim(), transport, connectionId: connectionId || undefined });
   };
 
@@ -564,19 +628,43 @@ function CustomServerForm({
               onChange={(e) => setArgs(e.target.value)}
             />
           </label>
+          <div className="flex flex-col gap-1">
+            <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+              Environment variables
+            </span>
+            <KeyValueEditor
+              entries={envEntries}
+              onChange={setEnvEntries}
+              keyPlaceholder="ENV_VAR"
+              valuePlaceholder="value"
+            />
+          </div>
         </>
       ) : (
-        <label className="flex flex-col gap-1">
-          <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
-            URL
-          </span>
-          <input
-            className="field-input"
-            placeholder="https://tools.example.com/mcp"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-          />
-        </label>
+        <>
+          <label className="flex flex-col gap-1">
+            <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+              URL
+            </span>
+            <input
+              className="field-input"
+              placeholder="https://tools.example.com/mcp"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+            />
+          </label>
+          <div className="flex flex-col gap-1">
+            <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+              Headers
+            </span>
+            <KeyValueEditor
+              entries={headerEntries}
+              onChange={setHeaderEntries}
+              keyPlaceholder="Header-Name"
+              valuePlaceholder="value"
+            />
+          </div>
+        </>
       )}
 
       <label className="flex flex-col gap-1">
