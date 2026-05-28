@@ -429,8 +429,8 @@ function ExpandedToolBody({ tool }: { tool: ToolItem }) {
         <div className="font-mono text-[10px] uppercase tracking-wider text-[var(--color-text-4)]">
           input
         </div>
-        <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap font-mono text-[11px] text-[var(--color-text-2)]">
-          {formatJson(tool.call.input)}
+        <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap font-mono text-[11px] text-[var(--color-text-2)]">
+          {formatValue(tool.call.input)}
         </pre>
       </div>
       <div>
@@ -445,7 +445,7 @@ function ExpandedToolBody({ tool }: { tool: ToolItem }) {
         >
           {tool.result === undefined
             ? '(streaming…)'
-            : (error ?? formatJson(tool.result.output))}
+            : (error ?? formatValue(tool.result.output))}
         </pre>
       </div>
     </div>
@@ -478,12 +478,74 @@ function secondsSince(tsMs: number, startMs: number): string {
   return ((tsMs - startMs) / 1000).toFixed(1);
 }
 
-function formatJson(v: unknown): string {
+/**
+ * Render a tool's input/output for the expanded panel. Strings come through
+ * raw so embedded newlines show as newlines (not `\n`). Objects/arrays are
+ * rendered in a YAML-like form where multi-line string values are unfolded
+ * under a `|` indicator — far more readable than `JSON.stringify(v, null, 2)`
+ * for things like agent prompts and sub-agent results.
+ */
+function formatValue(v: unknown): string {
   if (v === undefined) return '(empty)';
+  if (v === null) return 'null';
   if (typeof v === 'string') return v;
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
   try {
-    return JSON.stringify(v, null, 2);
+    return formatStructured(v, 0);
   } catch {
-    return String(v);
+    try {
+      return JSON.stringify(v, null, 2);
+    } catch {
+      return String(v);
+    }
   }
+}
+
+function formatStructured(v: unknown, indent: number): string {
+  const pad = '  '.repeat(indent);
+
+  if (v === null) return 'null';
+  if (v === undefined) return '(empty)';
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+
+  if (typeof v === 'string') {
+    if (!v.includes('\n')) return v;
+    const body = v.split('\n').map((l) => pad + l).join('\n');
+    return '|\n' + body;
+  }
+
+  if (Array.isArray(v)) {
+    if (v.length === 0) return '[]';
+    return v
+      .map((item) => {
+        const rendered = formatStructured(item, indent + 1);
+        const childPad = '  '.repeat(indent + 1);
+        // Object/array items render with their own indent — strip it from
+        // the first line so the `- ` lands at the parent's column.
+        if (rendered.startsWith(childPad)) {
+          return pad + '- ' + rendered.slice(childPad.length);
+        }
+        return pad + '- ' + rendered;
+      })
+      .join('\n');
+  }
+
+  if (typeof v === 'object') {
+    const entries = Object.entries(v as Record<string, unknown>);
+    if (entries.length === 0) return '{}';
+    return entries
+      .map(([k, val]) => {
+        const rendered = formatStructured(val, indent + 1);
+        if (rendered.startsWith('|')) {
+          return `${pad}${k}: ${rendered}`;
+        }
+        if (val !== null && typeof val === 'object') {
+          return `${pad}${k}:\n${rendered}`;
+        }
+        return `${pad}${k}: ${rendered}`;
+      })
+      .join('\n');
+  }
+
+  return String(v);
 }

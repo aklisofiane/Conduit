@@ -1,16 +1,18 @@
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import type { NodeRunRow } from '../../api/types.js';
 
 /**
  * Render `.conduit/<NodeName>.md` for a node, captured at the end of the
- * run (before workspace cleanup). Freeform markdown — we don't render it,
- * we show the raw text in monospace so agent-written contents are never
- * misinterpreted. A markdown pass can come later if users ask.
+ * run. Agents write freeform markdown — we render it with `react-markdown`
+ * (no raw HTML, so agent text can't inject markup) and style the elements
+ * to match the rest of the run view.
  */
 export function NodeSummary({ node }: { node: NodeRunRow }) {
   const summary = node.conduitSummary;
   if (!summary) {
     return (
-      <div className="flex h-full items-center justify-center font-mono text-[12px] text-[var(--color-text-4)]">
+      <div className="flex h-full items-center justify-center font-mono text-[12px] text-[var(--color-text-3)]">
         {node.status === 'COMPLETED'
           ? 'Agent did not write a summary.'
           : 'Summary appears after the node completes.'}
@@ -19,9 +21,9 @@ export function NodeSummary({ node }: { node: NodeRunRow }) {
   }
   return (
     <div className="h-full overflow-y-auto px-6 py-5">
-      <pre className="whitespace-pre-wrap font-mono text-[12px] leading-relaxed text-[var(--color-text)]">
-        {summary}
-      </pre>
+      <article className="markdown text-[13px] leading-relaxed text-[var(--color-text)]">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{summary}</ReactMarkdown>
+      </article>
     </div>
   );
 }
