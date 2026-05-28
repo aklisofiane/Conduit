@@ -1,0 +1,62 @@
+{
+  "id": "review",
+  "name": "Review",
+  "description": "Reviews an implementation branch and publishes a verdict. Pairs with the Develop template as the downstream gate in a board-driven workflow.",
+  "category": "review",
+  "workflows": [
+    {
+      "name": "Review",
+      "description": "Polling on status=Review. Code Reviewer evaluates the branch, Publish submits the review verdict and moves the ticket.",
+      "definition": {
+        "triggers": [
+          {
+            "id": "trigger-review",
+            "name": "ReviewTrigger",
+            "platform": "github",
+            "connectionId": "<github-repo>",
+            "boardConnectionId": "<github-board>",
+            "type": "issues",
+            "intervalSec": 60,
+            "filters": [{ "field": "status", "value": "Review" }]
+          }
+        ],
+        "nodes": [
+          {
+            "id": "agent-review",
+            "name": "Review",
+            "presetId": "code-reviewer",
+            "mcpServers": [],
+            "skills": []
+          },
+          {
+            "id": "agent-publish",
+            "name": "Publish",
+            "presetId": "publish",
+            "instructionsAppend": "Read the upstream Code Reviewer's verdict in `.conduit/`. Submit a PR review via the connected MCP server: APPROVE if the verdict recommends approval, or REQUEST_CHANGES with inline comments if changes are needed. After submitting the review, move the ticket: on approval move to \"ReadyToMerge\"; on changes requested move back to \"Dev\".",
+            "mcpServers": [{ "serverId": "github-mcp" }],
+            "skills": []
+          }
+        ],
+        "edges": [
+          { "from": "ReviewTrigger", "to": "Review" },
+          { "from": "Review", "to": "Publish" }
+        ],
+        "mcpServers": [
+          {
+            "id": "github-mcp",
+            "presetId": "github",
+            "connectionId": "<github-repo>"
+          }
+        ],
+        "ui": {
+          "nodePositions": {
+            "ReviewTrigger": { "x": 80, "y": 120 },
+            "Review": { "x": 400, "y": 120 },
+            "Publish": { "x": 720, "y": 120 }
+          },
+          "viewport": { "x": 0, "y": 0, "zoom": 1 }
+        }
+      }
+    }
+  ]
+}

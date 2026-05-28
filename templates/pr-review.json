@@ -23,8 +23,8 @@
           {
             "id": "agent-pr-review",
             "name": "Review",
-            "presetId": "reviewer",
-            "instructionsAppend": "A pull request has just been opened. Read the PR metadata from the trigger context and review the diff against the base branch. Read local guidance such as CLAUDE.md or CONTRIBUTING.md when present.",
+            "presetId": "pr-reviewer",
+            "instructionsAppend": "A pull request has just been opened. Read the PR metadata from the trigger context. Submit your review with COMMENT state only via the connected MCP server. Read local guidance such as CLAUDE.md or CONTRIBUTING.md when present.",
             "mcpServers": [{ "serverId": "github-mcp" }],
             "skills": []          }
         ],

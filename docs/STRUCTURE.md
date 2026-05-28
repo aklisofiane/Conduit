@@ -75,7 +75,7 @@ src/
                                        global Connection rows once, substitutes placeholder ids
                                        into each workflow's definition, validates per-slot
                                        scope kinds; polling schedules upserted after commit)
-    agent-presets/                     preset catalog: loads /agent-presets/*.json at boot,
+    agent-presets/                     preset catalog: loads /agent-presets/*.md at boot,
                                        GET /agent-presets[/:id]; consumed by TemplatesService
                                        for template expansion and by the canvas's agent
                                        config-panel preset picker

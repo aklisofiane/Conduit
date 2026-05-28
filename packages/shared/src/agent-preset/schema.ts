@@ -2,11 +2,12 @@ import { z } from 'zod';
 import { agentProviderIdSchema, agentConstraintsSchema } from '../agent/index';
 
 /**
- * Single-agent preset shipped as JSON in `/agent-presets/`. Picked from the
- * canvas's agent config panel to prefill `instructions`, `model`, and
- * `provider` on a freshly-added agent. Workflow-scoped fields (workspace,
- * mcpServers, skills) intentionally absent — the user wires those up
- * per-workflow after applying the preset.
+ * Single-agent preset shipped as markdown in `/agent-presets/`. Metadata
+ * lives in YAML frontmatter; the prose `instructions` is the markdown body.
+ * Picked from the canvas's agent config panel to prefill `instructions`,
+ * `model`, and `provider` on a freshly-added agent. Workflow-scoped fields
+ * (workspace, mcpServers, skills) intentionally absent — the user wires
+ * those up per-workflow after applying the preset.
  */
 export const agentPresetCategorySchema = z.enum([
   'research',

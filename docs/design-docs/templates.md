@@ -4,7 +4,7 @@ Pre-built workflow blueprints shipped with Conduit to help users get started qui
 
 ## How it works
 
-1. Templates live as JSON files in `/templates/` at the repo root. They reference reusable agent prompts from `/agent-presets/*.json` — see [agent-presets.md](./agent-presets.md).
+1. Templates live as JSON files in `/templates/` at the repo root. They reference reusable agent prompts from `/agent-presets/*.md` (markdown with YAML frontmatter) — see [agent-presets.md](./agent-presets.md).
 2. `TemplatesService.onModuleInit` reads the directory **once at API boot** via the shared `loadJsonDir` helper (`apps/api/src/common/load-json-dir.ts`), validates each file against the input Zod schema in `@conduit/shared/template`, expands `presetId` references via `expandTemplate`, re-validates against the runtime schema, then caches the entries. Files that fail any step (parse, input schema, unknown preset, post-expansion schema) are logged and skipped. **Editing a template on disk requires an API restart** to take effect.
 3. `GET /api/templates` returns the cached list — `{ id, name, description, category, workflowCount, placeholders }`. `placeholders` is the deduplicated list of `<alias>` strings the bundle references, used by the UI to build the binding form.
 4. The user picks a template in the UI (`TemplatePickerDialog` on the workflow list) and supplies one `TemplateBinding` per placeholder.
@@ -12,7 +12,7 @@ Pre-built workflow blueprints shipped with Conduit to help users get started qui
 
 Templates are **static seed data**, not first-class DB entities. They never link back to the workflows created from them. Editing a template file doesn't affect existing workflows.
 
-A template can contain **one or more workflow definitions**. Single-workflow templates (`analyze`, `develop`, `pr-review`) have a one-element `workflows` array; the multi-workflow bundle (`board-loop`'s Developer + Reviewer pair) ships multiple definitions that share a connection placeholder and are created together.
+A template can contain **one or more workflow definitions**. All shipped templates are single-workflow (one-element `workflows` array). The multi-workflow capability remains in the schema for user-authored bundles that need it.
 
 ## File shape
 
@@ -40,7 +40,7 @@ A template can contain **one or more workflow definitions**. Single-workflow tem
 
 Each entry's `definition` matches `Workflow.definition` in the DB **after preset expansion**. Two schemas govern this: `templateInputFileSchema` validates the on-disk shape (where agents may use `presetId`), and `templateFileSchema` validates the post-expansion shape (concrete `instructions`/`model`/`provider`). Connection placeholder strings pass structural validation because they satisfy `z.string().min(1)`; semantic validation (`validateWorkflowDefinition`) runs only after placeholder resolution, on the per-workflow path. The template's top-level `name`/`description`/`category` describe the bundle; each entry's `name`/`description` become the created `Workflow` row's fields.
 
-**Category** is one of `triage | develop | review | board-loop` — a display-only hint for grouping in the picker.
+**Category** is one of `triage | develop | review` — a display-only hint for grouping in the picker.
 
 ### Agent shape
 
@@ -146,10 +146,10 @@ A bundle of N workflows that all reference `<github-repo>` produces **one** `Con
 
 | File | Workflows | Pipeline |
 |---|---|---|
-| `templates/analyze.json` | 1 | GitHub `issues.opened` webhook → `Research` (GitHub MCP) → `Review` → `Publish` (GitHub MCP) updates the issue body with a marker-bracketed analysis section. Uses `research` / `reviewer` / `publish` presets. |
-| `templates/pr-review.json` | 1 | GitHub `pull_request.opened` webhook → single `Review` agent (lands directly on `pr.headRef`) + GitHub MCP reviews the diff. Uses `reviewer` preset. |
+| `templates/analyze.json` | 1 | Polling on `status = "Todo"` → `Research` (GitHub MCP) → `Review` → `Publish` (GitHub MCP) updates the issue body with a marker-bracketed analysis section. Uses `research` / `plan-reviewer` / `publish` presets. |
+| `templates/pr-review.json` | 1 | GitHub `pull_request.opened` webhook → single `Review` agent (lands directly on `pr.headRef`) + GitHub MCP reviews the diff. Uses `pr-reviewer` preset. |
 | `templates/develop.json` | 1 | Polling on `status = "Dev"` → `Seed` (`research` preset) fans out to `Dev` (`developer` preset) + `Tests` (`tests` preset) + `Docs` (`docs` preset) on branched worktrees → merge-back → `QA` (`qa` preset) opens a draft PR and moves the ticket to `"Review"`. |
-| `templates/board-loop.json` | 2 | **Developer** (polling on `status = "Dev"`, pushes to `conduit/<ticket>`, opens a draft PR on first push, moves to `"AIReview"` — `developer` preset) + **Reviewer** (polling on `status = "AIReview"`, same branch, approves or moves back to `"Dev"` — `reviewer` preset; the `instructionsAppend` re-grants `APPROVE`-state PR reviews, which the base preset disallows). Shares a `<github-repo>` + `<github-board>` placeholder pair across both workflows. |
+| `templates/review.json` | 1 | Polling on `status = "Review"` → `Review` (`code-reviewer` preset) evaluates the branch and writes verdict to `.conduit/` → `Publish` (`publish` preset, GitHub MCP) submits the PR review and moves the ticket to `"ReadyToMerge"` or back to `"Dev"`. Pairs with `develop.json` as the downstream gate. |
 
 Instructions in the shipped templates **do not** tell agents to "write `.conduit/<Node>.md`" — the runtime already drives a second turn with `finalSummaryPrompt(node.name)` and drops a placeholder if the agent didn't write one. See [agent-execution.md](./agent-execution.md#runagentnode-lifecycle).
 

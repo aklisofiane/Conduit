@@ -72,7 +72,7 @@ const BOARD_TEMPLATE: TemplateFile = {
   id: 'demo-board',
   name: 'Demo Board',
   description: 'demo template with a board connection',
-  category: 'board-loop',
+  category: 'review',
   workflows: [
     {
       name: 'A',

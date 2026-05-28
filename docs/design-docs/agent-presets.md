@@ -1,6 +1,6 @@
 # Agent Presets
 
-Reusable agent prompts shipped as JSON in `/agent-presets/`. A preset is a single source of truth for one agent's `provider`, `model`, and `instructions`. The canvas's agent config panel uses presets to prefill those three fields, and workflow templates reference presets so a tweak to a preset propagates to every template that uses it.
+Reusable agent prompts shipped as markdown in `/agent-presets/`. A preset is a single source of truth for one agent's `provider`, `model`, and `instructions`. The canvas's agent config panel uses presets to prefill those three fields, and workflow templates reference presets so a tweak to a preset propagates to every template that uses it.
 
 Presets are **catalog data**, not runtime entities. They never link back to created agents. Editing a preset on disk affects:
 
@@ -11,34 +11,40 @@ Existing agents and existing workflows are unaffected — their `instructions`, 
 
 ## File shape
 
-```json
-{
-  "id": "developer",
-  "name": "Developer",
-  "description": "Implements code changes from an upstream plan...",
-  "category": "implement",
-  "provider": "claude",
-  "model": "claude-opus-4-6",
-  "instructions": "You are a Developer agent...",
-  "suggestedConstraints": { "maxTurns": 40, "timeoutSec": 1800 }
-}
+Each preset is a markdown file with YAML frontmatter. Metadata lives in the frontmatter; the prose `instructions` field is the markdown body.
+
+```markdown
+---
+id: developer
+name: Developer
+description: Implements code changes from an upstream plan...
+category: implement
+provider: claude
+model: claude-opus-4-6
+---
+
+You are a Developer agent. Read the trigger context and any upstream
+agent's plan in `.conduit/` (typically a Research or planning summary)...
 ```
 
 Schema: `agentPresetFileSchema` in `packages/shared/src/agent-preset/schema.ts`.
 
 - `id` — kebab-case, used by templates to reference the preset (and by `GET /agent-presets/:id`).
 - `category` — one of `research | review | implement | qa | publish`. Drives the `<optgroup>` grouping in the canvas picker.
-- `provider` / `model` / `instructions` — the three fields prefilled into the agent.
-- `suggestedConstraints` — optional. Not currently consumed by the canvas picker; reserved for future use.
+- `provider` / `model` — set in frontmatter; prefilled into the agent alongside `instructions` (the body).
+- `instructions` — the markdown body. Loader strips frontmatter and trims surrounding whitespace before validation.
+- `suggestedConstraints` — optional frontmatter field (`maxTurns`, `timeoutSec`). Not currently consumed by the canvas picker; reserved for future use.
 
 Workflow-scoped fields (`mcpServers`, `skills`) are intentionally **absent**. The user wires those up per-workflow after applying a preset, because they depend on the workflow's connections. Workspaces aren't on this list either — they're derived from edges at load time, not user-authored.
 
 ## Load lifecycle
 
 1. `AgentPresetsService.onModuleInit` runs at API boot.
-2. `loadAgentPresets` reads `/agent-presets/*.json` (override with `CONDUIT_AGENT_PRESETS_DIR`) via the shared `loadJsonDir` helper in `apps/api/src/common/load-json-dir.ts` — same pattern as `TemplatesService`.
+2. `loadAgentPresets` reads `/agent-presets/*.md` (override with `CONDUIT_AGENT_PRESETS_DIR`). Each file is parsed with `gray-matter`: frontmatter becomes the metadata object, the body becomes `instructions`.
 3. Each file is validated against `agentPresetFileSchema`. Invalid files are logged and skipped.
 4. Valid presets are cached in a `Map<id, AgentPreset>` for the lifetime of the process. **Editing a preset on disk requires an API restart.**
+
+Markdown was chosen over JSON because the `instructions` field is multi-paragraph prose with bullets and code fences — content JSON can only encode as a single-line escaped string. Templates remain JSON (`/templates/*.json`) because they encode deeply nested workflow definitions, not prose.
 
 ## API endpoints
 
@@ -74,26 +80,28 @@ Templates reference presets via `presetId` instead of inlining literal prompts. 
 
 `TemplatesService.onModuleInit` runs expansion before caching the template. Templates that reference an unknown preset are logged and **skipped** — they don't appear in `GET /templates`. See [templates.md](./templates.md) for the full template lifecycle.
 
-`instructionsAppend` requires `presetId` (Zod `superRefine` rejects the combo with literal instructions). Workflow-specific guidance — e.g. board-loop's iteration mechanics, develop's Seed→fan-out handoff, pr-review's PR-branch checkout — lives in `instructionsAppend` so the base preset stays generic.
+`instructionsAppend` requires `presetId` (Zod `superRefine` rejects the combo with literal instructions). Workflow-specific guidance — e.g. review's ticket-status transitions, develop's Seed→fan-out handoff, pr-review's PR-branch checkout — lives in `instructionsAppend` so the base preset stays generic.
 
 ## Presets shipped with v1
 
 | File | Category | Used by |
 |---|---|---|
 | `research.json` | research | `analyze` (Research), `develop` (Seed) |
-| `reviewer.json` | review | `analyze` (Review), `pr-review` (Review), `board-loop` (Reviewer) |
-| `developer.json` | implement | `develop` (Dev), `board-loop` (Developer) |
+| `pr-reviewer.json` | review | `pr-review` (Review) |
+| `plan-reviewer.json` | review | `analyze` (Review) |
+| `code-reviewer.json` | review | `review` (Review) |
+| `developer.json` | implement | `develop` (Dev) |
 | `tests.json` | implement | `develop` (Tests) |
 | `docs.json` | implement | `develop` (Docs) |
 | `qa.json` | qa | `develop` (QA) |
-| `publish.json` | publish | `analyze` (Publish) |
+| `publish.json` | publish | `analyze` (Publish), `review` (Publish) |
 
-All ship with `provider: claude`, `model: claude-opus-4-6`. The reviewer preset's prompt explicitly **does not** authorize `APPROVE`-state PR reviews — workflows that need that (e.g. `board-loop`'s Reviewer) re-grant the permission via `instructionsAppend`.
+The three review presets are platform-agnostic — they describe what the agent reads, evaluates, and produces without referencing specific platforms. Platform-specific actions (review submission states, ticket column names, issue-body markers) live in template `instructionsAppend`. PR review submission (COMMENT vs APPROVE) is controlled at the template level: `pr-review` specifies COMMENT-only via `instructionsAppend`; `review`'s Publish agent submits APPROVE or REQUEST_CHANGES based on the upstream verdict.
 
 Two prompt directives are load-bearing across the catalog and worth calling out:
 
-- **Pattern comparison.** When a request introduces a new instance of a kind that already exists in the repo (a new provider, a new node type, a new transport, …), the Research preset requires the agent to compare the proposal against each existing implementation along the same dimensions and quote the relevant files. The Reviewer preset enforces this from the other side — if upstream skipped the comparison and an obvious one was available, raise it as a research gap.
-- **Unverified-claim flagging.** Both presets treat factual claims about external dependencies as unverified by default. Research lists them under "Unverified claims" rather than relaying as fact (using web search to verify when the agent has it enabled); Reviewer treats unverified third-party claims as gaps unless they can be confirmed from the workspace.
+- **Pattern comparison.** When a request introduces a new instance of a kind that already exists in the repo (a new provider, a new node type, a new transport, …), the Research preset requires the agent to compare the proposal against each existing implementation along the same dimensions and quote the relevant files. The three review presets (`pr-reviewer`, `plan-reviewer`, `code-reviewer`) enforce this from the other side — if upstream skipped the comparison and an obvious one was available, raise it as a gap.
+- **Unverified-claim flagging.** Research and the review presets treat factual claims about external dependencies as unverified by default. Research lists them under "Unverified claims" rather than relaying as fact (using web search to verify when the agent has it enabled); the review presets treat unverified third-party claims as gaps unless they can be confirmed from the workspace.
 
 Both directives live in the preset prompt, not in node config, so workflow authors don't have to re-state them per agent. Tightening them was a response to repeated runs that accepted issue framings as fact and missed in-repo divergences even when the existing patterns sat in the same workspace.
 

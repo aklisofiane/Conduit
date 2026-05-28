@@ -30,8 +30,8 @@
           {
             "id": "agent-review",
             "name": "Review",
-            "presetId": "reviewer",
-            "instructionsAppend": "You are reviewing the upstream Research agent's plan in `.conduit/`. Do not post to GitHub from this node — the downstream Publish agent handles all GitHub updates. Focus on whether the final output should be an implementation approach or a clarification question.",
+            "presetId": "plan-reviewer",
+            "instructionsAppend": "Do not post to the connected platform from this node — the downstream Publish agent handles all platform updates.",
             "mcpServers": [],
             "skills": []
           },
@@ -39,6 +39,7 @@
             "id": "agent-publish",
             "name": "Publish",
             "presetId": "publish",
+            "instructionsAppend": "Update the source issue body with a marker-bracketed analysis section. Preserve the user's original content. Add or replace only the section between <!-- conduit-analysis:start --> and <!-- conduit-analysis:end --> markers. The section should contain a concise summary, proposed approach, likely files or areas, tests to run, and risks or open questions. Do not post a normal comment.",
             "mcpServers": [{ "serverId": "github-mcp" }],
             "skills": []
           }

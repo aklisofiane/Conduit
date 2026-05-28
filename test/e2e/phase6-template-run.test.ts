@@ -11,14 +11,12 @@ import { TEST_STACK_ENV } from './stack';
  * Verifies:
  *
  *   1. `GET /api/templates` lists the v1 templates with placeholder metadata.
- *   2. `POST /api/workflows/from-template/:id` for the `board-loop` bundle
- *      creates *both* workflows in a single call with the
- *      `<github-repo>` / `<github-board>` placeholders resolved to real
- *      Connection ids on each.
+ *   2. `POST /api/workflows/from-template/:id` for the `review` template
+ *      creates a workflow with `<github-repo>` / `<github-board>`
+ *      placeholders resolved to real Connection ids.
  *   3. The resolved definitions reference real Connection cuids in every
  *      connection slot (trigger, mcpServers, boardConnectionId).
- *   4. Polling schedules are upserted for polling-mode templates (here
- *      both Developer and Reviewer are polling).
+ *   4. Polling schedules are upserted for polling-mode templates.
  *   5. A single-workflow template (`analyze`) works the same way.
  */
 
@@ -79,22 +77,22 @@ describe('Phase 6 — create workflows from template', () => {
     const templates = await harness.http.get<TemplateSummary[]>('/templates');
     const byId = new Map(templates.map((t) => [t.id, t]));
 
-    for (const id of ['analyze', 'pr-review', 'develop', 'board-loop']) {
+    for (const id of ['analyze', 'pr-review', 'develop', 'review', 'nightly-review']) {
       expect(byId.has(id), `${id} template missing`).toBe(true);
     }
 
-    expect(byId.get('board-loop')?.workflowCount).toBe(2);
+    expect(byId.get('review')?.workflowCount).toBe(1);
     expect(byId.get('analyze')?.workflowCount).toBe(1);
 
-    // Every template exposes the <github-repo> placeholder — board-loop +
+    // Every template exposes the <github-repo> placeholder — review +
     // develop additionally surface <github-board>.
     for (const t of templates) {
       expect(t.placeholders).toContain('github-repo');
     }
-    expect(byId.get('board-loop')?.placeholders).toContain('github-board');
+    expect(byId.get('review')?.placeholders).toContain('github-board');
   });
 
-  it('creates the board-loop bundle atomically with one shared pair of bindings', async () => {
+  it('creates the review template with repo + board placeholders resolved', async () => {
     const cred = await harness.http.post<{ id: string }>('/credentials', {
       platform: 'GITHUB',
       name: 'e2e-phase6-pat',
@@ -102,7 +100,7 @@ describe('Phase 6 — create workflows from template', () => {
     });
 
     const result = await harness.http.post<CreatedTemplateResult>(
-      '/workflows/from-template/board-loop',
+      '/workflows/from-template/review',
       {
         bindings: {
           'github-repo': {
@@ -126,43 +124,30 @@ describe('Phase 6 — create workflows from template', () => {
       },
     );
 
-    expect(result.workflows).toHaveLength(2);
-    const names = result.workflows.map((w) => w.name).sort();
-    expect(names).toEqual(['Developer', 'Reviewer']);
+    expect(result.workflows).toHaveLength(1);
+    expect(result.workflows[0]!.name).toBe('Review');
 
-    // Both workflows in the bundle reference the same pair of connection ids.
-    let sharedRepoId: string | undefined;
-    let sharedBoardId: string | undefined;
-    for (const { id } of result.workflows) {
-      const wf = await harness.http.get<WorkflowRow>(`/workflows/${id}`);
-      const def = wf.definition;
+    const wf = await harness.http.get<WorkflowRow>(`/workflows/${result.workflows[0]!.id}`);
+    const def = wf.definition;
 
-      const trigger = def.triggers[0]!;
-      expect(trigger.connectionId).toMatch(/^[a-z0-9]+$/);
-      expect(trigger.connectionId).not.toMatch(/^</);
-      expect(trigger.boardConnectionId).toMatch(/^[a-z0-9]+$/);
-      expect(trigger.boardConnectionId).not.toMatch(/^</);
+    const trigger = def.triggers[0]!;
+    expect(trigger.connectionId).toMatch(/^[a-z0-9]+$/);
+    expect(trigger.connectionId).not.toMatch(/^</);
+    expect(trigger.boardConnectionId).toMatch(/^[a-z0-9]+$/);
+    expect(trigger.boardConnectionId).not.toMatch(/^</);
 
-      sharedRepoId ??= trigger.connectionId;
-      sharedBoardId ??= trigger.boardConnectionId;
-      expect(trigger.connectionId).toBe(sharedRepoId);
-      expect(trigger.boardConnectionId).toBe(sharedBoardId);
-
-      for (const server of def.mcpServers) {
-        expect(server.connectionId).not.toMatch(/^</);
-      }
-      for (const node of def.nodes) {
-        expect(node.workspace).toBeUndefined();
-      }
+    for (const server of def.mcpServers) {
+      expect(server.connectionId).not.toMatch(/^</);
+    }
+    for (const node of def.nodes) {
+      expect(node.workspace).toBeUndefined();
     }
 
-    for (const { id } of result.workflows) {
-      const handle = scheduleClient.getHandle(workflowScheduleId(id));
-      await waitFor(
-        () => handle.describe().then(() => true).catch(() => false),
-        15_000,
-      );
-    }
+    const handle = scheduleClient.getHandle(workflowScheduleId(wf.id));
+    await waitFor(
+      () => handle.describe().then(() => true).catch(() => false),
+      15_000,
+    );
   }, 60_000);
 
   it('rejects creation when a required placeholder is missing', async () => {

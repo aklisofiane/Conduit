@@ -69,7 +69,7 @@ Format: `conduit/<ticket-id>-<slug>`.
 
 *Footgun*: if no agent in the workflow runs `git push`, commits accumulate locally and are lost when the next run resolves a fresh worktree from the remote. The runtime does not enforce a push. To surface this early, `cleanupRunActivity` does a local-only check at run end (no `git fetch`): if the remote-tracking ref is missing, everything local is treated as unpushed; otherwise it diffs `origin/<branch>..HEAD`. A warning is emitted to `ExecutionLog` without blocking the run. See [agent-execution.md](./agent-execution.md).
 
-*PR creation*: Conduit does not auto-open a PR. The Worker agent's instructions are expected to handle this on first push (e.g., "if no PR exists for this branch, open a draft PR"). The shipped `board-loop` template (Phase 6) includes this pattern.
+*PR creation*: Conduit does not auto-open a PR. The agent's instructions are expected to handle this on first push (e.g., "if no PR exists for this branch, open a draft PR"). The shipped `develop` template's QA agent includes this pattern.
 
 **Delete**: **not automatic in v1.** Branches persist until manually deleted. Branches are cheap; auto-janitors that watch PR merge + ticket close + cooling-off add a whole subsystem for modest ergonomic gain. Revisit in a later phase.
 
