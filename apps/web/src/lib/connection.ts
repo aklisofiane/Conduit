@@ -32,3 +32,44 @@ export function connectionLabel(c: {
   const hostSuffix = showHost ? ` · ${host}` : '';
   return `${c.name} · ${c.credential.platform.toLowerCase()}${hostSuffix}`;
 }
+
+export interface RepoGroupRef {
+  key: string;
+  label: string;
+  platform: 'github' | 'gitlab';
+  hostUrl: string | null;
+}
+
+/**
+ * Returns a stable group ref for a repo-shaped connection (so workflows
+ * sharing a repo across hosts don't collapse together). Non-repo scopes
+ * (`github_projects_v2`, `none`) and missing connections return `null` so
+ * callers can route them to a "no repo" bucket.
+ */
+export function repoGroupRef(
+  scope: ConnectionScope,
+  credentialPlatform: string,
+  credentialHostUrl: string | null,
+): RepoGroupRef | null {
+  const platformUpper = credentialPlatform.toUpperCase() as Platform;
+  const showHost = credentialHostUrl != null && !isCloudHost(platformUpper, credentialHostUrl);
+  const hostUrl = showHost ? credentialHostUrl : null;
+  const hostPart = hostUrl ?? '';
+  if (scope.kind === 'github_repo') {
+    return {
+      key: `github:${hostPart}:${scope.owner}/${scope.repo}`,
+      label: `${scope.owner}/${scope.repo}`,
+      platform: 'github',
+      hostUrl,
+    };
+  }
+  if (scope.kind === 'gitlab_project') {
+    return {
+      key: `gitlab:${hostPart}:${scope.projectPath}`,
+      label: scope.projectPath,
+      platform: 'gitlab',
+      hostUrl,
+    };
+  }
+  return null;
+}
