@@ -86,15 +86,15 @@ Templates reference presets via `presetId` instead of inlining literal prompts. 
 
 | File | Category | Used by |
 |---|---|---|
-| `research.json` | research | `analyze` (Research), `develop` (Seed) |
-| `pr-reviewer.json` | review | `pr-review` (Review) |
-| `plan-reviewer.json` | review | `analyze` (Review) |
-| `code-reviewer.json` | review | `review` (Review) |
-| `developer.json` | implement | `develop` (Dev) |
-| `tests.json` | implement | `develop` (Tests) |
-| `docs.json` | implement | `develop` (Docs) |
-| `qa.json` | qa | `develop` (QA) |
-| `publish.json` | publish | `analyze` (Publish), `review` (Publish) |
+| `research.md` | research | `analyze` (Research), `develop` (Seed) |
+| `pr-reviewer.md` | review | `pr-review` (Review) |
+| `plan-reviewer.md` | review | `analyze` (Review) |
+| `code-reviewer.md` | review | `review` (Review) |
+| `developer.md` | implement | `develop` (Dev) |
+| `tests.md` | implement | `develop` (Tests) |
+| `docs.md` | implement | `develop` (Docs) |
+| `qa.md` | qa | `develop` (QA) |
+| `publish.md` | publish | `analyze` (Publish), `review` (Publish) |
 
 The three review presets are platform-agnostic — they describe what the agent reads, evaluates, and produces without referencing specific platforms. Platform-specific actions (review submission states, ticket column names, issue-body markers) live in template `instructionsAppend`. PR review submission (COMMENT vs APPROVE) is controlled at the template level: `pr-review` specifies COMMENT-only via `instructionsAppend`; `review`'s Publish agent submits APPROVE or REQUEST_CHANGES based on the upstream verdict.
 
