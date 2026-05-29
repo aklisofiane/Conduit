@@ -28,8 +28,7 @@
             "presetId": "scope",
             "instructionsAppend": "The review scopes for this pipeline are:\n- **Security**: auth, input validation, secrets, injection vectors, dependency changes, crypto\n- **Quality**: bugs, logic errors, dead code, missing error handling, test gaps, race conditions\n- **Refactor**: duplication, complexity, pattern violations, outdated abstractions, naming\n- **Performance**: N+1 queries, unnecessary allocations, missing caching, expensive loops, bundle size",
             "mcpServers": [],
-            "skills": [],
-            "constraints": { "maxTurns": 15 }
+            "skills": []
           },
           {
             "id": "agent-security",
@@ -69,8 +68,7 @@
             "presetId": "issue-publisher",
             "instructionsAppend": "The upstream reviewers for this pipeline are: Security, Quality, Refactor, Performance. Read `.conduit/Security.md`, `.conduit/Quality.md`, `.conduit/Refactor.md`, and `.conduit/Performance.md`.\n\nBoard status routing:\n- Confidence: high → status \"AIDev\"\n- Confidence: low → status \"HumanReview\"",
             "mcpServers": [{ "serverId": "github-mcp" }],
-            "skills": [],
-            "constraints": { "maxTurns": 30 }
+            "skills": []
           }
         ],
         "edges": [
