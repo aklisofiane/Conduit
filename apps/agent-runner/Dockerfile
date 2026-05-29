@@ -113,4 +113,11 @@ RUN mkdir -p /home/runner/.codex \
  && chmod 1777 /home/runner /home/runner/.codex
 ENV HOME=/home/runner
 
+# Pin the pre-0.3 MCP connect behavior: connect to MCP servers synchronously
+# before the session starts, rather than 0.3.x's background-connect default
+# (which lets a session begin while a slow server is still `status: 'pending'`,
+# racing first-turn tool calls). Our adapter passes `mcpServers` and never
+# inspects connection status, so we want the blocking guarantee.
+ENV MCP_CONNECTION_NONBLOCKING=0
+
 ENTRYPOINT ["node", "/opt/agent-runner/dist/main.js"]

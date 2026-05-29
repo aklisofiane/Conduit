@@ -7,11 +7,11 @@ import type { AgentProviderId } from './provider';
  * when using Codex with a ChatGPT account" — verified empirically.
  */
 export const PROVIDER_MODELS: Record<AgentProviderId, readonly string[]> = {
-  claude: ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5'],
+  claude: ['claude-opus-4-8', 'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5'],
   codex: ['gpt-5.5', 'gpt-5.4', 'gpt-5.3-codex', 'gpt-5.2'],
 };
 
 export const DEFAULT_MODEL: Record<AgentProviderId, string> = {
-  claude: 'claude-opus-4-6',
+  claude: 'claude-opus-4-8',
   codex: 'gpt-5.3-codex',
 };
