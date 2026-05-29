@@ -41,12 +41,14 @@ export interface TicketBranchResolveInput {
  *      calls read it back verbatim). Row is shared across workflows via the
  *      unique `(platform, owner, repo, ticketId)` key.
  *   4. Check the remote for the branch:
- *        - exists  → `git worktree add <target> <branch>` so the worktree
- *                    tracks the remote branch and iteration N+1 sees
+ *        - exists  → `git worktree add -B <branch> <target>
+ *                    refs/remotes/origin/<branch>` so the worktree is reset
+ *                    to the freshly-fetched remote tip and iteration N+1 sees
  *                    iteration N's commits.
- *        - missing → `git worktree add -b <branch> <target> <baseRef>`
- *                    off the cached row's base (or the freshly-resolved
- *                    default branch on first-ever create).
+ *        - missing → `git worktree add -b <branch> <target>
+ *                    refs/remotes/origin/<baseRef>` off the cached row's base
+ *                    (or the freshly-resolved default branch on first-ever
+ *                    create).
  *   5. Clean the remote URL of any auth so `git remote -v` is tidy; push
  *      auth is supplied at run time by `installPushCredentials` via a
  *      per-run env var + credential helper.
@@ -77,9 +79,9 @@ export async function resolveTicketBranchWorkspace(
     // git still thinks that worktree has the branch checked out and refuses
     // ("refusing to fetch into branch X checked out at Y").
     await dropConflictingWorktrees(bare, target);
-    // Keep the base clone's mirrored refs fresh so `git worktree add <branch>`
-    // can resolve a branch someone else pushed between runs. Fetch uses the
-    // tokenized URL so private repos still authenticate.
+    // Keep the base clone's remote-tracking refs fresh so the worktree add
+    // below can resolve a branch someone else pushed between runs. Fetch uses
+    // the tokenized URL so private repos still authenticate.
     await Promise.all([
       fetchWithAuth(bare, connection),
       fs.mkdir(path.dirname(target), { recursive: true }),
@@ -155,27 +157,30 @@ async function ensureBaseClone(bare: string, connection: ConnectionContext): Pro
 }
 
 async function fetchWithAuth(bare: string, connection: ConnectionContext): Promise<void> {
+  // Fetch remote heads into `refs/remotes/origin/*` rather than mirroring
+  // into `refs/heads/*`. The base clone is shared across every run/workflow
+  // for this repo and hosts all of their worktrees; if any worktree has a
+  // branch checked out (e.g. a `fixed-branch` nightly run sitting on `main`),
+  // git refuses to update that same ref under `refs/heads/*` ("refusing to
+  // fetch into branch X checked out at Y") and the whole fetch aborts.
+  // `refs/remotes/origin/*` is never checked out, so the fetch always
+  // advances; worktrees are then materialized off `refs/remotes/origin/<…>`.
+  //
   // The base clone's stored remote URL is cleaned, so we inject a tokenized
-  // URL at fetch time. Falls back to the stored URL for public repos with no token.
-  if (!connection.token) {
-    await git(['fetch', '--prune', 'origin'], { cwd: bare });
-    return;
-  }
-  const tokenized = withTokenUrl(connection);
-  // `fetch <url> <refspec>` fetches without mutating the stored remote URL.
-  // Bare clones mirror `refs/heads/*:refs/heads/*` by default — replicate here.
-  await git(
-    ['fetch', '--prune', tokenized, '+refs/heads/*:refs/heads/*'],
-    { cwd: bare },
-  );
+  // URL at fetch time. Falls back to `origin` (the clean URL) for public
+  // repos with no token.
+  const remote = connection.token ? withTokenUrl(connection) : 'origin';
+  await git(['fetch', '--prune', remote, '+refs/heads/*:refs/remotes/origin/*'], { cwd: bare });
 }
 
 async function remoteBranchExists(bare: string, branchName: string): Promise<boolean> {
-  // Bare clones mirror remote heads into `refs/heads/*` — an existing ref
-  // means the branch is on the remote (we just fetched). Use `show-ref`
+  // We fetch remote heads into `refs/remotes/origin/*`, so an existing ref
+  // there means the branch is on the remote (we just fetched). Checking
+  // `refs/remotes/origin/*` — not `refs/heads/*` — also avoids being fooled
+  // by a stale local branch a prior worktree-add left behind. Use `show-ref`
   // instead of `ls-remote` to stay offline and avoid re-hitting auth.
   try {
-    const out = await git(['show-ref', '--verify', `refs/heads/${branchName}`], {
+    const out = await git(['show-ref', '--verify', `refs/remotes/origin/${branchName}`], {
       cwd: bare,
     });
     return out.trim().length > 0;
@@ -190,13 +195,32 @@ async function addTrackingWorktree(
   target: string,
   branchName: string,
 ): Promise<void> {
+  // `-B <branch> refs/remotes/origin/<branch>` resets the local branch to the
+  // just-fetched remote tip before checking it out, so iteration N+1 lands on
+  // iteration N's pushed commits. (A plain `worktree add <branch>` would reuse
+  // a stale local ref left by a prior add and miss them.)
+  const startPoint = `refs/remotes/origin/${branchName}`;
   try {
-    await git(['worktree', 'add', '--force', target, branchName], { cwd: bare });
+    await git(['worktree', 'add', '--force', '-B', branchName, target, startPoint], { cwd: bare });
+    return;
   } catch (err) {
     if (!(err instanceof GitError)) throw err;
-    throw new WorkspaceError(
-      `git worktree add ${branchName} into ${target} failed: ${err.stderr.trim()}`,
-    );
+    // `-B` refuses to reset a branch that's still checked out in another
+    // worktree — typically a stale leftover from a crashed/retried run. Drop
+    // the conflicting worktree (by path or branch) and retry once. Mirrors
+    // the recovery in `createTrackingWorktree`.
+    try {
+      await dropConflictingWorktrees(bare, target, branchName);
+      await git(['worktree', 'add', '--force', '-B', branchName, target, startPoint], {
+        cwd: bare,
+      });
+    } catch (recoveryErr) {
+      const recoveryStderr =
+        recoveryErr instanceof GitError ? recoveryErr.stderr.trim() : String(recoveryErr);
+      throw new WorkspaceError(
+        `git worktree add ${branchName} into ${target} failed: ${err.stderr.trim()}; recovery: ${recoveryStderr}`,
+      );
+    }
   }
 }
 
@@ -206,8 +230,12 @@ async function createTrackingWorktree(
   branchName: string,
   baseRef: string,
 ): Promise<void> {
+  // Base off the remote-tracking ref, not the local head — `fetchWithAuth`
+  // now only advances `refs/remotes/origin/*`, so the local `refs/heads/<baseRef>`
+  // (e.g. `main`) is frozen at clone time and would branch off a stale tip.
+  const startPoint = `refs/remotes/origin/${baseRef}`;
   try {
-    await git(['worktree', 'add', '-b', branchName, target, baseRef], { cwd: bare });
+    await git(['worktree', 'add', '-b', branchName, target, startPoint], { cwd: bare });
     return;
   } catch (err) {
     if (!(err instanceof GitError)) throw err;
@@ -218,7 +246,7 @@ async function createTrackingWorktree(
     // we can't recover regardless.
     try {
       await dropConflictingWorktrees(bare, target, branchName);
-      await git(['worktree', 'add', '--force', '-B', branchName, target, baseRef], {
+      await git(['worktree', 'add', '--force', '-B', branchName, target, startPoint], {
         cwd: bare,
       });
     } catch (recoveryErr) {

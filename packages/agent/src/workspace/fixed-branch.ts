@@ -50,13 +50,26 @@ export async function resolveFixedBranchWorkspace(
       );
     }
 
+    // `-B <branch> refs/remotes/origin/<branch>` resets the local branch to the
+    // just-fetched remote tip so the cron run works against the latest commits.
+    const startPoint = `refs/remotes/origin/${branch}`;
     try {
-      await git(['worktree', 'add', '--force', target, branch], { cwd: bare });
+      await git(['worktree', 'add', '--force', '-B', branch, target, startPoint], { cwd: bare });
     } catch (err) {
       if (!(err instanceof GitError)) throw err;
-      throw new WorkspaceError(
-        `git worktree add ${branch} into ${target} failed: ${err.stderr.trim()}`,
-      );
+      // `-B` refuses to reset a branch still checked out in another worktree —
+      // typically a stale leftover from a crashed/retried run. Drop the
+      // conflicting worktree (by path or branch) and retry once.
+      try {
+        await dropConflictingWorktrees(bare, target, branch);
+        await git(['worktree', 'add', '--force', '-B', branch, target, startPoint], { cwd: bare });
+      } catch (recoveryErr) {
+        const recoveryStderr =
+          recoveryErr instanceof GitError ? recoveryErr.stderr.trim() : String(recoveryErr);
+        throw new WorkspaceError(
+          `git worktree add ${branch} into ${target} failed: ${err.stderr.trim()}; recovery: ${recoveryStderr}`,
+        );
+      }
     }
 
     await git(['remote', 'set-url', 'origin', connection.cloneUrl], { cwd: target }).catch(
@@ -91,17 +104,16 @@ async function ensureBaseClone(bare: string, connection: ConnectionContext): Pro
 }
 
 async function fetchWithAuth(bare: string, connection: ConnectionContext): Promise<void> {
-  if (!connection.token) {
-    await git(['fetch', '--prune', 'origin'], { cwd: bare });
-    return;
-  }
-  const tokenized = withTokenUrl(connection);
-  await git(['fetch', '--prune', tokenized, '+refs/heads/*:refs/heads/*'], { cwd: bare });
+  // Fetch into `refs/remotes/origin/*`, never `refs/heads/*` — the base clone
+  // is shared and hosts worktrees, and git refuses to update a ref that any
+  // worktree has checked out. See the longer note in `ticket-branch.ts`.
+  const remote = connection.token ? withTokenUrl(connection) : 'origin';
+  await git(['fetch', '--prune', remote, '+refs/heads/*:refs/remotes/origin/*'], { cwd: bare });
 }
 
 async function remoteBranchExists(bare: string, branchName: string): Promise<boolean> {
   try {
-    const out = await git(['show-ref', '--verify', `refs/heads/${branchName}`], {
+    const out = await git(['show-ref', '--verify', `refs/remotes/origin/${branchName}`], {
       cwd: bare,
     });
     return out.trim().length > 0;
