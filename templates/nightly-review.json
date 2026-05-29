@@ -34,7 +34,7 @@
             "id": "agent-security",
             "name": "Security",
             "presetId": "code-analyst",
-            "instructionsAppend": "Your domain is **Security**. Read the ## Security section of `.conduit/Scope.md`.\n\nLook for:\n- Authentication/authorization bypasses\n- Input validation gaps (injection, XSS, path traversal)\n- Secrets or credentials in code\n- Insecure cryptographic usage\n- Dependency additions with known vulnerabilities\n- Race conditions with security implications\n- Unsafe deserialization",
+            "instructionsAppend": "Your domain is **Security**. Read the ## Security section of `.conduit/ScopeManifest.md`.\n\nLook for:\n- Authentication/authorization bypasses\n- Input validation gaps (injection, XSS, path traversal)\n- Secrets or credentials in code\n- Insecure cryptographic usage\n- Dependency additions with known vulnerabilities\n- Race conditions with security implications\n- Unsafe deserialization",
             "mcpServers": [],
             "skills": []
           },
@@ -42,7 +42,7 @@
             "id": "agent-quality",
             "name": "Quality",
             "presetId": "code-analyst",
-            "instructionsAppend": "Your domain is **Quality**. Read the ## Quality section of `.conduit/Scope.md`.\n\nLook for:\n- Logic errors and bugs\n- Dead code or unreachable branches\n- Missing error handling (unhandled promises, uncaught exceptions)\n- Race conditions\n- Missing or inadequate test coverage for new code paths\n- Incorrect type usage or unsafe casts\n- Resource leaks (unclosed handles, missing cleanup)",
+            "instructionsAppend": "Your domain is **Quality**. Read the ## Quality section of `.conduit/ScopeManifest.md`.\n\nLook for:\n- Logic errors and bugs\n- Dead code or unreachable branches\n- Missing error handling (unhandled promises, uncaught exceptions)\n- Race conditions\n- Missing or inadequate test coverage for new code paths\n- Incorrect type usage or unsafe casts\n- Resource leaks (unclosed handles, missing cleanup)",
             "mcpServers": [],
             "skills": []
           },
@@ -50,7 +50,7 @@
             "id": "agent-refactor",
             "name": "Refactor",
             "presetId": "code-analyst",
-            "instructionsAppend": "Your domain is **Refactor**. Read the ## Refactor section of `.conduit/Scope.md`.\n\nLook for:\n- Code duplication (same logic in multiple places)\n- High cyclomatic complexity (deeply nested conditionals, long functions)\n- Violations of project conventions (check CLAUDE.md and nearby siblings)\n- Outdated abstractions that the new code works around instead of fixing\n- God objects or functions doing too many things\n- Missing extraction opportunities (repeated patterns that should be shared utilities)",
+            "instructionsAppend": "Your domain is **Refactor**. Read the ## Refactor section of `.conduit/ScopeManifest.md`.\n\nLook for:\n- Code duplication (same logic in multiple places)\n- High cyclomatic complexity (deeply nested conditionals, long functions)\n- Violations of project conventions (check CLAUDE.md and nearby siblings)\n- Outdated abstractions that the new code works around instead of fixing\n- God objects or functions doing too many things\n- Missing extraction opportunities (repeated patterns that should be shared utilities)",
             "mcpServers": [],
             "skills": []
           },
@@ -58,7 +58,7 @@
             "id": "agent-performance",
             "name": "Performance",
             "presetId": "code-analyst",
-            "instructionsAppend": "Your domain is **Performance**. Read the ## Performance section of `.conduit/Scope.md`.\n\nLook for:\n- N+1 query patterns or missing batch operations\n- Unnecessary memory allocations in hot paths\n- Missing caching opportunities (repeated expensive computations)\n- Expensive operations inside loops\n- Bundle size regressions (large imports that could be lazy-loaded)\n- Missing pagination on unbounded queries\n- Synchronous blocking in async contexts",
+            "instructionsAppend": "Your domain is **Performance**. Read the ## Performance section of `.conduit/ScopeManifest.md`.\n\nLook for:\n- N+1 query patterns or missing batch operations\n- Unnecessary memory allocations in hot paths\n- Missing caching opportunities (repeated expensive computations)\n- Expensive operations inside loops\n- Bundle size regressions (large imports that could be lazy-loaded)\n- Missing pagination on unbounded queries\n- Synchronous blocking in async contexts",
             "mcpServers": [],
             "skills": []
           },
