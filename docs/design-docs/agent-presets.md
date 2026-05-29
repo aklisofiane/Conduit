@@ -37,12 +37,41 @@ Schema: `agentPresetFileSchema` in `packages/shared/src/agent-preset/schema.ts`.
 
 Workflow-scoped fields (`mcpServers`, `skills`) are intentionally **absent**. The user wires those up per-workflow after applying a preset, because they depend on the workflow's connections. Workspaces aren't on this list either — they're derived from edges at load time, not user-authored.
 
+## Shared fragments
+
+Preset bodies can include shared text from `/agent-presets/fragments/` using the `{{include:<name>}}` directive. `<name>` maps to `agent-presets/fragments/<name>.md`. This avoids copy-pasting sections that must stay identical across presets — for example, the idempotent marker contract shared by `publish.md` and `issue-publisher.md`.
+
+Fragment files are plain markdown with no frontmatter. Their content is injected verbatim (trimmed) into the preset body, replacing the directive.
+
+```markdown
+Some preamble.
+
+{{include:marker-contract}}
+
+Some epilogue.
+```
+
+Constraints:
+
+- **Name validation.** Fragment names must match `/^[a-z0-9-]+$/`. No slashes, no dots, no uppercase.
+- **Path containment.** The resolved path must stay inside `agent-presets/fragments/`. Path traversal attempts are rejected.
+- **Fail closed.** A missing or invalid fragment causes the entire preset to be skipped (logged as a warning, not included in the loaded catalog). An unresolved `{{include:…}}` token never reaches the validated preset.
+- **No recursion.** Fragments are not scanned for nested `{{include:}}` directives.
+- **No frontmatter on fragments.** Fragment files are read as raw text — `gray-matter` is not applied to them. A fragment that happens to contain `---` delimiters keeps them as literal content.
+
+### Shipped fragments
+
+| File | Used by |
+|---|---|
+| `fragments/marker-contract.md` | `publish.md`, `issue-publisher.md` |
+
 ## Load lifecycle
 
 1. `AgentPresetsService.onModuleInit` runs at API boot.
 2. `loadAgentPresets` reads `/agent-presets/*.md` (override with `CONDUIT_AGENT_PRESETS_DIR`). Each file is parsed with `gray-matter`: frontmatter becomes the metadata object, the body becomes `instructions`.
-3. Each file is validated against `agentPresetFileSchema`. Invalid files are logged and skipped.
-4. Valid presets are cached in a `Map<id, AgentPreset>` for the lifetime of the process. **Editing a preset on disk requires an API restart.**
+3. **Fragment resolution.** Any `{{include:<name>}}` directives in the body are expanded via `resolveFragments`. If any directive fails (invalid name, missing file, path traversal), the preset is skipped.
+4. Each file is validated against `agentPresetFileSchema`. Invalid files are logged and skipped.
+5. Valid presets are cached in a `Map<id, AgentPreset>` for the lifetime of the process. **Editing a preset or fragment on disk requires an API restart.**
 
 Markdown was chosen over JSON because the `instructions` field is multi-paragraph prose with bullets and code fences — content JSON can only encode as a single-line escaped string. Templates remain JSON (`/templates/*.json`) because they encode deeply nested workflow definitions, not prose.
 

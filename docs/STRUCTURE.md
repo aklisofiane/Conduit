@@ -11,6 +11,8 @@ docs/            spec — INDEX.md for read order
 templates/       bundled workflow templates (JSON) — see docs/design-docs/templates.md
 agent-presets/   reusable agent prompts referenced by templates and the canvas — see
                  docs/design-docs/agent-presets.md
+  fragments/     shared markdown snippets included via {{include:<name>}} directives
+                 in preset bodies — plain text, no frontmatter
 scripts/         dev tooling — `preflight.ts` probes user-facing ports before
                  `infra:up`/`dev`/`test:infra:up`, allocates free ports on collision,
                  and writes `.env.local` for docker / API / worker / web / Prisma to

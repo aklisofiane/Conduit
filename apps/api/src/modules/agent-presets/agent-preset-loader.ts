@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { Logger } from '@nestjs/common';
+import type { Logger } from '@nestjs/common';
 import matter from 'gray-matter';
 import {
   agentPresetFileSchema,
@@ -15,7 +15,7 @@ function resolvePresetsDir(): string {
 }
 
 const FRAGMENT_NAME_RE = /^[a-z0-9-]+$/;
-const INCLUDE_DIRECTIVE_RE = /\{\{include:([a-z0-9-]+)\}\}/g;
+const INCLUDE_DIRECTIVE_RE = /\{\{include:([^}]+)\}\}/g;
 
 export async function resolveFragments(
   content: string,
@@ -26,11 +26,11 @@ export async function resolveFragments(
   if (matches.length === 0) return content;
 
   let resolved = content;
-  const fragmentsDir = path.join(presetsDir, 'fragments');
+  const fragmentsDir = path.resolve(presetsDir, 'fragments');
 
   for (const match of matches) {
     const name = match[1];
-    if (!FRAGMENT_NAME_RE.test(name)) {
+    if (!name || !FRAGMENT_NAME_RE.test(name)) {
       logger.warn(`Fragment name "${name}" is invalid — skipping preset`);
       return null;
     }
