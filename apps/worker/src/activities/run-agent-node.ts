@@ -7,9 +7,11 @@ import {
   discoverSkills,
   finalSummaryPrompt,
   formatParallelDownstreamBlock,
+  formatUpstreamContextBlock,
   installPushCredentials,
   installSkillsIntoWorkspace,
   issueWritebackPrompt,
+  readConduitSummary,
   resolveMcpServers,
   runDir,
   serializeAgentContext,
@@ -76,6 +78,15 @@ export interface RunAgentNodeInput {
    * hardcode the DAG into every preset.
    */
   parallelDownstream?: string[];
+  /**
+   * Names of the node's *direct* upstream agents (immediate DAG-predecessors,
+   * including every branch of a fan-in), in edge-declaration order. The
+   * activity reads each one's `.conduit/<name>.md` summary from the workspace
+   * and prepends it to the main user turn, so a node starts already holding
+   * what ran before it instead of relying on prompt instructions to read it.
+   * Empty/undefined for entry nodes.
+   */
+  directUpstream?: string[];
 }
 
 /**
@@ -99,6 +110,7 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
     upstreamHead,
     parallelBranch,
     parallelDownstream,
+    directUpstream,
   } = input;
   const ctx = Context.current();
   const workspaceManager = new WorkspaceManager();
@@ -192,6 +204,23 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
       run: { id: runId, startedAt: nodeRun.startedAt ?? new Date() },
     });
 
+    // Auto-inject direct-upstream handoff summaries into the main user turn.
+    // Best-effort: a predecessor whose `.conduit/<name>.md` isn't present in
+    // this workspace is silently skipped (the copy machinery places them for
+    // the standard sequential/fan-in shapes). Read in edge-declaration order.
+    const upstreamSummaries = (
+      await Promise.all(
+        (directUpstream ?? []).map(async (name) => {
+          const body = await readConduitSummary(workspace.path, name);
+          return body === null ? null : { nodeName: name, body };
+        }),
+      )
+    ).filter((s): s is { nodeName: string; body: string } => s !== null);
+    const upstreamBlock = formatUpstreamContextBlock(upstreamSummaries);
+    const mainPrompt = upstreamBlock
+      ? `${upstreamBlock}\n\n${serializeAgentContext(agentCtx)}`
+      : serializeAgentContext(agentCtx);
+
     // Concat — don't replace — so the user's preset + instructionsAppend
     // still own the bulk of the prompt.
     const dagBlock = formatParallelDownstreamBlock(parallelDownstream ?? []);
@@ -240,7 +269,7 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
       },
       agent: agentRequest,
       prompts: {
-        main: serializeAgentContext(agentCtx),
+        main: mainPrompt,
         issueWriteback: writebackContext
           ? issueWritebackPrompt({
               owner: writebackContext.repoOwner,

@@ -43,6 +43,34 @@ export function formatParallelDownstreamBlock(siblings: readonly string[]): stri
 }
 
 /**
+ * Auto-injected block, prepended to the *user turn* (`prompts.main`) of any
+ * node with direct upstream agents. Renders each present predecessor summary
+ * as a `### <NodeName>` subsection under a single `## Upstream context`
+ * heading, body verbatim. Returns empty string when no summaries are present
+ * so callers can prepend it unconditionally.
+ *
+ * Lives in the user turn — not the system prompt — because these are turn-1
+ * *input data* (what upstream handed off), not role/behavior. Cf.
+ * `formatParallelDownstreamBlock`, which is behavioral and stays in the system
+ * prompt.
+ */
+export function formatUpstreamContextBlock(
+  summaries: ReadonlyArray<{ nodeName: string; body: string }>,
+): string {
+  if (summaries.length === 0) return '';
+  const sections = summaries.map(
+    ({ nodeName, body }) => `### ${nodeName}\n\n${body}`,
+  );
+  return [
+    '## Upstream context',
+    '',
+    'Handoff summaries from the agents that ran directly before you:',
+    '',
+    ...sections,
+  ].join('\n');
+}
+
+/**
  * Second-turn user message that asks the agent to record a summary for
  * downstream nodes. Written to `.conduit/<NodeName>.md` — the folder is
  * gitignored, ephemeral, and copied across parallel worktrees by the

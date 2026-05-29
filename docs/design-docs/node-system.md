@@ -228,7 +228,7 @@ The API reads each `SKILL.md` frontmatter (name, description) and returns the li
 
 ### `.conduit/` folder — inter-agent communication
 
-Each agent writes a summary file to `.conduit/<NodeName>.md` in the workspace as a final step. Content is freeform markdown: what the agent did, issues encountered, anything relevant for downstream agents. Downstream agents read the `.conduit/` folder from the workspace to get context from upstream agents.
+Each agent writes a summary file to `.conduit/<NodeName>.md` in the workspace as a final step. Content is freeform markdown: what the agent did, issues encountered, anything relevant for downstream agents. Downstream agents read the `.conduit/` folder from the workspace to get context from upstream agents — and the runtime additionally auto-injects each node's direct-upstream summaries into its user turn (see [agent-context.md](./agent-context.md#direct-upstream-auto-injection)).
 
 - `.conduit/` is **gitignored** — never committed. Ephemeral, internal-only.
 - Deleted at the end of the workflow run.

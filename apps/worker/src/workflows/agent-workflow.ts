@@ -4,7 +4,7 @@ import type {
   NodeOutput,
   TriggerEvent,
 } from '@conduit/shared';
-import { parallelDownstreamOf } from '@conduit/shared';
+import { directUpstreamOf, parallelDownstreamOf } from '@conduit/shared';
 import type * as activities from '../activities/index';
 import { topoSortGroups } from './topo-sort';
 
@@ -101,6 +101,7 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<void> {
             upstreamHead: upstreamOutput?.head,
             parallelBranch,
             parallelDownstream: parallelDownstreamOf(node.name, agentEdges),
+            directUpstream: directUpstreamOf(node.name, agentEdges),
           });
           return [node.name, output];
         }),

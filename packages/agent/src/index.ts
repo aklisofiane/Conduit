@@ -8,5 +8,6 @@ export {
   serializeAgentContext,
   finalSummaryPrompt,
   formatParallelDownstreamBlock,
+  formatUpstreamContextBlock,
   issueWritebackPrompt,
 } from './context';

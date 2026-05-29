@@ -6,4 +6,5 @@ export * from './definition';
 export * from './derive-workspace';
 export * from './identity';
 export * from './parallel-downstream';
+export * from './direct-upstream';
 export * from './validate';
