@@ -1,7 +1,7 @@
 {
   "id": "nightly-review",
   "name": "Nightly Code Review",
-  "description": "Scheduled nightly review of recent changes. Scope agent identifies what changed, four parallel reviewers (Security, Quality, Refactor, Performance) analyze their domain, and Publisher creates one issue per finding routed by confidence to HumanReview or AIDev.",
+  "description": "Scheduled nightly review of recent changes. Scope agent identifies what changed, four parallel reviewers (Security, Quality, Refactor, Performance) analyze their domain, and Publisher creates one issue per finding routed by confidence to Review or AIDev.",
   "category": "review",
   "workflows": [
     {
@@ -66,9 +66,10 @@
             "id": "agent-publisher",
             "name": "Publisher",
             "presetId": "issue-publisher",
-            "instructionsAppend": "The upstream reviewers for this pipeline are: Security, Quality, Refactor, Performance. Read `.conduit/Security.md`, `.conduit/Quality.md`, `.conduit/Refactor.md`, and `.conduit/Performance.md`.\n\nBoard status routing:\n- Confidence: high → status \"AIDev\"\n- Confidence: low → status \"HumanReview\"",
+            "instructionsAppend": "The upstream reviewers for this pipeline are: Security, Quality, Refactor, Performance. Read `.conduit/Security.md`, `.conduit/Quality.md`, `.conduit/Refactor.md`, and `.conduit/Performance.md`.",
             "mcpServers": [{ "serverId": "github-mcp" }],
-            "skills": []
+            "skills": [],
+            "issueWriteback": { "allowedStatuses": ["AIDev", "Review"], "allowedLabels": [] }
           }
         ],
         "edges": [

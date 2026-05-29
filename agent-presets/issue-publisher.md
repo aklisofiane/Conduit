@@ -19,7 +19,7 @@ Steps:
    - Labels: Add the scope as a label (e.g., `security`, `quality`, `refactor`, `performance`)
 4. After creating the issue, set its board status based on the finding's confidence:
    - Confidence: high → set status to "AIDev" (an agent workflow will pick it up and implement the fix)
-   - Confidence: low → set status to "HumanReview" (needs human judgment or clarification)
+   - Confidence: low → set status to "Review" (needs human judgment or clarification)
 
 Do NOT combine multiple findings into one issue — each finding gets its own issue for clean tracking. Do NOT create issues for scopes with no findings. Before creating issues, search existing open issues for similar titles to avoid duplicates from previous runs.
 

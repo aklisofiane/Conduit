@@ -93,22 +93,32 @@ export function finalSummaryPrompt(nodeName: string): string {
 
 /**
  * Trailing user turn injected between the main turn and the summary turn
- * when the agent has `issueWriteback` configured and the run was triggered
- * by a GitHub issue event. The allowlist values are interpolated verbatim
- * — only what the user picked appears here, so the prompt itself encodes
- * the choice set. Soft enforcement only.
+ * when the agent has `issueWriteback` configured and the run targets a
+ * GitHub repo. Two shapes, picked by whether `issueNumber` is present:
+ *
+ *   - issue-anchored — the run was fired by a GitHub issue event (polling /
+ *     webhook); the agent updates that one issue.
+ *   - repo-scoped (`issueNumber` omitted) — e.g. a cron run, which has no
+ *     triggering issue. The agent constrains the Status / labels it sets on
+ *     whatever issues it creates or touches in the repo during the run (the
+ *     nightly-review Publisher creating one issue per finding is the
+ *     motivating case).
+ *
+ * The allowlist values are interpolated verbatim — only what the user picked
+ * appears here, so the prompt itself encodes the choice set. Soft enforcement
+ * only.
  */
 export function issueWritebackPrompt(args: {
   owner: string;
   repo: string;
-  issueNumber: string;
+  issueNumber?: string;
   allowedStatuses: string[];
   allowedLabels: string[];
 }): string {
   const { owner, repo, issueNumber, allowedStatuses, allowedLabels } = args;
   const statusLine =
     allowedStatuses.length > 0
-      ? `- Set the issue's project Status to whichever of these best fits what you just did: ${allowedStatuses.map((s) => `"${s}"`).join(', ')}.`
+      ? `- Set the project Status to whichever of these values best fits: ${allowedStatuses.map((s) => `"${s}"`).join(', ')}.`
       : null;
   const labelLine =
     allowedLabels.length > 0
@@ -121,17 +131,29 @@ export function issueWritebackPrompt(args: {
     ? `- Do not apply any label that isn't in the list above.`
     : null;
 
+  const header = issueNumber
+    ? [
+        `Final step before you finish: update the GitHub issue this run was triggered by.`,
+        ``,
+        `Issue: ${owner}/${repo}#${issueNumber}`,
+      ]
+    : [
+        `Final step before you finish: for every GitHub issue you created or updated in ${owner}/${repo} during this run, constrain what you set as follows.`,
+      ];
+
+  const closing = issueNumber
+    ? `- If none apply, say so explicitly and skip the update — don't pick a default.`
+    : `- These constraints apply only to issues you touched this run. If you didn't create or update any issue, skip this — don't invent one.`;
+
   return [
-    `Final step before you finish: update the GitHub issue this run was triggered by.`,
-    ``,
-    `Issue: ${owner}/${repo}#${issueNumber}`,
+    ...header,
     ``,
     `Use the gh CLI available to you. Constraints:`,
     statusLine,
     labelLine,
     noopStatusLine,
     noopLabelLine,
-    `- If none apply, say so explicitly and skip the update — don't pick a default.`,
+    closing,
     ``,
     `When done, briefly state what you set and why.`,
   ]

@@ -458,7 +458,10 @@ function CanvasInner() {
           <AgentConfigPanel
             agent={selectedAgent}
             workflowId={id}
-            repoTrigger={draft.triggers.find((t) => t.type !== 'cron')}
+            writebackTrigger={
+              draft.triggers.find((t) => t.platform === 'github' && t.type !== 'cron') ??
+              draft.triggers.find((t) => t.platform === 'github')
+            }
             onChange={(patch) => updateAgent(selectedAgent.id, patch)}
             onSave={handleSave}
             onDiscard={() => wf && reset(wf.definition)}

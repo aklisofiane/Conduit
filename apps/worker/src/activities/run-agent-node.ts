@@ -458,7 +458,13 @@ interface WritebackContext {
   connectionId: string;
   repoOwner: string;
   repoName: string;
-  issueNumber: string;
+  /**
+   * The triggering issue, when the run was fired by a GitHub issue event
+   * (polling / webhook). Undefined for cron runs, which target a repo but no
+   * specific issue — writeback is then repo-scoped to whatever issues the
+   * agent creates or touches.
+   */
+  issueNumber?: string;
   allowedStatuses: string[];
   allowedLabels: string[];
 }
@@ -466,8 +472,13 @@ interface WritebackContext {
 /**
  * Resolve the per-run writeback context. Returns undefined when the feature
  * is not configured for this agent, when the workflow has no GitHub trigger,
- * when this run wasn't fired by a GitHub issue event, or when the user
- * enabled the checkbox without picking any statuses or labels.
+ * when this run didn't target a GitHub repo, or when the user enabled the
+ * checkbox without picking any statuses or labels.
+ *
+ * A run only needs a GitHub repo to qualify — not a triggering issue. Cron
+ * runs carry `repo` (resolved from the trigger connection in cron-fire.ts)
+ * but no `issue`, so they produce a repo-scoped context with `issueNumber`
+ * undefined; the writeback prompt adapts accordingly.
  */
 function resolveWritebackContext(
   node: AgentConfig,
@@ -480,14 +491,14 @@ function resolveWritebackContext(
     return undefined;
   }
   if (triggerEvent.source !== 'github') return undefined;
-  if (!triggerEvent.issue || !triggerEvent.repo) return undefined;
+  if (!triggerEvent.repo) return undefined;
   const trigger = triggers.find((t) => t.platform === 'github');
   if (!trigger) return undefined;
   return {
     connectionId: trigger.connectionId,
     repoOwner: triggerEvent.repo.owner,
     repoName: triggerEvent.repo.name,
-    issueNumber: triggerEvent.issue.key,
+    issueNumber: triggerEvent.issue?.key,
     allowedStatuses: writeback.allowedStatuses,
     allowedLabels: writeback.allowedLabels,
   };

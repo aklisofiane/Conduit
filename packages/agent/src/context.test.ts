@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { formatParallelDownstreamBlock, formatUpstreamContextBlock } from './context';
+import {
+  formatParallelDownstreamBlock,
+  formatUpstreamContextBlock,
+  issueWritebackPrompt,
+} from './context';
 
 describe('formatParallelDownstreamBlock', () => {
   it('returns empty string when there are no downstream siblings', () => {
@@ -57,5 +61,48 @@ describe('formatUpstreamContextBlock', () => {
     expect(out.indexOf('### Reviewer')).toBeLessThan(out.indexOf('### Tests'));
     // Body is reproduced exactly, not reflowed or escaped.
     expect(out).toContain('### Reviewer\n\nFound a null-deref.');
+  });
+});
+
+describe('issueWritebackPrompt', () => {
+  it('anchors to the triggering issue when issueNumber is set', () => {
+    const out = issueWritebackPrompt({
+      owner: 'acme',
+      repo: 'web',
+      issueNumber: '42',
+      allowedStatuses: ['AIDev', 'HumanReview'],
+      allowedLabels: ['bug'],
+    });
+    expect(out).toContain('the GitHub issue this run was triggered by');
+    expect(out).toContain('Issue: acme/web#42');
+    expect(out).toContain('"AIDev"');
+    expect(out).toContain('"HumanReview"');
+    expect(out).toContain('"bug"');
+    expect(out).toContain("skip the update — don't pick a default");
+  });
+
+  it('is repo-scoped when issueNumber is omitted (cron run)', () => {
+    const out = issueWritebackPrompt({
+      owner: 'acme',
+      repo: 'web',
+      allowedStatuses: ['AIDev', 'HumanReview'],
+      allowedLabels: [],
+    });
+    // No fixed issue — addresses whatever the agent creates/touches.
+    expect(out).not.toContain('Issue: acme/web#');
+    expect(out).toContain('every GitHub issue you created or updated in acme/web');
+    expect(out).toContain('"AIDev"');
+    expect(out).toContain("If you didn't create or update any issue, skip this");
+  });
+
+  it('omits the status constraint when no statuses are allowed', () => {
+    const out = issueWritebackPrompt({
+      owner: 'acme',
+      repo: 'web',
+      allowedStatuses: [],
+      allowedLabels: ['triage'],
+    });
+    expect(out).not.toContain('project Status');
+    expect(out).toContain('"triage"');
   });
 });

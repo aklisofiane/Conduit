@@ -23,7 +23,13 @@ const CUSTOM_PRESET_ID = '__custom__';
 interface AgentConfigPanelProps {
   agent: AgentConfig;
   workflowId: string;
-  repoTrigger?: TriggerConfig;
+  /**
+   * GitHub trigger that sources the writeback allowlist (repo for labels,
+   * board for statuses). Any GitHub trigger qualifies — including `cron`,
+   * which writes back to issues the agent creates rather than a triggering
+   * issue. Undefined when the workflow has no GitHub trigger.
+   */
+  writebackTrigger?: TriggerConfig;
   onChange: (patch: Partial<AgentConfig>) => void;
   onSave: () => void;
   onDiscard: () => void;
@@ -35,7 +41,7 @@ interface AgentConfigPanelProps {
 export function AgentConfigPanel({
   agent,
   workflowId,
-  repoTrigger,
+  writebackTrigger,
   onChange,
   onSave,
   onDiscard,
@@ -196,7 +202,7 @@ export function AgentConfigPanel({
             hint="set status / apply labels at end of run"
           >
             <IssueWritebackControl
-              trigger={repoTrigger}
+              trigger={writebackTrigger}
               value={agent.issueWriteback}
               onChange={(next) => onChange({ issueWriteback: next })}
             />
