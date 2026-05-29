@@ -84,13 +84,13 @@ describe('git-helpers', () => {
       const bare = path.join(conduitHome, 'base-clones', 'test.git');
       const connWithToken: ConnectionContext = {
         ...connection,
-        cloneUrl: 'https://github.com/acme/shop.git',
+        cloneUrl: `file://${remote}`,
         token: 'ghs_secret123',
       };
       await ensureBaseClone(bare, connWithToken);
 
       const remoteUrl = (await git(['remote', 'get-url', 'origin'], { cwd: bare })).trim();
-      expect(remoteUrl).toBe('https://github.com/acme/shop.git');
+      expect(remoteUrl).toBe(`file://${remote}`);
       expect(remoteUrl).not.toContain('ghs_secret123');
     });
   });
@@ -242,9 +242,7 @@ describe('git-helpers', () => {
       await fs.mkdir(path.dirname(second), { recursive: true });
       await createTrackingWorktree(bare, second, 'conduit/99-stale', 'main');
 
-      const branch = (
-        await git(['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: second })
-      ).trim();
+      const branch = (await git(['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: second })).trim();
       expect(branch).toBe('conduit/99-stale');
     });
   });

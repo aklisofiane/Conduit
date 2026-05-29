@@ -304,6 +304,10 @@ src/
     manager.ts                         top-level orchestration — dispatches ticket-branch,
                                        fixed-branch, or inherit
     git.ts, paths.ts                   worktree seeding, path derivation
+    git-helpers.ts                     shared base-clone / fetch / ref helpers used by both
+                                       ticket-branch and fixed-branch resolvers: ensureBaseClone,
+                                       fetchWithAuth, remoteBranchExists, defaultBranch,
+                                       stripRemoteAuth, addTrackingWorktree, createTrackingWorktree
     conduit-folder.ts                  .conduit/<NodeName>.md reads/writes + cross-worktree copy
     merge.ts                           mergeBranchedWorktree + MergeConflictError (clean-merge path)
     ticket-branch.ts                   resolveTicketBranchWorkspace — check-then-create
