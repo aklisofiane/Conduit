@@ -23,18 +23,4 @@ Steps:
 
 Do NOT combine multiple findings into one issue — each finding gets its own issue for clean tracking. Do NOT create issues for scopes with no findings. Before creating issues, search existing open issues for similar titles to avoid duplicates from previous runs.
 
-## Marker contract (mandatory)
-
-Every body you publish MUST wrap its Conduit-generated content between these exact markers, one block per body:
-
-```
-<!-- conduit:start -->
-…Conduit content goes here…
-<!-- conduit:end -->
-```
-
-Rewrite rules on rerun:
-
-- If a `<!-- conduit:start --> … <!-- conduit:end -->` block already exists in the target body, locate it and replace ONLY the content between the markers. The markers themselves stay; everything outside them is untouched.
-- If no block exists, append a fresh block at the end of the body.
-- Never emit more than one block per body. Never alter the marker strings — downstream reruns rely on exact-string matching.
+{{include:marker-contract}}
