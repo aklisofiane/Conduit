@@ -223,6 +223,59 @@ describe('fetchProjectBoardItems', () => {
     });
   });
 
+  it('captures `contentBody` when the project item content carries a body', async () => {
+    const canned = {
+      data: {
+        owner: {
+          projectV2: {
+            items: {
+              pageInfo: { hasNextPage: false, endCursor: null },
+              nodes: [
+                {
+                  id: 'PVTI_issue_with_body',
+                  content: {
+                    __typename: 'Issue',
+                    id: 'I_1',
+                    number: 42,
+                    title: 't',
+                    url: 'https://x',
+                    body: 'Reproduces on iOS only.',
+                    repository: { name: 'shop', owner: { login: 'acme' } },
+                  },
+                  fieldValues: { nodes: [] },
+                },
+                {
+                  id: 'PVTI_pr_with_body',
+                  content: {
+                    __typename: 'PullRequest',
+                    id: 'PR_1',
+                    number: 7,
+                    title: 'p',
+                    url: 'https://x',
+                    body: 'Closes #42.',
+                    repository: { name: 'shop', owner: { login: 'acme' } },
+                    isDraft: false,
+                    headRefName: 'f',
+                    baseRefName: 'main',
+                    headRepository: { name: 'shop', owner: { login: 'acme' } },
+                  },
+                  fieldValues: { nodes: [] },
+                },
+              ],
+            },
+          },
+        },
+      },
+    };
+    const fakeFetch = makeFetch([canned]);
+    const items = await fetchProjectBoardItems(
+      { ownerType: 'org', owner: 'acme', projectNumber: 5, token: 't' },
+      fakeFetch,
+    );
+    expect(items[0]?.contentBody).toBe('Reproduces on iOS only.');
+    expect(items[1]?.contentBody).toBe('Closes #42.');
+  });
+
   it('does not populate `pr` for Issue items', async () => {
     const canned = {
       data: {
@@ -443,6 +496,39 @@ describe('fetchRepositoryPullRequests', () => {
     });
   });
 
+  it('captures `contentBody` from the PR `body` field', async () => {
+    const canned = {
+      data: {
+        repository: {
+          pullRequests: {
+            pageInfo: { hasNextPage: false, endCursor: null },
+            nodes: [
+              {
+                id: 'PR_node_3',
+                number: 9,
+                title: 'with body',
+                url: 'https://github.com/acme/shop/pull/9',
+                body: 'Refactor checkout flow.',
+                isDraft: false,
+                headRefName: 'refactor',
+                baseRefName: 'main',
+                repository: { name: 'shop', owner: { login: 'acme' } },
+                headRepository: { name: 'shop', owner: { login: 'acme' } },
+                labels: { nodes: [] },
+              },
+            ],
+          },
+        },
+      },
+    };
+    const fakeFetch = makeFetch([canned]);
+    const items = await fetchRepositoryPullRequests(
+      { owner: 'acme', name: 'shop', token: 't' },
+      fakeFetch,
+    );
+    expect(items[0]?.contentBody).toBe('Refactor checkout flow.');
+  });
+
   it('throws when the repo cannot be resolved', async () => {
     const canned = { data: { repository: null } };
     const fakeFetch = makeFetch([canned]);
@@ -507,6 +593,35 @@ describe('fetchRepositoryIssues', () => {
     await expect(
       fetchRepositoryIssues({ owner: 'acme', name: 'missing', token: 't' }, fakeFetch),
     ).rejects.toThrow(/Repository acme\/missing not found/);
+  });
+
+  it('captures `contentBody` from the issue `body` field', async () => {
+    const canned = {
+      data: {
+        repository: {
+          issues: {
+            pageInfo: { hasNextPage: false, endCursor: null },
+            nodes: [
+              {
+                id: 'I_42',
+                number: 42,
+                title: 'with body',
+                url: 'https://x',
+                body: 'Steps to reproduce: open empty cart.',
+                repository: { name: 'shop', owner: { login: 'acme' } },
+                labels: { nodes: [] },
+              },
+            ],
+          },
+        },
+      },
+    };
+    const fakeFetch = makeFetch([canned]);
+    const items = await fetchRepositoryIssues(
+      { owner: 'acme', name: 'shop', token: 't' },
+      fakeFetch,
+    );
+    expect(items[0]?.contentBody).toBe('Steps to reproduce: open empty cart.');
   });
 });
 

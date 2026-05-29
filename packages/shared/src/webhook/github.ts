@@ -39,6 +39,7 @@ export function normalizeGithubWebhook(
         key: String(p.issue.number ?? ''),
         title: String(p.issue.title ?? ''),
         url: String(p.issue.html_url ?? ''),
+        ...(typeof p.issue.body === 'string' ? { body: p.issue.body } : {}),
       },
       actor,
     };
@@ -56,6 +57,7 @@ export function normalizeGithubWebhook(
         key: String(p.pull_request.number ?? ''),
         title: String(p.pull_request.title ?? ''),
         url: String(p.pull_request.html_url ?? ''),
+        ...(typeof p.pull_request.body === 'string' ? { body: p.pull_request.body } : {}),
       },
       pr: extractPr(p.pull_request),
       actor,
@@ -71,6 +73,8 @@ export function normalizeGithubWebhook(
     // ref must rely on the worktree already being on the PR branch (set up
     // by an earlier `pull_request.opened` run on the same ticket-branch row).
     // Leaving `pr` undefined here keeps the existing behavior intact.
+    // `issue.body` on this payload carries the PR description (GitHub reuses
+    // the `issue` object for PR-scoped comments) — forward it when present.
     return {
       source: 'github',
       mode: 'webhook',
@@ -82,6 +86,7 @@ export function normalizeGithubWebhook(
         key: String(p.issue.number ?? ''),
         title: String(p.issue.title ?? ''),
         url: String(p.issue.html_url ?? ''),
+        ...(typeof p.issue.body === 'string' ? { body: p.issue.body } : {}),
       },
       actor,
     };
@@ -122,6 +127,7 @@ interface GithubWebhookPayload {
     number?: number;
     title?: string;
     html_url?: string;
+    body?: string;
     pull_request?: unknown;
   };
   pull_request?: {
@@ -130,6 +136,7 @@ interface GithubWebhookPayload {
     number?: number;
     title?: string;
     html_url?: string;
+    body?: string;
     head?: {
       ref?: string;
       repo?: {

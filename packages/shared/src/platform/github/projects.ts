@@ -27,6 +27,12 @@ export interface ProjectBoardItem {
   contentKey?: string;
   contentTitle?: string;
   contentUrl?: string;
+  /**
+   * Issue/PR body markdown at fetch time. Populated only for `Issue` and
+   * `PullRequest` content; absent for draft items and any older callers that
+   * don't request it. Forwarded by `toTriggerEvent` as `event.issue.body`.
+   */
+  contentBody?: string;
   /** Repository the content lives in (issues/PRs only). */
   repo?: { owner: string; name: string };
   /** Current single-select field values on the item, keyed by field name (e.g. `Status`). */
@@ -111,6 +117,7 @@ interface RawProjectItem {
         number?: number;
         title?: string;
         url?: string;
+        body?: string;
         repository?: { name: string; owner: { login: string } };
         labels?: { nodes: Array<{ name?: string } | null> };
         // PullRequest-only fields
@@ -153,6 +160,7 @@ function buildItemsQuery(ownerType: 'user' | 'org'): string {
                   number
                   title
                   url
+                  body
                   repository { name owner { login } }
                   labels(first: 20) { nodes { name } }
                 }
@@ -161,6 +169,7 @@ function buildItemsQuery(ownerType: 'user' | 'org'): string {
                   number
                   title
                   url
+                  body
                   repository { name owner { login } }
                   labels(first: 20) { nodes { name } }
                   isDraft
@@ -360,6 +369,7 @@ function toItem(raw: RawProjectItem): ProjectBoardItem {
   if (content.title) item.contentTitle = content.title;
   if (typeof content.number === 'number') item.contentKey = String(content.number);
   if (content.url) item.contentUrl = content.url;
+  if (typeof content.body === 'string') item.contentBody = content.body;
   if (content.repository?.name && content.repository.owner?.login) {
     item.repo = { owner: content.repository.owner.login, name: content.repository.name };
   }
@@ -536,6 +546,7 @@ interface RawRepoPullRequest {
   number: number;
   title: string;
   url: string;
+  body?: string;
   isDraft: boolean;
   headRefName: string;
   baseRefName: string;
@@ -549,6 +560,7 @@ interface RawRepoIssue {
   number: number;
   title: string;
   url: string;
+  body?: string;
   repository: { name: string; owner: { login: string } };
   labels?: { nodes: Array<{ name?: string } | null> };
 }
@@ -578,6 +590,7 @@ const REPO_PULL_REQUESTS_QUERY = /* GraphQL */ `
           number
           title
           url
+          body
           isDraft
           headRefName
           baseRefName
@@ -610,6 +623,7 @@ const REPO_ISSUES_QUERY = /* GraphQL */ `
           number
           title
           url
+          body
           repository { name owner { login } }
           labels(first: 20) { nodes { name } }
         }
@@ -716,6 +730,7 @@ function repoPullRequestToItem(raw: RawRepoPullRequest): ProjectBoardItem {
       state: raw.isDraft ? 'draft' : 'ready_for_review',
     },
   };
+  if (typeof raw.body === 'string') item.contentBody = raw.body;
   for (const node of raw.labels?.nodes ?? []) {
     if (node?.name) item.labels.push(node.name);
   }
@@ -736,6 +751,7 @@ function repoIssueToItem(raw: RawRepoIssue): ProjectBoardItem {
     singleSelectValues: {},
     labels: [],
   };
+  if (typeof raw.body === 'string') item.contentBody = raw.body;
   for (const node of raw.labels?.nodes ?? []) {
     if (node?.name) item.labels.push(node.name);
   }

@@ -25,6 +25,7 @@ interface RawGitlabIssue {
   id: number;
   iid: number;
   title: string;
+  description?: string | null;
   web_url: string;
   labels: string[];
 }
@@ -51,7 +52,7 @@ export async function fetchGitlabProjectIssues(
     const batch = (await resp.json()) as RawGitlabIssue[];
     const { owner, name } = splitProjectPath(q.projectPath);
     for (const raw of batch) {
-      items.push({
+      const item: ProjectBoardItem = {
         itemNodeId: String(raw.id),
         contentNodeId: String(raw.id),
         contentType: 'Issue',
@@ -61,7 +62,9 @@ export async function fetchGitlabProjectIssues(
         repo: { owner, name },
         singleSelectValues: {},
         labels: raw.labels ?? [],
-      });
+      };
+      if (typeof raw.description === 'string') item.contentBody = raw.description;
+      items.push(item);
     }
     if (batch.length < PAGE_SIZE) return items;
   }
@@ -75,6 +78,7 @@ interface RawGitlabMergeRequest {
   id: number;
   iid: number;
   title: string;
+  description?: string | null;
   web_url: string;
   labels: string[];
   source_branch: string;
@@ -104,7 +108,7 @@ export async function fetchGitlabProjectMergeRequests(
     const batch = (await resp.json()) as RawGitlabMergeRequest[];
     const { owner, name } = splitProjectPath(q.projectPath);
     for (const raw of batch) {
-      items.push({
+      const item: ProjectBoardItem = {
         itemNodeId: String(raw.id),
         contentNodeId: String(raw.id),
         contentType: 'PullRequest',
@@ -119,7 +123,9 @@ export async function fetchGitlabProjectMergeRequests(
           baseRef: raw.target_branch,
           state: raw.draft ? 'draft' : 'ready_for_review',
         },
-      });
+      };
+      if (typeof raw.description === 'string') item.contentBody = raw.description;
+      items.push(item);
     }
     if (batch.length < PAGE_SIZE) return items;
   }

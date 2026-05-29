@@ -40,6 +40,13 @@ export const triggerEventSchema = z.object({
       key: z.string().min(1),
       title: z.string(),
       url: z.string().url(),
+      /**
+       * The platform's issue/PR body at trigger-fire time. Populated by both
+       * webhook and polling normalizers when available. Consumers must treat
+       * absence as "unknown" — older triggers and platforms that haven't been
+       * wired yet won't carry it.
+       */
+      body: z.string().optional(),
     })
     .optional(),
   pr: z

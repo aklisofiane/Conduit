@@ -50,6 +50,27 @@ describe('fetchGitlabProjectIssues', () => {
     expect(items).toEqual([]);
   });
 
+  it('captures `contentBody` from the GitLab `description` field on issues', async () => {
+    const canned = [
+      {
+        id: 100,
+        iid: 42,
+        title: 't',
+        description: 'Reproduces on Firefox.',
+        web_url: 'https://x',
+        labels: [],
+      },
+    ];
+    const fakeFetch = makeFetch([canned]);
+    const items = await fetchGitlabProjectIssues({
+      hostUrl: 'gitlab.com',
+      projectPath: 'acme/api',
+      token: 't',
+      fetchImpl: fakeFetch,
+    });
+    expect(items[0]!.contentBody).toBe('Reproduces on Firefox.');
+  });
+
   it('handles empty labels array', async () => {
     const canned = [
       { id: 1, iid: 1, title: 't', web_url: 'https://x', labels: [] },
@@ -200,6 +221,30 @@ describe('fetchGitlabProjectMergeRequests', () => {
         state: 'ready_for_review',
       },
     });
+  });
+
+  it('captures `contentBody` from the GitLab `description` field on MRs', async () => {
+    const canned = [
+      {
+        id: 400,
+        iid: 9,
+        title: 't',
+        description: 'Closes #42.',
+        web_url: 'https://x',
+        labels: [],
+        source_branch: 'feat',
+        target_branch: 'main',
+        draft: false,
+      },
+    ];
+    const fakeFetch = makeFetch([canned]);
+    const items = await fetchGitlabProjectMergeRequests({
+      hostUrl: 'gitlab.com',
+      projectPath: 'acme/api',
+      token: 't',
+      fetchImpl: fakeFetch,
+    });
+    expect(items[0]!.contentBody).toBe('Closes #42.');
   });
 
   it('maps draft MR to draft state', async () => {

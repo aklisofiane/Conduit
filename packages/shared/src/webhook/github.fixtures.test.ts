@@ -16,7 +16,7 @@ function load(file: string): unknown {
  * changes these break long before the webhook endpoint does in production.
  */
 describe('normalizeGithubWebhook — real payload fixtures', () => {
-  it('issues.opened → TriggerEvent with full identity', () => {
+  it('issues.opened → TriggerEvent with full identity (incl. body)', () => {
     const evt = normalizeGithubWebhook('issues', load('issues.opened.json'));
     expect(evt).toMatchObject({
       source: 'github',
@@ -31,12 +31,17 @@ describe('normalizeGithubWebhook — real payload fixtures', () => {
         url: 'https://github.com/acme/shop/issues/42',
       },
     });
+    // Body must flow through as a verbatim copy of `payload.issue.body` —
+    // analyze's Publish step rewrites against it on rerun.
+    expect(evt?.issue?.body).toBe(
+      'Steps to reproduce:\n1. Sign in\n2. Clear cart\n3. Click checkout\n\nExpected: redirect. Actual: 500.',
+    );
     // Result shape must round-trip through the shared Zod schema so every
     // downstream consumer (worker, DB, WS clients) sees a valid event.
     expect(triggerEventSchema.safeParse(evt).success).toBe(true);
   });
 
-  it('pull_request.opened → TriggerEvent with PR identity', () => {
+  it('pull_request.opened → TriggerEvent with PR identity (incl. body)', () => {
     const evt = normalizeGithubWebhook('pull_request', load('pull_request.opened.json'));
     expect(evt).toMatchObject({
       event: 'pull_request.opened',
@@ -52,6 +57,9 @@ describe('normalizeGithubWebhook — real payload fixtures', () => {
         baseRef: 'main',
       },
     });
+    expect(evt?.issue?.body).toBe(
+      'Closes #42. Guard against empty cart in the checkout controller.',
+    );
     // Same-repo PR: no headRepo on the event.
     expect(evt?.pr?.headRepo).toBeUndefined();
     expect(triggerEventSchema.safeParse(evt).success).toBe(true);

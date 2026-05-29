@@ -116,4 +116,18 @@ describe('toTriggerEvent', () => {
     // gated on scope.
     expect(event.payload.prState).toBe('ready_for_review');
   });
+
+  it('forwards `contentBody` from the board item to `event.issue.body`', () => {
+    const withBody: ProjectBoardItem = {
+      ...ISSUE_ITEM,
+      contentBody: 'Steps to reproduce:\n1. Open cart\n2. Crash',
+    };
+    expect(toTriggerEvent(withBody, 'issues').issue?.body).toBe(
+      'Steps to reproduce:\n1. Open cart\n2. Crash',
+    );
+  });
+
+  it('omits `event.issue.body` when the board item has no `contentBody`', () => {
+    expect(toTriggerEvent(ISSUE_ITEM, 'issues').issue?.body).toBeUndefined();
+  });
 });

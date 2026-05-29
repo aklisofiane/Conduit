@@ -70,6 +70,7 @@ export function toTriggerEvent(
       key: item.contentKey,
       title: item.contentTitle,
       url: item.contentUrl,
+      ...(typeof item.contentBody === 'string' ? { body: item.contentBody } : {}),
     };
   }
   if (scope === 'pull_requests' && item.pr) {
