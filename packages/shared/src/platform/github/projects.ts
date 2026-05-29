@@ -95,46 +95,38 @@ interface RawProjectSummary {
   title: string;
   url: string;
   fields: {
-    nodes: Array<
-      | null
-      | {
-          __typename?: string;
-          name?: string;
-          options?: Array<{ name: string }>;
-        }
-    >;
+    nodes: Array<null | {
+      __typename?: string;
+      name?: string;
+      options?: Array<{ name: string }>;
+    }>;
   };
 }
 
 interface RawProjectItem {
   id: string;
-  content:
-    | null
-    | {
-        __typename: 'Issue' | 'PullRequest' | 'DraftIssue';
-        // Issue / PullRequest common fields
-        id?: string;
-        number?: number;
-        title?: string;
-        url?: string;
-        body?: string;
-        repository?: { name: string; owner: { login: string } };
-        labels?: { nodes: Array<{ name?: string } | null> };
-        // PullRequest-only fields
-        isDraft?: boolean;
-        headRefName?: string;
-        baseRefName?: string;
-        headRepository?: { name: string; owner: { login: string } } | null;
-      };
+  content: null | {
+    __typename: 'Issue' | 'PullRequest' | 'DraftIssue';
+    // Issue / PullRequest common fields
+    id?: string;
+    number?: number;
+    title?: string;
+    url?: string;
+    body?: string;
+    repository?: { name: string; owner: { login: string } };
+    labels?: { nodes: Array<{ name?: string } | null> };
+    // PullRequest-only fields
+    isDraft?: boolean;
+    headRefName?: string;
+    baseRefName?: string;
+    headRepository?: { name: string; owner: { login: string } } | null;
+  };
   fieldValues: {
-    nodes: Array<
-      | null
-      | {
-          __typename?: string;
-          name?: string;
-          field?: { __typename?: string; name?: string };
-        }
-    >;
+    nodes: Array<null | {
+      __typename?: string;
+      name?: string;
+      field?: { __typename?: string; name?: string };
+    }>;
   };
 }
 
@@ -160,7 +152,6 @@ function buildItemsQuery(ownerType: 'user' | 'org'): string {
                   number
                   title
                   url
-                  body
                   repository { name owner { login } }
                   labels(first: 20) { nodes { name } }
                 }
@@ -169,7 +160,6 @@ function buildItemsQuery(ownerType: 'user' | 'org'): string {
                   number
                   title
                   url
-                  body
                   repository { name owner { login } }
                   labels(first: 20) { nodes { name } }
                   isDraft
@@ -253,9 +243,7 @@ export async function fetchProjectBoardItems(
     );
 
     if (payload.errors?.length) {
-      throw new Error(
-        `GitHub GraphQL error: ${payload.errors.map((e) => e.message).join('; ')}`,
-      );
+      throw new Error(`GitHub GraphQL error: ${payload.errors.map((e) => e.message).join('; ')}`);
     }
 
     const project = payload.data?.owner?.projectV2;
@@ -293,9 +281,7 @@ export async function listProjectBoards(
   );
 
   if (payload.errors?.length) {
-    throw new Error(
-      `GitHub GraphQL error: ${payload.errors.map((e) => e.message).join('; ')}`,
-    );
+    throw new Error(`GitHub GraphQL error: ${payload.errors.map((e) => e.message).join('; ')}`);
   }
 
   const owner = payload.data?.owner;
@@ -342,9 +328,7 @@ async function callGraphQL<T>(
     body: JSON.stringify(body),
   });
   if (!resp.ok) {
-    throw new Error(
-      `GitHub GraphQL HTTP ${resp.status}: ${await resp.text().catch(() => '')}`,
-    );
+    throw new Error(`GitHub GraphQL HTTP ${resp.status}: ${await resp.text().catch(() => '')}`);
   }
   return (await resp.json()) as GraphQLResponse<T>;
 }
@@ -428,7 +412,9 @@ const VIEWER_REPOS_QUERY = /* GraphQL */ `
           name
           url
           isPrivate
-          owner { login }
+          owner {
+            login
+          }
         }
       }
     }
@@ -459,9 +445,7 @@ export async function listViewerRepositories(
   );
 
   if (payload.errors?.length) {
-    throw new Error(
-      `GitHub GraphQL error: ${payload.errors.map((e) => e.message).join('; ')}`,
-    );
+    throw new Error(`GitHub GraphQL error: ${payload.errors.map((e) => e.message).join('; ')}`);
   }
 
   const repos: RepositorySummary[] = [];
@@ -489,7 +473,9 @@ const VIEWER_ORGS_QUERY = /* GraphQL */ `
     viewer {
       login
       organizations(first: 100) {
-        nodes { login }
+        nodes {
+          login
+        }
       }
     }
   }
@@ -515,9 +501,7 @@ export async function listViewerOrganizations(
   );
 
   if (payload.errors?.length) {
-    throw new Error(
-      `GitHub GraphQL error: ${payload.errors.map((e) => e.message).join('; ')}`,
-    );
+    throw new Error(`GitHub GraphQL error: ${payload.errors.map((e) => e.message).join('; ')}`);
   }
 
   const viewer = payload.data?.viewer;
@@ -571,12 +555,7 @@ interface RepoConnectionPage<N> {
 }
 
 const REPO_PULL_REQUESTS_QUERY = /* GraphQL */ `
-  query ConduitRepoPullRequests(
-    $owner: String!
-    $name: String!
-    $first: Int!
-    $after: String
-  ) {
+  query ConduitRepoPullRequests($owner: String!, $name: String!, $first: Int!, $after: String) {
     repository(owner: $owner, name: $name) {
       pullRequests(
         first: $first
@@ -584,19 +563,35 @@ const REPO_PULL_REQUESTS_QUERY = /* GraphQL */ `
         states: [OPEN]
         orderBy: { field: UPDATED_AT, direction: DESC }
       ) {
-        pageInfo { hasNextPage endCursor }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
         nodes {
           id
           number
           title
           url
-          body
           isDraft
           headRefName
           baseRefName
-          repository { name owner { login } }
-          headRepository { name owner { login } }
-          labels(first: 20) { nodes { name } }
+          repository {
+            name
+            owner {
+              login
+            }
+          }
+          headRepository {
+            name
+            owner {
+              login
+            }
+          }
+          labels(first: 20) {
+            nodes {
+              name
+            }
+          }
         }
       }
     }
@@ -604,12 +599,7 @@ const REPO_PULL_REQUESTS_QUERY = /* GraphQL */ `
 `;
 
 const REPO_ISSUES_QUERY = /* GraphQL */ `
-  query ConduitRepoIssues(
-    $owner: String!
-    $name: String!
-    $first: Int!
-    $after: String
-  ) {
+  query ConduitRepoIssues($owner: String!, $name: String!, $first: Int!, $after: String) {
     repository(owner: $owner, name: $name) {
       issues(
         first: $first
@@ -617,15 +607,26 @@ const REPO_ISSUES_QUERY = /* GraphQL */ `
         states: [OPEN]
         orderBy: { field: UPDATED_AT, direction: DESC }
       ) {
-        pageInfo { hasNextPage endCursor }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
         nodes {
           id
           number
           title
           url
-          body
-          repository { name owner { login } }
-          labels(first: 20) { nodes { name } }
+          repository {
+            name
+            owner {
+              login
+            }
+          }
+          labels(first: 20) {
+            nodes {
+              name
+            }
+          }
         }
       }
     }
@@ -660,10 +661,13 @@ export function fetchRepositoryIssues(
   q: RepoQuery,
   fetchImpl: typeof fetch = fetch,
 ): Promise<ProjectBoardItem[]> {
-  return paginateRepoConnection<
-    { issues: RepoConnectionPage<RawRepoIssue> },
-    RawRepoIssue
-  >(q, REPO_ISSUES_QUERY, (repo) => repo.issues, repoIssueToItem, fetchImpl);
+  return paginateRepoConnection<{ issues: RepoConnectionPage<RawRepoIssue> }, RawRepoIssue>(
+    q,
+    REPO_ISSUES_QUERY,
+    (repo) => repo.issues,
+    repoIssueToItem,
+    fetchImpl,
+  );
 }
 
 async function paginateRepoConnection<R, N>(
@@ -687,16 +691,12 @@ async function paginateRepoConnection<R, N>(
     );
 
     if (payload.errors?.length) {
-      throw new Error(
-        `GitHub GraphQL error: ${payload.errors.map((e) => e.message).join('; ')}`,
-      );
+      throw new Error(`GitHub GraphQL error: ${payload.errors.map((e) => e.message).join('; ')}`);
     }
 
     const repo = payload.data?.repository;
     if (!repo) {
-      throw new Error(
-        `Repository ${q.owner}/${q.name} not found (token may lack repo scope)`,
-      );
+      throw new Error(`Repository ${q.owner}/${q.name} not found (token may lack repo scope)`);
     }
 
     const conn = selectPage(repo);
@@ -756,4 +756,51 @@ function repoIssueToItem(raw: RawRepoIssue): ProjectBoardItem {
     if (node?.name) item.labels.push(node.name);
   }
   return item;
+}
+
+// ── Body hydration (deferred fetch) ───────────────────────────────────
+
+const HYDRATE_BODIES_QUERY = /* GraphQL */ `
+  query ConduitHydrateBodies($ids: [ID!]!) {
+    nodes(ids: $ids) {
+      ... on Issue {
+        id
+        body
+      }
+      ... on PullRequest {
+        id
+        body
+      }
+    }
+  }
+`;
+
+interface HydrateNodesResponse {
+  nodes?: Array<{ id?: string; body?: string } | null>;
+}
+
+export async function hydrateGithubItemBodies(
+  nodeIds: string[],
+  token: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<Map<string, string>> {
+  const bodies = new Map<string, string>();
+  if (nodeIds.length === 0) return bodies;
+
+  const payload: GraphQLResponse<HydrateNodesResponse> = await callGraphQL(
+    { query: HYDRATE_BODIES_QUERY, variables: { ids: nodeIds } },
+    token,
+    fetchImpl,
+  );
+
+  if (payload.errors?.length) {
+    throw new Error(`GitHub GraphQL error: ${payload.errors.map((e) => e.message).join('; ')}`);
+  }
+
+  for (const node of payload.data?.nodes ?? []) {
+    if (node?.id && typeof node.body === 'string') {
+      bodies.set(node.id, node.body);
+    }
+  }
+  return bodies;
 }

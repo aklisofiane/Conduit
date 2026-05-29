@@ -64,3 +64,10 @@ export const triggerEventSchema = z.object({
   actor: z.string().optional(),
 });
 export type TriggerEvent = z.infer<typeof triggerEventSchema>;
+
+const DEFAULT_BODY_CAP = 64 * 1024;
+
+export function capTriggerBody(body: string, max = DEFAULT_BODY_CAP): string {
+  if (body.length <= max) return body;
+  return body.slice(0, max) + '\n\n[truncated]';
+}

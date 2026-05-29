@@ -1,5 +1,5 @@
 import type { TriggerEvent, TriggerFilter } from '@conduit/shared';
-import { applyFilter } from '@conduit/shared';
+import { applyFilter, capTriggerBody } from '@conduit/shared';
 import type { ProjectBoardItem } from '@conduit/shared/platform';
 
 /**
@@ -7,10 +7,7 @@ import type { ProjectBoardItem } from '@conduit/shared/platform';
  * filters against it. Mirrors the webhook-side flatten+apply dance in
  * `matchesTrigger` so a single filter set works in either mode.
  */
-export function itemPassesFilters(
-  item: ProjectBoardItem,
-  filters: TriggerFilter[],
-): boolean {
+export function itemPassesFilters(item: ProjectBoardItem, filters: TriggerFilter[]): boolean {
   const view = {
     status: item.singleSelectValues.Status,
     labels: item.labels,
@@ -70,7 +67,7 @@ export function toTriggerEvent(
       key: item.contentKey,
       title: item.contentTitle,
       url: item.contentUrl,
-      ...(typeof item.contentBody === 'string' ? { body: item.contentBody } : {}),
+      ...(typeof item.contentBody === 'string' ? { body: capTriggerBody(item.contentBody) } : {}),
     };
   }
   if (scope === 'pull_requests' && item.pr) {

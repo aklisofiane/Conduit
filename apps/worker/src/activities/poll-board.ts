@@ -8,6 +8,7 @@ import {
   ticketLockFor,
   type PollCycleResult,
   type PollWorkflowInput,
+  capTriggerBody,
   type TriggerEvent,
   type WorkflowDefinition,
   workflowDefinitionSchema,
@@ -20,6 +21,7 @@ import {
   fetchProjectBoardItems,
   fetchRepositoryIssues,
   fetchRepositoryPullRequests,
+  hydrateGithubItemBodies,
   fetchGitlabProjectIssues,
   fetchGitlabProjectMergeRequests,
 } from '@conduit/shared/platform';
@@ -34,9 +36,7 @@ import { itemPassesFilters, toTriggerEvent } from './poll-board-helpers';
  * Trigger config is re-read + re-parsed on every tick so edits take effect
  * on the next scheduled tick without needing to rewrite the schedule.
  */
-export async function pollBoardActivity(
-  input: PollWorkflowInput,
-): Promise<PollCycleResult> {
+export async function pollBoardActivity(input: PollWorkflowInput): Promise<PollCycleResult> {
   const { workflowId } = input;
 
   const wf = await prisma().workflow.findUnique({
@@ -172,6 +172,21 @@ export async function pollBoardActivity(
   const eventsToStart = candidateEvents.filter((event) => matchesTrigger(event, trigger));
   const gatedOutCount = candidateEvents.length - eventsToStart.length;
 
+  if (platform === 'github' && eventsToStart.length > 0) {
+    const idsToHydrate = eventsToStart.map((e) => e.issue?.id).filter((id): id is string => !!id);
+    if (idsToHydrate.length > 0) {
+      const bodies = await hydrateGithubItemBodies(idsToHydrate, token);
+      for (const event of eventsToStart) {
+        if (event.issue?.id) {
+          const body = bodies.get(event.issue.id);
+          if (typeof body === 'string') {
+            event.issue.body = capTriggerBody(body);
+          }
+        }
+      }
+    }
+  }
+
   const outcomes = await Promise.all(
     eventsToStart.map((event) => startAgentWorkflow(workflowId, wf.orgId, definition, event)),
   );
@@ -191,9 +206,8 @@ export async function pollBoardActivity(
       gatedOutIds.add(newItems[i]!.itemNodeId);
     }
   }
-  const snapshotIds = gatedOutIds.size > 0
-    ? matchingIds.filter((id) => !gatedOutIds.has(id))
-    : matchingIds;
+  const snapshotIds =
+    gatedOutIds.size > 0 ? matchingIds.filter((id) => !gatedOutIds.has(id)) : matchingIds;
 
   const snapshotChanged =
     startedRunIds.length > 0 ||
@@ -247,7 +261,6 @@ function readPreviousIds(raw: unknown): string[] {
   return raw.filter((v): v is string => typeof v === 'string');
 }
 
-
 type StartOutcome =
   | { ok: true; runId: string }
   | { ok: false; reason: 'duplicate' | 'error'; error?: string; issueKey?: string };
@@ -288,7 +301,9 @@ async function startAgentWorkflow(
   } catch (err) {
     if (err instanceof WorkflowExecutionAlreadyStartedError) {
       // Another Conduit start is in flight for this ticket — drop this one.
-      await prisma().workflowRun.delete({ where: { id: run.id } }).catch(() => undefined);
+      await prisma()
+        .workflowRun.delete({ where: { id: run.id } })
+        .catch(() => undefined);
       return { ok: false, reason: 'duplicate', issueKey };
     }
     const errMsg = err instanceof Error ? err.message : String(err);

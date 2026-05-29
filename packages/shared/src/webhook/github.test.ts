@@ -223,6 +223,74 @@ describe('normalizeGithubWebhook', () => {
     expect(evt?.actor).toBeUndefined();
   });
 
+  it('truncates oversized issue body on issues.opened', () => {
+    const longBody = 'x'.repeat(64 * 1024 + 500);
+    const evt = normalizeGithubWebhook('issues', {
+      action: 'opened',
+      repository: BASE_REPO,
+      sender: { login: 'alice' },
+      issue: {
+        id: 99,
+        node_id: 'I_kgBIG',
+        number: 100,
+        title: 'Huge body',
+        html_url: 'https://github.com/acme/shop/issues/100',
+        body: longBody,
+      },
+    });
+
+    expect(evt?.issue?.body).toBeDefined();
+    expect(evt?.issue?.body).toMatch(/\n\n\[truncated\]$/);
+    expect(evt?.issue?.body?.length).toBe(64 * 1024 + '\n\n[truncated]'.length);
+  });
+
+  it('truncates oversized PR body on pull_request.opened', () => {
+    const longBody = 'y'.repeat(64 * 1024 + 500);
+    const evt = normalizeGithubWebhook('pull_request', {
+      action: 'opened',
+      repository: BASE_REPO,
+      sender: { login: 'bob' },
+      pull_request: {
+        id: 200,
+        node_id: 'PR_kgBIG',
+        number: 20,
+        title: 'Huge PR body',
+        html_url: 'https://github.com/acme/shop/pull/20',
+        body: longBody,
+        head: {
+          ref: 'conduit/20-huge-pr-body',
+          repo: { name: 'shop', owner: { login: 'acme' } },
+        },
+        base: {
+          ref: 'main',
+          repo: { name: 'shop', owner: { login: 'acme' } },
+        },
+      },
+    });
+
+    expect(evt?.issue?.body).toBeDefined();
+    expect(evt?.issue?.body).toMatch(/\n\n\[truncated\]$/);
+    expect(evt?.issue?.body?.length).toBe(64 * 1024 + '\n\n[truncated]'.length);
+  });
+
+  it('passes through normal-sized body unchanged on issues.opened', () => {
+    const evt = normalizeGithubWebhook('issues', {
+      action: 'opened',
+      repository: BASE_REPO,
+      sender: { login: 'alice' },
+      issue: {
+        id: 101,
+        node_id: 'I_kgNORM',
+        number: 101,
+        title: 'Normal issue',
+        html_url: 'https://github.com/acme/shop/issues/101',
+        body: 'Normal body text',
+      },
+    });
+
+    expect(evt?.issue?.body).toBe('Normal body text');
+  });
+
   it('returns null for garbage input', () => {
     expect(normalizeGithubWebhook('issues', null)).toBeNull();
     expect(normalizeGithubWebhook('issues', 'not-an-object')).toBeNull();

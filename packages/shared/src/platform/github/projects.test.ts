@@ -3,6 +3,7 @@ import {
   fetchProjectBoardItems,
   fetchRepositoryIssues,
   fetchRepositoryPullRequests,
+  hydrateGithubItemBodies,
   listProjectBoards,
 } from './projects';
 
@@ -223,7 +224,7 @@ describe('fetchProjectBoardItems', () => {
     });
   });
 
-  it('captures `contentBody` when the project item content carries a body', async () => {
+  it('does not populate contentBody from initial fetch (body omitted from query)', async () => {
     const canned = {
       data: {
         owner: {
@@ -239,7 +240,6 @@ describe('fetchProjectBoardItems', () => {
                     number: 42,
                     title: 't',
                     url: 'https://x',
-                    body: 'Reproduces on iOS only.',
                     repository: { name: 'shop', owner: { login: 'acme' } },
                   },
                   fieldValues: { nodes: [] },
@@ -252,7 +252,6 @@ describe('fetchProjectBoardItems', () => {
                     number: 7,
                     title: 'p',
                     url: 'https://x',
-                    body: 'Closes #42.',
                     repository: { name: 'shop', owner: { login: 'acme' } },
                     isDraft: false,
                     headRefName: 'f',
@@ -272,8 +271,8 @@ describe('fetchProjectBoardItems', () => {
       { ownerType: 'org', owner: 'acme', projectNumber: 5, token: 't' },
       fakeFetch,
     );
-    expect(items[0]?.contentBody).toBe('Reproduces on iOS only.');
-    expect(items[1]?.contentBody).toBe('Closes #42.');
+    expect(items[0]?.contentBody).toBeUndefined();
+    expect(items[1]?.contentBody).toBeUndefined();
   });
 
   it('does not populate `pr` for Issue items', async () => {
@@ -412,10 +411,7 @@ describe('listProjectBoards', () => {
     const canned = { data: { owner: null } };
     const fakeFetch = makeFetch([canned]);
     await expect(
-      listProjectBoards(
-        { ownerType: 'user', owner: 'unknown', token: 't' },
-        fakeFetch,
-      ),
+      listProjectBoards({ ownerType: 'user', owner: 'unknown', token: 't' }, fakeFetch),
     ).rejects.toThrow(/User "unknown" not found/);
   });
 
@@ -423,10 +419,7 @@ describe('listProjectBoards', () => {
     const canned = { errors: [{ message: 'Bad credentials', type: 'UNAUTHORIZED' }] };
     const fakeFetch = makeFetch([canned]);
     await expect(
-      listProjectBoards(
-        { ownerType: 'org', owner: 'acme', token: 'bad' },
-        fakeFetch,
-      ),
+      listProjectBoards({ ownerType: 'org', owner: 'acme', token: 'bad' }, fakeFetch),
     ).rejects.toThrow(/Bad credentials/);
   });
 });
@@ -496,7 +489,7 @@ describe('fetchRepositoryPullRequests', () => {
     });
   });
 
-  it('captures `contentBody` from the PR `body` field', async () => {
+  it('does not populate contentBody from initial fetch (body omitted from query)', async () => {
     const canned = {
       data: {
         repository: {
@@ -508,7 +501,6 @@ describe('fetchRepositoryPullRequests', () => {
                 number: 9,
                 title: 'with body',
                 url: 'https://github.com/acme/shop/pull/9',
-                body: 'Refactor checkout flow.',
                 isDraft: false,
                 headRefName: 'refactor',
                 baseRefName: 'main',
@@ -526,7 +518,7 @@ describe('fetchRepositoryPullRequests', () => {
       { owner: 'acme', name: 'shop', token: 't' },
       fakeFetch,
     );
-    expect(items[0]?.contentBody).toBe('Refactor checkout flow.');
+    expect(items[0]?.contentBody).toBeUndefined();
   });
 
   it('throws when the repo cannot be resolved', async () => {
@@ -595,7 +587,7 @@ describe('fetchRepositoryIssues', () => {
     ).rejects.toThrow(/Repository acme\/missing not found/);
   });
 
-  it('captures `contentBody` from the issue `body` field', async () => {
+  it('does not populate contentBody from initial fetch (body omitted from query)', async () => {
     const canned = {
       data: {
         repository: {
@@ -607,7 +599,6 @@ describe('fetchRepositoryIssues', () => {
                 number: 42,
                 title: 'with body',
                 url: 'https://x',
-                body: 'Steps to reproduce: open empty cart.',
                 repository: { name: 'shop', owner: { login: 'acme' } },
                 labels: { nodes: [] },
               },
@@ -621,7 +612,55 @@ describe('fetchRepositoryIssues', () => {
       { owner: 'acme', name: 'shop', token: 't' },
       fakeFetch,
     );
-    expect(items[0]?.contentBody).toBe('Steps to reproduce: open empty cart.');
+    expect(items[0]?.contentBody).toBeUndefined();
+  });
+});
+
+describe('hydrateGithubItemBodies', () => {
+  it('returns a Map of node IDs to body strings', async () => {
+    const canned = {
+      data: {
+        nodes: [
+          { id: 'I_1', body: 'Issue body' },
+          { id: 'PR_1', body: 'PR body' },
+        ],
+      },
+    };
+    const fakeFetch = makeFetch([canned]);
+    const map = await hydrateGithubItemBodies(['I_1', 'PR_1'], 'tok', fakeFetch);
+    expect(map.get('I_1')).toBe('Issue body');
+    expect(map.get('PR_1')).toBe('PR body');
+  });
+
+  it('returns empty map and skips fetch when given empty ID list', async () => {
+    let called = false;
+    const trackingFetch: typeof fetch = async () => {
+      called = true;
+      return new Response('{}', { status: 200 });
+    };
+    const map = await hydrateGithubItemBodies([], 'tok', trackingFetch);
+    expect(map.size).toBe(0);
+    expect(called).toBe(false);
+  });
+
+  it('throws on GraphQL error response', async () => {
+    const canned = { errors: [{ message: 'Bad credentials' }] };
+    const fakeFetch = makeFetch([canned]);
+    await expect(hydrateGithubItemBodies(['I_1'], 'tok', fakeFetch)).rejects.toThrow(
+      /Bad credentials/,
+    );
+  });
+
+  it('skips nodes that are null or missing body', async () => {
+    const canned = {
+      data: {
+        nodes: [null, { id: 'I_1' }, { id: 'I_2', body: 'text' }],
+      },
+    };
+    const fakeFetch = makeFetch([canned]);
+    const map = await hydrateGithubItemBodies(['I_1', 'I_2', 'I_3'], 'tok', fakeFetch);
+    expect(map.size).toBe(1);
+    expect(map.get('I_2')).toBe('text');
   });
 });
 

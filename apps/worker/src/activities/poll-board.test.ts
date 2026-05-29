@@ -33,11 +33,9 @@ const PR_ITEM: ProjectBoardItem = {
 
 describe('itemPassesFilters', () => {
   it('passes a PR item under `pr_state: ready_for_review` when isDraft is false', () => {
-    expect(
-      itemPassesFilters(PR_ITEM, [
-        { field: 'pr_state', value: 'ready_for_review' },
-      ]),
-    ).toBe(true);
+    expect(itemPassesFilters(PR_ITEM, [{ field: 'pr_state', value: 'ready_for_review' }])).toBe(
+      true,
+    );
   });
 
   it('rejects a draft PR under `pr_state: ready_for_review`', () => {
@@ -45,9 +43,9 @@ describe('itemPassesFilters', () => {
       ...PR_ITEM,
       pr: { ...PR_ITEM.pr!, state: 'draft' },
     };
-    expect(
-      itemPassesFilters(draft, [{ field: 'pr_state', value: 'ready_for_review' }]),
-    ).toBe(false);
+    expect(itemPassesFilters(draft, [{ field: 'pr_state', value: 'ready_for_review' }])).toBe(
+      false,
+    );
   });
 
   it('matches both PR states under `pr_state: any`', () => {
@@ -129,5 +127,24 @@ describe('toTriggerEvent', () => {
 
   it('omits `event.issue.body` when the board item has no `contentBody`', () => {
     expect(toTriggerEvent(ISSUE_ITEM, 'issues').issue?.body).toBeUndefined();
+  });
+
+  it('caps oversized contentBody with truncation suffix', () => {
+    const oversized: ProjectBoardItem = {
+      ...ISSUE_ITEM,
+      contentBody: 'x'.repeat(64 * 1024 + 100),
+    };
+    const body = toTriggerEvent(oversized, 'issues').issue?.body;
+    expect(body).toBeDefined();
+    expect(body!.endsWith('\n\n[truncated]')).toBe(true);
+    expect(body!.length).toBe(64 * 1024 + '\n\n[truncated]'.length);
+  });
+
+  it('passes through contentBody under cap unchanged', () => {
+    const atCap: ProjectBoardItem = {
+      ...ISSUE_ITEM,
+      contentBody: 'a'.repeat(64 * 1024),
+    };
+    expect(toTriggerEvent(atCap, 'issues').issue?.body).toBe('a'.repeat(64 * 1024));
   });
 });
