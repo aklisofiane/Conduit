@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useCancelRun, useRun, useRunLogs } from '../api/hooks.js';
 import type { ExecutionLogRow, NodeRunRow } from '../api/types.js';
@@ -34,12 +34,16 @@ export function RunDetailPage() {
   }, [run]);
 
   const selected = run?.nodes.find((n) => n.nodeName === selectedNode);
+  const autoSwitchedNode = useRef<string | undefined>(undefined);
   useEffect(() => {
-    // Auto-switch to Error tab when a node fails so users don't hunt for it.
-    if (selected?.status === 'FAILED' && activeTab === 'timeline') {
+    // Auto-switch to Error tab the first time a failed node is shown so users
+    // don't hunt for it — but only once per node, so they can still navigate
+    // back to Timeline afterwards.
+    if (selected?.status === 'FAILED' && autoSwitchedNode.current !== selected.nodeName) {
+      autoSwitchedNode.current = selected.nodeName;
       setActiveTab('error');
     }
-  }, [selected?.status, activeTab]);
+  }, [selected?.status, selected?.nodeName]);
 
   const { data: logs = [] } = useRunLogs(runId, selectedNode);
   const orderedEvents = useOrderedEvents(logs);
