@@ -85,3 +85,8 @@ export const MCP_PRESETS: readonly McpPreset[] = [
 export function findMcpPreset(id: string): McpPreset | undefined {
   return MCP_PRESETS.find((p) => p.id === id);
 }
+
+/** Lookup by credential platform. Returns undefined for platforms without a shipped preset. */
+export function findMcpPresetByPlatform(platform: Platform): McpPreset | undefined {
+  return MCP_PRESETS.find((p) => p.platform === platform);
+}

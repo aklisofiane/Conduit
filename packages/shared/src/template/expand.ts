@@ -109,6 +109,9 @@ function expandMcpServer(
     transport: server.transport ?? preset.transport,
     connectionId: server.connectionId,
     discoveredTools: server.discoveredTools,
+    // Provenance only when the transport is the preset's own — a template
+    // that inlines a custom transport opts out of platform-follow swapping.
+    presetId: server.transport ? undefined : server.presetId,
   };
 }
 

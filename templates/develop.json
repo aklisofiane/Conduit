@@ -1,12 +1,12 @@
 {
   "id": "develop",
   "name": "Develop",
-  "description": "Multi-agent development pipeline: Planner dispatches Dev + Tests in parallel, Docs documents the result, QA merges and opens a draft PR. Triggered on status = \"Dev\".",
+  "description": "Multi-agent development pipeline: Planner dispatches Dev + Tests in parallel, Docs documents the result, QA merges and opens a draft pull/merge request. Triggered when a ticket enters the \"Dev\" board column (rename the trigger filter to match your board's column or label names).",
   "category": "develop",
   "workflows": [
     {
       "name": "Develop",
-      "description": "Polling on status=Dev. Planner reads the ticket and dispatches scoped work to Dev and Tests (parallel branched worktrees). Docs runs once both finish so it documents what was actually shipped. QA consumes the merged workspace and opens a draft PR.",
+      "description": "Polling on status=Dev. Planner reads the ticket and dispatches scoped work to Dev and Tests (parallel branched worktrees). Docs runs once both finish so it documents what was actually shipped. QA consumes the merged workspace and opens a draft pull/merge request.",
       "definition": {
         "triggers": [
           {
@@ -52,7 +52,7 @@
             "id": "agent-qa",
             "name": "QA",
             "presetId": "qa",
-            "instructionsAppend": "After opening the draft PR, move the ticket to the \"Review\" column on the board.",
+            "instructionsAppend": "After opening the draft pull/merge request, move the ticket to the review-stage column or label on the board (named \"Review\" by default).",
             "mcpServers": [{ "serverId": "github-mcp" }],
             "skills": []          }
         ],

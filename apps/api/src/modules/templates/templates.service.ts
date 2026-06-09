@@ -7,10 +7,12 @@ import {
 } from '@nestjs/common';
 import {
   connectionScopeSchema,
+  findMcpPresetByPlatform,
   isScheduledTrigger,
   platformForScopeKind,
   resolveTemplate,
   type ConnectionScopeKind,
+  type Platform,
   type TemplatePlaceholder,
   type TemplateSummary,
   type WorkflowDefinition,
@@ -112,6 +114,35 @@ export class TemplatesService implements OnModuleInit {
             const parsed = connectionScopeSchema.parse(conn.scope);
             const derived = platformForScopeKind(parsed.kind);
             if (derived) trigger.platform = derived;
+          }
+        }
+        // Preset-backed MCP servers follow the bound connection's platform,
+        // same idea as the trigger.platform rewrite above: the template JSON
+        // ships a GitHub default, but a GitLab binding gets the GitLab preset.
+        for (const server of resolvedDefinition.mcpServers) {
+          if (!server.presetId || !server.connectionId) continue;
+          const conn = await tx.connection.findUnique({
+            where: { id: server.connectionId },
+            select: { scope: true },
+          });
+          if (!conn) continue;
+          const parsed = connectionScopeSchema.parse(conn.scope);
+          const source = platformForScopeKind(parsed.kind);
+          const platform = source
+            ? (source.toUpperCase() as Platform)
+            : undefined;
+          const preset = platform
+            ? findMcpPresetByPlatform(platform)
+            : undefined;
+          if (!preset) {
+            throw new BadRequestException(
+              `MCP server "${server.name}" is preset-backed, but the bound connection's scope kind "${parsed.kind}" has no matching MCP preset.`,
+            );
+          }
+          if (preset.id !== server.presetId) {
+            server.presetId = preset.id;
+            server.name = preset.name;
+            server.transport = structuredClone(preset.transport);
           }
         }
         assertDefinitionValid(resolvedDefinition);

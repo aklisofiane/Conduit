@@ -1,7 +1,7 @@
 {
   "id": "analyze",
   "name": "Analyze",
-  "description": "Analyze a new issue, internally review the plan for gaps, and update the issue description with a grounded implementation approach. Triggered on GitHub issues.opened.",
+  "description": "Analyze a new issue, internally review the plan for gaps, and update the issue description with a grounded implementation approach. Triggered when an issue enters the \"Todo\" board column (rename the trigger filter to match your board's column or label names).",
   "category": "triage",
   "workflows": [
     {

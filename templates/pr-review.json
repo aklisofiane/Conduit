@@ -1,12 +1,12 @@
 {
   "id": "pr-review",
   "name": "PR Review",
-  "description": "Review a newly opened pull request. Posts inline comments and a summary review.",
+  "description": "Review a newly opened pull/merge request. Posts inline comments and a summary review.",
   "category": "review",
   "workflows": [
     {
       "name": "PR Review",
-      "description": "Reads the PR diff, posts inline comments where appropriate, leaves a summary review.",
+      "description": "Reads the pull/merge request diff, posts inline comments where appropriate, leaves a summary review.",
       "definition": {
         "triggers": [
           {
@@ -24,7 +24,7 @@
             "id": "agent-pr-review",
             "name": "Review",
             "presetId": "pr-reviewer",
-            "instructionsAppend": "A pull request has just been opened. Read the PR metadata from the trigger context. Submit your review with COMMENT state only via the connected MCP server. Read local guidance such as CLAUDE.md or CONTRIBUTING.md when present.",
+            "instructionsAppend": "A pull/merge request has just been opened. Read its metadata from the trigger context. Submit your review with COMMENT state only via the connected MCP server. Read local guidance such as CLAUDE.md or CONTRIBUTING.md when present.",
             "mcpServers": [{ "serverId": "github-mcp" }],
             "skills": []          }
         ],

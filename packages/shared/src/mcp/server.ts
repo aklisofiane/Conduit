@@ -13,6 +13,13 @@ export const workflowMcpServerSchema = z.object({
   transport: mcpTransportSchema,
   connectionId: z.string().optional(),
   discoveredTools: z.array(discoveredToolSchema).optional(),
+  /**
+   * Provenance marker: set when `transport` was copied verbatim from the
+   * `MCP_PRESETS` entry with this id. Lets template instantiation swap the
+   * transport to the preset matching the bound connection's platform.
+   * Absent on user-defined transports — those are never rewritten.
+   */
+  presetId: z.string().optional(),
 });
 export type WorkflowMcpServer = z.infer<typeof workflowMcpServerSchema>;
 

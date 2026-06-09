@@ -32,7 +32,7 @@
             "id": "agent-publish",
             "name": "Publish",
             "presetId": "publish",
-            "instructionsAppend": "Read the upstream Code Reviewer's verdict in `.conduit/`. Submit a PR review via the connected MCP server: APPROVE if the verdict recommends approval, or REQUEST_CHANGES with inline comments if changes are needed. After submitting the review, move the ticket: on approval move to \"ReadyToMerge\"; on changes requested move back to \"Dev\".",
+            "instructionsAppend": "Read the upstream Code Reviewer's verdict in `.conduit/`. Submit a review on the pull/merge request via the connected MCP server: approve if the verdict recommends approval, or request changes with inline comments if changes are needed. After submitting the review, move the ticket: on approval move to the ready-to-merge column or label (\"ReadyToMerge\" by default); on changes requested move back to the development column or label (\"Dev\" by default).",
             "mcpServers": [{ "serverId": "github-mcp" }],
             "skills": []
           }

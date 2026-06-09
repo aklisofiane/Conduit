@@ -338,7 +338,50 @@ describe('mcp preset expansion', () => {
     expect(server.name).toBe(githubPreset.name);
     expect(server.transport).toEqual(githubPreset.transport);
     expect(server.connectionId).toBe('<github-repo>');
+    // Provenance survives expansion so instantiation can platform-swap.
+    expect(server.presetId).toBe('github');
     expect(templateFileSchema.safeParse(expanded).success).toBe(true);
+  });
+
+  it('expandTemplate drops presetId provenance when the template inlines a transport', () => {
+    const t = structuredClone(baseInput);
+    t.workflows[0]!.definition.mcpServers[0]!.transport = {
+      kind: 'stdio',
+      command: 'custom',
+      args: [],
+      env: {},
+    };
+    const expanded = expandTemplate(t, {
+      agent: () => RESEARCH_PRESET,
+      mcp: findMcpPreset,
+    });
+    expect(expanded.workflows[0]!.definition.mcpServers[0]!.presetId).toBeUndefined();
+  });
+
+  it('preset-backed mcp slots expect a repo-type scope; user transports stay any', () => {
+    const expanded = expandTemplate(baseInput, {
+      agent: () => RESEARCH_PRESET,
+      mcp: findMcpPreset,
+    });
+    const details = collectTemplatePlaceholderDetails(expanded);
+    const repoSlot = details.find((d) => d.alias === 'github-repo')!;
+    expect(repoSlot.expectedScopeKinds).toEqual(['repo']);
+
+    const userTransport = structuredClone(baseInput);
+    userTransport.workflows[0]!.definition.mcpServers[0]! = {
+      id: 'github-mcp',
+      name: 'Custom',
+      transport: { kind: 'stdio', command: 'custom', args: [], env: {} },
+      connectionId: '<custom-server>',
+    };
+    const expandedUser = expandTemplate(userTransport, {
+      agent: () => RESEARCH_PRESET,
+      mcp: findMcpPreset,
+    });
+    const userDetails = collectTemplatePlaceholderDetails(expandedUser);
+    expect(
+      userDetails.find((d) => d.alias === 'custom-server')!.expectedScopeKinds,
+    ).toEqual(['any']);
   });
 
   it('expandTemplate throws UnknownMcpPresetError when the mcp preset is missing', () => {
