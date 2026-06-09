@@ -18,6 +18,11 @@ export const STDERR_TAIL_BYTES = 8 * 1024;
  * runner (via the spawner-supplied `cancel`) and surfaces a synthetic
  * `exit` error so the orchestrator's existing failure path picks it up.
  *
+ * Liveness is measured at the raw-stdout level, not per yielded event: the
+ * generator suspends at `yield` until the consumer pulls again, so a slow
+ * consumer (e.g. a DB hiccup in the orchestrator's per-event handling)
+ * must not look like a silent runner whose heartbeats sit buffered.
+ *
  * Forwards the runner's stderr verbatim to the worker process's stderr —
  * useful for diagnosing environment-level failures (e.g. native build
  * errors, missing system tools) that the agent never gets to report.
@@ -30,6 +35,9 @@ export async function* pumpEvents(
 ): AsyncIterable<RunnerEvent> {
   let lastTouch = Date.now();
   let livenessFired = false;
+  child.stdout.on('data', () => {
+    lastTouch = Date.now();
+  });
   const liveness = setInterval(() => {
     if (Date.now() - lastTouch > livenessMs) {
       livenessFired = true;
@@ -52,7 +60,6 @@ export async function* pumpEvents(
   let sawTerminalExit = false;
   try {
     for await (const event of readRunnerEvents(child.stdout, onMalformed)) {
-      lastTouch = Date.now();
       if (event.kind === 'exit') sawTerminalExit = true;
       yield event;
     }

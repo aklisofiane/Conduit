@@ -1,5 +1,5 @@
 export { LocalDockerSpawner } from './local-docker';
-export { LocalProcessSpawner } from './local-process';
+export { LocalProcessSpawner, resolveRunnerEntryPoint } from './local-process';
 export type { RunnerHandle, RunnerSpawner } from './spawner';
 export { resolveRunnerSpawner, runnerImageTag } from './resolve';
 export { resolveRunnerMode, type RunnerMode } from './mode';

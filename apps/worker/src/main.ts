@@ -15,6 +15,7 @@ import { closePrisma } from './runtime/prisma';
 import {
   dockerPreflight,
   resolveAgentAuthMode,
+  resolveRunnerEntryPoint,
   resolveRunnerMode,
   sweepOrphanProcessGroups,
   sweepOrphans,
@@ -38,26 +39,29 @@ async function run(): Promise<void> {
         '[runner] CONDUIT_AGENT_AUTH=oauth-mount active — host ~/.codex/auth.json is bind-mounted into agent containers; do not use in shared/production environments.',
       );
     }
-    // Catch containers from a previous worker process whose run already
-    // settled to a terminal state. Best-effort; never blocks startup.
-    await sweepOrphans().catch((err: unknown) => {
-      console.warn(
-        'Orphan sweep failed:',
-        err instanceof Error ? err.message : String(err),
-      );
-    });
   } else {
     console.warn(
       '[runner] host mode — agent runs execute unsandboxed on this host, as this user, with this environment.',
     );
+    // Host counterpart of dockerPreflight: refuse to start when the runner
+    // entry point hasn't been built, instead of failing every run at spawn
+    // time once activities start landing.
+    resolveRunnerEntryPoint();
     if (resolveAgentAuthMode() === 'oauth-mount') {
       console.log(
         '[runner] CONDUIT_AGENT_AUTH=oauth-mount is a no-op in host mode — the runner sees the real $HOME, so ~/.codex/auth.json is reachable without a mount.',
       );
     }
-    // Host counterpart of the container sweep: kill process groups whose
-    // pidfile points at a run that already settled. Best-effort.
-    await sweepOrphanProcessGroups().catch((err: unknown) => {
+  }
+
+  // Reap runners left behind by a previous worker session — containers
+  // labelled with a settled run, and process groups whose pidfile points at
+  // one. Both sweeps run regardless of today's mode: orphans belong to
+  // whichever mode the *previous* session ran in, and each sweep no-ops
+  // cheaply when its substrate is absent (no Docker / no runs root).
+  // Best-effort; never blocks startup.
+  for (const sweep of [sweepOrphans, sweepOrphanProcessGroups]) {
+    await sweep().catch((err: unknown) => {
       console.warn(
         'Orphan sweep failed:',
         err instanceof Error ? err.message : String(err),

@@ -81,6 +81,10 @@ export class LocalDockerSpawner implements RunnerSpawner {
     });
 
     const child = spawn('docker', args, { stdio: ['pipe', 'pipe', 'pipe'] });
+    // Swallow EPIPE from a docker process that dies before draining stdin —
+    // an unhandled stream 'error' would crash the whole worker. The failure
+    // still surfaces through the pump's synthetic exit event.
+    child.stdin.on('error', () => undefined);
     child.stdin.setDefaultEncoding('utf8');
     child.stdin.write(JSON.stringify(req));
     child.stdin.end();

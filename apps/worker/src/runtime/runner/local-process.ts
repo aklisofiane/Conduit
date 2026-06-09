@@ -61,6 +61,7 @@ export const SPAWN_ENV_DENYLIST: readonly string[] = [
   'BETTER_AUTH_SECRET',
   'WEBHOOK_DEV_SECRET',
   'GITHUB_CLIENT_SECRET',
+  'GITLAB_CLIENT_SECRET',
   'ANTHROPIC_API_KEY',
   'OPENAI_API_KEY',
   'CLAUDE_CODE_OAUTH_TOKEN',
@@ -109,7 +110,7 @@ export class LocalProcessSpawner implements RunnerSpawner {
     };
 
     try {
-      await writeRunnerPidfile(runDirPath, pid);
+      await writeRunnerPidfile(runDirPath, req.run.nodeName, pid);
     } catch (err) {
       await cancel();
       throw new Error(
@@ -117,6 +118,11 @@ export class LocalProcessSpawner implements RunnerSpawner {
       );
     }
 
+    // A runner that dies before draining stdin (e.g. a module-load failure
+    // in the entry point) EPIPEs the write; without a listener that is a
+    // process-killing uncaught exception on the whole worker. The failure
+    // itself still surfaces through the pump's synthetic exit event.
+    child.stdin.on('error', () => undefined);
     child.stdin.setDefaultEncoding('utf8');
     child.stdin.write(JSON.stringify(req));
     child.stdin.end();
@@ -136,10 +142,14 @@ export class LocalProcessSpawner implements RunnerSpawner {
       try {
         yield* pump;
       } finally {
-        // Pump exhausted ⇒ the runner process has exited; the pidfile is
-        // no longer tracking anything. Removing it keeps the boot sweep
-        // from SIGKILLing a recycled pid later.
-        await removeRunnerPidfile(runDirPath).catch(() => undefined);
+        // The pump can end while the group is still alive — the consumer
+        // breaking out of (or throwing from) its for-await skips the
+        // pump's post-loop wait for child exit. Tear the group down before
+        // dropping the pidfile, so the boot sweep can always find a group
+        // that outlived its run; cancel() is idempotent and returns
+        // immediately when the group is already gone.
+        await cancel().catch(() => undefined);
+        await removeRunnerPidfile(runDirPath, req.run.nodeName).catch(() => undefined);
       }
     })();
 

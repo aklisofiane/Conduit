@@ -21,6 +21,7 @@ describe('buildSpawnEnv', () => {
       BETTER_AUTH_SECRET: 'auth',
       WEBHOOK_DEV_SECRET: 'hook',
       GITHUB_CLIENT_SECRET: 'gh',
+      GITLAB_CLIENT_SECRET: 'gl',
       ANTHROPIC_API_KEY: 'sk-ant',
       OPENAI_API_KEY: 'sk-oai',
       CLAUDE_CODE_OAUTH_TOKEN: 'oat',
@@ -77,8 +78,15 @@ describe('LocalProcessSpawner', () => {
   const req = (): RunnerRequest =>
     ({ run: { runId, nodeName: 'Worker' } }) as unknown as RunnerRequest;
 
+  // Keyed by node name so parallel nodes in the same run can't clobber
+  // each other's tracking; the request above uses nodeName 'Worker'.
   const pidfile = (): string =>
-    path.join(tmpDir, 'conduit-home', 'runs', runId, 'runner.pid');
+    path.join(tmpDir, 'conduit-home', 'runs', runId, 'runner-Worker.pid');
+
+  const readPidfilePid = async (): Promise<number> => {
+    const contents = JSON.parse(await fs.readFile(pidfile(), 'utf8')) as { pid: number };
+    return contents.pid;
+  };
 
   async function writeStub(name: string, body: string): Promise<string> {
     const file = path.join(tmpDir, name);
@@ -127,7 +135,7 @@ describe('LocalProcessSpawner', () => {
     );
     const spawner = new LocalProcessSpawner({ entryPoint });
     const handle = await spawner.spawn(req(), new AbortController().signal);
-    const pid = Number.parseInt(await fs.readFile(pidfile(), 'utf8'), 10);
+    const pid = await readPidfilePid();
     expect(pid).toBeGreaterThan(0);
     for await (const _ of handle.events) {
       // drain
@@ -158,6 +166,22 @@ describe('LocalProcessSpawner', () => {
     expect(exit.error.message).toContain('boom: native tool missing');
   });
 
+  it('survives a runner that exits before reading stdin (EPIPE must not crash the worker)', async () => {
+    // No stdin handling at all: the process dies at "module load", the
+    // worker's stdin write EPIPEs, and the only acceptable outcome is a
+    // synthetic failed exit — not an uncaught exception.
+    const entryPoint = await writeStub('stillborn.js', `process.exit(7);`);
+    const spawner = new LocalProcessSpawner({ entryPoint });
+    const handle = await spawner.spawn(req(), new AbortController().signal);
+    const events = [];
+    for await (const e of handle.events) events.push(e);
+    expect(events).toHaveLength(1);
+    const exit = events[0]!;
+    expect(exit.kind).toBe('exit');
+    if (exit.kind !== 'exit' || exit.ok) throw new Error('expected failed exit');
+    expect(exit.error.message).toContain('code=7');
+  });
+
   it('cancel() kills the whole process group — SIGTERM-ignoring runner and its grandchild — and resolves only when gone', async () => {
     const grandchildPidFile = path.join(tmpDir, 'grandchild.pid');
     const entryPoint = await writeStub(
@@ -184,7 +208,7 @@ describe('LocalProcessSpawner', () => {
     const first = await iterator.next();
     expect(first.value).toEqual({ kind: 'system', message: 'dug in' });
     const grandchildPid = Number.parseInt(await fs.readFile(grandchildPidFile, 'utf8'), 10);
-    const runnerPid = Number.parseInt(await fs.readFile(pidfile(), 'utf8'), 10);
+    const runnerPid = await readPidfilePid();
 
     await handle.cancel();
 

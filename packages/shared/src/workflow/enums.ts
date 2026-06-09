@@ -10,6 +10,17 @@ import { z } from 'zod';
 export const runStatusSchema = z.enum(['PENDING', 'RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED']);
 export type RunStatus = z.infer<typeof runStatusSchema>;
 
+/**
+ * States a run can never leave. Single source of truth for the orphan
+ * sweeps (docker-admin / process-admin): a runner whose run is terminal
+ * has nothing left to do and is safe to reap.
+ */
+export const TERMINAL_RUN_STATUSES: readonly RunStatus[] = ['COMPLETED', 'FAILED', 'CANCELLED'];
+
+export function isTerminalRunStatus(status: string): boolean {
+  return (TERMINAL_RUN_STATUSES as readonly string[]).includes(status);
+}
+
 export const nodeTypeSchema = z.enum(['TRIGGER', 'AGENT']);
 export type NodeType = z.infer<typeof nodeTypeSchema>;
 

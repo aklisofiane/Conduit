@@ -133,8 +133,8 @@ src/
                                        `event-pump.ts` (spawner-agnostic stdout pump: liveness
                                        timeout, stderr tail, synthetic exit — consumed by both
                                        spawners), `docker-admin.ts` (`dockerPreflight` +
-                                       `sweepOrphans`), `process-admin.ts` (runner.pid write +
-                                       boot-time process-group sweep — host counterpart of
+                                       `sweepOrphans`), `process-admin.ts` (per-node runner-<node>.pid write
+                                       + boot-time process-group sweep — host counterpart of
                                        docker-admin), `auth-mode.ts` (`CONDUIT_AGENT_AUTH`
                                        parser), `json-line-iterator.ts` (line-buffered
                                        RunnerEvent stream with an 8 MiB per-line cap),
