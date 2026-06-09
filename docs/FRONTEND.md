@@ -85,7 +85,7 @@ The agent config panel includes a skills section:
 
 ### Issue writeback control
 
-Above the MCP server picker, an opt-in control that lets an agent end its run by updating the triggering GitHub issue:
+Above the MCP server picker, an opt-in control that lets an agent end its run by setting Status / labels on GitHub issues. It's offered for any GitHub trigger — issue-driven (board/webhook) **and** cron — since cron runs can write back to issues the agent creates during the run:
 
 - **Checkbox** — turns the feature on; presence of the field on `AgentConfig` (vs. `undefined`) is the on/off signal.
 - **Allowed statuses** pills — the trigger board's `Status` single-select options, fetched via `useListProjectBoards`.

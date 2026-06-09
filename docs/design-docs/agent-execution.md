@@ -220,7 +220,12 @@ The original design called for `mergeWorktreeActivity` to be a lightweight agent
 
 ## Issue writeback
 
-Optional per-agent capability: at end of run, the agent updates the triggering GitHub issue's project Status and/or applies repo labels. Opt-in via `AgentConfig.issueWriteback` (`packages/shared/src/agent/issue-writeback.ts`) — its mere presence is the "feature is on" signal. Both arrays may be empty; an empty allowlist is treated as enabled-but-unselected and the runtime skips the writeback turn entirely.
+Optional per-agent capability: at end of run, the agent sets a project Status and/or applies repo labels on GitHub issues. Opt-in via `AgentConfig.issueWriteback` (`packages/shared/src/agent/issue-writeback.ts`) — its mere presence is the "feature is on" signal. Both arrays may be empty; an empty allowlist is treated as enabled-but-unselected and the runtime skips the writeback turn entirely.
+
+The turn has two shapes, picked by whether the run has a triggering issue:
+
+- **Issue-anchored** — the run was fired by a GitHub issue event (polling / webhook); the agent updates that one issue.
+- **Repo-scoped** — the run targets a GitHub repo but no specific issue (a cron run; cron carries `repo` resolved from the trigger connection but no `issue`). The agent constrains the Status / labels it sets on whatever issues it creates or touches during the run — the nightly-review Publisher creating one issue per finding is the motivating case.
 
 ### Config-time
 
@@ -235,16 +240,18 @@ The field is hidden behind a hint when the workflow has no GitHub trigger. Picki
 
 Between the main turn and the summary turn, `runAgentNode` injects a third turn driven by `issueWritebackPrompt` (`packages/agent/src/context.ts`). The prompt interpolates the allowlist values verbatim — *only what the user picked appears* — so the choice set is encoded entirely in the prompt wording. There is no schema-level enforcement and no post-run validation; the agent is trusted to pick one of the listed values, or skip if none fit. Prompt construction is per-list — if only statuses (or only labels) are allowlisted, no phantom second list shows up in the directive.
 
-`resolveWritebackContext` returns `undefined` (skipping the turn) when:
+`resolveWritebackContext` (`apps/worker/src/activities/writeback.ts`) returns `undefined` (skipping the turn) when:
 
 - the agent has no `issueWriteback` field;
 - both `allowedStatuses` and `allowedLabels` are empty;
 - the run wasn't fired by a GitHub trigger;
-- `triggerEvent.issue` or `triggerEvent.repo` is missing (manual runs, future non-GitHub triggers).
+- `triggerEvent.repo` is missing (manual runs, future non-GitHub triggers).
+
+A run only needs a GitHub **repo** to qualify — not a triggering issue. `triggerEvent.issue` is optional: present ⇒ issue-anchored, absent ⇒ repo-scoped.
 
 ### Synthetic GitHub MCP auto-attach
 
-The agent needs the GitHub MCP to actually call the writeback. `runAgentNode` checks whether the agent already references a GitHub MCP server on the workflow (`agentReferencesGithubMcp` matches by transport args derived from `findMcpPreset('github')`, so a rename of the npm package doesn't break the check). If not, it builds a synthetic `WorkflowMcpServer` (id `__conduit_writeback_github__`, preset transport, bound to the workflow's GitHub trigger connection) and appends it to both `effectiveNode.mcpServers` and `effectiveMcpServers` for this activity invocation only — nothing is persisted to the workflow definition.
+The agent needs the GitHub MCP to actually call the writeback. `runAgentNode` checks whether the agent already references a GitHub MCP server on the workflow (`agentReferencesGithubMcp` in `apps/worker/src/activities/writeback.ts`). The check matches by transport fingerprint, not id, against `findMcpPreset('github')` so a rename doesn't break it — and it covers both transports the preset can take: the **shipped preset is a remote `streamable-http` server, matched by same `url`**, while a stdio GitHub MCP is matched by shared package args. (Matching only stdio args was the bug behind the duplicate, dead `GitHub (writeback)` server when the agent already carried the remote preset.) If no GitHub MCP is referenced, it builds a synthetic `WorkflowMcpServer` (id `__conduit_writeback_github__`, preset transport, bound to the workflow's GitHub trigger connection) and appends it to both `effectiveNode.mcpServers` and `effectiveMcpServers` for this activity invocation only — nothing is persisted to the workflow definition.
 
 When the user *has* added a GitHub MCP, that one wins regardless of which connection it uses. No double-attach.
 

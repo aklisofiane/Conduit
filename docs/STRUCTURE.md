@@ -96,6 +96,9 @@ src/
     topo-sort.ts                       pure graph ordering
   activities/
     run-agent-node.ts                  invokes provider, streams events via heartbeat + Redis
+    writeback.ts                       pure issue-writeback helpers (context resolution, GitHub
+                                       MCP match, synthetic auto-attach) — unit-testable apart
+                                       from run-agent-node's Temporal/Prisma imports
     cron-fire.ts                       one cron tick — build TriggerEvent, start agentWorkflow
     load-graph.ts, cleanup-run.ts
     merge-worktree.ts                  clean-merge parallel branched worktree back into upstream
