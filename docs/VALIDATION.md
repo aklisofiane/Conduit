@@ -37,7 +37,7 @@ Per-package, real external deps, slower.
 
 The lever that makes Claude able to validate exit criteria autonomously.
 
-Harness spins up: Postgres + Temporal + Redis + api + worker + `StubProvider`. Drives via HTTP. Asserts on DB state, WS frames, workspace filesystem, Temporal workflow history.
+Harness spins up: Postgres + Temporal + Redis + api + worker + `StubProvider`. Drives via HTTP. Asserts on DB state, WS frames, workspace filesystem, Temporal workflow history. The harness pins `CONDUIT_RUNNER_MODE=docker` so e2e always exercises the real `agent-runner` image, even though local deployments default to host runner mode.
 
 **Example** — webhook-triggered run:
 ```

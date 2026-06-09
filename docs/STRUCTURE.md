@@ -122,17 +122,25 @@ src/
                                        — DB-row-wins lookup feeding `runAgentNode`'s runner request;
                                        falls back to `config.{anthropic,openai}ApiKey` when absent)
   runtime/runner/                      runner-spawn primitive used by `runAgentNode` —
+                                       `mode.ts` (CONDUIT_DEPLOYMENT × CONDUIT_RUNNER_MODE →
+                                       'docker' | 'host'; hosted+host refuses to boot),
                                        `local-docker.ts` (LocalDockerSpawner: builds the
-                                       `docker run` argv, pumps stdout via `json-line-iterator`,
-                                       enforces a stdout-liveness timeout, kills via
-                                       `docker kill <name>` so the container is reaped before the
-                                       call returns), `docker-admin.ts` (`dockerPreflight` +
-                                       `sweepOrphans` — both invoked from `main.ts`),
-                                       `auth-mode.ts` (`CONDUIT_AGENT_AUTH` parser),
-                                       `json-line-iterator.ts` (line-buffered RunnerEvent stream
-                                       with an 8 MiB per-line cap), `resolve.ts`
-                                       (image-tag picker + `setRunnerSpawnerForTest` hook),
-                                       `spawner.ts` (RunnerSpawner / RunnerHandle interface)
+                                       `docker run` argv, kills via `docker kill <name>` so the
+                                       container is reaped before the call returns),
+                                       `local-process.ts` (LocalProcessSpawner: detached host
+                                       process in its own group, secrets-denylist env via
+                                       `buildSpawnEnv`, SIGTERM→SIGKILL group kill),
+                                       `event-pump.ts` (spawner-agnostic stdout pump: liveness
+                                       timeout, stderr tail, synthetic exit — consumed by both
+                                       spawners), `docker-admin.ts` (`dockerPreflight` +
+                                       `sweepOrphans`), `process-admin.ts` (runner.pid write +
+                                       boot-time process-group sweep — host counterpart of
+                                       docker-admin), `auth-mode.ts` (`CONDUIT_AGENT_AUTH`
+                                       parser), `json-line-iterator.ts` (line-buffered
+                                       RunnerEvent stream with an 8 MiB per-line cap),
+                                       `resolve.ts` (mode-driven spawner picker +
+                                       `setRunnerSpawnerForTest` hook), `spawner.ts`
+                                       (RunnerSpawner / RunnerHandle interface)
 ```
 
 If it touches I/O, it belongs under `activities/` or `runtime/`, never `workflows/`.
@@ -157,6 +165,8 @@ src/
 ```
 
 Image tag resolution: `CONDUIT_RUNNER_IMAGE` (CI sets a git-sha tag), defaults to `agent-runner:dev`. The workspace `build` script chains `tsc` + `docker build` so any monorepo build keeps `agent-runner:dev` current; `npm run docker:agent-runner:build` forces a clean rebuild from the repo root. `pretest:e2e` builds `@conduit/agent-runner` alongside api+worker so e2e exercises the real image.
+
+In **host runner mode** (the local-deployment default; see [agent-execution.md](./design-docs/agent-execution.md#host-mode-local-deployments)) no image is involved: the worker spawns `dist/main.js` directly via the `@conduit/agent-runner` workspace dependency, so the same entry point runs byte-identical as a host process.
 
 ## apps/web (React + Vite)
 

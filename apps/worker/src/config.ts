@@ -1,6 +1,11 @@
 import { DEFAULT_TEMPORAL_TASK_QUEUE } from '@conduit/shared';
 
 export const config = {
+  // Mirrors apps/api/src/config.ts. The worker uses it to gate runner mode:
+  // `hosted` can never run agents outside Docker (see runtime/runner/mode.ts).
+  deployment: (process.env.CONDUIT_DEPLOYMENT === 'hosted' ? 'hosted' : 'local') as
+    | 'hosted'
+    | 'local',
   temporal: {
     address: process.env.TEMPORAL_ADDRESS ?? 'localhost:7233',
     namespace: process.env.TEMPORAL_NAMESPACE ?? 'default',

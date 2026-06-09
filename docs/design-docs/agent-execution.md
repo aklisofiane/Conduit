@@ -27,7 +27,7 @@ Failure handling: per-activity retry policy. Workflow-level `try/catch` marks ru
 | Activity | Responsibility |
 |---|---|
 | `loadGraphActivity(workflowId)` | Read workflow + nodes + edges from Postgres, return plain object |
-| `runAgentNode(node, context)` | **Orchestrator only.** Resolves workspace + MCP configs, packs a `RunnerRequest`, spawns an `agent-runner` container, and translates the returned `RunnerEvent` stream into Prisma + Redis + heartbeat writes. The provider SDK runs inside the runner, not here. See [Runner container model](#runner-container-model). |
+| `runAgentNode(node, context)` | **Orchestrator only.** Resolves workspace + MCP configs, packs a `RunnerRequest`, spawns an `agent-runner` (container or host process, by runner mode), and translates the returned `RunnerEvent` stream into Prisma + Redis + heartbeat writes. The provider SDK runs inside the runner, not here. See [Runner container model](#runner-container-model). |
 | `mergeWorktreeActivity(node, targetBranch)` | Spins up a lightweight agent session to merge a parallel agent's worktree back to the target branch — resolves conflicts via LLM if needed. See "Merge-back agent" below. |
 | `copyConduitFilesActivity(group)` | Copy `.conduit/` files from each parallel worktree into the target workspace after merge |
 | `cleanupRunActivity(runId)` | Best-effort cleanup after run ends — deletes workspace tmpdirs, prunes git worktrees, deletes `.conduit/` folder. `ticket-branch` workspaces have extra semantics; see [Cleanup for `ticket-branch` workspaces](#cleanup-for-ticket-branch-workspaces) below. |
@@ -66,8 +66,9 @@ The activity is now an **orchestrator** — it never imports a provider SDK. All
 7. On `exit ok=true` persist NodeRun COMPLETED with output (files, head,
    workspaceKind, branchName) and the runner-returned `.conduit/<NodeName>.md`.
    On `exit ok=false` or missing terminal event, throw — Temporal flips to FAILED.
-8. On cancel: the abort signal flows through `RunnerHandle.cancel()` → `docker kill`,
-   the container is reaped, and the activity returns CANCELLED.
+8. On cancel: the abort signal flows through `RunnerHandle.cancel()` — `docker kill`
+   in docker mode, a process-group SIGTERM→SIGKILL in host mode — the runner is
+   reaped, and the activity returns CANCELLED.
 ```
 
 ## Provider abstraction
@@ -128,7 +129,7 @@ Codex emits `web_search` items with no `status` field; the provider adapter tran
 
 ## Runner container model
 
-Provider SDKs and MCP servers run inside a dedicated `agent-runner` container — one short-lived `docker run --rm` per agent node — not on the worker process. The split:
+Provider SDKs and MCP servers run inside a dedicated `agent-runner` process — never on the worker process. In **docker mode** that's one short-lived `docker run --rm` per agent node; in **host mode** ([below](#host-mode-local-deployments)) it's a detached child process on the worker's machine. The orchestrator/runner split is identical either way:
 
 | Worker process (orchestrator) | Runner container (agent-runner) |
 |---|---|
@@ -136,7 +137,17 @@ Provider SDKs and MCP servers run inside a dedicated `agent-runner` container �
 | Workspace + MCP resolution, prompt rendering, RunnerEvent translation | Provider session, three turns (main / writeback / summary), `.conduit/<NodeName>.md` placeholder, post-run `git status` |
 | Idempotent under Temporal retries | One process per run; on retry the worker spawns a fresh container |
 
-The orchestrator activity calls `resolveRunnerSpawner().spawn(req, signal)`. Phase 1 ships `LocalDockerSpawner`; the `RunnerSpawner` interface is the seam future phases (k8s Job, runner pool) plug into without touching the activity above.
+The orchestrator activity calls `resolveRunnerSpawner().spawn(req, signal)`. Two spawners sit behind the `RunnerSpawner` seam — `LocalDockerSpawner` and `LocalProcessSpawner` — picked by **runner mode**, resolved once at worker boot from `CONDUIT_DEPLOYMENT` × `CONDUIT_RUNNER_MODE` (`apps/worker/src/runtime/runner/mode.ts`):
+
+| `CONDUIT_DEPLOYMENT` | `CONDUIT_RUNNER_MODE` | Result |
+|---|---|---|
+| `local` (default) | unset | **host** |
+| `local` | `docker` | docker |
+| `hosted` | unset or `docker` | docker |
+| `hosted` | `host` | **boot failure** — worker refuses to start |
+| any | anything else | boot failure (invalid value) |
+
+`hosted`+`host` fails loudly rather than silently downgrading — same posture as `CONDUIT_AGENT_AUTH=oauth-mount`: trust-boundary relaxation is explicit, logged, and impossible when hosted. The wire protocol is identical in both modes (`apps/agent-runner/src/main.ts` runs byte-identical; only the spawn primitive differs), and the same seam is where future phases (k8s Job, runner pool) plug in without touching the activity above.
 
 **Wire protocol** lives in `@conduit/shared/runner` (Zod-validated on both ends): the orchestrator writes one `RunnerRequest` to stdin, the runner streams `RunnerEvent` lines back. Three non-obvious bits:
 
@@ -144,7 +155,7 @@ The orchestrator activity calls `resolveRunnerSpawner().spawn(req, signal)`. Pha
 - If the runner dies without emitting `exit`, or stdout goes silent past the liveness threshold (default 60s), the spawner synthesizes an `exit ok=false` carrying a tail of stderr — so the failure surfaces in the run timeline instead of a bare exit code.
 - `heartbeat` events are independent of agent flow, so a slow tool call doesn't look like a dead runner.
 
-**Container invariants** — enforced by `LocalDockerSpawner`, not user-configurable:
+**Container invariants** (docker mode) — enforced by `LocalDockerSpawner`, not user-configurable:
 
 - **Same-path bind mounts.** Run dir mounted at its host absolute path, so `.git` worktree pointer files resolve identically. The bare clone backing this workspace is mounted similarly when applicable; **only that one bare clone**, never the whole `~/.conduit/base-clones/` tree.
 - **Non-root UID/GID** equal to the host worker's.
@@ -158,7 +169,18 @@ The orchestrator activity calls `resolveRunnerSpawner().spawn(req, signal)`. Pha
 | `api-key` *(default)* | Credentials travel only through `RunnerRequest.provider`. No host credential files mounted. | Production / shared environments |
 | `oauth-mount` | Additionally bind-mounts **only** the host's `~/.codex/auth.json` at `/home/runner/.codex/auth.json` inside the container (Codex has no `setup-token` flow yet). Worker logs a boot warning. A compromised agent can read or rewrite the host file. | Local dev only |
 
-Claude OAuth uses `CLAUDE_CODE_OAUTH_TOKEN` forwarded through the protocol — no mount needed, regardless of mode.
+Claude OAuth uses `CLAUDE_CODE_OAUTH_TOKEN` forwarded through the protocol — no mount needed, regardless of mode. In host mode `oauth-mount` is a no-op (logged at boot): the runner sees the real `$HOME`, so `~/.codex/auth.json` is reachable without any mount.
+
+### Host mode (local deployments)
+
+The Docker image can never replicate a user's dev environment — Xcode and iOS simulators, the Android SDK, signing certs, `~/.gitconfig`, host toolchains. So local deployments default to running the runner directly on the host. The trust model is "agent acting as the user on their machine", the same thing running Claude Code or Codex CLI directly grants; host mode is **explicitly unsandboxed** and the worker says so in a boot banner. Mechanics (`apps/worker/src/runtime/runner/local-process.ts`):
+
+- **Detached process group.** The runner entry point (resolved through the `@conduit/agent-runner` workspace dependency) spawns as a detached child leading its own process group. Cancellation signals the whole group — SIGTERM, then SIGKILL after a grace period — so MCP-server grandchildren die with the runner, and `cancel()` resolves only once the group is gone.
+- **Env denylist instead of explicit forwarding.** Docker forwards only explicit `-e` vars; a host child inherits everything. The spawner strips Conduit-internal secrets (DB/Redis URLs, the master encryption key, auth/webhook/GitHub secrets, provider API keys) before spawning, so "the runner never sees Conduit credentials" still holds. Provider creds travel via `RunnerRequest.provider`, same as docker mode; the user's toolchain env (`PATH`, `ANDROID_HOME`, `JAVA_HOME`, …) works by construction.
+- **Pidfile sweep instead of container labels.** Each spawn writes `<runDir>/runner.pid`; worker boot kills process groups whose run is already terminal or unknown (`process-admin.ts`, the host counterpart of `docker-admin.ts`'s label-based `sweepOrphans`). `dockerPreflight` is skipped — Docker need not be installed at all.
+- **No mounts, no UID mapping, no HOME override.** The same-path bind-mount machinery in docker mode exists only to make the container look like the host; on the host it holds trivially.
+
+E2e pins `CONDUIT_RUNNER_MODE=docker` (`test/e2e/harness.ts`) so the suite keeps exercising the real image. Per-node mode mixing (`runtime: host|docker` on individual agents) and host-side sandboxing are out of scope for now; the spawner seam supports them later.
 
 ## Workspace manager
 
@@ -274,8 +296,8 @@ Frontend flow:
 - User clicks "Cancel run" → API sends Temporal `cancelWorkflow`.
 - Workflow cancellation propagates to in-flight activities.
 - Activity's `CancelledFailure` handler triggers the orchestrator's `AbortController`.
-- The abort signal flows to `RunnerHandle.cancel()`, which runs `docker kill <containerName>`. The runner process exits; the provider SDK tears down its MCP servers on the way out. Workspace manager runs cleanup in `finally` on the orchestrator side.
-- `docker kill` is idempotent — safe to call after the runner has already exited on its own — and waits for the container to be reaped, so the next run with the same name doesn't race.
+- The abort signal flows to `RunnerHandle.cancel()` — `docker kill <containerName>` in docker mode, a process-group SIGTERM (escalating to SIGKILL after a grace period) in host mode. The runner process exits; the provider SDK tears down its MCP servers on the way out. Workspace manager runs cleanup in `finally` on the orchestrator side.
+- Both paths are idempotent — safe to call after the runner has already exited on its own — and resolve only after the runner is fully reaped (container removed / process group gone), so the orchestrator can sequence cleanup and the next run with the same name doesn't race.
 
 ## Per-ticket concurrency
 

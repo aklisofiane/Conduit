@@ -53,13 +53,22 @@ Not in scope for v1: supply-chain attacks, side-channel attacks, compromised wor
 
 ### Agent providers
 
-Providers run inside a per-run **`agent-runner` container** — a fresh `docker run --rm` per agent node — not on the worker process. See [agent-execution.md > Runner container model](./design-docs/agent-execution.md#runner-container-model) for the mechanism. The properties this gains us:
+Providers run inside a per-run **`agent-runner` container** — a fresh `docker run --rm` per agent node — not on the worker process (docker mode; forced when `CONDUIT_DEPLOYMENT=hosted`, see *Host runner mode* below for the local default). See [agent-execution.md > Runner container model](./design-docs/agent-execution.md#runner-container-model) for the mechanism. The properties this gains us:
 
 - **Nothing the run doesn't need crosses the boundary.** No DB, Redis, master KEK, or other-run credentials. The `RunnerRequest` carries only this run's provider creds, the `{{credential}}`-substituted `AgentRequest`, and the three prompts.
 - **The container can't widen its mount surface.** Same-path bind mounts of the run dir + (when applicable) the single bare clone backing this workspace, no docker.sock, no `--network=host`, no `--privileged`, non-root UID — all enforced by `LocalDockerSpawner`, not user-configurable.
 - **The protocol seam is policed.** Runner stdout is Zod-validated; malformed lines are dropped and any single line is capped at 8 MiB so a runaway runner can't OOM the worker.
 
 `CONDUIT_AGENT_AUTH=oauth-mount` deliberately weakens the boundary by bind-mounting `~/.codex/auth.json` — a compromised agent can read or rewrite the host file. Codex-only, because Codex has no `setup-token` flow yet; Claude OAuth flows through `CLAUDE_CODE_OAUTH_TOKEN` over the protocol with no mount, so the strong boundary holds. Local dev only; deployment runbooks must keep the default `api-key`.
+
+### Host runner mode (local deployments only)
+
+`CONDUIT_DEPLOYMENT=local` defaults to running the agent-runner as a plain child process on the worker machine — **explicitly unsandboxed**, with the user's real `$HOME`, `PATH`, and toolchains. The trust model is "agent acting as the user on their own machine": exactly what running Claude Code or Codex CLI directly already grants, which is the audience local Conduit serves. The container invariants above (mount surface, networking, UID) are moot in this mode; two properties deliberately survive the relaxation:
+
+- **Conduit-internal secrets never reach the runner.** A child process inherits its parent's env, so the spawner strips a denylist before spawning: `DATABASE_URL`, `REDIS_URL`, `CONDUIT_ENCRYPTION_KEY`, `BETTER_AUTH_SECRET`, `WEBHOOK_DEV_SECRET`, `GITHUB_CLIENT_SECRET`, and the provider API keys / OAuth token. Provider creds still arrive only via `RunnerRequest`, same as docker mode. The denylist invariant is unit-locked (`buildSpawnEnv` in `apps/worker/src/runtime/runner/local-process.test.ts`).
+- **The protocol seam stays policed.** Same Zod validation of runner stdout, same per-line cap.
+
+The "no non-Docker execution path" invariant from the original runner spec therefore holds **when hosted**: `CONDUIT_DEPLOYMENT=hosted` + `CONDUIT_RUNNER_MODE=host` is a worker boot failure, not a downgrade — mirroring the `oauth-mount` precedent that trust-boundary relaxation must be explicit, logged, and impossible in shared deployments. See [agent-execution.md > Host mode](./design-docs/agent-execution.md#host-mode-local-deployments).
 
 ## Prompt injection
 

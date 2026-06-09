@@ -134,6 +134,10 @@ export async function startHarness(opts: HarnessOptions = {}): Promise<Harness> 
     ...process.env,
     ...TEST_STACK_ENV,
     CONDUIT_PROVIDER: 'stub',
+    // Pin the worker to the Docker spawner regardless of local defaults —
+    // e2e exists to exercise the real agent-runner image, and host mode is
+    // the default for local deployments.
+    CONDUIT_RUNNER_MODE: 'docker',
     CONDUIT_STUB_SCRIPT: stubScriptPath,
     CONDUIT_CORS_ORIGIN: 'http://localhost',
     BETTER_AUTH_SECRET:
