@@ -242,36 +242,37 @@ The original design called for `mergeWorktreeActivity` to be a lightweight agent
 
 ## Issue writeback
 
-Optional per-agent capability: at end of run, the agent sets a project Status and/or applies repo labels on GitHub issues. Opt-in via `AgentConfig.issueWriteback` (`packages/shared/src/agent/issue-writeback.ts`) — its mere presence is the "feature is on" signal. Both arrays may be empty; an empty allowlist is treated as enabled-but-unselected and the runtime skips the writeback turn entirely.
+Optional per-agent capability: at end of run, the agent sets a project Status, applies repo labels, and/or sets a pull request's open/closed state — on the GitHub issue *or* PR the run is about. The UI labels this **Issue / PR writeback**; the field stays `AgentConfig.issueWriteback` (`packages/shared/src/agent/issue-writeback.ts`) so no migration was needed. Its mere presence is the "feature is on" signal. All three allowlists may be empty; an empty allowlist is treated as enabled-but-unselected and the runtime skips the writeback turn entirely.
 
-`allowedStatuses` / `allowedLabels` are what the agent may *set*. The label the run was *gated on* — the trigger's `label` filter — is removed automatically, so a board-pipeline handoff (e.g. `conduit-dev` → `conduit-review`) is a remove-the-consumed-label, add-the-next-one swap that the template never has to describe. The removal target isn't authored anywhere; it's derived from the trigger that fired.
+`allowedStatuses` / `allowedLabels` / `allowedPrStates` are what the agent may *set*. Labels carry over to PRs unchanged (GitHub treats PRs as issues for labels), and a project Status applies only when a board is bound. `allowedPrStates` (`'open'` / `'closed'`) is a repo-native axis that needs no project board and is meaningful only on PR-triggered runs — merging is deliberately excluded. The label the run was *gated on* — the trigger's `label` filter — is removed automatically, so a board-pipeline handoff (e.g. `conduit-dev` → `conduit-review`) is a remove-the-consumed-label, add-the-next-one swap that the template never has to describe. The removal target isn't authored anywhere; it's derived from the trigger that fired.
 
 The turn has two shapes, picked by whether the run has a triggering issue:
 
-- **Issue-anchored** — the run was fired by a GitHub issue event (polling / webhook); the agent updates that one issue.
+- **Issue- or PR-anchored** — the run was fired by a GitHub issue *or* PR event (polling / webhook); the agent updates that one issue or PR. PR-shaped runs (`triggerEvent.pr` present) share the issue number space, so the anchor is the same `owner/repo#N` — only the wording and CLI verbs change (see [Run-time](#run-time)).
 - **Repo-scoped** — the run targets a GitHub repo but no specific issue (a cron run; cron carries `repo` resolved from the trigger connection but no `issue`). The agent constrains the Status / labels it sets on whatever issues it creates or touches during the run — the nightly-review Publisher creating one issue per finding is the motivating case.
 
 ### Config-time
 
-The agent panel's **Issue writeback** field renders a checkbox plus two pill-toggle groups (`AgentConfigPanel.IssueWritebackControl` in `apps/web/src/components/canvas/AgentConfigPanel.tsx`):
+The agent panel's **Issue / PR writeback** field renders a checkbox plus pill-toggle groups (`AgentConfigPanel.IssueWritebackControl` in `apps/web/src/components/canvas/AgentConfigPanel.tsx`); which status axis shows depends on the trigger type:
 
-- **Allowed statuses** — the trigger's project board's `Status` single-select options, fetched via `useListProjectBoards` (already used by the trigger panel).
-- **Allowed labels** — the trigger connection's repo labels, fetched via `useListLabels` → `POST /api/workflows/:id/trigger/list-labels` → `listRepoLabels` (`packages/shared/src/platform/github/labels.ts`).
+- **Allowed statuses** (issue / cron triggers) — the trigger's project board's `Status` single-select options, fetched via `useListProjectBoards` (already used by the trigger panel).
+- **Allowed PR states** (`pull_requests` triggers) — a fixed Open / Closed pill group, shown *instead of* board statuses since PR triggers never bind a project board.
+- **Allowed labels** (any GitHub trigger) — the trigger connection's repo labels, fetched via `useListLabels` → `POST /api/workflows/:id/trigger/list-labels` → `listRepoLabels` (`packages/shared/src/platform/github/labels.ts`).
 
 The field is hidden behind a hint when the workflow has no GitHub trigger. Picking nothing is allowed at save time, but explicit copy warns the user that the runtime will skip the turn.
 
 ### Run-time
 
-Between the main turn and the summary turn, `runAgentNode` injects a third turn driven by `issueWritebackPrompt` (`packages/agent/src/context.ts`). The prompt interpolates the allowlist values verbatim — *only what the user picked appears* — so the choice set is encoded entirely in the prompt wording. There is no schema-level enforcement and no post-run validation; the agent is trusted to pick one of the listed values, or skip if none fit. Prompt construction is per-list — if only statuses (or only labels) are allowlisted, no phantom second list shows up in the directive. `consumedLabels` (the trigger's `label` filters, minus any the agent is also told to apply) add a *remove* directive, so a status-gated entry point like Analyze removes nothing while a label-gated stage removes the label that fired it.
+Between the main turn and the summary turn, `runAgentNode` injects a third turn driven by `issueWritebackPrompt` (`packages/agent/src/context.ts`). The prompt interpolates the allowlist values verbatim — *only what the user picked appears* — so the choice set is encoded entirely in the prompt wording. There is no schema-level enforcement and no post-run validation; the agent is trusted to pick one of the listed values, or skip if none fit. Prompt construction is per-list — if only statuses (or only labels) are allowlisted, no phantom second list shows up in the directive. `consumedLabels` (the trigger's `label` filters, minus any the agent is also told to apply) add a *remove* directive, so a status-gated entry point like Analyze removes nothing while a label-gated stage removes the label that fired it. When the run is PR-shaped (the context's `isPr` flag), the prompt switches to pull-request wording — anchor `PR: owner/repo#N`, the `gh pr` CLI (`gh pr edit` for labels, `gh pr close` / `gh pr reopen` for state) — and emits the `allowedPrStates` open/closed directive; board-Status lines never appear for PRs because the trigger offers no statuses.
 
 `resolveWritebackContext` (`apps/worker/src/activities/writeback.ts`) returns `undefined` (skipping the turn) when:
 
 - the agent has no `issueWriteback` field;
-- both `allowedStatuses` and `allowedLabels` are empty;
+- all of `allowedStatuses`, `allowedLabels`, and `allowedPrStates` are empty;
 - the run wasn't fired by a GitHub trigger;
 - `triggerEvent.repo` is missing (manual runs, future non-GitHub triggers).
 
-A run only needs a GitHub **repo** to qualify — not a triggering issue. `triggerEvent.issue` is optional: present ⇒ issue-anchored, absent ⇒ repo-scoped.
+A run only needs a GitHub **repo** to qualify — not a triggering issue. `triggerEvent.issue` is optional: present ⇒ issue-anchored, absent ⇒ repo-scoped. `triggerEvent.pr` presence sets the context's `isPr` flag, which is what flips the prompt to PR wording.
 
 ### Synthetic GitHub MCP auto-attach
 
