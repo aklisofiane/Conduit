@@ -63,3 +63,23 @@ export async function loadConnectionContext(
     token,
   };
 }
+
+/**
+ * Resolve just the normalized host for a connection — the same `host` value
+ * `loadConnectionContext` derives, but without decrypting the secret or
+ * parsing the scope. Used by issue writeback to point the self-hosted GitLab
+ * MCP at the instance's API base; returns `undefined` when the connection is
+ * missing (callers fall back to the preset's cloud default).
+ *
+ * `normalizeHostUrl` returns the canonical cloud host (`gitlab.com` /
+ * `github.com`) when `hostUrl` is empty, and `null` for non-VCS platforms —
+ * collapsed to `undefined` here.
+ */
+export async function loadConnectionHost(connectionId: string): Promise<string | undefined> {
+  const conn = await prisma().connection.findUnique({
+    where: { id: connectionId },
+    select: { credential: { select: { hostUrl: true, platform: true } } },
+  });
+  if (!conn) return undefined;
+  return normalizeHostUrl(conn.credential.hostUrl, conn.credential.platform) ?? undefined;
+}

@@ -1,7 +1,8 @@
 import {
-  findMcpPreset,
+  findMcpPresetByPlatform,
   type AgentConfig,
   type McpServerRef,
+  type Platform,
   type TriggerConfig,
   type TriggerEvent,
   type WorkflowMcpServer,
@@ -13,11 +14,33 @@ import {
  * runner imports (same split as `poll-board-helpers.ts`).
  */
 
-/** Reserved id for the auto-attached GitHub MCP server. Underscored to make
- * a collision with a user-defined server vanishingly unlikely. */
-export const WRITEBACK_GITHUB_MCP_ID = '__conduit_writeback_github__';
+/** Platform the writeback path can auto-attach an MCP server for. A subset of
+ * `TriggerEvent['source']` — `jira` has no writeback MCP and is rejected by the
+ * resolver. */
+export type WritebackPlatform = 'github' | 'gitlab';
+
+/** Reserved id for the auto-attached writeback MCP server, per platform.
+ * Underscored to make a collision with a user-defined server vanishingly
+ * unlikely. The GitHub value is unchanged from when it was a constant, so
+ * existing behavior stays byte-identical. */
+export function writebackMcpId(platform: WritebackPlatform): string {
+  return platform === 'gitlab' ? '__conduit_writeback_gitlab__' : '__conduit_writeback_github__';
+}
+
+/** Map a lowercase writeback platform to the uppercase `Platform` enum the MCP
+ * presets key off (same convention as `templates.service`). */
+function presetPlatform(platform: WritebackPlatform): Platform {
+  return platform.toUpperCase() as Platform;
+}
 
 export interface WritebackContext {
+  /**
+   * The firing event's platform (`triggerEvent.source`). Picks the writeback
+   * MCP preset and prompt branch; for GitLab it also signals the call site to
+   * resolve the instance host. Never `jira` — the resolver rejects sources
+   * with no writeback MCP.
+   */
+  platform: WritebackPlatform;
   connectionId: string;
   repoOwner: string;
   repoName: string;
@@ -54,11 +77,14 @@ export interface WritebackContext {
 
 /**
  * Resolve the per-run writeback context. Returns undefined when the feature
- * is not configured for this agent, when the workflow has no GitHub trigger,
- * when this run didn't target a GitHub repo, or when the user enabled the
+ * is not configured for this agent, when the workflow has no matching-platform
+ * trigger, when this run didn't target a GitHub/GitLab repo, when the firing
+ * source has no writeback MCP (e.g. `jira`), or when the user enabled the
  * checkbox without picking any statuses, labels, or PR states.
  *
- * A run only needs a GitHub repo to qualify — not a triggering issue. Cron
+ * GitHub and GitLab are both admitted; the returned `platform` follows the
+ * firing event's source so the call site picks the right preset and prompt
+ * branch. A run only needs a repo to qualify — not a triggering issue. Cron
  * runs carry `repo` (resolved from the trigger connection in cron-fire.ts)
  * but no `issue`, so they produce a repo-scoped context with `issueNumber`
  * undefined; the writeback prompt adapts accordingly.
@@ -83,14 +109,18 @@ export function resolveWritebackContext(
   ) {
     return undefined;
   }
-  if (triggerEvent.source !== 'github') return undefined;
+  // Only platforms with a shipped writeback MCP qualify; `jira` is rejected.
+  if (triggerEvent.source !== 'github' && triggerEvent.source !== 'gitlab') {
+    return undefined;
+  }
+  const platform: WritebackPlatform = triggerEvent.source;
   if (!triggerEvent.repo) return undefined;
-  // First github trigger. Workflows ship with a single github trigger, so this
-  // is the trigger that fired; if a workflow ever declares more than one, both
-  // connectionId and consumedLabels below would follow the first rather than
-  // the one that actually fired — revisit with matchesTrigger() (trigger/match)
-  // if multi-trigger workflows land.
-  const trigger = triggers.find((t) => t.platform === 'github');
+  // First trigger on the firing platform. Workflows ship with a single trigger
+  // per source, so this is the trigger that fired; if a workflow ever declares
+  // more than one, both connectionId and consumedLabels below would follow the
+  // first rather than the one that actually fired — revisit with
+  // matchesTrigger() (trigger/match) if multi-trigger workflows land.
+  const trigger = triggers.find((t) => t.platform === platform);
   if (!trigger) return undefined;
   // consumedLabels is removed in the (issue-scoped) writeback turn, decoupled
   // from any cross-artifact handoff the agent does in prose (e.g. Review's
@@ -104,6 +134,7 @@ export function resolveWritebackContext(
     .map((f) => f.value)
     .filter((label) => !writeback.allowedLabels.includes(label));
   return {
+    platform,
     connectionId: trigger.connectionId,
     repoOwner: triggerEvent.repo.owner,
     repoName: triggerEvent.repo.name,
@@ -117,31 +148,34 @@ export function resolveWritebackContext(
 }
 
 /**
- * True when the agent already references a GitHub MCP server defined on the
- * workflow. Matched by transport fingerprint, not id (user-defined ids are
- * arbitrary): the shipped GitHub preset is a remote `streamable-http` server,
- * so a same-`url` match identifies it; a stdio GitHub MCP is matched when it
- * shares package args with the preset. Both are derived from the preset so
- * this stays correct if the transport ever changes. When true, we skip
- * writeback auto-attach so the user-configured server wins — same connection
- * or not. (Without the url branch the auto-attach always fires alongside an
- * existing remote GitHub MCP, leaving the agent with a duplicate, dead
- * `GitHub (writeback)` server.)
+ * True when the agent already references the firing platform's MCP server
+ * defined on the workflow. Matched by transport fingerprint, not id
+ * (user-defined ids are arbitrary): the shipped GitHub preset is a remote
+ * `streamable-http` server, so a same-`url` match identifies it; the GitLab
+ * preset (and any stdio MCP) is matched when it shares package args with the
+ * preset. Both are derived from the preset so this stays correct if a
+ * transport ever changes. When true, we skip writeback auto-attach so the
+ * user-configured server wins — same connection or not. (Without the url
+ * branch the auto-attach always fires alongside an existing remote GitHub
+ * MCP, leaving the agent with a duplicate, dead `<Provider> (writeback)`
+ * server.)
  */
-export function agentReferencesGithubMcp(
+export function agentReferencesWritebackMcp(
   node: AgentConfig,
   mcpServers: WorkflowMcpServer[],
+  platform: WritebackPlatform,
 ): boolean {
-  const preset = findMcpPreset('github');
+  const preset = findMcpPresetByPlatform(presetPlatform(platform));
   if (!preset) return false;
   const pt = preset.transport;
   const byId = new Map(mcpServers.map((s) => [s.id, s]));
   for (const ref of node.mcpServers) {
     const t = byId.get(ref.serverId)?.transport;
     if (!t || t.kind !== pt.kind) continue;
-    // Remote GitHub MCP (the shipped preset): same endpoint ⇒ same server.
+    // Remote MCP (the shipped GitHub preset): same endpoint ⇒ same server.
     if (t.kind !== 'stdio' && pt.kind !== 'stdio' && t.url === pt.url) return true;
-    // stdio GitHub MCP: user points at the same package as the preset.
+    // stdio MCP (the shipped GitLab preset, or a user's stdio GitHub): user
+    // points at the same package as the preset.
     if (t.kind === 'stdio' && pt.kind === 'stdio') {
       const presetArgs = pt.args ?? [];
       if (presetArgs.length > 0 && presetArgs.some((a) => (t.args ?? []).includes(a))) {
@@ -152,21 +186,46 @@ export function agentReferencesGithubMcp(
   return false;
 }
 
-/** Build the synthetic GitHub MCP server entry + agent ref for auto-attach. */
-export function buildSyntheticGithubMcp(connectionId: string): {
+/**
+ * Build the synthetic writeback MCP server entry + agent ref for auto-attach,
+ * cloned from the firing platform's preset.
+ *
+ * For **GitLab** a resolved `apiBaseUrl` (the self-hosted instance's
+ * `https://<host>/api/v4`) overrides the preset's literal `GITLAB_API_URL`;
+ * when omitted the preset's gitlab.com default stands. The
+ * `GITLAB_PERSONAL_ACCESS_TOKEN: {{credential}}` placeholder is preserved and
+ * still resolves through `makeCredentialLookup` like any other MCP secret.
+ * For **GitHub** `apiBaseUrl` is ignored — the preset URL is cloud-only — and
+ * the transport is passed through untouched, so its output is byte-identical
+ * to the previous GitHub-only builder.
+ */
+export function buildSyntheticWritebackMcp(args: {
+  platform: WritebackPlatform;
+  connectionId: string;
+  apiBaseUrl?: string;
+}): {
   server: WorkflowMcpServer;
   ref: McpServerRef;
 } {
-  const preset = findMcpPreset('github');
+  const { platform, connectionId, apiBaseUrl } = args;
+  const preset = findMcpPresetByPlatform(presetPlatform(platform));
   if (!preset) {
-    throw new Error('GitHub MCP preset missing — required for issue writeback auto-attach');
+    throw new Error(`${platform} MCP preset missing — required for issue writeback auto-attach`);
   }
+  let transport = preset.transport;
+  if (platform === 'gitlab' && apiBaseUrl && transport.kind === 'stdio') {
+    transport = {
+      ...transport,
+      env: { ...(transport.env ?? {}), GITLAB_API_URL: apiBaseUrl },
+    };
+  }
+  const id = writebackMcpId(platform);
   const server: WorkflowMcpServer = {
-    id: WRITEBACK_GITHUB_MCP_ID,
-    name: 'GitHub (writeback)',
-    transport: preset.transport,
+    id,
+    name: platform === 'gitlab' ? 'GitLab (writeback)' : 'GitHub (writeback)',
+    transport,
     connectionId,
   };
-  const ref: McpServerRef = { serverId: WRITEBACK_GITHUB_MCP_ID };
+  const ref: McpServerRef = { serverId: id };
   return { server, ref };
 }

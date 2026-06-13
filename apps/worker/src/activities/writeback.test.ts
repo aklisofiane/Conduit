@@ -1,22 +1,23 @@
 import { describe, expect, it } from 'vitest';
 import {
-  findMcpPreset,
+  findMcpPresetByPlatform,
   type AgentConfig,
   type TriggerConfig,
   type TriggerEvent,
   type WorkflowMcpServer,
 } from '@conduit/shared';
 import {
-  WRITEBACK_GITHUB_MCP_ID,
-  agentReferencesGithubMcp,
-  buildSyntheticGithubMcp,
+  agentReferencesWritebackMcp,
+  buildSyntheticWritebackMcp,
   resolveWritebackContext,
+  writebackMcpId,
 } from './writeback';
 
-// Drive matching off the real preset so these stay correct if the GitHub MCP
+// Drive matching off the real presets so these stay correct if a writeback MCP
 // transport ever changes (the bug this guards against was exactly the matcher
-// assuming a stdio transport while the preset is remote streamable-http).
-const GITHUB_TRANSPORT = findMcpPreset('github')!.transport;
+// assuming a stdio transport while the GitHub preset is remote streamable-http).
+const GITHUB_TRANSPORT = findMcpPresetByPlatform('GITHUB')!.transport;
+const GITLAB_TRANSPORT = findMcpPresetByPlatform('GITLAB')!.transport;
 
 function makeAgent(overrides: Partial<AgentConfig> = {}): AgentConfig {
   return {
@@ -111,6 +112,30 @@ const PR_EVENT: TriggerEvent = {
   pr: { headRef: 'feature-checkout', baseRef: 'main' },
 };
 
+const GITLAB_LABEL_TRIGGER: TriggerConfig = {
+  id: 'trigger-gl-develop',
+  name: 'GitlabDevelopTrigger',
+  platform: 'gitlab',
+  connectionId: 'conn-gl',
+  type: 'issues',
+  intervalSec: 60,
+  filters: [{ field: 'label', value: 'conduit-dev' }],
+};
+
+const GITLAB_ISSUE_EVENT: TriggerEvent = {
+  source: 'gitlab',
+  mode: 'polling',
+  event: 'board.column.changed',
+  payload: {},
+  repo: { owner: 'acme', name: 'shop' },
+  issue: {
+    id: 'gid://gitlab/Issue/1',
+    key: '42',
+    title: 'Crash on save',
+    url: 'https://gitlab.com/acme/shop/-/issues/42',
+  },
+};
+
 describe('resolveWritebackContext', () => {
   it('returns undefined when issueWriteback is not configured', () => {
     expect(resolveWritebackContext(makeAgent(), [CRON_TRIGGER], CRON_EVENT)).toBeUndefined();
@@ -123,14 +148,57 @@ describe('resolveWritebackContext', () => {
     expect(resolveWritebackContext(node, [CRON_TRIGGER], CRON_EVENT)).toBeUndefined();
   });
 
-  it('returns undefined for a non-GitHub run', () => {
-    const node = makeAgent({ issueWriteback: { allowedStatuses: ['AIDev'], allowedLabels: [], allowedPrStates: [] } });
-    const gitlabEvent: TriggerEvent = { ...CRON_EVENT, source: 'gitlab' };
-    expect(resolveWritebackContext(node, [CRON_TRIGGER], gitlabEvent)).toBeUndefined();
+  it('returns undefined for a source with no writeback MCP (jira)', () => {
+    const node = makeAgent({
+      issueWriteback: { allowedStatuses: ['AIDev'], allowedLabels: [], allowedPrStates: [] },
+    });
+    const jiraEvent: TriggerEvent = { ...CRON_EVENT, source: 'jira' };
+    expect(resolveWritebackContext(node, [CRON_TRIGGER], jiraEvent)).toBeUndefined();
+  });
+
+  it('returns undefined when no trigger matches the firing platform', () => {
+    // A GitLab event but only a GitHub trigger configured → no matching trigger.
+    const node = makeAgent({
+      issueWriteback: { allowedStatuses: ['AIDev'], allowedLabels: [], allowedPrStates: [] },
+    });
+    expect(resolveWritebackContext(node, [CRON_TRIGGER], GITLAB_ISSUE_EVENT)).toBeUndefined();
+  });
+
+  it('resolves a GitLab issue-fired context, deriving the consumed label', () => {
+    const node = makeAgent({
+      issueWriteback: {
+        allowedStatuses: [],
+        allowedLabels: ['conduit-review'],
+        allowedPrStates: [],
+      },
+    });
+    const ctx = resolveWritebackContext(node, [GITLAB_LABEL_TRIGGER], GITLAB_ISSUE_EVENT);
+    expect(ctx).toEqual({
+      platform: 'gitlab',
+      connectionId: 'conn-gl',
+      repoOwner: 'acme',
+      repoName: 'shop',
+      issueNumber: '42',
+      allowedStatuses: [],
+      allowedLabels: ['conduit-review'],
+      allowedPrStates: [],
+      isPr: false,
+      // conduit-dev gated the GitLab run → consumed; conduit-review is added.
+      consumedLabels: ['conduit-dev'],
+    });
+  });
+
+  it('tags a GitHub context with platform github', () => {
+    const node = makeAgent({
+      issueWriteback: { allowedStatuses: ['AIDev'], allowedLabels: [], allowedPrStates: [] },
+    });
+    expect(resolveWritebackContext(node, [CRON_TRIGGER], CRON_EVENT)?.platform).toBe('github');
   });
 
   it('returns undefined when the run carries no repo', () => {
-    const node = makeAgent({ issueWriteback: { allowedStatuses: ['AIDev'], allowedLabels: [], allowedPrStates: [] } });
+    const node = makeAgent({
+      issueWriteback: { allowedStatuses: ['AIDev'], allowedLabels: [], allowedPrStates: [] },
+    });
     const noRepo: TriggerEvent = {
       source: 'github',
       mode: 'scheduled',
@@ -142,9 +210,14 @@ describe('resolveWritebackContext', () => {
 
   it('resolves a repo-scoped context (issueNumber undefined) for a cron run', () => {
     const node = makeAgent({
-      issueWriteback: { allowedStatuses: ['AIDev', 'Review'], allowedLabels: [], allowedPrStates: [] },
+      issueWriteback: {
+        allowedStatuses: ['AIDev', 'Review'],
+        allowedLabels: [],
+        allowedPrStates: [],
+      },
     });
     expect(resolveWritebackContext(node, [CRON_TRIGGER], CRON_EVENT)).toEqual({
+      platform: 'github',
       connectionId: 'conn-repo',
       repoOwner: 'acme',
       repoName: 'shop',
@@ -185,7 +258,11 @@ describe('resolveWritebackContext', () => {
 
   it('derives the consumed label from the trigger’s label filter', () => {
     const node = makeAgent({
-      issueWriteback: { allowedStatuses: ['Review'], allowedLabels: ['conduit-review'], allowedPrStates: [] },
+      issueWriteback: {
+        allowedStatuses: ['Review'],
+        allowedLabels: ['conduit-review'],
+        allowedPrStates: [],
+      },
     });
     const ctx = resolveWritebackContext(node, [DEV_LABEL_TRIGGER], ISSUE_EVENT);
     // conduit-dev gated the run → consumed; conduit-review is the one to add.
@@ -211,7 +288,7 @@ describe('resolveWritebackContext', () => {
   });
 });
 
-describe('agentReferencesGithubMcp', () => {
+describe('agentReferencesWritebackMcp', () => {
   it('detects the shipped remote (streamable-http) GitHub MCP by url', () => {
     // Regression: the matcher used to only inspect stdio args, so a remote
     // GitHub MCP was never recognized and the writeback server was attached
@@ -223,7 +300,7 @@ describe('agentReferencesGithubMcp', () => {
       connectionId: 'conn-repo',
     };
     const node = makeAgent({ mcpServers: [{ serverId: 'github-mcp' }] });
-    expect(agentReferencesGithubMcp(node, [server])).toBe(true);
+    expect(agentReferencesWritebackMcp(node, [server], 'github')).toBe(true);
   });
 
   it('does not match an unrelated server with a different url', () => {
@@ -233,29 +310,124 @@ describe('agentReferencesGithubMcp', () => {
       transport: { kind: 'streamable-http', url: 'https://example.com/mcp/' },
     };
     const node = makeAgent({ mcpServers: [{ serverId: 'other' }] });
-    expect(agentReferencesGithubMcp(node, [server])).toBe(false);
+    expect(agentReferencesWritebackMcp(node, [server], 'github')).toBe(false);
   });
 
   it('returns false when the agent references no servers', () => {
-    expect(agentReferencesGithubMcp(makeAgent(), [])).toBe(false);
+    expect(agentReferencesWritebackMcp(makeAgent(), [], 'github')).toBe(false);
+  });
+
+  it('detects a user-defined stdio GitLab MCP by shared package args', () => {
+    // The GitLab preset is stdio (@zereight/mcp-gitlab); a user who wired their
+    // own copy (any id, any GITLAB_API_URL) should suppress auto-attach.
+    const server: WorkflowMcpServer = {
+      id: 'my-gitlab',
+      name: 'My GitLab',
+      transport: {
+        kind: 'stdio',
+        command: 'npx',
+        args: ['-y', '@zereight/mcp-gitlab'],
+        env: { GITLAB_PERSONAL_ACCESS_TOKEN: 'x', GITLAB_API_URL: 'https://gitlab.acme.io/api/v4' },
+      },
+      connectionId: 'conn-gl',
+    };
+    const node = makeAgent({ mcpServers: [{ serverId: 'my-gitlab' }] });
+    expect(agentReferencesWritebackMcp(node, [server], 'gitlab')).toBe(true);
+  });
+
+  it('does not treat a GitHub MCP as a GitLab reference', () => {
+    // Platform-scoped: a remote GitHub server must not suppress GitLab attach.
+    const server: WorkflowMcpServer = {
+      id: 'github-mcp',
+      name: 'GitHub',
+      transport: GITHUB_TRANSPORT,
+      connectionId: 'conn-repo',
+    };
+    const node = makeAgent({ mcpServers: [{ serverId: 'github-mcp' }] });
+    expect(agentReferencesWritebackMcp(node, [server], 'gitlab')).toBe(false);
   });
 });
 
-describe('buildSyntheticGithubMcp', () => {
-  it('builds the reserved writeback server bound to the given connection', () => {
-    const { server, ref } = buildSyntheticGithubMcp('conn-xyz');
-    expect(server.id).toBe(WRITEBACK_GITHUB_MCP_ID);
-    expect(ref.serverId).toBe(WRITEBACK_GITHUB_MCP_ID);
+describe('buildSyntheticWritebackMcp', () => {
+  it('builds the reserved GitHub writeback server, byte-identical to before', () => {
+    const { server, ref } = buildSyntheticWritebackMcp({
+      platform: 'github',
+      connectionId: 'conn-xyz',
+    });
+    expect(server.id).toBe(writebackMcpId('github'));
+    expect(server.id).toBe('__conduit_writeback_github__');
+    expect(server.name).toBe('GitHub (writeback)');
+    expect(ref.serverId).toBe('__conduit_writeback_github__');
     expect(server.connectionId).toBe('conn-xyz');
     expect(server.transport).toEqual(GITHUB_TRANSPORT);
   });
 
-  it('produces a server that agentReferencesGithubMcp itself recognizes', () => {
+  it('ignores apiBaseUrl for GitHub (preset URL is cloud-only)', () => {
+    const { server } = buildSyntheticWritebackMcp({
+      platform: 'github',
+      connectionId: 'conn-xyz',
+      apiBaseUrl: 'https://ghe.acme.io/api/v3',
+    });
+    expect(server.transport).toEqual(GITHUB_TRANSPORT);
+  });
+
+  it('builds the GitLab writeback server from the GitLab preset', () => {
+    const { server, ref } = buildSyntheticWritebackMcp({
+      platform: 'gitlab',
+      connectionId: 'conn-gl',
+    });
+    expect(server.id).toBe(writebackMcpId('gitlab'));
+    expect(server.id).toBe('__conduit_writeback_gitlab__');
+    expect(server.name).toBe('GitLab (writeback)');
+    expect(ref.serverId).toBe('__conduit_writeback_gitlab__');
+    expect(server.connectionId).toBe('conn-gl');
+    expect(server.transport).toEqual(GITLAB_TRANSPORT);
+  });
+
+  it('leaves GITLAB_API_URL at the gitlab.com default when no host is given', () => {
+    // Phase 1: the call site does not resolve a host yet, so cloud GitLab uses
+    // the preset's gitlab.com URL untouched.
+    const { server } = buildSyntheticWritebackMcp({
+      platform: 'gitlab',
+      connectionId: 'conn-gl',
+    });
+    const env = server.transport.kind === 'stdio' ? server.transport.env : undefined;
+    expect(env?.GITLAB_API_URL).toBe('https://gitlab.com/api/v4');
+    // The credential placeholder is preserved untouched.
+    expect(env?.GITLAB_PERSONAL_ACCESS_TOKEN).toBe(
+      GITLAB_TRANSPORT.kind === 'stdio'
+        ? GITLAB_TRANSPORT.env?.GITLAB_PERSONAL_ACCESS_TOKEN
+        : undefined,
+    );
+  });
+
+  it('overrides GITLAB_API_URL for a self-hosted host, leaving the token placeholder', () => {
+    const { server } = buildSyntheticWritebackMcp({
+      platform: 'gitlab',
+      connectionId: 'conn-gl',
+      apiBaseUrl: 'https://gitlab.acme.io:8443/api/v4',
+    });
+    const env = server.transport.kind === 'stdio' ? server.transport.env : undefined;
+    expect(env?.GITLAB_API_URL).toBe('https://gitlab.acme.io:8443/api/v4');
+    expect(env?.GITLAB_PERSONAL_ACCESS_TOKEN).toBe(
+      GITLAB_TRANSPORT.kind === 'stdio'
+        ? GITLAB_TRANSPORT.env?.GITLAB_PERSONAL_ACCESS_TOKEN
+        : undefined,
+    );
+    // The shipped preset is not mutated by the override.
+    expect(GITLAB_TRANSPORT.kind === 'stdio' && GITLAB_TRANSPORT.env?.GITLAB_API_URL).toBe(
+      'https://gitlab.com/api/v4',
+    );
+  });
+
+  it('produces a server that agentReferencesWritebackMcp recognizes (both platforms)', () => {
     // Couples the two helpers: whatever transport auto-attach uses must be
     // detectable by the duplicate-skip guard, or a second pass would attach
     // yet another copy.
-    const { server, ref } = buildSyntheticGithubMcp('conn-xyz');
-    const node = makeAgent({ mcpServers: [ref] });
-    expect(agentReferencesGithubMcp(node, [server])).toBe(true);
+    for (const platform of ['github', 'gitlab'] as const) {
+      const { server, ref } = buildSyntheticWritebackMcp({ platform, connectionId: 'conn-xyz' });
+      const node = makeAgent({ mcpServers: [ref] });
+      expect(agentReferencesWritebackMcp(node, [server], platform)).toBe(true);
+    }
   });
 });

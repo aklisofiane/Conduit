@@ -38,7 +38,7 @@ export function formatParallelDownstreamBlock(siblings: readonly string[]): stri
     'This node fans out to siblings that run concurrently in branched worktrees:',
     bullets,
     '',
-    'Each sibling gets its own copy of your workspace. Files you write to `.conduit/` are shared across them. Scope responsibilities so they do not stomp each other\'s files.',
+    "Each sibling gets its own copy of your workspace. Files you write to `.conduit/` are shared across them. Scope responsibilities so they do not stomp each other's files.",
   ].join('\n');
 }
 
@@ -58,9 +58,7 @@ export function formatUpstreamContextBlock(
   summaries: ReadonlyArray<{ nodeName: string; body: string }>,
 ): string {
   if (summaries.length === 0) return '';
-  const sections = summaries.map(
-    ({ nodeName, body }) => `### ${nodeName}\n\n${body}`,
-  );
+  const sections = summaries.map(({ nodeName, body }) => `### ${nodeName}\n\n${body}`);
   return [
     '## Upstream context',
     '',
@@ -94,7 +92,10 @@ export function finalSummaryPrompt(nodeName: string): string {
 /**
  * Trailing user turn injected between the main turn and the summary turn
  * when the agent has `issueWriteback` configured and the run targets a
- * GitHub repo. Two shapes, picked by whether `issueNumber` is present:
+ * GitHub or GitLab repo (`platform`). Both platforms drive writeback through
+ * the auto-attached MCP server (`GitHub (writeback)` / `GitLab (writeback)`),
+ * never a CLI. GitLab is additionally labels-only — no Projects-v2 Status, no
+ * MR-state. Two shapes, picked by whether `issueNumber` is present:
  *
  *   - issue-anchored — the run was fired by a GitHub issue event (polling /
  *     webhook); the agent updates that one issue.
@@ -113,15 +114,23 @@ export function finalSummaryPrompt(nodeName: string): string {
  * done, so a board handoff is a remove-old/add-new label swap without the
  * template describing the removal.
  *
- * `isPr` switches the wording to a pull request: the agent is told to use the
- * `gh pr` CLI (`gh pr edit` for labels, `gh pr close|reopen` for state) rather
- * than the issue-shaped `gh issue` path, and the `allowedPrStates` open/closed
- * directive is emitted. PR runs share the issue number space, so the anchor is
- * the same `owner/repo#N`. Labels and project Status carry over unchanged
- * (GitHub treats PRs as issues for labels; Status only emits if a board status
- * was picked, which the PR-trigger UI never offers).
+ * `isPr` switches the wording to a pull request: the agent works the PR through
+ * the attached GitHub MCP tools (GitHub stores PR labels on the shared issue
+ * number, so the issue-label tools apply; open/closed is a pull-request field),
+ * and the `allowedPrStates` open/closed directive is emitted. PR runs share the
+ * issue number space, so the anchor is the same `owner/repo#N`. Labels and
+ * project Status carry over unchanged (Status only emits if a board status was
+ * picked, which the PR-trigger UI never offers).
+ *
+ * All writeback — issue or PR, GitHub or GitLab — goes through the attached MCP
+ * server, never a `gh`/`glab` CLI. The runner image ships those binaries but
+ * never authenticates them (the connection token reaches the runner only as the
+ * MCP bearer header and a `git push` credential helper), so CLI wording sends
+ * the agent to an unauthenticated tool — the bug behind PR-writeback label
+ * failures.
  */
 export function issueWritebackPrompt(args: {
+  platform: 'github' | 'gitlab';
   owner: string;
   repo: string;
   issueNumber?: string;
@@ -132,6 +141,7 @@ export function issueWritebackPrompt(args: {
   isPr?: boolean;
 }): string {
   const {
+    platform,
     owner,
     repo,
     issueNumber,
@@ -141,16 +151,25 @@ export function issueWritebackPrompt(args: {
     consumedLabels = [],
     isPr = false,
   } = args;
-  const noun = isPr ? 'pull request' : 'issue';
+  // GitLab v1 is labels-only: no Projects-v2 Status field, and MR-state /
+  // MR-label writeback is out of scope, so the PR wording never applies and the
+  // noun stays "issue". Both platforms work through the auto-attached MCP
+  // server's tools rather than a CLI — the runner ships `gh`/`glab` but never
+  // authenticates either, so CLI wording would point the agent at an
+  // unauthenticated binary.
+  const isGitlab = platform === 'gitlab';
+  const providerName = isGitlab ? 'GitLab' : 'GitHub';
+  const noun = !isGitlab && isPr ? 'pull request' : 'issue';
   const statusLine =
-    allowedStatuses.length > 0
+    !isGitlab && allowedStatuses.length > 0
       ? `- Set the project Status to whichever of these values best fits: ${allowedStatuses.map((s) => `"${s}"`).join(', ')}.`
       : null;
   // Open/closed is a repo-native PR state — no board needed. Emitted only for
-  // PR-shaped runs; on issue/cron runs `allowedPrStates` is inert by config.
+  // PR-shaped GitHub runs; on issue/cron runs `allowedPrStates` is inert by
+  // config, and GitLab MR-state writeback is out of scope.
   const prStateLine =
-    isPr && allowedPrStates.length > 0
-      ? `- Set the pull request's open/closed state to whichever of these fits: ${allowedPrStates.map((s) => `"${s}"`).join(', ')}. Use \`gh pr close\` to close and \`gh pr reopen\` to reopen.`
+    !isGitlab && isPr && allowedPrStates.length > 0
+      ? `- Set the pull request's open/closed state to whichever of these fits: ${allowedPrStates.map((s) => `"${s}"`).join(', ')}. This is the PR's open/closed field, not a label.`
       : null;
   const labelLine =
     allowedLabels.length > 0
@@ -180,26 +199,33 @@ export function issueWritebackPrompt(args: {
 
   const header = issueNumber
     ? [
-        `Final step before you finish: update the GitHub ${noun} this run was triggered by.`,
+        `Final step before you finish: update the ${providerName} ${noun} this run was triggered by.`,
         ``,
-        `${isPr ? 'PR' : 'Issue'}: ${owner}/${repo}#${issueNumber}`,
+        `${!isGitlab && isPr ? 'PR' : 'Issue'}: ${owner}/${repo}#${issueNumber}`,
       ]
     : [
-        `Final step before you finish: for every GitHub ${noun} you created or updated in ${owner}/${repo} during this run, constrain what you set as follows.`,
+        `Final step before you finish: for every ${providerName} ${noun} you created or updated in ${owner}/${repo} during this run, constrain what you set as follows.`,
       ];
 
   const closing = issueNumber
     ? `- If none apply, say so explicitly and skip the update — don't pick a default.`
     : `- These constraints apply only to ${noun}s you touched this run. If you didn't create or update any ${noun}, skip this — don't invent one.`;
 
-  const cliLine = isPr
-    ? `Use the \`gh pr\` CLI available to you (\`gh pr edit\` for labels, \`gh pr close\` / \`gh pr reopen\` for state). Constraints:`
-    : `Use the gh CLI available to you. Constraints:`;
+  // Both platforms point at their auto-attached MCP server's tools — the runner
+  // has no authenticated `gh`/`glab` CLI, so CLI wording would send the agent to
+  // an unauthenticated binary (the bug behind PR-writeback label failures). The
+  // GitHub PR branch notes that PR labels share the issue number, so the agent
+  // reaches for the issue-label tools rather than hunting for a PR-only one.
+  const toolingLine = isGitlab
+    ? `Use the attached GitLab MCP tools (the \`GitLab (writeback)\` server auto-attached to this run) to read and update labels. Constraints:`
+    : isPr
+      ? `Use the attached GitHub MCP tools (the \`GitHub (writeback)\` server auto-attached to this run) to read and update this pull request — GitHub stores PR labels on the same number as issues, so the issue-label tools apply, and open/closed is a pull-request field. Constraints:`
+      : `Use the attached GitHub MCP tools (the \`GitHub (writeback)\` server auto-attached to this run) to read and update the ${noun}. Constraints:`;
 
   return [
     ...header,
     ``,
-    cliLine,
+    toolingLine,
     statusLine,
     prStateLine,
     labelLine,

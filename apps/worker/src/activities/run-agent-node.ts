@@ -27,6 +27,7 @@ import {
   type WorkflowMcpServer,
 } from '@conduit/shared';
 import type { RunnerEvent, RunnerRequest } from '@conduit/shared/runner';
+import { gitlabApiUrl } from '@conduit/shared/platform';
 import type {
   ConnectionContext,
   PrContext,
@@ -34,7 +35,7 @@ import type {
   TicketContext,
 } from '@conduit/agent';
 import { config } from '../config';
-import { loadConnectionContext } from '../runtime/connection-context';
+import { loadConnectionContext, loadConnectionHost } from '../runtime/connection-context';
 import { makeCredentialLookup } from '../runtime/credential-lookup';
 import { publishRunUpdate } from '../runtime/event-bus';
 import { writeAgentEventLog, writeSystemLog } from '../runtime/log-writer';
@@ -43,8 +44,8 @@ import { loadProviderConfig } from '../runtime/provider-config';
 import { resolveRunnerSpawner } from '../runtime/runner';
 import { makeTicketBranchStore } from '../runtime/ticket-branch-store';
 import {
-  agentReferencesGithubMcp,
-  buildSyntheticGithubMcp,
+  agentReferencesWritebackMcp,
+  buildSyntheticWritebackMcp,
   resolveWritebackContext,
 } from './writeback';
 
@@ -178,13 +179,29 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
       await installSkillsIntoWorkspace(workspace.path, selected, node.provider);
     }
 
-    // Skip auto-attach if a GitHub MCP is already referenced — the user-
-    // configured one wins, regardless of which connection it uses.
+    // Skip auto-attach if the firing platform's MCP is already referenced —
+    // the user-configured one wins, regardless of which connection it uses.
     const writebackContext = resolveWritebackContext(node, triggers, triggerEvent);
-    const writebackAttach =
-      writebackContext && !agentReferencesGithubMcp(node, mcpServers)
-        ? buildSyntheticGithubMcp(writebackContext.connectionId)
-        : null;
+    let writebackAttach: ReturnType<typeof buildSyntheticWritebackMcp> | null = null;
+    if (
+      writebackContext &&
+      !agentReferencesWritebackMcp(node, mcpServers, writebackContext.platform)
+    ) {
+      // Self-hosted GitLab varies the API base by instance, so the synthetic
+      // MCP needs the credential's host; gitlab.com normalizes to the preset's
+      // default URL (the override is then a no-op). GitHub needs no host — its
+      // preset URL is cloud-only — so it skips the lookup entirely.
+      let apiBaseUrl: string | undefined;
+      if (writebackContext.platform === 'gitlab') {
+        const host = await loadConnectionHost(writebackContext.connectionId);
+        apiBaseUrl = host ? gitlabApiUrl(host) : undefined;
+      }
+      writebackAttach = buildSyntheticWritebackMcp({
+        platform: writebackContext.platform,
+        connectionId: writebackContext.connectionId,
+        apiBaseUrl,
+      });
+    }
     const effectiveNode: AgentConfig = writebackAttach
       ? { ...node, mcpServers: [...node.mcpServers, writebackAttach.ref] }
       : node;
@@ -227,9 +244,7 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
     // Concat — don't replace — so the user's preset + instructionsAppend
     // still own the bulk of the prompt.
     const dagBlock = formatParallelDownstreamBlock(parallelDownstream ?? []);
-    const fullSystemPrompt = dagBlock
-      ? `${node.instructions}\n\n${dagBlock}`
-      : node.instructions;
+    const fullSystemPrompt = dagBlock ? `${node.instructions}\n\n${dagBlock}` : node.instructions;
 
     const agentRequest: AgentRequest = {
       model: node.model,
@@ -250,8 +265,7 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
     };
 
     const providerConfig = await loadProviderConfig(orgId, node.provider);
-    const envApiKey =
-      node.provider === 'claude' ? config.anthropicApiKey : config.openaiApiKey;
+    const envApiKey = node.provider === 'claude' ? config.anthropicApiKey : config.openaiApiKey;
     const resolvedApiKey = providerConfig?.apiKey ?? envApiKey;
 
     const runnerRequest: RunnerRequest = {
@@ -275,6 +289,7 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
         main: mainPrompt,
         issueWriteback: writebackContext
           ? issueWritebackPrompt({
+              platform: writebackContext.platform,
               owner: writebackContext.repoOwner,
               repo: writebackContext.repoName,
               issueNumber: writebackContext.issueNumber,
@@ -386,11 +401,7 @@ async function onAgentEvent(
   ]);
 }
 
-async function publishSystemEvent(
-  runId: string,
-  nodeName: string,
-  message: string,
-): Promise<void> {
+async function publishSystemEvent(runId: string, nodeName: string, message: string): Promise<void> {
   await publishRunUpdate({
     runId,
     nodeName,
@@ -455,4 +466,3 @@ async function resolveEntryWorkspaceInputs(
     pr: triggerEvent.pr ? { ...triggerEvent.pr } : undefined,
   };
 }
-
