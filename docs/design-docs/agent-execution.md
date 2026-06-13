@@ -244,6 +244,8 @@ The original design called for `mergeWorktreeActivity` to be a lightweight agent
 
 Optional per-agent capability: at end of run, the agent sets a project Status and/or applies repo labels on GitHub issues. Opt-in via `AgentConfig.issueWriteback` (`packages/shared/src/agent/issue-writeback.ts`) — its mere presence is the "feature is on" signal. Both arrays may be empty; an empty allowlist is treated as enabled-but-unselected and the runtime skips the writeback turn entirely.
 
+`allowedStatuses` / `allowedLabels` are what the agent may *set*. The label the run was *gated on* — the trigger's `label` filter — is removed automatically, so a board-pipeline handoff (e.g. `conduit-dev` → `conduit-review`) is a remove-the-consumed-label, add-the-next-one swap that the template never has to describe. The removal target isn't authored anywhere; it's derived from the trigger that fired.
+
 The turn has two shapes, picked by whether the run has a triggering issue:
 
 - **Issue-anchored** — the run was fired by a GitHub issue event (polling / webhook); the agent updates that one issue.
@@ -260,7 +262,7 @@ The field is hidden behind a hint when the workflow has no GitHub trigger. Picki
 
 ### Run-time
 
-Between the main turn and the summary turn, `runAgentNode` injects a third turn driven by `issueWritebackPrompt` (`packages/agent/src/context.ts`). The prompt interpolates the allowlist values verbatim — *only what the user picked appears* — so the choice set is encoded entirely in the prompt wording. There is no schema-level enforcement and no post-run validation; the agent is trusted to pick one of the listed values, or skip if none fit. Prompt construction is per-list — if only statuses (or only labels) are allowlisted, no phantom second list shows up in the directive.
+Between the main turn and the summary turn, `runAgentNode` injects a third turn driven by `issueWritebackPrompt` (`packages/agent/src/context.ts`). The prompt interpolates the allowlist values verbatim — *only what the user picked appears* — so the choice set is encoded entirely in the prompt wording. There is no schema-level enforcement and no post-run validation; the agent is trusted to pick one of the listed values, or skip if none fit. Prompt construction is per-list — if only statuses (or only labels) are allowlisted, no phantom second list shows up in the directive. `consumedLabels` (the trigger's `label` filters, minus any the agent is also told to apply) add a *remove* directive, so a status-gated entry point like Analyze removes nothing while a label-gated stage removes the label that fired it.
 
 `resolveWritebackContext` (`apps/worker/src/activities/writeback.ts`) returns `undefined` (skipping the turn) when:
 

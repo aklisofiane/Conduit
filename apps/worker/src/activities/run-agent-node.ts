@@ -280,6 +280,7 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
               issueNumber: writebackContext.issueNumber,
               allowedStatuses: writebackContext.allowedStatuses,
               allowedLabels: writebackContext.allowedLabels,
+              consumedLabels: writebackContext.consumedLabels,
             })
           : undefined,
         summary: finalSummaryPrompt(node.name),

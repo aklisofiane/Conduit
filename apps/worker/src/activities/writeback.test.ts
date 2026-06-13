@@ -43,6 +43,26 @@ const CRON_TRIGGER: TriggerConfig = {
   branch: 'main',
 };
 
+const DEV_LABEL_TRIGGER: TriggerConfig = {
+  id: 'trigger-develop',
+  name: 'DevelopTrigger',
+  platform: 'github',
+  connectionId: 'conn-repo',
+  type: 'issues',
+  intervalSec: 60,
+  filters: [{ field: 'label', value: 'conduit-dev' }],
+};
+
+const TODO_STATUS_TRIGGER: TriggerConfig = {
+  id: 'trigger-analyze',
+  name: 'AnalyzeTrigger',
+  platform: 'github',
+  connectionId: 'conn-repo',
+  type: 'issues',
+  intervalSec: 60,
+  filters: [{ field: 'status', value: 'Todo' }],
+};
+
 const CRON_EVENT: TriggerEvent = {
   source: 'github',
   mode: 'scheduled',
@@ -103,6 +123,7 @@ describe('resolveWritebackContext', () => {
       issueNumber: undefined,
       allowedStatuses: ['AIDev', 'Review'],
       allowedLabels: [],
+      consumedLabels: [],
     });
   });
 
@@ -111,6 +132,33 @@ describe('resolveWritebackContext', () => {
       issueWriteback: { allowedStatuses: ['AIDev'], allowedLabels: ['bug'] },
     });
     expect(resolveWritebackContext(node, [CRON_TRIGGER], ISSUE_EVENT)?.issueNumber).toBe('42');
+  });
+
+  it('derives the consumed label from the trigger’s label filter', () => {
+    const node = makeAgent({
+      issueWriteback: { allowedStatuses: ['Review'], allowedLabels: ['conduit-review'] },
+    });
+    const ctx = resolveWritebackContext(node, [DEV_LABEL_TRIGGER], ISSUE_EVENT);
+    // conduit-dev gated the run → consumed; conduit-review is the one to add.
+    expect(ctx?.consumedLabels).toEqual(['conduit-dev']);
+    expect(ctx?.allowedLabels).toEqual(['conduit-review']);
+  });
+
+  it('does not list a label as consumed when it is also being applied', () => {
+    const node = makeAgent({
+      issueWriteback: { allowedStatuses: [], allowedLabels: ['conduit-dev'] },
+    });
+    // Trigger gates on conduit-dev AND the agent re-applies it → not a removal.
+    const ctx = resolveWritebackContext(node, [DEV_LABEL_TRIGGER], ISSUE_EVENT);
+    expect(ctx?.consumedLabels).toEqual([]);
+  });
+
+  it('has no consumed label for a status-gated trigger', () => {
+    const node = makeAgent({
+      issueWriteback: { allowedStatuses: [], allowedLabels: ['conduit-dev'] },
+    });
+    const ctx = resolveWritebackContext(node, [TODO_STATUS_TRIGGER], ISSUE_EVENT);
+    expect(ctx?.consumedLabels).toEqual([]);
   });
 });
 

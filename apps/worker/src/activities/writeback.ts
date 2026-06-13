@@ -30,6 +30,14 @@ export interface WritebackContext {
   issueNumber?: string;
   allowedStatuses: string[];
   allowedLabels: string[];
+  /**
+   * Labels the run was gated on (the trigger's `label` filters), minus any
+   * the agent is also asked to set. The writeback turn removes these — the
+   * stage the run just consumed — so a board handoff swaps one stage label
+   * for the next without the template describing the removal. Empty for
+   * status-gated entry points (e.g. Analyze on `status=Todo`).
+   */
+  consumedLabels: string[];
 }
 
 /**
@@ -57,6 +65,11 @@ export function resolveWritebackContext(
   if (!triggerEvent.repo) return undefined;
   const trigger = triggers.find((t) => t.platform === 'github');
   if (!trigger) return undefined;
+  const triggerFilters = 'filters' in trigger ? trigger.filters : [];
+  const consumedLabels = triggerFilters
+    .filter((f) => f.field === 'label')
+    .map((f) => f.value)
+    .filter((label) => !writeback.allowedLabels.includes(label));
   return {
     connectionId: trigger.connectionId,
     repoOwner: triggerEvent.repo.owner,
@@ -64,6 +77,7 @@ export function resolveWritebackContext(
     issueNumber: triggerEvent.issue?.key,
     allowedStatuses: writeback.allowedStatuses,
     allowedLabels: writeback.allowedLabels,
+    consumedLabels,
   };
 }
 

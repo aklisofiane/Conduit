@@ -107,6 +107,11 @@ export function finalSummaryPrompt(nodeName: string): string {
  * The allowlist values are interpolated verbatim — only what the user picked
  * appears here, so the prompt itself encodes the choice set. Soft enforcement
  * only.
+ *
+ * `consumedLabels` are the stage labels the run was gated on (derived from the
+ * trigger). The directive tells the agent to remove them now that the stage is
+ * done, so a board handoff is a remove-old/add-new label swap without the
+ * template describing the removal.
  */
 export function issueWritebackPrompt(args: {
   owner: string;
@@ -114,8 +119,9 @@ export function issueWritebackPrompt(args: {
   issueNumber?: string;
   allowedStatuses: string[];
   allowedLabels: string[];
+  consumedLabels?: string[];
 }): string {
-  const { owner, repo, issueNumber, allowedStatuses, allowedLabels } = args;
+  const { owner, repo, issueNumber, allowedStatuses, allowedLabels, consumedLabels = [] } = args;
   const statusLine =
     allowedStatuses.length > 0
       ? `- Set the project Status to whichever of these values best fits: ${allowedStatuses.map((s) => `"${s}"`).join(', ')}.`
@@ -124,12 +130,17 @@ export function issueWritebackPrompt(args: {
     allowedLabels.length > 0
       ? `- Apply whichever of these labels best fit (you may apply more than one, or none if none apply): ${allowedLabels.map((l) => `"${l}"`).join(', ')}.`
       : null;
+  const removeLabelLine =
+    consumedLabels.length > 0
+      ? `- Remove the label that gated this run, now consumed: ${consumedLabels.map((l) => `"${l}"`).join(', ')}.`
+      : null;
   const noopStatusLine = statusLine
     ? `- Do not set any project Status that isn't in the list above.`
     : null;
-  const noopLabelLine = labelLine
-    ? `- Do not apply any label that isn't in the list above.`
-    : null;
+  const noopLabelLine =
+    labelLine || removeLabelLine
+      ? `- Leave every other label untouched — only apply and remove what's listed above.`
+      : null;
 
   const header = issueNumber
     ? [
@@ -151,6 +162,7 @@ export function issueWritebackPrompt(args: {
     `Use the gh CLI available to you. Constraints:`,
     statusLine,
     labelLine,
+    removeLabelLine,
     noopStatusLine,
     noopLabelLine,
     closing,

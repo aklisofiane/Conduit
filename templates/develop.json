@@ -1,12 +1,12 @@
 {
   "id": "develop",
   "name": "Develop",
-  "description": "Multi-agent development pipeline: Planner dispatches Dev + Tests in parallel, Docs documents the result, QA merges and opens a draft pull/merge request. Triggered when a ticket enters the \"Dev\" board column (rename the trigger filter to match your board's column or label names).",
+  "description": "Multi-agent development pipeline: Planner dispatches Dev + Tests in parallel, Docs documents the result, QA merges and opens a draft pull/merge request. Gated on the \"conduit-dev\" label — Analyze applies it to auto-chain an opened issue into a draft PR untouched, and a human can re-apply it to re-run. On completion QA swaps the label to \"conduit-review\" to hand off to the Review workflow. GitHub Projects users who prefer drag-to-column can swap the trigger filter to status=Dev; GitLab boards are label-native, so the label default works out of the box.",
   "category": "develop",
   "workflows": [
     {
       "name": "Develop",
-      "description": "Polling on status=Dev. Planner reads the ticket and dispatches scoped work to Dev and Tests (parallel branched worktrees). Docs runs once both finish so it documents what was actually shipped. QA consumes the merged workspace and opens a draft pull/merge request.",
+      "description": "Polling on label=conduit-dev. Planner reads the ticket and dispatches scoped work to Dev and Tests (parallel branched worktrees). Docs runs once both finish so it documents what was actually shipped. QA consumes the merged workspace, opens a draft pull/merge request, and swaps the issue label conduit-dev → conduit-review.",
       "definition": {
         "triggers": [
           {
@@ -17,7 +17,7 @@
             "boardConnectionId": "<github-board>",
             "type": "issues",
             "intervalSec": 60,
-            "filters": [{ "field": "status", "value": "Dev" }]
+            "filters": [{ "field": "label", "value": "conduit-dev" }]
           }
         ],
         "nodes": [
@@ -52,9 +52,10 @@
             "id": "agent-qa",
             "name": "QA",
             "presetId": "qa",
-            "instructionsAppend": "After opening the draft pull/merge request, move the ticket to the review-stage column or label on the board (named \"Review\" by default).",
             "mcpServers": [{ "serverId": "github-mcp" }],
-            "skills": []          }
+            "skills": [],
+            "issueWriteback": { "allowedStatuses": ["Review"], "allowedLabels": ["conduit-review"] }
+          }
         ],
         "edges": [
           { "from": "DevelopTrigger", "to": "Planner" },

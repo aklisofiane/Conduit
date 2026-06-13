@@ -105,4 +105,47 @@ describe('issueWritebackPrompt', () => {
     expect(out).not.toContain('project Status');
     expect(out).toContain('"triage"');
   });
+
+  it('instructs removal of the consumed (trigger) label and application of the next one', () => {
+    const out = issueWritebackPrompt({
+      owner: 'acme',
+      repo: 'web',
+      issueNumber: '42',
+      allowedStatuses: ['Review'],
+      allowedLabels: ['conduit-review'],
+      consumedLabels: ['conduit-dev'],
+    });
+    // Removes the gating label, applies the next.
+    expect(out).toContain('Remove the label that gated this run');
+    expect(out).toContain('"conduit-dev"');
+    expect(out).toContain('"conduit-review"');
+  });
+
+  it('has no removal directive when nothing was consumed (status-gated entry)', () => {
+    const out = issueWritebackPrompt({
+      owner: 'acme',
+      repo: 'web',
+      issueNumber: '7',
+      allowedStatuses: [],
+      allowedLabels: ['conduit-dev'],
+      consumedLabels: [],
+    });
+    expect(out).not.toContain('Remove the label that gated this run');
+    expect(out).toContain('"conduit-dev"');
+  });
+
+  it('can remove a consumed label even when nothing new is applied (terminal clear)', () => {
+    const out = issueWritebackPrompt({
+      owner: 'acme',
+      repo: 'web',
+      issueNumber: '9',
+      allowedStatuses: ['ReadyToMerge', 'In Progress'],
+      allowedLabels: [],
+      consumedLabels: ['conduit-review'],
+    });
+    expect(out).toContain('Remove the label that gated this run');
+    expect(out).toContain('"conduit-review"');
+    // The no-other-labels guard still fires off the removal directive alone.
+    expect(out).toContain('Leave every other label untouched');
+  });
 });
