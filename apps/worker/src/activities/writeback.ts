@@ -58,13 +58,30 @@ export function resolveWritebackContext(
 ): WritebackContext | undefined {
   const writeback = node.issueWriteback;
   if (!writeback) return undefined;
+  // Empty allowlist means enabled-but-unselected → skip the whole turn. This
+  // also skips consumed-label removal, so a stage must declare at least one
+  // status or label for its gating label to be cleared; a pure-removal stage
+  // (both allowlists empty) is intentionally unsupported. Every shipped
+  // terminal stage sets a status or label, so this never strands a gating
+  // label in practice.
   if (writeback.allowedStatuses.length === 0 && writeback.allowedLabels.length === 0) {
     return undefined;
   }
   if (triggerEvent.source !== 'github') return undefined;
   if (!triggerEvent.repo) return undefined;
+  // First github trigger. Workflows ship with a single github trigger, so this
+  // is the trigger that fired; if a workflow ever declares more than one, both
+  // connectionId and consumedLabels below would follow the first rather than
+  // the one that actually fired — revisit with matchesTrigger() (trigger/match)
+  // if multi-trigger workflows land.
   const trigger = triggers.find((t) => t.platform === 'github');
   if (!trigger) return undefined;
+  // consumedLabels is removed in the (issue-scoped) writeback turn, decoupled
+  // from any cross-artifact handoff the agent does in prose (e.g. Review's
+  // conduit-merge on the PR). If that prose step fails, the gating label is
+  // still removed and the ticket can fall out of the pipeline — a known
+  // limitation; recovery is manual (re-apply the stage label) until a
+  // reconciler sweeps for unlabeled issues with open work.
   const triggerFilters = 'filters' in trigger ? trigger.filters : [];
   const consumedLabels = triggerFilters
     .filter((f) => f.field === 'label')

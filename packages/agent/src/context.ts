@@ -137,10 +137,17 @@ export function issueWritebackPrompt(args: {
   const noopStatusLine = statusLine
     ? `- Do not set any project Status that isn't in the list above.`
     : null;
+  // Phrase the no-op guard to match the directives actually present, so a
+  // pure-removal turn (labelLine null, removeLabelLine set) doesn't reference an
+  // "apply" list that isn't there.
   const noopLabelLine =
-    labelLine || removeLabelLine
+    labelLine && removeLabelLine
       ? `- Leave every other label untouched — only apply and remove what's listed above.`
-      : null;
+      : labelLine
+        ? `- Leave every other label untouched — only apply what's listed above.`
+        : removeLabelLine
+          ? `- Leave every other label untouched — only remove what's listed above; don't add any new label.`
+          : null;
 
   const header = issueNumber
     ? [

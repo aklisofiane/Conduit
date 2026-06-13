@@ -145,7 +145,10 @@ describe('issueWritebackPrompt', () => {
     });
     expect(out).toContain('Remove the label that gated this run');
     expect(out).toContain('"conduit-review"');
-    // The no-other-labels guard still fires off the removal directive alone.
+    // The no-other-labels guard still fires off the removal directive alone,
+    // and phrases itself as remove-only (no phantom "apply" list).
     expect(out).toContain('Leave every other label untouched');
+    expect(out).toContain("only remove what's listed above");
+    expect(out).not.toContain('only apply and remove');
   });
 });
