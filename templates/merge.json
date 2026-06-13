@@ -1,0 +1,53 @@
+{
+  "id": "merge",
+  "name": "Merge",
+  "description": "Merges a pull/merge request once a human opts it in: label it \"conduit-merge\", then mark it ready for review — on this workflow, labeled + ready means \"merge it\". Checks must be green. Minor mechanical conflicts are resolved automatically; semantic conflicts are escalated by converting the PR/MR back to draft with an analysis comment (re-marking ready retries). Closes the linked issue after merging. Pairs with the Develop and Review templates as the final stage of a board-driven pipeline, or runs standalone.",
+  "category": "merge",
+  "workflows": [
+    {
+      "name": "Merge",
+      "description": "Polling on label=conduit-merge AND pr_state=ready_for_review. Merger verifies CI, merges clean or mechanically-resolvable pull/merge requests into their base branch, closes the linked issue, and converts semantic conflicts back to draft for a human to decide.",
+      "definition": {
+        "triggers": [
+          {
+            "id": "trigger-merge",
+            "name": "MergeTrigger",
+            "platform": "github",
+            "connectionId": "<github-repo>",
+            "type": "pull_requests",
+            "intervalSec": 60,
+            "filters": [
+              { "field": "label", "value": "conduit-merge" },
+              { "field": "pr_state", "value": "ready_for_review" }
+            ]
+          }
+        ],
+        "nodes": [
+          {
+            "id": "agent-merger",
+            "name": "Merger",
+            "presetId": "merger",
+            "instructionsAppend": "If you escalate or block, your comment must mention that this workflow re-runs when the pull/merge request transitions from draft to ready for review with the \"conduit-merge\" label still applied.",
+            "mcpServers": [{ "serverId": "github-mcp" }],
+            "skills": []
+          }
+        ],
+        "edges": [{ "from": "MergeTrigger", "to": "Merger" }],
+        "mcpServers": [
+          {
+            "id": "github-mcp",
+            "presetId": "github",
+            "connectionId": "<github-repo>"
+          }
+        ],
+        "ui": {
+          "nodePositions": {
+            "MergeTrigger": { "x": 80, "y": 120 },
+            "Merger": { "x": 440, "y": 120 }
+          },
+          "viewport": { "x": 0, "y": 0, "zoom": 1 }
+        }
+      }
+    }
+  ]
+}

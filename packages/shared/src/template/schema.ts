@@ -26,6 +26,7 @@ export const templateCategorySchema = z.enum([
   'triage',
   'develop',
   'review',
+  'merge',
 ]);
 export type TemplateCategory = z.infer<typeof templateCategorySchema>;
 

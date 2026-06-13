@@ -77,7 +77,7 @@ describe('Phase 6 — create workflows from template', () => {
     const templates = await harness.http.get<TemplateSummary[]>('/templates');
     const byId = new Map(templates.map((t) => [t.id, t]));
 
-    for (const id of ['analyze', 'pr-review', 'develop', 'review', 'nightly-review']) {
+    for (const id of ['analyze', 'pr-review', 'develop', 'review', 'nightly-review', 'merge']) {
       expect(byId.has(id), `${id} template missing`).toBe(true);
     }
 
