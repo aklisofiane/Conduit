@@ -4,7 +4,7 @@ How Conduit handles branches for iterative board-loop workflows. Covers the `tic
 
 ## Core principle: the board is the loop
 
-Iteration is expressed by board transitions, not by cycles in the workflow graph. A Worker workflow fires on `status = Dev`, commits to a persistent branch, and moves the ticket to `AIReview`. A Critic workflow fires on `status = AIReview` and either approves (moves to `ReadyToMerge`) or rejects (moves the ticket back to `Dev`, re-triggering the Worker).
+Iteration is expressed by board transitions, not by cycles in the workflow graph. A Worker workflow fires on the `conduit-dev` label, commits to a persistent branch, and on completion swaps the label to `conduit-review` to hand off. A Critic workflow fires on `conduit-review` and either approves (swaps to `conduit-merge`) or requests changes (drops the label and moves status to a human column, where re-applying `conduit-dev` re-triggers the Worker). AI-to-AI handoffs ride `conduit-*` labels, not board status, so the convention works identically on GitHub and GitLab — see [Label-gated signaling](./templates.md#label-gated-signaling); human-gesture entry points (a freshly opened issue) still gate on status.
 
 Cross-run state lives in two platform-native places:
 
