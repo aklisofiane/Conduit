@@ -31,6 +31,18 @@ export interface WritebackContext {
   allowedStatuses: string[];
   allowedLabels: string[];
   /**
+   * PR-native open/closed states the agent may set. Only meaningful when the
+   * run is PR-shaped (`isPr`); the prompt emits the directive accordingly.
+   */
+  allowedPrStates: string[];
+  /**
+   * True when the triggering event is a pull request (`triggerEvent.pr`
+   * present — PR-poll `pull_request.detected` runs and PR webhooks). Switches
+   * the writeback prompt to PR wording (`gh pr edit` / `gh pr close|reopen`)
+   * and unlocks the `allowedPrStates` directive. False for issue/cron runs.
+   */
+  isPr: boolean;
+  /**
    * Labels the run was gated on (the trigger's `label` filters), minus any
    * the agent is also asked to set. The writeback turn removes these — the
    * stage the run just consumed — so a board handoff swaps one stage label
@@ -44,7 +56,7 @@ export interface WritebackContext {
  * Resolve the per-run writeback context. Returns undefined when the feature
  * is not configured for this agent, when the workflow has no GitHub trigger,
  * when this run didn't target a GitHub repo, or when the user enabled the
- * checkbox without picking any statuses or labels.
+ * checkbox without picking any statuses, labels, or PR states.
  *
  * A run only needs a GitHub repo to qualify — not a triggering issue. Cron
  * runs carry `repo` (resolved from the trigger connection in cron-fire.ts)
@@ -64,7 +76,11 @@ export function resolveWritebackContext(
   // (both allowlists empty) is intentionally unsupported. Every shipped
   // terminal stage sets a status or label, so this never strands a gating
   // label in practice.
-  if (writeback.allowedStatuses.length === 0 && writeback.allowedLabels.length === 0) {
+  if (
+    writeback.allowedStatuses.length === 0 &&
+    writeback.allowedLabels.length === 0 &&
+    writeback.allowedPrStates.length === 0
+  ) {
     return undefined;
   }
   if (triggerEvent.source !== 'github') return undefined;
@@ -94,6 +110,8 @@ export function resolveWritebackContext(
     issueNumber: triggerEvent.issue?.key,
     allowedStatuses: writeback.allowedStatuses,
     allowedLabels: writeback.allowedLabels,
+    allowedPrStates: writeback.allowedPrStates,
+    isPr: Boolean(triggerEvent.pr),
     consumedLabels,
   };
 }

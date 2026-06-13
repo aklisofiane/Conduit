@@ -112,6 +112,14 @@ export function finalSummaryPrompt(nodeName: string): string {
  * trigger). The directive tells the agent to remove them now that the stage is
  * done, so a board handoff is a remove-old/add-new label swap without the
  * template describing the removal.
+ *
+ * `isPr` switches the wording to a pull request: the agent is told to use the
+ * `gh pr` CLI (`gh pr edit` for labels, `gh pr close|reopen` for state) rather
+ * than the issue-shaped `gh issue` path, and the `allowedPrStates` open/closed
+ * directive is emitted. PR runs share the issue number space, so the anchor is
+ * the same `owner/repo#N`. Labels and project Status carry over unchanged
+ * (GitHub treats PRs as issues for labels; Status only emits if a board status
+ * was picked, which the PR-trigger UI never offers).
  */
 export function issueWritebackPrompt(args: {
   owner: string;
@@ -119,12 +127,30 @@ export function issueWritebackPrompt(args: {
   issueNumber?: string;
   allowedStatuses: string[];
   allowedLabels: string[];
+  allowedPrStates?: string[];
   consumedLabels?: string[];
+  isPr?: boolean;
 }): string {
-  const { owner, repo, issueNumber, allowedStatuses, allowedLabels, consumedLabels = [] } = args;
+  const {
+    owner,
+    repo,
+    issueNumber,
+    allowedStatuses,
+    allowedLabels,
+    allowedPrStates = [],
+    consumedLabels = [],
+    isPr = false,
+  } = args;
+  const noun = isPr ? 'pull request' : 'issue';
   const statusLine =
     allowedStatuses.length > 0
       ? `- Set the project Status to whichever of these values best fits: ${allowedStatuses.map((s) => `"${s}"`).join(', ')}.`
+      : null;
+  // Open/closed is a repo-native PR state — no board needed. Emitted only for
+  // PR-shaped runs; on issue/cron runs `allowedPrStates` is inert by config.
+  const prStateLine =
+    isPr && allowedPrStates.length > 0
+      ? `- Set the pull request's open/closed state to whichever of these fits: ${allowedPrStates.map((s) => `"${s}"`).join(', ')}. Use \`gh pr close\` to close and \`gh pr reopen\` to reopen.`
       : null;
   const labelLine =
     allowedLabels.length > 0
@@ -136,6 +162,9 @@ export function issueWritebackPrompt(args: {
       : null;
   const noopStatusLine = statusLine
     ? `- Do not set any project Status that isn't in the list above.`
+    : null;
+  const noopPrStateLine = prStateLine
+    ? `- Don't move the pull request to any state that isn't listed above; if it's already in the right state, leave it.`
     : null;
   // Phrase the no-op guard to match the directives actually present, so a
   // pure-removal turn (labelLine null, removeLabelLine set) doesn't reference an
@@ -151,26 +180,32 @@ export function issueWritebackPrompt(args: {
 
   const header = issueNumber
     ? [
-        `Final step before you finish: update the GitHub issue this run was triggered by.`,
+        `Final step before you finish: update the GitHub ${noun} this run was triggered by.`,
         ``,
-        `Issue: ${owner}/${repo}#${issueNumber}`,
+        `${isPr ? 'PR' : 'Issue'}: ${owner}/${repo}#${issueNumber}`,
       ]
     : [
-        `Final step before you finish: for every GitHub issue you created or updated in ${owner}/${repo} during this run, constrain what you set as follows.`,
+        `Final step before you finish: for every GitHub ${noun} you created or updated in ${owner}/${repo} during this run, constrain what you set as follows.`,
       ];
 
   const closing = issueNumber
     ? `- If none apply, say so explicitly and skip the update — don't pick a default.`
-    : `- These constraints apply only to issues you touched this run. If you didn't create or update any issue, skip this — don't invent one.`;
+    : `- These constraints apply only to ${noun}s you touched this run. If you didn't create or update any ${noun}, skip this — don't invent one.`;
+
+  const cliLine = isPr
+    ? `Use the \`gh pr\` CLI available to you (\`gh pr edit\` for labels, \`gh pr close\` / \`gh pr reopen\` for state). Constraints:`
+    : `Use the gh CLI available to you. Constraints:`;
 
   return [
     ...header,
     ``,
-    `Use the gh CLI available to you. Constraints:`,
+    cliLine,
     statusLine,
+    prStateLine,
     labelLine,
     removeLabelLine,
     noopStatusLine,
+    noopPrStateLine,
     noopLabelLine,
     closing,
     ``,

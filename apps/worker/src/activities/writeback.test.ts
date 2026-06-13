@@ -53,6 +53,16 @@ const DEV_LABEL_TRIGGER: TriggerConfig = {
   filters: [{ field: 'label', value: 'conduit-dev' }],
 };
 
+const PR_LABEL_TRIGGER: TriggerConfig = {
+  id: 'trigger-pr',
+  name: 'PrTrigger',
+  platform: 'github',
+  connectionId: 'conn-repo',
+  type: 'pull_requests',
+  intervalSec: 60,
+  filters: [{ field: 'label', value: 'conduit-review' }],
+};
+
 const TODO_STATUS_TRIGGER: TriggerConfig = {
   id: 'trigger-analyze',
   name: 'AnalyzeTrigger',
@@ -85,24 +95,42 @@ const ISSUE_EVENT: TriggerEvent = {
   },
 };
 
+const PR_EVENT: TriggerEvent = {
+  source: 'github',
+  mode: 'polling',
+  event: 'pull_request.detected',
+  payload: {},
+  repo: { owner: 'acme', name: 'shop' },
+  // PRs share the issue number space — `issue` is populated for PR events.
+  issue: {
+    id: 'PR_1',
+    key: '7',
+    title: 'Add checkout flow',
+    url: 'https://github.com/acme/shop/pull/7',
+  },
+  pr: { headRef: 'feature-checkout', baseRef: 'main' },
+};
+
 describe('resolveWritebackContext', () => {
   it('returns undefined when issueWriteback is not configured', () => {
     expect(resolveWritebackContext(makeAgent(), [CRON_TRIGGER], CRON_EVENT)).toBeUndefined();
   });
 
   it('returns undefined when the allowlist is empty (checkbox on, nothing picked)', () => {
-    const node = makeAgent({ issueWriteback: { allowedStatuses: [], allowedLabels: [] } });
+    const node = makeAgent({
+      issueWriteback: { allowedStatuses: [], allowedLabels: [], allowedPrStates: [] },
+    });
     expect(resolveWritebackContext(node, [CRON_TRIGGER], CRON_EVENT)).toBeUndefined();
   });
 
   it('returns undefined for a non-GitHub run', () => {
-    const node = makeAgent({ issueWriteback: { allowedStatuses: ['AIDev'], allowedLabels: [] } });
+    const node = makeAgent({ issueWriteback: { allowedStatuses: ['AIDev'], allowedLabels: [], allowedPrStates: [] } });
     const gitlabEvent: TriggerEvent = { ...CRON_EVENT, source: 'gitlab' };
     expect(resolveWritebackContext(node, [CRON_TRIGGER], gitlabEvent)).toBeUndefined();
   });
 
   it('returns undefined when the run carries no repo', () => {
-    const node = makeAgent({ issueWriteback: { allowedStatuses: ['AIDev'], allowedLabels: [] } });
+    const node = makeAgent({ issueWriteback: { allowedStatuses: ['AIDev'], allowedLabels: [], allowedPrStates: [] } });
     const noRepo: TriggerEvent = {
       source: 'github',
       mode: 'scheduled',
@@ -114,7 +142,7 @@ describe('resolveWritebackContext', () => {
 
   it('resolves a repo-scoped context (issueNumber undefined) for a cron run', () => {
     const node = makeAgent({
-      issueWriteback: { allowedStatuses: ['AIDev', 'Review'], allowedLabels: [] },
+      issueWriteback: { allowedStatuses: ['AIDev', 'Review'], allowedLabels: [], allowedPrStates: [] },
     });
     expect(resolveWritebackContext(node, [CRON_TRIGGER], CRON_EVENT)).toEqual({
       connectionId: 'conn-repo',
@@ -123,20 +151,41 @@ describe('resolveWritebackContext', () => {
       issueNumber: undefined,
       allowedStatuses: ['AIDev', 'Review'],
       allowedLabels: [],
+      allowedPrStates: [],
+      isPr: false,
       consumedLabels: [],
     });
   });
 
   it('carries the triggering issue number for an issue-fired run', () => {
     const node = makeAgent({
-      issueWriteback: { allowedStatuses: ['AIDev'], allowedLabels: ['bug'] },
+      issueWriteback: { allowedStatuses: ['AIDev'], allowedLabels: ['bug'], allowedPrStates: [] },
     });
     expect(resolveWritebackContext(node, [CRON_TRIGGER], ISSUE_EVENT)?.issueNumber).toBe('42');
   });
 
+  it('flags an issue-fired run as not a PR', () => {
+    const node = makeAgent({
+      issueWriteback: { allowedStatuses: ['AIDev'], allowedLabels: [], allowedPrStates: [] },
+    });
+    expect(resolveWritebackContext(node, [CRON_TRIGGER], ISSUE_EVENT)?.isPr).toBe(false);
+  });
+
+  it('qualifies a PR run on PR-state allowlist alone (no board status needed)', () => {
+    const node = makeAgent({
+      issueWriteback: { allowedStatuses: [], allowedLabels: [], allowedPrStates: ['closed'] },
+    });
+    const ctx = resolveWritebackContext(node, [PR_LABEL_TRIGGER], PR_EVENT);
+    expect(ctx?.isPr).toBe(true);
+    expect(ctx?.issueNumber).toBe('7');
+    expect(ctx?.allowedPrStates).toEqual(['closed']);
+    // The PR trigger's gating label is consumed just like an issue trigger's.
+    expect(ctx?.consumedLabels).toEqual(['conduit-review']);
+  });
+
   it('derives the consumed label from the trigger’s label filter', () => {
     const node = makeAgent({
-      issueWriteback: { allowedStatuses: ['Review'], allowedLabels: ['conduit-review'] },
+      issueWriteback: { allowedStatuses: ['Review'], allowedLabels: ['conduit-review'], allowedPrStates: [] },
     });
     const ctx = resolveWritebackContext(node, [DEV_LABEL_TRIGGER], ISSUE_EVENT);
     // conduit-dev gated the run → consumed; conduit-review is the one to add.
@@ -146,7 +195,7 @@ describe('resolveWritebackContext', () => {
 
   it('does not list a label as consumed when it is also being applied', () => {
     const node = makeAgent({
-      issueWriteback: { allowedStatuses: [], allowedLabels: ['conduit-dev'] },
+      issueWriteback: { allowedStatuses: [], allowedLabels: ['conduit-dev'], allowedPrStates: [] },
     });
     // Trigger gates on conduit-dev AND the agent re-applies it → not a removal.
     const ctx = resolveWritebackContext(node, [DEV_LABEL_TRIGGER], ISSUE_EVENT);
@@ -155,7 +204,7 @@ describe('resolveWritebackContext', () => {
 
   it('has no consumed label for a status-gated trigger', () => {
     const node = makeAgent({
-      issueWriteback: { allowedStatuses: [], allowedLabels: ['conduit-dev'] },
+      issueWriteback: { allowedStatuses: [], allowedLabels: ['conduit-dev'], allowedPrStates: [] },
     });
     const ctx = resolveWritebackContext(node, [TODO_STATUS_TRIGGER], ISSUE_EVENT);
     expect(ctx?.consumedLabels).toEqual([]);

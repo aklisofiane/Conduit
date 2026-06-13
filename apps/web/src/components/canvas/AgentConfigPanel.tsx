@@ -198,8 +198,8 @@ export function AgentConfigPanel({
           </Field>
 
           <Field
-            label="Issue writeback"
-            hint="set status / apply labels at end of run"
+            label="Issue / PR writeback"
+            hint="set status / state / apply labels at end of run"
           >
             <IssueWritebackControl
               trigger={writebackTrigger}
@@ -302,6 +302,7 @@ function IssueWritebackControl({
   onChange: (next: AgentIssueWriteback | undefined) => void;
 }) {
   const enabled = value !== undefined;
+  const isPr = trigger?.type === 'pull_requests';
   const connectionId = trigger?.connectionId ?? '';
   const boardConnectionId = trigger?.boardConnectionId ?? '';
   const { data: connections = [] } = useConnections();
@@ -329,7 +330,7 @@ function IssueWritebackControl({
   const labelOptions = labelsQuery.data ?? [];
 
   const toggle = (next: boolean) => {
-    onChange(next ? { allowedStatuses: [], allowedLabels: [] } : undefined);
+    onChange(next ? { allowedStatuses: [], allowedLabels: [], allowedPrStates: [] } : undefined);
   };
 
   const toggleStatus = (status: string) => {
@@ -348,6 +349,14 @@ function IssueWritebackControl({
     onChange({ ...value, allowedLabels: [...set] });
   };
 
+  const togglePrState = (state: string) => {
+    if (!value) return;
+    const set = new Set(value.allowedPrStates);
+    if (set.has(state as 'open' | 'closed')) set.delete(state as 'open' | 'closed');
+    else set.add(state as 'open' | 'closed');
+    onChange({ ...value, allowedPrStates: [...set] });
+  };
+
   if (!trigger) {
     return (
       <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
@@ -364,29 +373,41 @@ function IssueWritebackControl({
           checked={enabled}
           onChange={(e) => toggle(e.target.checked)}
         />
-        <span>Allow updating issue status / labels</span>
+        <span>Allow updating issue/PR status &amp; labels</span>
       </label>
 
       {enabled && (
         <div className="space-y-3 rounded-[var(--radius)] border border-[var(--color-divider)] bg-[var(--color-bg)] p-3">
-          <PillSection
-            label="Allowed statuses"
-            empty={
-              !boardScope
-                ? "Trigger has no project board — set one to pick statuses."
-                : boardsQuery.isLoading
-                  ? 'Loading…'
-                  : statusOptions.length === 0
-                    ? "No Status field options found on the trigger's project."
-                    : null
-            }
-          >
-            <PillToggleGroup
-              options={statusOptions}
-              selected={value?.allowedStatuses ?? []}
-              onToggle={toggleStatus}
-            />
-          </PillSection>
+          {isPr ? (
+            // PR triggers carry no project board — offer the repo-native
+            // open/closed state instead of a board Status column.
+            <PillSection label="Allowed PR states" empty={null}>
+              <PillToggleGroup
+                options={['open', 'closed']}
+                selected={value?.allowedPrStates ?? []}
+                onToggle={togglePrState}
+              />
+            </PillSection>
+          ) : (
+            <PillSection
+              label="Allowed statuses"
+              empty={
+                !boardScope
+                  ? "Trigger has no project board — set one to pick statuses."
+                  : boardsQuery.isLoading
+                    ? 'Loading…'
+                    : statusOptions.length === 0
+                      ? "No Status field options found on the trigger's project."
+                      : null
+              }
+            >
+              <PillToggleGroup
+                options={statusOptions}
+                selected={value?.allowedStatuses ?? []}
+                onToggle={toggleStatus}
+              />
+            </PillSection>
+          )}
 
           <PillSection
             label="Allowed labels"
@@ -407,10 +428,13 @@ function IssueWritebackControl({
 
           {value &&
             value.allowedStatuses.length === 0 &&
-            value.allowedLabels.length === 0 && (
+            value.allowedLabels.length === 0 &&
+            // Null-safe: workflows saved before the PR-state axis existed have
+            // no `allowedPrStates` until the definition is re-parsed on save.
+            (value.allowedPrStates?.length ?? 0) === 0 && (
               <div className="font-mono text-[10.5px] text-[var(--color-text-muted)]">
-                Pick at least one status or label — without selections, the
-                writeback turn is skipped at run time.
+                Pick at least one {isPr ? 'state' : 'status'} or label — without
+                selections, the writeback turn is skipped at run time.
               </div>
             )}
         </div>

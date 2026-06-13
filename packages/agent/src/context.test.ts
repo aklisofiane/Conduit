@@ -151,4 +151,60 @@ describe('issueWritebackPrompt', () => {
     expect(out).toContain("only remove what's listed above");
     expect(out).not.toContain('only apply and remove');
   });
+
+  it('switches to pull-request wording and the gh pr CLI when isPr', () => {
+    const out = issueWritebackPrompt({
+      owner: 'acme',
+      repo: 'web',
+      issueNumber: '7',
+      allowedStatuses: [],
+      allowedLabels: ['needs-changes'],
+      allowedPrStates: ['open', 'closed'],
+      isPr: true,
+    });
+    expect(out).toContain('update the GitHub pull request this run was triggered by');
+    expect(out).toContain('PR: acme/web#7');
+    expect(out).toContain('`gh pr` CLI');
+    // Open/closed directive is the repo-native state axis — no board needed.
+    expect(out).toContain("Set the pull request's open/closed state");
+    expect(out).toContain('"open"');
+    expect(out).toContain('"closed"');
+    expect(out).toContain('`gh pr close`');
+    expect(out).toContain('`gh pr reopen`');
+    // Labels still apply (GitHub treats PRs as issues for labels).
+    expect(out).toContain('"needs-changes"');
+    // Never the issue-shaped anchor.
+    expect(out).not.toContain('Issue: acme/web#7');
+  });
+
+  it('omits the PR-state directive on a non-PR run even if states are passed', () => {
+    const out = issueWritebackPrompt({
+      owner: 'acme',
+      repo: 'web',
+      issueNumber: '7',
+      allowedStatuses: [],
+      allowedLabels: ['bug'],
+      allowedPrStates: ['closed'],
+      isPr: false,
+    });
+    expect(out).toContain('Issue: acme/web#7');
+    expect(out).not.toContain('open/closed state');
+    expect(out).not.toContain('`gh pr');
+  });
+
+  it('skips the PR-state directive when no states are allowed (labels-only PR run)', () => {
+    const out = issueWritebackPrompt({
+      owner: 'acme',
+      repo: 'web',
+      issueNumber: '7',
+      allowedStatuses: [],
+      allowedLabels: ['needs-changes'],
+      allowedPrStates: [],
+      isPr: true,
+    });
+    // PR wording, but no state line because nothing was allowed.
+    expect(out).toContain('PR: acme/web#7');
+    expect(out).not.toContain('open/closed state');
+    expect(out).toContain('"needs-changes"');
+  });
 });
