@@ -154,6 +154,9 @@ services:
       TEMPORAL_NAMESPACE: ${TEMPORAL_NAMESPACE:-default}
       TEMPORAL_TASK_QUEUE: ${TEMPORAL_TASK_QUEUE:-conduit-workflows}
       REDIS_URL: redis://redis:6379
+      # Must match the api service — selects docker runner mode. Without it the
+      # worker defaults to host mode and crashes at boot. See runner/mode.ts.
+      CONDUIT_DEPLOYMENT: hosted
       CONDUIT_PROVIDER: ${CONDUIT_PROVIDER:-claude}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
