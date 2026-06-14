@@ -32,9 +32,10 @@ Temporal activity retry defaults:
   maximumInterval: '60s',
   maximumAttempts: 3,
   nonRetryableErrorTypes: [
-    'ValidationError',        // bad node config
+    'ValidationError',         // bad node config
     'ConstraintExceededError', // agent budget
     'UnauthorizedError',       // credential invalid
+    'MergeConflictError',      // unresolvable worktree merge
   ],
 }
 ```

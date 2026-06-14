@@ -40,7 +40,7 @@ A template can contain **one or more workflow definitions**. All shipped templat
 
 Each entry's `definition` matches `Workflow.definition` in the DB **after preset expansion**. Two schemas govern this: `templateInputFileSchema` validates the on-disk shape (where agents may use `presetId`), and `templateFileSchema` validates the post-expansion shape (concrete `instructions`/`model`/`provider`). Connection placeholder strings pass structural validation because they satisfy `z.string().min(1)`; semantic validation (`validateWorkflowDefinition`) runs only after placeholder resolution, on the per-workflow path. The template's top-level `name`/`description`/`category` describe the bundle; each entry's `name`/`description` become the created `Workflow` row's fields.
 
-**Category** is one of `triage | develop | review` — a display-only hint for grouping in the picker.
+**Category** is one of `triage | develop | review | merge` (`packages/shared/src/template/schema.ts`) — a display-only hint for grouping in the picker.
 
 ### Agent shape
 
@@ -167,6 +167,7 @@ A bundle of N workflows that all reference `<github-repo>` produces **one** `Con
 | `templates/develop.json` | 1 | Polling on `label = "conduit-dev"` (applied by Analyze, or by a human) → `Planner` (`planner` preset) fans out to `Dev` (`developer` preset) + `Tests` (`tests` preset) → `Docs` (`docs` preset) on branched worktrees → merge-back → `QA` (`qa` preset) opens a draft PR and swaps the issue label `conduit-dev`→`conduit-review` (status move to `"Review"` is courtesy). GitHub board users can swap the trigger to `status=Dev`. |
 | `templates/review.json` | 1 | Polling on `label = "conduit-review"` → `Review` (`code-reviewer` preset) evaluates the branch and writes verdict to `.conduit/` → `Publish` (`publish` preset, GitHub MCP) submits the PR review, then on approval removes `conduit-review` and applies `conduit-merge` to the PR, or on changes requested removes `conduit-review` and moves status to a human column (no relabel — a human re-applies `conduit-dev`). Pairs with `develop.json` and `merge.json` as a label-gated pipeline. |
 | `templates/merge.json` | 1 | Polling on `label = "conduit-merge"` AND `pr_state = "ready_for_review"` → `Merger` (`merger` preset, GitHub MCP) verifies CI and merges, resolving mechanical conflicts and escalating semantic ones back to draft. The final stage of the label-gated pipeline. |
+| `templates/nightly-review.json` | 1 | `cron` trigger (`0 2 * * *` UTC, `branch: main`; depends on the `cron` trigger type) → `Scope` (`scope` preset) identifies changed files and writes a per-domain manifest → fans out to four parallel reviewers `Security` / `Quality` / `Refactor` / `Performance` (all `code-analyst` preset, one domain each) → `Publisher` (`issue-publisher` preset, GitHub MCP) opens one issue per finding, routed by confidence to a `Review` or `AIDev` board status via `issueWriteback.allowedStatuses`. Six agents; not a label-gated stage — a standalone scheduled fan-out. |
 
 Instructions in the shipped templates **do not** tell agents to "write `.conduit/<Node>.md`" — the runtime already drives a second turn with `finalSummaryPrompt(node.name)` and drops a placeholder if the agent didn't write one. See [agent-execution.md](./agent-execution.md#runagentnode-lifecycle).
 

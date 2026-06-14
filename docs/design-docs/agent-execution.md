@@ -28,7 +28,7 @@ Failure handling: per-activity retry policy. Workflow-level `try/catch` marks ru
 |---|---|
 | `loadGraphActivity(workflowId)` | Read workflow + nodes + edges from Postgres, return plain object |
 | `runAgentNode(node, context)` | **Orchestrator only.** Resolves workspace + MCP configs, packs a `RunnerRequest`, spawns an `agent-runner` (container or host process, by runner mode), and translates the returned `RunnerEvent` stream into Prisma + Redis + heartbeat writes. The provider SDK runs inside the runner, not here. See [Runner container model](#runner-container-model). |
-| `mergeWorktreeActivity(node, targetBranch)` | Spins up a lightweight agent session to merge a parallel agent's worktree back to the target branch — resolves conflicts via LLM if needed. See "Merge-back agent" below. |
+| `mergeWorktreeActivity(node, targetBranch)` | `git merge --squash` of a parallel agent's worktree back into the target branch — no LLM. On conflict it aborts with `MergeConflictError`; the conflict-resolution agent session is deferred (see [Merge-back agent](#merge-back-agent) below / PLANS Phase 8+). |
 | `copyConduitFilesActivity(group)` | Copy `.conduit/` files from each parallel worktree into the target workspace after merge |
 | `cleanupRunActivity(runId)` | Best-effort cleanup after run ends — deletes workspace tmpdirs, prunes git worktrees, deletes `.conduit/` folder. `ticket-branch` workspaces have extra semantics; see [Cleanup for `ticket-branch` workspaces](#cleanup-for-ticket-branch-workspaces) below. |
 | `pollBoardActivity(input)` | One poll cycle for a polling-mode workflow. Queries GitHub Projects v2, filters, set-diffs against `PollSnapshot`, starts `agentWorkflow`s for new matches, upserts the snapshot. See [Polling pipeline](#polling-pipeline) below. |
@@ -309,26 +309,13 @@ Frontend flow:
 
 ## Per-ticket concurrency
 
-Concurrent runs on the same workflow + ticket would race on `git worktree add` and push. Intent: one active run per `(workflow, ticket)` at a time; duplicate triggers during that run are silently dropped; once the run terminates (any status), a new trigger starts fresh so board cycles (Dev → Review → Dev) keep re-firing the workflow. Handled at the Temporal boundary:
+One active run per `(workflow, ticket)` at a time, enforced at the Temporal boundary by the deterministic workflow ID `run-<workflowId>-<ticketId>` (`WorkflowIdConflictPolicy = FAIL` drops the duplicate, `WorkflowIdReusePolicy = ALLOW_DUPLICATE` lets the ID re-fire after termination so board cycles keep working). The base-clone file lock from lifecycle step 2 covers the separate, smaller window where two *different* workflows/tickets race on `git worktree add` against the same shared base clone.
 
-- `agentWorkflow` is started with deterministic ID `run-<workflowId>-<ticketId>`.
-- `WorkflowIdReusePolicy = ALLOW_DUPLICATE` (Temporal default; stated explicitly because it's load-bearing for board cycles) — after termination, the same ID can be reused, so a ticket re-entering `Dev` triggers a fresh Worker run.
-- `WorkflowIdConflictPolicy = FAIL` (Temporal's default for an already-running ID) — starting a second workflow with the ID of an in-flight one throws `WorkflowExecutionAlreadyStarted`. The API / trigger handler catches it, logs at debug, and drops the trigger: webhook handlers return 200 so the platform doesn't retry; poll-loop skips are internal. No `WorkflowRun` row is created for the dropped trigger.
-
-The base-clone file lock mentioned in the lifecycle step 2 covers the smaller window where two *different* workflows or tickets might race on `git worktree add` against the same shared base clone.
-
-See [branch-management.md](./branch-management.md) for the full concurrency model.
+Ownership angle (why `conduit/*` is one-run-at-a-time): [branch-management.md](./branch-management.md#concurrency). Drop/return-200 failure-mode detail: [RELIABILITY.md](../RELIABILITY.md#failure-modes-and-responses).
 
 ## Cleanup for `ticket-branch` workspaces
 
-`cleanupRunActivity` runs at end-of-workflow for all workspace kinds. For `ticket-branch`, two things differ:
-
-1. **Remote branch preserved.** The local worktree is cleaned (tmpdir rm + `git worktree prune`), but the remote branch and its pushed commits stay put — they're the persistent state that iteration N+1 consumes.
-2. **Unpushed-commits warning.** Before cleanup, the runtime checks whether local commits were pushed, using **local state only** (no `git fetch`):
-   - If `origin/<branch>` doesn't exist yet, all local commits are treated as unpushed.
-   - Otherwise, `git log origin/<branch>..HEAD` gives the diff.
-   - The no-fetch choice means the check can false-positive if the remote advanced during the run — acceptable tradeoff, since the goal is catching the "no agent ever pushed" footgun, not perfectly accounting for concurrent pushers.
-   - A warning is emitted to `ExecutionLog` without blocking the run.
+`cleanupRunActivity` runs at end-of-workflow for all workspace kinds. `ticket-branch` differs in two ways — it preserves the remote branch (only the local worktree is pruned, since the branch is iteration N+1's persistent state) and emits a non-blocking unpushed-commits warning to `ExecutionLog`. Both are owned elsewhere: see the "Footgun" + Lifecycle sections of [branch-management.md](./branch-management.md#lifecycle) for the local-only (no-`git fetch`) push check and remote-branch preservation, and [RELIABILITY.md](../RELIABILITY.md#workspace-cleanup) for the cleanup layering.
 
 ## Constraints enforcement
 
@@ -348,17 +335,12 @@ Lifecycle:
    Webhook-mode or non-existent triggers have their schedule deleted. Delete is idempotent (`NOT_FOUND` is swallowed).
 2. **Boot reconcile.** `WorkflowsService.onModuleInit` walks every polling workflow in the DB and calls `upsertPollSchedule` so a Temporal outage at boot doesn't leave schedules out of sync — any subsequent API restart re-asserts the state.
 3. **Tick.** The Schedule fires `pollWorkflow(workflowId)` — a sandboxed shell that just calls `pollBoardActivity`.
-4. **Poll cycle (`pollBoardActivity`):**
+4. **Poll cycle (`pollBoardActivity`).** The query dispatch (board issues / repo issues / repo PRs by `type` + `boardConnectionId`, set-diff against `PollSnapshot`, start `agentWorkflow`s for new matches) is summarized in [ARCHITECTURE.md](../ARCHITECTURE.md#data-flow-webhook--live-ui). The activity-specific mechanics:
    - Re-read the workflow + trigger config from Postgres (schedule definitions carry only the workflow id, so config edits take effect on the next tick).
-   - Decrypt the connection's platform token; dispatch on `mode.scope` and (for issue scope) `mode.source`:
-     - `scope: 'pull_requests'` — query the connection's `repository.pullRequests(states: OPEN)` via `fetchRepositoryPullRequests`. `source` is ignored.
-     - `scope: 'issues'` + `source: 'board'` — query the configured Projects v2 board via `fetchProjectBoardItems`, paginating via `endCursor` up to a hard cap. Items are filtered to `contentType === 'Issue'` (drafts and PRs that happen to live on the board are dropped).
-     - `scope: 'issues'` + `source: 'repo'` — query the connection's `repository.issues(states: OPEN)` via `fetchRepositoryIssues`. No board ref needed.
-   - All three paths return the same `ProjectBoardItem` shape so the rest of the pipeline (filter, dedup, event-build) is source-agnostic. Repo-source items have empty `singleSelectValues` (no board, no Status column).
+   - All query paths return the same `ProjectBoardItem` shape so filter/dedup/event-build is source-agnostic. Repo-source items have empty `singleSelectValues` (no Status column).
    - Apply the trigger's filters against a small `FilterView` built from the polled item: `status` (from `singleSelectValues.Status`), `labels` (from the issue/PR's labels, fetched in the same GraphQL query), and `prState` (from the PR's draft flag, only set when the item is a PR). The webhook flattener builds the same shape from the inbound payload, so one filter set works in either mode.
    - Build the `TriggerEvent`: `event === 'board.column.changed'` for issue scope, `event === 'pull_request.detected'` for PR scope. PR scope additionally populates `TriggerEvent.pr` (head/base refs, plus `headRepo` for fork PRs) and writes `payload.prState` so the matcher can flatten it back into the `FilterView`.
-   - Diff the matching `itemNodeId` set against `PollSnapshot.matchingIds`. **New → start an `agentWorkflow`**; still-matching items do *not* re-fire. Re-entry (item leaves the matching set, comes back) is treated as new — this is the board-cycle primitive that makes Dev → Review → Dev loops work, and it extends transparently to draft↔ready PR transitions under `pr_state` filters.
-   - Upsert `PollSnapshot` with the current matching set.
+   - Re-entry (item leaves the matching set, comes back) counts as new — the board-cycle primitive behind Dev → Review → Dev loops, extending transparently to draft↔ready PR transitions under `pr_state` filters.
 5. **Run start from inside an activity.** `pollBoardActivity` starts `agentWorkflow`s directly via a worker-side `@temporalio/client` singleton (`apps/worker/src/runtime/temporal-client.ts`) — separate from the `NativeConnection` used to poll the worker task queue. Each new match gets a fresh `WorkflowRun` row and a per-run workflow id (`run-<runId>`).
 
 Failure handling: one retry per tick (`maximumAttempts: 2`) — if a cycle fails, the next scheduled tick retries from scratch rather than burning retries on a flaky upstream. Run-starts that succeed are committed before the snapshot upsert, so a crash between the two reprocesses those items on the next tick; worst case is a duplicate run, not a missed transition.

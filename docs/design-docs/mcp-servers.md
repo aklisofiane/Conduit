@@ -13,16 +13,16 @@ Both Claude Agent SDK and Codex SDK support MCP natively. **Conduit does not man
 
 ## Presets
 
-Conduit ships preset configs for common MCP servers that users can add with one click from the UI:
+Conduit ships preset configs for common MCP servers that users can add with one click from the UI. Two ship today (`packages/shared/src/mcp/presets.ts`):
 
 | Preset | Server | Transport | Required credential |
 |---|---|---|---|
-| GitHub | `https://api.githubcopilot.com/mcp/` | streamable HTTP | GitHub PAT |
-| Slack | `@modelcontextprotocol/server-slack` | stdio | Slack Bot Token |
-| PostgreSQL | `@modelcontextprotocol/server-postgres` | stdio | Connection string |
-| Brave Search | `@modelcontextprotocol/server-brave-search` | stdio | Brave API key |
+| GitHub (`github`) | `https://api.githubcopilot.com/mcp/` | streamable HTTP | GitHub PAT (`repo` + `workflow` + `project` scopes) |
+| GitLab (`gitlab`) | `@zereight/mcp-gitlab` (`npx`) | stdio | GitLab PAT (`api` scope) |
 
-Presets are just pre-filled `WorkflowMcpServer` configs — no special handling. Users can edit them or add entirely custom servers.
+Planned (Phase 7): Slack, PostgreSQL, Brave Search.
+
+Presets are just pre-filled `WorkflowMcpServer` configs — no special handling at runtime. Users can edit them or add entirely custom servers. The GitHub preset sends an `X-MCP-Toolsets: default,projects` header so project-status / project-item tools are exposed (without it, agents can't move issues between board columns). A `WorkflowMcpServer` copied from a preset records its origin in `presetId` (`packages/shared/src/mcp/server.ts`) — that provenance marker lets template instantiation swap the transport to the preset matching the bound connection's platform; user-defined transports carry no `presetId` and are never rewritten.
 
 Note: **filesystem/shell tools are not MCP servers**. When an agent node has a workspace, the provider's SDK built-in tools (file read/write/edit, shell, glob, grep) are enabled automatically. MCP servers are for *external platform integrations* (GitHub, Slack, databases, search, etc.).
 
@@ -88,7 +88,7 @@ An agent node can restrict which tools it sees from a given MCP server:
 ```ts
 mcpServers: [
   { serverId: 'github', allowedTools: ['create_issue', 'list_issues', 'add_comment'] },
-  { serverId: 'filesystem' }  // all tools
+  { serverId: 'gitlab' }  // all tools
 ]
 ```
 

@@ -27,11 +27,11 @@ Per-package, real external deps, slower.
 - `apps/worker` activities: run each activity in isolation against `@temporalio/testing` MockActivityEnvironment, real Postgres, real Redis, `StubProvider`.
 - `apps/worker` workflows: `@temporalio/testing` TestWorkflowEnvironment with time-skipping, assert on activity call order, retry behavior, signal/cancellation handling.
 
-### 3. API contract tests (`vitest` + supertest)
+### 3. API contract tests (`vitest`, the `api` project)
 
-`apps/api` endpoints against a real test stack (Postgres + Temporal test env). Covers workflow CRUD, credential CRUD, webhook ingestion (HMAC verification), MCP introspection, template instantiation.
+`apps/api` service-layer contracts against a real test stack (Postgres + Redis, brought up by `npm run test:infra:up`). Each spec in `apps/api/test/contract/` opens a fresh `PrismaClient` against the test DB, seeds fixtures, instantiates the Nest service directly (e.g. `new CredentialsService(prisma)`), and tears down its own rows in `afterEach` — **no `@nestjs/testing`, no `supertest`, no running HTTP server**. The contract under test is org-scoping and data isolation, asserted at the service boundary rather than over the wire.
 
-> **Status**: not yet wired up. `@nestjs/testing` + `supertest` aren't installed and `apps/api/test/contract/` doesn't exist. New endpoints in the meantime rely on unit coverage of the service layer plus the E2E harness to exercise the HTTP surface. Stand this layer up the first time an endpoint's logic is too entangled with Nest DI / guards / pipes to cover cleanly at either end. Likely candidate: webhook ingestion (HMAC signature guard is the whole point of the feature).
+Coverage today: cross-org rejection for every tenant-scoped service (`credentials-`, `connections-`, `runs-`, `trigger-`, `workflows-`, `provider-configs-cross-org.test.ts`), the `@OrgId()` decorator (`org-id-decorator.test.ts`), audit logging + rate limit (`audit-log.test.ts`, `audit-rate-limit.test.ts`), the frozen Temporal slug (`workflows-temporal-slug.test.ts`), and template platform swaps (`templates-platform-swap.test.ts`).
 
 ### 4. E2E tests (`vitest` harness)
 
@@ -48,6 +48,8 @@ Harness spins up: Postgres + Temporal + Redis + api + worker + `StubProvider`. D
 5. Assert: run row status = SUCCEEDED, frames include streamed agent output, workspace contains expected side effects
 ```
 
+Beyond the per-phase suites (`phase2`–`phase6`), the harness also drives the auth and multi-tenant surface end-to-end: `auth-cookie-flow.test.ts` (sign-up/sign-in → session cookie → guarded route), `authz-enforcement.test.ts` (guards reject the unauthenticated), and `cross-org-isolation.test.ts` (one org can't read another's rows over HTTP/WS — the wire-level companion to the service-layer contract tests above).
+
 ### 5. UI smoke tests (Playwright, via MCP)
 
 **Setup**: the user configures the Playwright MCP server in Claude Code:
@@ -60,7 +62,7 @@ Claude does not install or configure Playwright directly — the MCP server brin
 
 **Usage**: when a phase adds UI surface, the author writes a short smoke script (repo path: `test/smoke/<phase>.smoke.md`) containing the golden-path interaction as plain prose. Claude reads the script, starts the dev stack (`npm run infra:up` + `npm run dev`), then drives Playwright via MCP tools to exercise the flow. Assertions are on visible DOM text, not snapshots.
 
-One smoke per phase's golden path — the minimum that proves the UI wires up to the backend. Everything else (timeline rendering, edge cases, error states) is covered by the unit/integration/E2E layers.
+One smoke per phase's golden path — the minimum that proves the UI wires up to the backend. Everything else (timeline rendering, edge cases, error states) is covered by the unit/integration/E2E layers. The same convention covers cross-cutting UI: `auth.smoke.md` (sign-up/sign-in/sign-out) and `org-switching.smoke.md` (active-org switch) sit alongside the `phase*.smoke.md` scripts.
 
 **Scope limit**: smoke only. Visual regression, accessibility audits, cross-browser matrices are not in scope for v1.
 
@@ -77,11 +79,9 @@ Part of Phase 1 deliverables alongside `ClaudeProvider`.
 
 ## Fixtures
 
-- **Seed workflows**: JSON files under `test/fixtures/workflows/` covering each node topology (single agent, parallel, polling, ticket-branch, multi-trigger).
-- **Seed git repos**: tarballs under `test/fixtures/repos/` containing pre-built bare repos with commit history, ready to clone locally. No GitHub network access in tests.
-- **Seed trigger events**: JSON payloads for GitHub webhook events (issue opened, PR opened, PR comment, `projects_v2_item` single-select change) captured from real payloads once, checked in.
-- **Seed MCP servers**: a tiny in-repo stdio MCP server (`test/fixtures/mcp-stub/`) that exposes a handful of tools with predictable behavior, used instead of real GitHub MCP servers in tests.
-- **Mock GitHub GraphQL**: `test/e2e/mock-github.ts` stands up a local HTTP server that serves canned payloads for the three queries `pollBoardActivity` issues — Projects v2 items (`projectBoardItemsResponse`), repo open PRs (`repositoryPullRequestsResponse`), and repo open issues — so each polling source/scope combo is drivable without GitHub. `startMockGithubGraphql()` returns `{ url, enqueue, close }`; the URL is injected into the worker subprocess via `GITHUB_GRAPHQL_URL`. Used by the Phase 4 E2Es (`phase4-polling-run.test.ts`, `phase4-polling-pr-run.test.ts`) to drive `pollBoardActivity` deterministically across cycles.
+The fixture tree (seed workflows, MCP stub, GitHub event payloads) is mapped in [STRUCTURE.md > test/](./STRUCTURE.md#test). Tests get bare git remotes from local clones via `CONDUIT_TEST_REMOTE_BASE` (the harness builds them on the fly — `test/fixtures/repos/` is reserved, not a tarball store) so there's no GitHub network access. Two pieces carry behavior worth spelling out:
+
+- **Mock GitHub GraphQL**: `test/e2e/mock-github.ts` stands up a local HTTP server that serves canned payloads for the queries `pollBoardActivity` issues — Projects v2 items (`projectBoardResponse`), repo open PRs (`repositoryPullRequestsResponse`), and repo open issues — so each polling source/scope combo is drivable without GitHub. `startMockGithubGraphql()` returns `{ url, enqueue, close }`; the URL is injected into the worker subprocess via `GITHUB_GRAPHQL_URL`. Used by the Phase 4 E2Es (`phase4-polling-run.test.ts`, `phase4-polling-pr-run.test.ts`) to drive `pollBoardActivity` deterministically across cycles.
 - **PR-scope branch seeding**: `Harness.seedRemoteBranch(owner, repo, branch)` pushes `branch` onto the bare remote (one synthetic commit on top of `main`) and refreshes the worker's base-clone mirror so `ticket-branch`'s PR arm can `git worktree add <pr.headRef>` without a network fetch. The PR-scope polling fixture is `test/fixtures/workflows/phase4-polling-pr.json` — `mode.scope: 'pull_requests'` with a `pr_state` filter.
 
 ## Temporal testing specifics

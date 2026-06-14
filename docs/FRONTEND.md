@@ -9,8 +9,7 @@ Icons come from `lucide-react`. Call sites import the specific component they ne
 | Screen | Purpose |
 |---|---|
 | `/` | Workflow list (name, last run, status, active toggle) + "new workflow" + "from template" entry points |
-| `/workflows/:id` | Edit — canvas + config side panel (design only, no runtime data) |
-| `/workflows/:id/runs` | Run history list (status, trigger, duration, started at) |
+| `/workflows/:id` | Edit — canvas + config side panel (design only, no runtime data). Holds a build/runs tab toggle; the **Runs tab** renders the run history list (status, trigger, duration, started at) in-canvas — no separate route. |
 | `/runs/:runId` | Run detail — dedicated observation page with live logs (not on the canvas) |
 | `/settings` | Settings shell — left sidebar (`apps/web/src/components/layout/SettingsLayout.tsx`) reading from a config array (`apps/web/src/components/settings/settings-nav.ts`) + content outlet. Index redirects to `/settings/integrations`. The top-bar gear icon (`TopChrome`) lands here. |
 | `/settings/integrations` | `Credential` + `Connection` management stacked on one surface. Credentials feed connections (one credential can back many; rotation propagates), so they live together rather than as separate sidebar entries. Typed scope picker is unchanged (`github_repo` `{owner, repo}` / `github_projects_v2` `{ownerType, owner, number}` / `none`). OAuth-derived credentials (auto-created from GitHub sign-in) get an `oauth` badge next to the platform tag; rotating their secret with a PAT converts them to manual. Old `/credentials` and `/connections` paths redirect here. |
@@ -110,9 +109,9 @@ The agent config panel includes an MCP server section:
 - **Canvas state** — Zustand. Tracks selection, dirty flags, pending edits not yet persisted. Persistent canvas state (node positions, viewport) lives in `Workflow.definition.ui`.
 - **Forms** — react-hook-form + Zod resolver, schemas imported directly from `@conduit/shared`.
 
-## Run history (`/workflows/:id/runs`)
+## Runs tab (inside `/workflows/:id`)
 
-List of runs for a workflow. Each row shows:
+Not a separate route — `CanvasPage` holds an `activeTab` (`'build' | 'runs'`) state, `WorkflowTabs` toggles between them, and `activeTab === 'runs'` swaps the canvas for `<WorkflowRunsList workflowId={id} />`. The list shows the workflow's runs; each row shows:
 - Status badge (pending / running / completed / failed / cancelled)
 - Trigger source + event (e.g., "GitHub · issues.opened")
 - Duration (or "running" timer for in-flight runs)

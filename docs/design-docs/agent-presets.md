@@ -80,21 +80,26 @@ Templates reference presets via `presetId` instead of inlining literal prompts. 
 
 `TemplatesService.onModuleInit` runs expansion before caching the template. Templates that reference an unknown preset are logged and **skipped** — they don't appear in `GET /templates`. See [templates.md](./templates.md) for the full template lifecycle.
 
-`instructionsAppend` requires `presetId` (Zod `superRefine` rejects the combo with literal instructions). Workflow-specific guidance — e.g. review's ticket-status transitions, develop's Seed→fan-out handoff, pr-review's PR-branch checkout — lives in `instructionsAppend` so the base preset stays generic.
+`instructionsAppend` requires `presetId` (Zod `superRefine` rejects the combo with literal instructions). Workflow-specific guidance — e.g. review's ticket-status transitions, develop's Planner→fan-out handoff, pr-review's PR-branch checkout — lives in `instructionsAppend` so the base preset stays generic.
 
 ## Presets shipped with v1
 
-| File | Category | Used by |
-|---|---|---|
-| `research.md` | research | `analyze` (Research), `develop` (Seed) |
-| `pr-reviewer.md` | review | `pr-review` (Review) |
-| `plan-reviewer.md` | review | `analyze` (Review) |
-| `code-reviewer.md` | review | `review` (Review) |
-| `developer.md` | implement | `develop` (Dev) |
-| `tests.md` | implement | `develop` (Tests) |
-| `docs.md` | implement | `develop` (Docs) |
-| `qa.md` | qa | `develop` (QA) |
-| `publish.md` | publish | `analyze` (Publish), `review` (Publish) |
+| File | Category | Provider / model | Used by |
+|---|---|---|---|
+| `research.md` | research | claude / claude-opus-4-6 | `analyze` (Research) |
+| `planner.md` | research | claude / claude-opus-4-6 | `develop` (Planner) |
+| `scope.md` | research | claude / claude-sonnet-4-6 | `nightly-review` (Scope) |
+| `pr-reviewer.md` | review | codex / gpt-5.5 | `pr-review` (Review) |
+| `plan-reviewer.md` | review | codex / gpt-5.5 | `analyze` (Review) |
+| `code-reviewer.md` | review | codex / gpt-5.5 | `review` (Review) |
+| `code-analyst.md` | review | codex / gpt-5.5 | `nightly-review` (Security, Quality, Refactor, Performance) |
+| `developer.md` | implement | claude / claude-opus-4-6 | `develop` (Dev) |
+| `tests.md` | implement | claude / claude-opus-4-6 | `develop` (Tests) |
+| `docs.md` | implement | claude / claude-opus-4-6 | `develop` (Docs) |
+| `qa.md` | qa | codex / gpt-5.5 | `develop` (QA) |
+| `merger.md` | publish | claude / claude-opus-4-6 | `merge` (Merger) |
+| `issue-publisher.md` | publish | claude / claude-sonnet-4-6 | `nightly-review` (Publisher) |
+| `publish.md` | publish | claude / claude-sonnet-4-6 | `analyze` (Publish), `review` (Publish) |
 
 The three review presets are platform-agnostic — they describe what the agent reads, evaluates, and produces without referencing specific platforms. Platform-specific actions (review submission states, ticket column names, issue-body markers) live in template `instructionsAppend`. PR review submission (COMMENT vs APPROVE) is controlled at the template level: `pr-review` specifies COMMENT-only via `instructionsAppend`; `review`'s Publish agent submits APPROVE or REQUEST_CHANGES based on the upstream verdict.
 

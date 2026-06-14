@@ -97,7 +97,7 @@ Read by `AgentNode` / `TriggerNode` for the outer wrapper; React Flow uses these
 | `AgentNode` (`canvas/AgentNode.tsx`) | `providerStyle()` for all provider colors + `ps.font` for header/prompt; `tokens.color`, `tokens.shadow`, `nodeSize` |
 | `NodePalette` (`canvas/NodePalette.tsx`) | `providerStyle()` for agent cards (`ps.font`, `ps.mark`, `ps.card`, `ps.border`); `tokens.color.trigger*` for the trigger card |
 | `AgentConfigPanel` (`canvas/AgentConfigPanel.tsx`) | `providerStyle()` for the heading dot + `ps.label` text; arbitrary-`var` Tailwind for the rest |
-| `TriggerNode`, `TriggerConfigPanel` (`canvas/`) | `tokens.color.trigger*` only (trigger is not provider-specific) |
+| Typed trigger nodes (`IssuesTriggerNode`, `PrTriggerNode`, `CronTriggerNode`, `WebhookTriggerPlaceholderNode` via `trigger-node-common.tsx` / `TriggerNodeShell`) + panels (`IssuesTriggerPanel`, `PrTriggerPanel`, `CronTriggerPanel` via `trigger-panel-common.tsx`), all in `canvas/` | `tokens.color.trigger*` only (trigger is not provider-specific) |
 | `TopChrome` (`layout/TopChrome.tsx`) | Arbitrary-`var` Tailwind only — divider, panel bg, accent for the logo, pill bg for nav-icon hover |
 | Component primitives in `globals.css` | `.btn`, `.chip`, `.pill`, `.field-input`, `.kbd`, `.status-dot`, `.prov-glyph` — read CSS vars directly |
 

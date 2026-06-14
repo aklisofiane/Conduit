@@ -3,7 +3,7 @@
 How Conduit keeps one organization's business data isolated from another's. Every business-data row carries `orgId` (FK to `Organization.id`); every API service method takes `orgId` as an explicit parameter; the worker chains `orgId` through the rows it loads. Cross-org id references resolve as **404, never 403** — we never confirm the existence of sibling-org rows.
 
 This doc covers:
-- The eight partitioned models, the indexes, and the same-org invariant.
+- The nine partitioned models, the indexes, and the same-org invariant.
 - Why the enforcement style is "explicit `orgId` parameter" (not CLS, not a Prisma client extension).
 - The `@OrgId()` decorator and the signup-time shim that makes it resolve.
 - How worker activities thread `orgId` without an auth context.
@@ -18,13 +18,14 @@ Out of scope here:
 
 ## Partitioned models
 
-Every business-data row carries `orgId String` (non-nullable, FK to `Organization.id`, cascade-delete from the org). The eight tenant-scoped models:
+Every business-data row carries `orgId String` (non-nullable, FK to `Organization.id`, cascade-delete from the org). The nine tenant-scoped models:
 
 | Model | Why partitioned |
 |---|---|
 | `Workflow` | Top-level user-owned config. List, get, update, delete all scope by `orgId`. |
 | `Connection` | Named binding over a Credential. Same-org invariant: `Connection.orgId == Credential.orgId`. |
 | `Credential` | Rotatable platform secret. One credential row can back many connections, all in the same org. |
+| `ProviderConfig` | Per-org agent-provider API key + base URL. At most one row per `(orgId, providerId)`; consumed directly by the agent runtime. |
 | `WorkflowRun` | Audit + billing prep. Copied from `Workflow.orgId` at run-start. |
 | `NodeRun` | Per-node run state. Copied from `WorkflowRun.orgId` at upsert. |
 | `ExecutionLog` | High-volume agent event stream. Copied from `WorkflowRun.orgId` at write. |
@@ -42,6 +43,7 @@ Additive — pre-partitioning indexes stay intact:
 | `Workflow` | `@@index([orgId, isActive])` | "list active workflows in my org" |
 | `Connection` | `@@index([orgId, createdAt])` | "list my org's connections, newest first" |
 | `Credential` | `@@index([orgId, createdAt])` | same shape for credentials |
+| `ProviderConfig` | `@@index([orgId])` (plus `@@unique([orgId, providerId])`) | "resolve my org's provider key" |
 | `WorkflowRun` | `@@index([orgId, startedAt])` | per-org run history (billing prep) |
 
 `ExecutionLog`, `NodeRun`, `PollSnapshot`, `TicketBranch` get no new index — current keys remain optimal in v1.
@@ -102,14 +104,16 @@ Wired into every method on these guarded controllers:
 
 ## Signup-time shim
 
-Because `@OrgId()` requires `activeOrganizationId` on the session, `apps/api/src/auth/auth.config.ts` extends Better Auth with two `databaseHooks`:
+Because `@OrgId()` requires `activeOrganizationId` on the session, `apps/api/src/auth/auth.config.ts` extends Better Auth with a single `databaseHooks.session.create.before` hook backed by the `ensurePersonalOrgFor(userId)` helper:
 
-| Hook | Action |
+| Step (inside `session.create.before`) | Action |
 |---|---|
-| `user.create.after` | Calls `auth.api.createOrganization` (with `userId` set, allowed for system invocations) to create one personal org named `"<email-localpart>'s workspace"` with a randomized slug suffix. |
-| `session.create.before` | Looks up the user's first `Member` row and stamps `session.activeOrganizationId` on the new session before the cookie is issued. |
+| `ensurePersonalOrgFor(userId)` | Looks up the user's first `Member` row; if none exists, calls `auth.api.createOrganization` (with `userId` set, allowed for system invocations) to create one personal org named `"<email-localpart>'s workspace"` with a randomized slug suffix. Idempotent — a second sign-in (e.g. on another device) reuses the existing org. |
+| return `{ data: { ...session, activeOrganizationId: orgId } }` | Stamps the resolved org onto the new session row before the cookie is issued. |
 
-That's the entire shim. Polished naming, the org switcher, members management, and invitations all live in `org-on-signup-and-switching`. The slug suffix is `Math.random().toString(36).slice(2, 8)` — collision probability is fine for v1 and gets a proper "name your workspace" UI later.
+There is **no** `user.create.after` hook — running the org-create after the session row is inserted would persist `activeOrganizationId = null` and 403 the first authenticated request; see [authorization-enforcement.md § Signup-time shim](./authorization-enforcement.md#signup-time-shim--placement-matters). (Separately, `databaseHooks.user.create.before` enforces the hosted invitation gate — out of scope here; see [authentication.md](./authentication.md#invitation-gate-hosted-only).)
+
+That's the entire partitioning shim. Polished naming, the org switcher, members management, and invitations all live in `org-on-signup-and-switching`. The slug suffix is `Math.random().toString(36).slice(2, 8)` — collision probability is fine for v1 and gets a proper "name your workspace" UI later.
 
 ### Verified Better Auth API surface
 
@@ -123,9 +127,7 @@ Better Auth's `organization` plugin (verified against the live `node_modules/bet
 
 ## Cross-org rejection: 404, not 403
 
-A client that knows another org's row id (workflow, run, connection, credential, etc.) and references it through any of the API services gets `NotFoundException` — never `ForbiddenException`. We don't confirm the existence of cross-org rows. The same convention applies to template-apply bindings (`credentialId`, `connectionId`).
-
-Implementation detail: Prisma's `findUnique({ where: { id } })` resolves cross-org rows; we use `findFirst({ where: { id, orgId } })` (or `updateMany` / `deleteMany` for write paths) so a sibling-org id silently misses and surfaces as 404.
+The project-wide convention — a cross-org row id resolves as `NotFoundException`, never `ForbiddenException` — is owned by [authorization-enforcement.md § Cross-org → 404](./authorization-enforcement.md#cross-org--404-project-wide-convention). The partitioning mechanism that makes it hold at the data layer is the explicit `orgId` filter above: services use `findFirst({ where: { id, orgId } })` (or `updateMany` / `deleteMany` on write paths) instead of `findUnique({ where: { id } })`, so a sibling-org id silently misses. The same applies to template-apply bindings (`credentialId`, `connectionId`).
 
 ## Worker side: chain `orgId` through the loaded row
 

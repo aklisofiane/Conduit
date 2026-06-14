@@ -1,6 +1,6 @@
 # Web auth UI
 
-Browser-side authentication surface for Conduit. Owns the unauthenticated route shell (sign-in / sign-up / forgot-password / reset-password), the authenticated `/account` page, the `RequireAuth` boundary inside `AppLayout`, and the `UserMenuPill` that anchors the top bar's actions slot once a user is signed in. Pairs with the API-side Better Auth mount described in [SECURITY.md](../SECURITY.md) and the partitioning shim in [data-model.md](../data-model.md) — this doc is the *web* side only.
+Browser-side authentication surface for Conduit. Owns the unauthenticated route shell (sign-in / sign-up / forgot-password / reset-password), the authenticated `/account` page, the `RequireAuth` boundary inside `AppLayout`, and the `UserMenuPill` that anchors the top bar's actions slot once a user is signed in. Pairs with the API-side Better Auth mount described in [auth-integration.md](./auth-integration.md) and the partitioning shim in [tenant-partitioning.md](./tenant-partitioning.md) (cross-org enforcement in [authorization-enforcement.md](./authorization-enforcement.md)) — this doc is the *web* side only.
 
 ## Surface
 

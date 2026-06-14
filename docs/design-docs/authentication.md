@@ -1,6 +1,6 @@
 # Authentication
 
-Multi-tenant authentication for Conduit. Built on [Better Auth](https://better-auth.com/) with the `organization` plugin, configured in two modes — `local` (indie dev on `localhost`, lenient rate limits, no email transport required) and `hosted` (public registration, every signup gets their own org, conservative rate limits, GitHub OAuth available). Every business row is partitioned by `orgId`; every API surface (REST, WebSocket, webhook) refuses cross-org access; member management is delegated end-to-end to Better Auth. This doc is the umbrella entry point — start here, then drill into the sub-feature docs below.
+Multi-tenant authentication for Conduit. Built on [Better Auth](https://better-auth.com/) with the `organization` plugin, configured in two modes — `local` (indie dev on `localhost`, lenient rate limits, no email transport required) and `hosted` (invitation-gated registration, every signup gets their own org, conservative rate limits, GitHub OAuth available). Every business row is partitioned by `orgId`; every API surface (REST, WebSocket, webhook) refuses cross-org access; member management is delegated end-to-end to Better Auth. This doc is the umbrella entry point — start here, then drill into the sub-feature docs below.
 
 ## Sub-feature docs
 
@@ -11,12 +11,12 @@ The auth umbrella ships as seven focused subsystems. Each owns a thin slice; thi
 | 1 | [auth-integration.md](./auth-integration.md) | Better Auth mount, `SessionGuard`, public `/api/auth-config`, harness signup. |
 | 2 | [connections-reshape](#) — see [connections.md](./connections.md) | `Credential` + `Connection` model split, typed scope union, workflow `webhookSecret`. (Sequenced into the umbrella because the org-partitioning column attaches to the new shape.) |
 | 3 | [tenant-partitioning.md](./tenant-partitioning.md) | `orgId` on every business row, `@OrgId()` decorator, signup-time shim, cross-org → 404 contract. |
-| 4 | [authorization-enforcement.md](./authorization-enforcement.md) | `activeOrganizationId` trust contract, Socket.IO auth on `RunsGateway`, webhook → run org chain, v1 RBAC stance, [SECURITY.md](../SECURITY.md) "API auth (v1)" section. |
+| 4 | [authorization-enforcement.md](./authorization-enforcement.md) | `activeOrganizationId` trust contract, Socket.IO auth on `RunsGateway`, webhook → run org chain, v1 RBAC stance, cross-org → 404 convention. |
 | 5 | [web-auth-ui.md](./web-auth-ui.md) | `AuthLayout` / `RequireAuth` shell, sign-in / sign-up / forgot / reset / account pages, `UserMenuPill`, web `auth-client`. |
 | 6 | [org-switching.md](./org-switching.md) | Organizations section in `UserMenuPill`, members + invitations management, `/accept-invitation/:id` deep link, copyable invite URL fallback. |
 | 7 | [operational-hardening.md](./operational-hardening.md) | Better Auth rate limits (mode-aware, Redis-backed), `AuditLog` model, failed-login-spike abuse signal. |
 
-[SECURITY.md § API auth (v1)](../SECURITY.md) is the operator-facing summary; this doc is the developer-facing umbrella.
+[SECURITY.md § API auth & tenant isolation](../SECURITY.md#api-auth--tenant-isolation-operator-summary) is the operator-facing summary; this doc is the developer-facing umbrella.
 
 ## Deployment modes
 
@@ -24,12 +24,17 @@ The auth umbrella ships as seven focused subsystems. Each owns a thin slice; thi
 
 | Concern | `local` | `hosted` |
 |---|---|---|
+| Registration | Open — any email can sign up | **Invitation-gated** — only seeded or invited emails may register (see below) |
 | Rate limits on `/api/auth/*` | 100/hr (lenient) | 5–10/hr per endpoint (see [operational-hardening.md](./operational-hardening.md)) |
 | GitHub OAuth | Available iff `GITHUB_CLIENT_ID` + `GITHUB_CLIENT_SECRET` are set | Same — env-gated, not mode-gated |
 | Email verification | `requireEmailVerification: false` (no email transport yet) | Same; flips to `true` when transport ships |
 | Personal-org auto-create on signup | Yes | Yes |
 
-There is no first-boot owner auto-provision, no token-URL-to-console, no zero-config bypass. `local` just happens to have one user and lenient rate limits.
+`local` just happens to have one user, open registration, and lenient rate limits — there is no first-boot owner auto-provision, no token-URL-to-console, no zero-config bypass.
+
+### Invitation gate (hosted only)
+
+In `hosted` mode, registration is **not public**. `auth.config.ts`'s `databaseHooks.user.create.before` (`apps/api/src/auth/auth.config.ts`) lets a signup through only if the email is **seeded** (matches `config.seedEmails`, sourced from `CONDUIT_SEED_EMAILS` — exact addresses, or `@domain` suffixes) or has a **pending, unexpired `Invitation`** row for that address. Any other email throws `403 'Registration is by invitation only'`. The hook is a no-op in `local` mode (returns early when `deployment !== 'hosted'`), so open registration is the `local` default.
 
 ## Signup → org creation flow
 
@@ -62,35 +67,19 @@ See [authorization-enforcement.md § Signup-time shim](./authorization-enforceme
 
 Webhooks deliberately stay HMAC-only — the platform sending the delivery doesn't carry a session cookie, and the workflow row keys the resulting run's `orgId` so there's no caller-controlled org input on this path.
 
-## Trust contract
+## Cross-cutting rules (owned elsewhere)
 
-`req.session.activeOrganizationId` (set by Better Auth's `organization` plugin) is treated as authoritative end-to-end. The plugin only allows `setActiveOrganization` for orgs the caller is a member of, so the value on the session row is trustworthy by construction. **Conduit does not re-check membership on every authenticated request.**
+The contracts that span every sub-feature are documented once, in the sub-feature that owns them. One-line summaries with the canonical link:
 
-The accepted trade-off is a membership-staleness window: revoking a member from Org X does not auto-invalidate sessions that already carry `activeOrganizationId = X`. Operators with stricter requirements use Better Auth's session-management endpoints to revoke specific sessions when removing members. v1 favors the per-request cost of the hot path over instantaneous revocation.
-
-### Same-org invariant
-
-`tenant-partitioning` denormalizes `orgId` onto every leaf row (`NodeRun`, `ExecutionLog`, `PollSnapshot`) instead of relying on transitive joins. Postgres does not enforce the invariant — services do, by always passing `orgId` into every `where` and `data` clause. The invariant: a `Connection.orgId` matches its `Credential.orgId`; a `WorkflowRun.orgId` matches its `Workflow.orgId`; a `NodeRun.orgId` matches its `WorkflowRun.orgId`; etc. Defense in depth — a missed filter still fails closed instead of leaking.
-
-### Cross-org → 404, never 403
-
-Project-wide convention. A request from Org A asking for Org B's resource id (whether by direct fetch, list filter, or a connection-id reference inside a workflow definition) resolves as **not found**. Never as forbidden. Never confirms cross-org existence. Applied uniformly across REST, WS, and template-apply.
+- **Trust contract.** `req.session.activeOrganizationId` (set by the `organization` plugin) is authoritative end-to-end; Conduit does not re-check membership per request, accepting a membership-staleness window. Full version: [authorization-enforcement.md § Trust contract](./authorization-enforcement.md#trust-contract).
+- **Same-org invariant.** `orgId` is denormalized onto every leaf row and services pass it into every `where`/`data` clause so a missed filter fails closed. See [tenant-partitioning.md § Same-org invariant](./tenant-partitioning.md#same-org-invariant).
+- **Cross-org → 404, never 403.** A request for another org's row id resolves as not-found, never confirms existence, uniformly across REST / WS / template-apply. See [authorization-enforcement.md § Cross-org → 404](./authorization-enforcement.md#cross-org--404-project-wide-convention).
+- **v1 RBAC: flat within an org.** Any member (any role) can read/write any tenant-scoped row; the only role-gated operations are member-management, enforced inside the `organization` plugin. The threat model is cross-tenant leakage, not intra-tenant misuse. See [authorization-enforcement.md § RBAC](./authorization-enforcement.md#rbac-flat-within-an-org-for-v1).
+- **Operational posture.** Rate limits (Redis-backed, mode-aware), the `AuditLog` model + event taxonomy, and the failed-login-spike abuse signal all live in [operational-hardening.md](./operational-hardening.md).
 
 ## Member management
 
 Every member-management operation — invite, remove, role-change, leave, delete-org, accept/reject invitation — is delegated to Better Auth's `organization` plugin endpoints under `/api/auth/organization/*`. **No Conduit-side routes layer over them.** The plugin gates by role internally per its defaults: `owner` does everything, `admin` invites and removes non-owners and changes non-owner roles, `member` can leave only.
-
-### v1 RBAC: flat within an org
-
-Any member of an org (any role) can read and write any tenant-scoped row in that org — including workflow delete, credential rotation, run cancel. The only role-distinguishing operations are the member-management ones above, and those gate at the plugin level. The umbrella's threat model is **cross-tenant leakage**, not intra-tenant misuse; flat-within-org is straightforward to extend later when there's a real ask, and retracting per-action rules already shipped is messier.
-
-## Operational posture
-
-[operational-hardening.md](./operational-hardening.md) covers the details. Quick summary:
-
-- **Rate limits** on `/api/auth/*` via Better Auth's built-in middleware, Redis-backed via `secondaryStorage`. Mode-aware numbers (lenient `local`, conservative `hosted`). Failure to reach Redis at boot fails the API — no silent fallback to memory.
-- **`AuditLog`** Prisma table, **snapshot-style with no foreign keys** (deliberate divergence — audit rows must survive user/org deletion). Closed event taxonomy: `auth.signIn`, `auth.signIn.failed`, `auth.signUp`, `auth.signOut`, `auth.passwordReset.{requested,completed}`, `org.{created,deleted,renamed}`, `org.member.{invited,invitationAccepted,invitationRejected,invitationRevoked,removed,roleChanged,left}`. Hooks fire from Better Auth's `hooks.after` (success-only) and the org plugin's typed `organizationHooks`.
-- **Failed-login-spike abuse signal** — inline check inside `auth.signIn.failed`. >10 failures for the same email in 5 minutes → `logger.warn` with event `abuse.failedLoginSpike`. Detect-only in v1; no auto-block, no external alert.
 
 ## Cross-cutting status
 
@@ -126,7 +115,7 @@ apps/web/src/api/organization.ts       ← TanStack Query hooks wrapping authCli
 apps/web/src/components/layout/        ← AuthLayout, RequireAuth, RedirectIfAuthed, UserMenuPill
 apps/web/src/pages/                    ← SignIn, SignUp, Forgot, Reset, Account, OrganizationSettings, Invitations, AcceptInvitation
 
-packages/database/prisma/schema.prisma ← Better Auth tables + AuditLog + orgId on 8 tenant rows
+packages/database/prisma/schema.prisma ← Better Auth tables + AuditLog + orgId on 9 tenant rows
 ```
 
 The interface boundary for self-host operators who want to fork is the **`SessionGuard` + the user/org context shape exposed to controllers**. Better Auth config lives in one module so a self-hoster can swap providers, disable signup, add MFA, or replace it entirely without touching the rest of Conduit.
