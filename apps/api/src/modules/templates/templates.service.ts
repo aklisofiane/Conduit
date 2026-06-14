@@ -173,13 +173,12 @@ export class TemplatesService implements OnModuleInit {
         try {
           // Freeze the slug for this freshly created workflow so its schedule
           // (and the poll/cron runs it spawns) carry the human-readable prefix.
-          const slug =
-            (await resolveTemporalSlug(this.prisma, {
-              id,
-              name,
-              definition,
-              temporalSlug: null,
-            })) || undefined;
+          const slug = await resolveTemporalSlug(this.prisma, {
+            id,
+            name,
+            definition,
+            temporalSlug: null,
+          });
           if (trigger.type === 'cron') {
             await this.temporal.upsertWorkflowSchedule({
               kind: 'cron',

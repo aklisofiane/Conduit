@@ -183,23 +183,6 @@ export class TemporalService implements OnModuleInit, OnModuleDestroy {
     const scheduleId = workflowScheduleId(opts.workflowId, opts.slug);
     const scheduleDef = buildScheduleDefinition(opts);
 
-    // A slugged schedule supersedes the legacy slug-less `poll-<cuid>` one.
-    // The freeze is one-way, so on the first slugged upsert (typically the
-    // boot reconcile after deploy) we best-effort remove the legacy schedule
-    // before creating its slugged replacement, re-keying it exactly once.
-    // Idempotent: once gone, every later upsert's delete is a swallowed 404.
-    // Best-effort — a cleanup failure must never block creating the slugged
-    // schedule; reconcile retries the cleanup on next boot/save.
-    if (opts.slug) {
-      try {
-        await this.deleteWorkflowSchedule(opts.workflowId);
-      } catch (err) {
-        this.logger.warn(
-          `Legacy schedule cleanup for workflow ${opts.workflowId} failed: ${String(err)}`,
-        );
-      }
-    }
-
     try {
       await this.schedules.create({
         scheduleId,
@@ -219,9 +202,9 @@ export class TemporalService implements OnModuleInit, OnModuleDestroy {
    * Delete the schedule. Idempotent — 404 from Temporal is swallowed so
    * calling on a workflow that never had a schedule is a no-op.
    *
-   * `slug` selects which schedule id to remove: pass the frozen slug to drop
-   * the slugged schedule, omit it to drop the legacy slug-less one (the
-   * legacy-cleanup path in `upsertWorkflowSchedule`).
+   * `slug` selects which schedule id to remove: callers pass the workflow's
+   * frozen `temporalSlug` so the id matches whatever the schedule was created
+   * under (a null/empty slug → the slug-less id).
    */
   async deleteWorkflowSchedule(workflowId: string, slug?: string): Promise<void> {
     if (!this.schedules) return;

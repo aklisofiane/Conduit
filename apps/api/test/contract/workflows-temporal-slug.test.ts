@@ -17,6 +17,7 @@ describe('WorkflowsService temporal-slug freeze', () => {
   let prisma: PrismaClient;
   let fixture: TwoOrgFixture;
   let upserts: WorkflowScheduleOptions[];
+  let deletes: DeleteCall[];
   let svc: WorkflowsService;
 
   beforeEach(async () => {
@@ -24,9 +25,10 @@ describe('WorkflowsService temporal-slug freeze', () => {
     await clearTenantData(prisma);
     fixture = await seedTwoOrgs(prisma);
     upserts = [];
+    deletes = [];
     svc = new WorkflowsService(
       prisma as unknown as PrismaService,
-      recordingTemporal(upserts) as unknown as TemporalService,
+      recordingTemporal(upserts, deletes) as unknown as TemporalService,
     );
   });
 
@@ -81,6 +83,24 @@ describe('WorkflowsService temporal-slug freeze', () => {
     expect(row.temporalSlug).toBe(expected);
     expect(upserts.at(-1)?.slug).toBe(expected);
   });
+
+  it('tears the schedule down under the frozen slug — never re-resolves on teardown', async () => {
+    // Freeze a slug by creating with a polling trigger…
+    const created = await svc.create(fixture.orgA.id, {
+      name: 'Teardown WF',
+      definition: pollingDefinition(fixture.orgA.connectionId),
+    });
+    const frozen = buildTemporalSlug('Teardown WF', 'A repo');
+    expect(frozen).toBe('teardown-wf-a-repo');
+    expect(upserts.at(-1)?.slug).toBe(frozen);
+
+    // …then drop the trigger. The delete must target the id the schedule was
+    // created under (the frozen slug), not a freshly re-resolved value — a
+    // regression there leaks the real schedule (it keeps firing forever).
+    await svc.update(fixture.orgA.id, created.id, { definition: triggerlessDefinition() });
+
+    expect(deletes.at(-1)).toEqual({ workflowId: created.id, slug: frozen });
+  });
 });
 
 function pollingDefinition(connectionId: string) {
@@ -103,12 +123,30 @@ function pollingDefinition(connectionId: string) {
   };
 }
 
-function recordingTemporal(upserts: WorkflowScheduleOptions[]) {
+interface DeleteCall {
+  workflowId: string;
+  slug?: string;
+}
+
+/** A valid definition with no trigger — drives the un-schedule (teardown) path. */
+function triggerlessDefinition() {
+  return {
+    triggers: [],
+    nodes: [],
+    edges: [],
+    mcpServers: [],
+    ui: { nodePositions: {}, viewport: { x: 0, y: 0, zoom: 1 } },
+  };
+}
+
+function recordingTemporal(upserts: WorkflowScheduleOptions[], deletes: DeleteCall[]) {
   return {
     upsertWorkflowSchedule: async (opts: WorkflowScheduleOptions) => {
       upserts.push(opts);
     },
-    deleteWorkflowSchedule: async () => undefined,
+    deleteWorkflowSchedule: async (workflowId: string, slug?: string) => {
+      deletes.push({ workflowId, slug });
+    },
     cancelAgentWorkflow: async () => undefined,
     startAgentWorkflow: async () => ({
       temporalWorkflowId: 'fake-tw',

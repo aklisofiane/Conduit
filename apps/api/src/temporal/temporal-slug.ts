@@ -26,9 +26,16 @@ export interface TemporalSlugWorkflow {
  *   - Already frozen (`temporalSlug` set)        → return it unchanged.
  *   - Source connection resolvable               → `<wf>-<conn>`, persisted.
  *   - No trigger / draft / deleted connection    → name only, persisted.
- *   - Name slugs to empty                        → `''`, NOT persisted (the
- *     workflow keeps producing legacy slug-less ids until it has a usable
- *     name, at which point the next call freezes a real slug).
+ *   - Name slugs to empty                        → `undefined`, NOT persisted
+ *     (the workflow keeps producing slug-less ids until it has a usable name,
+ *     at which point the next call freezes a real slug).
+ *
+ * Returns `undefined` (not `''`) for the no-slug case so callers can thread the
+ * result straight into the id builders without an extra `|| undefined` coerce.
+ *
+ * Only ever called on the materialize (create/upsert/run-start) paths — never
+ * on teardown. Schedule/run removal reads the already-frozen `temporalSlug`
+ * directly, so it never freezes a fresh slug or targets the wrong id.
  *
  * The write is guarded on `temporalSlug: null` so a concurrent freeze can't
  * overwrite an existing value — and since the slug is deterministic, racing
@@ -37,7 +44,7 @@ export interface TemporalSlugWorkflow {
 export async function resolveTemporalSlug(
   prisma: PrismaService,
   wf: TemporalSlugWorkflow,
-): Promise<string> {
+): Promise<string | undefined> {
   if (wf.temporalSlug) return wf.temporalSlug;
 
   const trigger = (wf.definition as Partial<WorkflowDefinition> | null)?.triggers?.[0];
@@ -52,7 +59,7 @@ export async function resolveTemporalSlug(
   }
 
   const slug = buildTemporalSlug(wf.name, connectionName);
-  if (!slug) return '';
+  if (!slug) return undefined;
 
   // First writer wins; the null guard keeps a frozen slug immutable even if
   // two starts race the freeze. `updateMany` (not `update`) so a row already

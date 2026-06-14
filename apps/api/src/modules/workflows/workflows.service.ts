@@ -262,14 +262,17 @@ export class WorkflowsService implements OnModuleInit {
   }): Promise<void> {
     const trigger = (wf.definition as Partial<WorkflowDefinition> | null)?.triggers?.[0];
     try {
-      // Freeze the slug once (no-op read after the first call) so both the
-      // upsert and the delete path key Temporal on the frozen value. `''`
-      // (name slugs to empty) → undefined → legacy slug-less ids.
-      const slug = (await resolveTemporalSlug(this.prisma, wf)) || undefined;
       if (!isScheduledTrigger(trigger)) {
-        await this.temporal.deleteWorkflowSchedule(wf.id, slug);
+        // Teardown: target whatever id the schedule was created under by
+        // reading the already-frozen slug. Never re-resolve here — that would
+        // freeze a fresh slug and delete the wrong (non-existent) id, leaking
+        // the real schedule.
+        await this.temporal.deleteWorkflowSchedule(wf.id, wf.temporalSlug ?? undefined);
         return;
       }
+      // Materialize: freeze the slug once (no-op read after the first call) so
+      // the schedule + the poll/cron runs it spawns all carry the prefix.
+      const slug = await resolveTemporalSlug(this.prisma, wf);
       if (trigger.type === 'cron') {
         await this.temporal.upsertWorkflowSchedule({
           kind: 'cron',
@@ -314,7 +317,7 @@ export class WorkflowsService implements OnModuleInit {
       : undefined;
     // Freeze (or read) the slug so the agent-run id carries the same prefix
     // as the workflow's schedule/poll/cron ids.
-    const slug = (await resolveTemporalSlug(this.prisma, wf)) || undefined;
+    const slug = await resolveTemporalSlug(this.prisma, wf);
 
     const run = await this.prisma.workflowRun.create({
       data: {

@@ -69,18 +69,26 @@ the schedule already exists, so the slug is already frozen — `poll-board.ts` a
 > freeze and read would diverge from the frozen value and break ticket-branch dedup
 > against an in-flight run.
 
-## Legacy re-key on boot
+## One target id per workflow — no legacy migration
 
-`Workflow.temporalSlug` is nullable with no backfill. On the first API boot after deploy,
-the existing schedule-reconcile loop (`syncWorkflowSchedule` over all scheduled
-workflows) freezes each slug and, in `upsertWorkflowSchedule`, **best-effort deletes the
-legacy slug-less `poll-<cuid>` schedule** before creating the slugged replacement — so
-existing schedules are re-keyed exactly once, automatically. The cleanup is idempotent
-(404 swallowed) and never blocks creating the slugged schedule; a failure just retries on
-the next boot/save. On hard delete the API reads `temporalSlug` *before* `deleteMany` so
-it can target the slugged schedule for removal. Historical `WorkflowRun.temporalWorkflowId`
-values are untouched, and cancellation uses the stored full id, so in-flight runs are
-unaffected.
+`Workflow.temporalSlug` is nullable, frozen on the first materialization of a schedule or
+run. There is **no backfill and no legacy re-key path**: the namespace carries no pre-slug
+`poll-<cuid>` schedules to migrate, so the slug a schedule is created under is the slug it
+is torn down under.
+
+The single rule that keeps create and teardown in agreement: **only the materialize paths
+(`upsertWorkflowSchedule` via `syncWorkflowSchedule`, and `startRun`) ever call
+`resolveTemporalSlug` (which freezes); every teardown path reads the already-frozen
+`temporalSlug` directly.** Concretely:
+
+- Removing a trigger → `syncWorkflowSchedule` deletes `workflowScheduleId(id, wf.temporalSlug)`.
+- Hard delete → the API reads `temporalSlug` *before* `deleteMany`, then deletes the same id.
+
+Because both teardown paths read the stored value, a never-frozen workflow (`temporalSlug =
+null`) resolves to the slug-less id — exactly what its schedule was created under — and a
+frozen one resolves to its slugged id. Neither path re-resolves, so neither can target a
+mismatched id and leak the real schedule. Historical `WorkflowRun.temporalWorkflowId` values
+are untouched, and cancellation uses the stored full id, so in-flight runs are unaffected.
 
 ## See also
 
