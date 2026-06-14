@@ -281,6 +281,74 @@ describe('templateInputFileSchema + expandTemplate', () => {
       expandTemplate(PRESET_TEMPLATE, { agent: () => undefined, mcp: () => undefined }),
     ).toThrow(UnknownPresetError);
   });
+
+  it("expandTemplate preserves a preset-backed node's issueWriteback (pr-review shape)", () => {
+    // Mirror templates/pr-review.json: a preset node carrying a *partial*
+    // issueWriteback. Parse first (as the loader does) so the unspecified
+    // allowlists default to [], then expand. Rebuilding the AgentConfig from an
+    // explicit field list used to silently drop this field — regression guard.
+    const base = PRESET_TEMPLATE.workflows[0]!.definition.nodes[0]!;
+    const input = templateInputFileSchema.parse({
+      ...PRESET_TEMPLATE,
+      workflows: [
+        {
+          ...PRESET_TEMPLATE.workflows[0]!,
+          definition: {
+            ...PRESET_TEMPLATE.workflows[0]!.definition,
+            nodes: [{ ...base, issueWriteback: { allowedPrStates: ['draft', 'ready'] } }],
+          },
+        },
+      ],
+    });
+    const expanded = expandTemplate(input, resolveFromMap);
+    const node = expanded.workflows[0]!.definition.nodes[0]!;
+    expect(node.issueWriteback).toEqual({
+      allowedStatuses: [],
+      allowedLabels: [],
+      allowedPrStates: ['draft', 'ready'],
+    });
+    // Preset-derived fields still applied, template-only field stripped, and the
+    // result remains a valid runtime shape.
+    expect(node.instructions).toBe(RESEARCH_PRESET.instructions);
+    expect('presetId' in node).toBe(false);
+    expect(templateFileSchema.safeParse(expanded).success).toBe(true);
+  });
+
+  it("expandTemplate preserves an inline (preset-less) node's issueWriteback", () => {
+    const input = templateInputFileSchema.parse({
+      ...PRESET_TEMPLATE,
+      workflows: [
+        {
+          ...PRESET_TEMPLATE.workflows[0]!,
+          definition: {
+            ...PRESET_TEMPLATE.workflows[0]!.definition,
+            nodes: [
+              {
+                id: 'agent-a',
+                name: 'A',
+                provider: 'claude',
+                model: 'stub',
+                instructions: 'inline',
+                mcpServers: [],
+                skills: [],
+                webSearch: false,
+                issueWriteback: { allowedLabels: ['conduit-review'] },
+              },
+            ],
+          },
+        },
+      ],
+    });
+    const expanded = expandTemplate(input, resolveFromMap);
+    const node = expanded.workflows[0]!.definition.nodes[0]!;
+    expect(node.issueWriteback).toEqual({
+      allowedStatuses: [],
+      allowedLabels: ['conduit-review'],
+      allowedPrStates: [],
+    });
+    expect(node.instructions).toBe('inline');
+    expect(templateFileSchema.safeParse(expanded).success).toBe(true);
+  });
 });
 
 describe('mcp preset expansion', () => {
