@@ -256,6 +256,15 @@ describe('resolveWritebackContext', () => {
     expect(ctx?.consumedLabels).toEqual(['conduit-review']);
   });
 
+  it('passes draft/ready PR states through on a PR run (pr-review template shape)', () => {
+    const node = makeAgent({
+      issueWriteback: { allowedStatuses: [], allowedLabels: [], allowedPrStates: ['draft', 'ready'] },
+    });
+    const ctx = resolveWritebackContext(node, [PR_LABEL_TRIGGER], PR_EVENT);
+    expect(ctx?.isPr).toBe(true);
+    expect(ctx?.allowedPrStates).toEqual(['draft', 'ready']);
+  });
+
   it('derives the consumed label from the trigger’s label filter', () => {
     const node = makeAgent({
       issueWriteback: {

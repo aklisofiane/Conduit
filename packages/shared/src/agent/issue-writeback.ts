@@ -13,12 +13,18 @@ import { z } from 'zod';
  * the run just consumed), so the handoff is a remove-the-trigger-label,
  * add-the-next-one swap without the template spelling out the removal.
  *
- * `allowedPrStates` is the PR-native open/closed axis — repo-level, so it
- * needs no project board. It only applies to `pull_requests`-triggered runs
- * (the UI offers it only there, and `issueWritebackPrompt` emits the
- * directive only when the run is PR-shaped); on issue/cron runs it's inert.
- * Merging is deliberately excluded — that's a heavier action with a merge
- * method and conflict handling, out of scope here.
+ * `allowedPrStates` is the PR-native state axis — repo-level, so it needs no
+ * project board. It carries two *orthogonal* sub-axes whose values share this
+ * one array: open/closed (`'open'`/`'closed'` — whether the PR is active) and
+ * draft/ready (`'draft'`/`'ready'` — whether it's marked ready for review). A
+ * PR is e.g. open+draft or open+ready, so the two are independent;
+ * `issueWritebackPrompt` partitions the array and emits a separate directive
+ * per sub-axis rather than one mutually-exclusive list. Both apply only to
+ * `pull_requests`-triggered runs (the UI offers them only there, and the prompt
+ * emits the directives only when the run is PR-shaped); on issue/cron runs the
+ * field is inert, and on GitLab it's inert too (MR-state writeback is out of
+ * scope). Merging is deliberately excluded — that's a heavier action with a
+ * merge method and conflict handling, out of scope here.
  *
  * At run time the picked values are interpolated verbatim into the trailing
  * user message — no schema-level enforcement, no post-run validation. The
@@ -28,6 +34,6 @@ import { z } from 'zod';
 export const agentIssueWritebackSchema = z.object({
   allowedStatuses: z.array(z.string().min(1)).default([]),
   allowedLabels: z.array(z.string().min(1)).default([]),
-  allowedPrStates: z.array(z.enum(['open', 'closed'])).default([]),
+  allowedPrStates: z.array(z.enum(['open', 'closed', 'draft', 'ready'])).default([]),
 });
 export type AgentIssueWriteback = z.infer<typeof agentIssueWritebackSchema>;

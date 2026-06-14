@@ -116,11 +116,13 @@ export function finalSummaryPrompt(nodeName: string): string {
  *
  * `isPr` switches the wording to a pull request: the agent works the PR through
  * the attached GitHub MCP tools (GitHub stores PR labels on the shared issue
- * number, so the issue-label tools apply; open/closed is a pull-request field),
- * and the `allowedPrStates` open/closed directive is emitted. PR runs share the
- * issue number space, so the anchor is the same `owner/repo#N`. Labels and
- * project Status carry over unchanged (Status only emits if a board status was
- * picked, which the PR-trigger UI never offers).
+ * number, so the issue-label tools apply; open/closed and draft/ready are
+ * pull-request fields). `allowedPrStates` carries two orthogonal sub-axes —
+ * open/closed and draft/ready — which are partitioned here into separate
+ * directives so the agent never reads them as one mutually-exclusive list. PR
+ * runs share the issue number space, so the anchor is the same `owner/repo#N`.
+ * Labels and project Status carry over unchanged (Status only emits if a board
+ * status was picked, which the PR-trigger UI never offers).
  *
  * All writeback — issue or PR, GitHub or GitLab — goes through the attached MCP
  * server, never a `gh`/`glab` CLI. The runner image ships those binaries but
@@ -164,12 +166,22 @@ export function issueWritebackPrompt(args: {
     !isGitlab && allowedStatuses.length > 0
       ? `- Set the project Status to whichever of these values best fits: ${allowedStatuses.map((s) => `"${s}"`).join(', ')}.`
       : null;
-  // Open/closed is a repo-native PR state — no board needed. Emitted only for
-  // PR-shaped GitHub runs; on issue/cron runs `allowedPrStates` is inert by
-  // config, and GitLab MR-state writeback is out of scope.
-  const prStateLine =
-    !isGitlab && isPr && allowedPrStates.length > 0
-      ? `- Set the pull request's open/closed state to whichever of these fits: ${allowedPrStates.map((s) => `"${s}"`).join(', ')}. This is the PR's open/closed field, not a label.`
+  // PR state has two orthogonal sub-axes, both repo-native (no board) and
+  // GitHub-only: open/closed (whether the PR is active) and draft/ready (whether
+  // it's marked ready for review). They share `allowedPrStates`, so partition it
+  // and emit one directive per sub-axis — a single "whichever fits: open, draft"
+  // list would read as mutually exclusive. Emitted only for PR-shaped GitHub
+  // runs; on issue/cron runs the field is inert by config, and GitLab MR-state
+  // writeback is out of scope.
+  const prOpenClosed = allowedPrStates.filter((s) => s === 'open' || s === 'closed');
+  const prDraftReady = allowedPrStates.filter((s) => s === 'draft' || s === 'ready');
+  const prOpenClosedLine =
+    !isGitlab && isPr && prOpenClosed.length > 0
+      ? `- Set the pull request's open/closed state to whichever of these fits: ${prOpenClosed.map((s) => `"${s}"`).join(', ')}. This is the PR's open/closed field, not a label.`
+      : null;
+  const prDraftReadyLine =
+    !isGitlab && isPr && prDraftReady.length > 0
+      ? `- Set the pull request's draft / ready-for-review state to whichever of these fits: ${prDraftReady.map((s) => (s === 'ready' ? '"ready for review"' : `"${s}"`)).join(', ')}. This is the PR's draft flag (mark a draft ready for review, or convert it back to a draft) — not a label, and not the open/closed field.`
       : null;
   const labelLine =
     allowedLabels.length > 0
@@ -182,8 +194,11 @@ export function issueWritebackPrompt(args: {
   const noopStatusLine = statusLine
     ? `- Do not set any project Status that isn't in the list above.`
     : null;
-  const noopPrStateLine = prStateLine
-    ? `- Don't move the pull request to any state that isn't listed above; if it's already in the right state, leave it.`
+  const noopPrOpenClosedLine = prOpenClosedLine
+    ? `- Don't move the pull request to any open/closed state that isn't listed above; if it's already in the right state, leave it.`
+    : null;
+  const noopPrDraftReadyLine = prDraftReadyLine
+    ? `- Don't change the pull request's draft/ready state to anything not listed above; if it's already in the right state, leave it.`
     : null;
   // Phrase the no-op guard to match the directives actually present, so a
   // pure-removal turn (labelLine null, removeLabelLine set) doesn't reference an
@@ -219,7 +234,7 @@ export function issueWritebackPrompt(args: {
   const toolingLine = isGitlab
     ? `Use the attached GitLab MCP tools (the \`GitLab (writeback)\` server auto-attached to this run) to read and update labels. Constraints:`
     : isPr
-      ? `Use the attached GitHub MCP tools (the \`GitHub (writeback)\` server auto-attached to this run) to read and update this pull request — GitHub stores PR labels on the same number as issues, so the issue-label tools apply, and open/closed is a pull-request field. Constraints:`
+      ? `Use the attached GitHub MCP tools (the \`GitHub (writeback)\` server auto-attached to this run) to read and update this pull request — GitHub stores PR labels on the same number as issues, so the issue-label tools apply, while open/closed and draft/ready are pull-request fields (set draft/ready via the PR-update tool's \`draft\` flag). Constraints:`
       : `Use the attached GitHub MCP tools (the \`GitHub (writeback)\` server auto-attached to this run) to read and update the ${noun}. Constraints:`;
 
   return [
@@ -227,11 +242,13 @@ export function issueWritebackPrompt(args: {
     ``,
     toolingLine,
     statusLine,
-    prStateLine,
+    prOpenClosedLine,
+    prDraftReadyLine,
     labelLine,
     removeLabelLine,
     noopStatusLine,
-    noopPrStateLine,
+    noopPrOpenClosedLine,
+    noopPrDraftReadyLine,
     noopLabelLine,
     closing,
     ``,

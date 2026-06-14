@@ -351,9 +351,10 @@ function IssueWritebackControl({
 
   const togglePrState = (state: string) => {
     if (!value) return;
+    type PrState = AgentIssueWriteback['allowedPrStates'][number];
     const set = new Set(value.allowedPrStates);
-    if (set.has(state as 'open' | 'closed')) set.delete(state as 'open' | 'closed');
-    else set.add(state as 'open' | 'closed');
+    if (set.has(state as PrState)) set.delete(state as PrState);
+    else set.add(state as PrState);
     onChange({ ...value, allowedPrStates: [...set] });
   };
 
@@ -379,11 +380,12 @@ function IssueWritebackControl({
       {enabled && (
         <div className="space-y-3 rounded-[var(--radius)] border border-[var(--color-divider)] bg-[var(--color-bg)] p-3">
           {isPr ? (
-            // PR triggers carry no project board — offer the repo-native
-            // open/closed state instead of a board Status column.
+            // PR triggers carry no project board — offer the repo-native PR
+            // state axes instead of a board Status column. Two orthogonal
+            // sub-axes: open/closed (active) and draft/ready (ready for review).
             <PillSection label="Allowed PR states" empty={null}>
               <PillToggleGroup
-                options={['open', 'closed']}
+                options={['open', 'closed', 'draft', 'ready']}
                 selected={value?.allowedPrStates ?? []}
                 onToggle={togglePrState}
               />

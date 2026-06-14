@@ -89,7 +89,7 @@ Above the MCP server picker, an opt-in control that lets an agent end its run by
 
 - **Checkbox** — turns the feature on; presence of the field on `AgentConfig` (vs. `undefined`) is the on/off signal.
 - **Allowed statuses** pills (issue / cron triggers) — the trigger board's `Status` single-select options, fetched via `useListProjectBoards`.
-- **Allowed PR states** pills (`pull_requests` triggers) — a fixed Open / Closed group, shown in place of board statuses since PR triggers bind no board.
+- **Allowed PR states** pills (`pull_requests` triggers) — a fixed Open / Closed / Draft / Ready group (two orthogonal axes: open/closed and draft↔ready-for-review), shown in place of board statuses since PR triggers bind no board.
 - **Allowed labels** pills — the trigger repo's labels, fetched via `useListLabels` (`POST /api/workflows/:id/trigger/list-labels`).
 
 If the workflow has no GitHub trigger, the control collapses to a hint. With the checkbox on but nothing picked, a muted note warns that the runtime will skip the writeback turn. The runtime side is documented in [agent-execution.md > Issue writeback](./design-docs/agent-execution.md#issue-writeback).

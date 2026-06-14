@@ -224,7 +224,65 @@ describe('issueWritebackPrompt', () => {
     // PR wording, but no state line because nothing was allowed.
     expect(out).toContain('PR: acme/web#7');
     expect(out).not.toContain('open/closed state');
+    expect(out).not.toContain('draft / ready-for-review state');
     expect(out).toContain('"needs-changes"');
+  });
+
+  it('emits the draft/ready directive (and not open/closed) on a draft-only PR run', () => {
+    const out = issueWritebackPrompt({
+      platform: 'github',
+      owner: 'acme',
+      repo: 'web',
+      issueNumber: '7',
+      allowedStatuses: [],
+      allowedLabels: [],
+      allowedPrStates: ['draft', 'ready'],
+      isPr: true,
+    });
+    expect(out).toContain('PR: acme/web#7');
+    expect(out).toContain("Set the pull request's draft / ready-for-review state");
+    expect(out).toContain('"draft"');
+    // `'ready'` is expanded to the human phrase GitHub uses.
+    expect(out).toContain('"ready for review"');
+    // The draft/ready axis is not the open/closed axis — that line stays absent.
+    expect(out).not.toContain('open/closed state');
+  });
+
+  it('partitions open/closed and draft/ready into two separate directives', () => {
+    const out = issueWritebackPrompt({
+      platform: 'github',
+      owner: 'acme',
+      repo: 'web',
+      issueNumber: '7',
+      allowedStatuses: [],
+      allowedLabels: [],
+      allowedPrStates: ['closed', 'ready'],
+      isPr: true,
+    });
+    // Two distinct lines — the agent never sees one mutually-exclusive list.
+    expect(out).toContain("Set the pull request's open/closed state");
+    expect(out).toContain("Set the pull request's draft / ready-for-review state");
+    expect(out).toContain('"closed"');
+    expect(out).toContain('"ready for review"');
+    // The open/closed line only lists open/closed values; the draft/ready line
+    // only lists draft/ready values — neither leaks into the other.
+    expect(out).not.toMatch(/open\/closed state[^\n]*ready for review/);
+    expect(out).not.toMatch(/draft \/ ready-for-review state[^\n]*"closed"/);
+  });
+
+  it('drops the draft/ready directive on a non-PR run even if states are passed', () => {
+    const out = issueWritebackPrompt({
+      platform: 'github',
+      owner: 'acme',
+      repo: 'web',
+      issueNumber: '7',
+      allowedStatuses: [],
+      allowedLabels: ['bug'],
+      allowedPrStates: ['ready'],
+      isPr: false,
+    });
+    expect(out).toContain('Issue: acme/web#7');
+    expect(out).not.toContain('draft / ready-for-review state');
   });
 });
 
@@ -276,12 +334,13 @@ describe('issueWritebackPrompt — GitLab (labels-only)', () => {
       repo: 'shop',
       allowedStatuses: [],
       allowedLabels: ['needs-changes'],
-      allowedPrStates: ['closed'],
+      allowedPrStates: ['closed', 'ready'],
       isPr: true,
     });
     expect(out).not.toContain('pull request');
     expect(out).not.toContain('PR: acme/shop#');
     expect(out).not.toContain('open/closed state');
+    expect(out).not.toContain('draft / ready-for-review state');
     expect(out).not.toContain('gh pr');
     expect(out).toContain('"needs-changes"');
   });
