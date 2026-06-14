@@ -173,7 +173,9 @@ export async function pollBoardActivity(
   const gatedOutCount = candidateEvents.length - eventsToStart.length;
 
   const outcomes = await Promise.all(
-    eventsToStart.map((event) => startAgentWorkflow(workflowId, wf.orgId, definition, event)),
+    eventsToStart.map((event) =>
+      startAgentWorkflow(workflowId, wf.orgId, definition, event, wf.temporalSlug ?? undefined),
+    ),
   );
   const startedRunIds = outcomes
     .filter((o): o is Extract<StartOutcome, { ok: true }> => o.ok)
@@ -257,6 +259,7 @@ async function startAgentWorkflow(
   orgId: string,
   definition: WorkflowDefinition,
   triggerEvent: TriggerEvent,
+  slug?: string,
 ): Promise<StartOutcome> {
   const ticketLock = ticketLockFor(definition, workflowId, triggerEvent);
   const issueKey = triggerEvent.issue?.key;
@@ -270,7 +273,10 @@ async function startAgentWorkflow(
   });
   try {
     const client = await getTemporalClient();
-    const temporalWorkflowId = agentWorkflowId(run.id, ticketLock);
+    // Read-only: the slug was frozen by the API before this schedule existed.
+    // Never recompute from the live name — that would diverge from the frozen
+    // value and break ticket-branch dedup against an in-flight run.
+    const temporalWorkflowId = agentWorkflowId(run.id, ticketLock, slug);
     const handle = await client.workflow.start(AGENT_WORKFLOW_TYPE, {
       args: [{ workflowId, runId: run.id, triggerEvent }],
       taskQueue: config.temporal.taskQueue,

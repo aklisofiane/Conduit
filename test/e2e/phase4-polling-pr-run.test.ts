@@ -75,6 +75,16 @@ describe('Phase 4 PR scope — repo polling fires runs on PR set-diff', () => {
       return rows.length >= expected ? rows : null;
     }, 30_000);
 
+  // The API freezes a human-readable slug into the schedule id, so the
+  // deterministic handle is `poll-<slug>-<id>`. Read the frozen slug back
+  // rather than recomputing it (the connection is patched in after create).
+  const slugScheduleId = async (workflowId: string): Promise<string> => {
+    const row = await harness.http.get<{ temporalSlug: string | null }>(
+      `/workflows/${workflowId}`,
+    );
+    return workflowScheduleId(workflowId, row.temporalSlug ?? undefined);
+  };
+
   beforeAll(async () => {
     github = await startMockGithubGraphql();
 
@@ -140,7 +150,7 @@ describe('Phase 4 PR scope — repo polling fires runs on PR set-diff', () => {
       isActive: true,
     });
 
-    const scheduleHandle = scheduleClient.getHandle(workflowScheduleId(created.id));
+    const scheduleHandle = scheduleClient.getHandle(await slugScheduleId(created.id));
     await waitFor(async () => {
       try {
         await scheduleHandle.describe();

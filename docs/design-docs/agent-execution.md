@@ -362,3 +362,5 @@ Lifecycle:
 5. **Run start from inside an activity.** `pollBoardActivity` starts `agentWorkflow`s directly via a worker-side `@temporalio/client` singleton (`apps/worker/src/runtime/temporal-client.ts`) — separate from the `NativeConnection` used to poll the worker task queue. Each new match gets a fresh `WorkflowRun` row and a per-run workflow id (`run-<runId>`).
 
 Failure handling: one retry per tick (`maximumAttempts: 2`) — if a cycle fails, the next scheduled tick retries from scratch rather than burning retries on a flaky upstream. Run-starts that succeed are committed before the snapshot upsert, so a crash between the two reprocesses those items on the next tick; worst case is a duplicate run, not a missed transition.
+
+The schedule id, poll/cron run ids, and the agent-run id above all carry a frozen, human-readable **slug** prefix (`poll-run-<slug>-<cuid>`) so an operator can read the workflow + source connection off a Temporal row. The slug is cosmetic — the cuid stays the determinism anchor — and the worker only *reads* the value the API froze. See [temporal-id-slug.md](./temporal-id-slug.md).

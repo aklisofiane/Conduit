@@ -21,6 +21,7 @@ import { PrismaService } from '../../common/prisma.service';
 import { assertDefinitionValid } from '../../common/assert-definition-valid';
 import { errMessage } from '../../common/err-message';
 import { TemporalService } from '../../temporal/temporal.service';
+import { resolveTemporalSlug } from '../../temporal/temporal-slug';
 import { AgentPresetsService } from '../agent-presets/agent-presets.service';
 import { loadTemplates, type LoadedTemplate } from './template-loader';
 import type { CreateFromTemplateDto, TemplateBinding } from './dto';
@@ -166,10 +167,19 @@ export class TemplatesService implements OnModuleInit {
     // Schedules live outside the DB — upsert after commit so a Temporal hiccup
     // doesn't roll back the workflow rows.
     await Promise.allSettled(
-      created.map(async ({ id, definition, isActive }) => {
+      created.map(async ({ id, name, definition, isActive }) => {
         const trigger = definition.triggers[0];
         if (!isScheduledTrigger(trigger)) return;
         try {
+          // Freeze the slug for this freshly created workflow so its schedule
+          // (and the poll/cron runs it spawns) carry the human-readable prefix.
+          const slug =
+            (await resolveTemporalSlug(this.prisma, {
+              id,
+              name,
+              definition,
+              temporalSlug: null,
+            })) || undefined;
           if (trigger.type === 'cron') {
             await this.temporal.upsertWorkflowSchedule({
               kind: 'cron',
@@ -177,6 +187,7 @@ export class TemplatesService implements OnModuleInit {
               cron: trigger.cron,
               timezone: trigger.timezone,
               active: isActive,
+              slug,
             });
           } else {
             await this.temporal.upsertWorkflowSchedule({
@@ -184,6 +195,7 @@ export class TemplatesService implements OnModuleInit {
               workflowId: id,
               intervalSec: trigger.intervalSec,
               active: isActive,
+              slug,
             });
           }
         } catch (err) {

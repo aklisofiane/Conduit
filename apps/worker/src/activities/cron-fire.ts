@@ -95,7 +95,9 @@ export async function cronFireActivity(input: CronWorkflowInput): Promise<CronFi
   });
   try {
     const client = await getTemporalClient();
-    const temporalWorkflowId = agentWorkflowId(run.id);
+    // Read-only: the slug was frozen by the API when the schedule was created.
+    // Cron has no ticket dimension, so this is purely the cosmetic prefix.
+    const temporalWorkflowId = agentWorkflowId(run.id, undefined, wf.temporalSlug ?? undefined);
     const handle = await client.workflow.start(AGENT_WORKFLOW_TYPE, {
       args: [{ workflowId, runId: run.id, triggerEvent }],
       taskQueue: config.temporal.taskQueue,

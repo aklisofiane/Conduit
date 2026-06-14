@@ -53,6 +53,11 @@ export interface StartAgentWorkflowOptions {
    * run collide and the second start throws `DuplicateRunError`.
    */
   ticketLock?: TicketLock;
+  /**
+   * Frozen, human-readable slug woven in front of the run id as a cosmetic
+   * prefix. Resolved by the caller; omitted/empty → legacy slug-less id.
+   */
+  slug?: string;
 }
 
 export type WorkflowScheduleOptions =
@@ -62,6 +67,11 @@ export type WorkflowScheduleOptions =
       intervalSec: number;
       /** When false, the schedule is created/updated in a paused state. */
       active: boolean;
+      /**
+       * Frozen, human-readable slug woven into the schedule + poll-run ids as
+       * a cosmetic prefix. Omitted/empty → legacy slug-less ids.
+       */
+      slug?: string;
     }
   | {
       kind: 'cron';
@@ -70,6 +80,11 @@ export type WorkflowScheduleOptions =
       timezone: string;
       /** When false, the schedule is created/updated in a paused state. */
       active: boolean;
+      /**
+       * Frozen, human-readable slug woven into the schedule + cron-run ids as
+       * a cosmetic prefix. Omitted/empty → legacy slug-less ids.
+       */
+      slug?: string;
     };
 
 /**
@@ -117,7 +132,7 @@ export class TemporalService implements OnModuleInit, OnModuleDestroy {
     if (!this.client) {
       throw new Error('Temporal client not initialized — check TEMPORAL_ADDRESS');
     }
-    const temporalWorkflowId = agentWorkflowId(input.runId, opts.ticketLock);
+    const temporalWorkflowId = agentWorkflowId(input.runId, opts.ticketLock, opts.slug);
     try {
       // Temporal defaults already match what ticket-branch needs:
       //   - workflowIdReusePolicy = ALLOW_DUPLICATE — closed workflows' IDs
@@ -165,8 +180,25 @@ export class TemporalService implements OnModuleInit, OnModuleDestroy {
     if (!this.schedules) {
       throw new Error('Temporal client not initialized — check TEMPORAL_ADDRESS');
     }
-    const scheduleId = workflowScheduleId(opts.workflowId);
+    const scheduleId = workflowScheduleId(opts.workflowId, opts.slug);
     const scheduleDef = buildScheduleDefinition(opts);
+
+    // A slugged schedule supersedes the legacy slug-less `poll-<cuid>` one.
+    // The freeze is one-way, so on the first slugged upsert (typically the
+    // boot reconcile after deploy) we best-effort remove the legacy schedule
+    // before creating its slugged replacement, re-keying it exactly once.
+    // Idempotent: once gone, every later upsert's delete is a swallowed 404.
+    // Best-effort — a cleanup failure must never block creating the slugged
+    // schedule; reconcile retries the cleanup on next boot/save.
+    if (opts.slug) {
+      try {
+        await this.deleteWorkflowSchedule(opts.workflowId);
+      } catch (err) {
+        this.logger.warn(
+          `Legacy schedule cleanup for workflow ${opts.workflowId} failed: ${String(err)}`,
+        );
+      }
+    }
 
     try {
       await this.schedules.create({
@@ -186,11 +218,15 @@ export class TemporalService implements OnModuleInit, OnModuleDestroy {
   /**
    * Delete the schedule. Idempotent — 404 from Temporal is swallowed so
    * calling on a workflow that never had a schedule is a no-op.
+   *
+   * `slug` selects which schedule id to remove: pass the frozen slug to drop
+   * the slugged schedule, omit it to drop the legacy slug-less one (the
+   * legacy-cleanup path in `upsertWorkflowSchedule`).
    */
-  async deleteWorkflowSchedule(workflowId: string): Promise<void> {
+  async deleteWorkflowSchedule(workflowId: string, slug?: string): Promise<void> {
     if (!this.schedules) return;
     try {
-      await this.schedules.getHandle(workflowScheduleId(workflowId)).delete();
+      await this.schedules.getHandle(workflowScheduleId(workflowId, slug)).delete();
     } catch (err) {
       if (isScheduleNotFound(err)) return;
       throw err;
@@ -208,7 +244,7 @@ function buildScheduleDefinition(opts: WorkflowScheduleOptions) {
         workflowType: POLL_WORKFLOW_TYPE,
         args,
         taskQueue: config.temporal.taskQueue,
-        workflowId: pollWorkflowId(opts.workflowId),
+        workflowId: pollWorkflowId(opts.workflowId, opts.slug),
       },
       policies: { overlap: ScheduleOverlapPolicy.SKIP },
     };
@@ -224,7 +260,7 @@ function buildScheduleDefinition(opts: WorkflowScheduleOptions) {
       workflowType: CRON_WORKFLOW_TYPE,
       args,
       taskQueue: config.temporal.taskQueue,
-      workflowId: cronWorkflowId(opts.workflowId),
+      workflowId: cronWorkflowId(opts.workflowId, opts.slug),
     },
     policies: { overlap: ScheduleOverlapPolicy.SKIP },
   };

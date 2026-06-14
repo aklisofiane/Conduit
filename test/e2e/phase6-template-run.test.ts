@@ -30,6 +30,7 @@ interface WorkflowRow {
   name: string;
   definition: WorkflowDefinition;
   isActive: boolean;
+  temporalSlug: string | null;
 }
 
 interface TemplateSummary {
@@ -143,7 +144,9 @@ describe('Phase 6 — create workflows from template', () => {
       expect(node.workspace).toBeUndefined();
     }
 
-    const handle = scheduleClient.getHandle(workflowScheduleId(wf.id));
+    const handle = scheduleClient.getHandle(
+      workflowScheduleId(wf.id, wf.temporalSlug ?? undefined),
+    );
     await waitFor(
       () => handle.describe().then(() => true).catch(() => false),
       15_000,
@@ -198,7 +201,9 @@ describe('Phase 6 — create workflows from template', () => {
     expect(result.workflows).toHaveLength(1);
     const wf = await harness.http.get<WorkflowRow>(`/workflows/${result.workflows[0]!.id}`);
     expect(wf.definition.triggers[0]!.type).toBe('issues');
-    const handle = scheduleClient.getHandle(workflowScheduleId(wf.id));
+    const handle = scheduleClient.getHandle(
+      workflowScheduleId(wf.id, wf.temporalSlug ?? undefined),
+    );
     await waitFor(
       () => handle.describe().then(() => true).catch(() => false),
       15_000,

@@ -37,6 +37,14 @@ model Workflow {
   // rest (AES-256-GCM). Nullable — polling-only workflows don't need one.
   // Single-secret per workflow; rotating overwrites. See docs/SECURITY.md.
   webhookSecret String?
+  // Frozen, human-readable slug woven into every Temporal id (schedule,
+  // poll/cron runs, agent runs) as a cosmetic prefix so operators can read
+  // the workflow + source connection off a Temporal row at a glance. Written
+  // once by the API the first time the workflow materializes a schedule or
+  // run (`null → value`), then read by API + worker. Never changes after
+  // first assignment — the immutable cuid stays the sole determinism anchor.
+  // See .specs/temporal-id-slug.md.
+  temporalSlug  String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

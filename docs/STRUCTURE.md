@@ -43,7 +43,10 @@ src/
                                        `load-json-dir.ts` (shared JSON-folder loader used by
                                        templates + agent-presets — read dir, parse-or-skip,
                                        Zod-issue formatter)
-  redis/, temporal/                    clients shared across modules
+  redis/, temporal/                    clients shared across modules; temporal/ also holds
+                                       `temporal-slug.ts` (resolve-and-freeze the cosmetic
+                                       Temporal id slug onto Workflow.temporalSlug — Prisma side
+                                       of design-docs/temporal-id-slug.md)
   modules/
     workflows/                         workflow CRUD + duplicate + webhook-secret PUT/DELETE
                                        (encrypted Workflow.webhookSecret — single secret per
@@ -283,7 +286,9 @@ src/
   temporal/   task queue name + workflow-type constants (AGENT_WORKFLOW_TYPE,
               POLL_WORKFLOW_TYPE, CRON_WORKFLOW_TYPE) + deterministic id
               helpers (`workflowScheduleId`, `pollWorkflowId`,
-              `cronWorkflowId`, `agentWorkflowId`)
+              `cronWorkflowId`, `agentWorkflowId`) — each takes an optional
+              cosmetic `slug` prefix — plus pure `buildTemporalSlug`
+              (sandbox-safe; see design-docs/temporal-id-slug.md)
   crypto/     AES-256-GCM helpers                              backend-only subpath
   webhook/    HMAC signature verify + GitHub event normalizer  backend-only subpath
               (handles issues.opened / pull_request.opened / issue_comment.created /
