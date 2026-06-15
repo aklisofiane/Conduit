@@ -1,22 +1,27 @@
 import { LocalDockerSpawner } from './local-docker';
+import { LocalProcessSpawner } from './local-process';
+import { resolveRunnerMode } from './mode';
 import type { RunnerSpawner } from './spawner';
 
 /**
- * Pick the runner-spawner implementation. Phase 1 has exactly one: the
- * local-Docker spawner. The indirection exists so worker-package unit
- * tests can swap in a fully scripted spawner via `setRunnerSpawnerForTest`,
- * and so phase 3 (k8s Jobs) can plug in a different concrete spawner
- * without touching the orchestrator activity.
+ * Pick the runner-spawner implementation by runner mode (see `mode.ts`):
+ * Docker containers when `docker`, detached host processes when `host`.
+ * The indirection also lets worker-package unit tests swap in a fully
+ * scripted spawner via `setRunnerSpawnerForTest`, and leaves room for a
+ * k8s-Jobs spawner to plug in without touching the orchestrator activity.
  *
- * Note: there is **no** non-Docker production or e2e path. The spec is
- * explicit that Docker is the only execution mode — anything that
- * bypasses the container also bypasses the trust boundary. E2e tests
- * exercise the real `agent-runner` image; that's what makes them e2e.
+ * Note: there is **no** non-Docker path when `CONDUIT_DEPLOYMENT=hosted` —
+ * anything that bypasses the container also bypasses the trust boundary,
+ * and `resolveRunnerMode` refuses to boot `hosted`+`host`. Host mode is a
+ * local-deployment affordance: the agent acts as the user on the user's
+ * own machine. E2e tests pin `CONDUIT_RUNNER_MODE=docker` and exercise the
+ * real `agent-runner` image; that's what makes them e2e.
  */
 let override: RunnerSpawner | null = null;
 
 export function resolveRunnerSpawner(): RunnerSpawner {
   if (override) return override;
+  if (resolveRunnerMode() === 'host') return new LocalProcessSpawner();
   return new LocalDockerSpawner({ image: runnerImageTag() });
 }
 

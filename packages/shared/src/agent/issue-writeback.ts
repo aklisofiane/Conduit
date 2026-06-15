@@ -1,19 +1,39 @@
 import { z } from 'zod';
 
 /**
- * Per-agent allowlist for end-of-run issue writeback. Presence of this
- * field on an `AgentConfig` is the "feature is enabled" signal — both
+ * Per-agent allowlist for end-of-run issue / PR writeback. Presence of this
+ * field on an `AgentConfig` is the "feature is enabled" signal — all three
  * arrays may be empty (treated as enabled-but-unselected; the runtime
  * skips the writeback turn rather than synthesizing an empty directive).
  *
- * Values are picked at config time from the workflow's GitHub trigger
- * connection (Project v2 Status options + repo labels). At run time the
- * picked values are interpolated verbatim into the trailing user message
- * — no schema-level enforcement, no post-run validation. The allowlist
- * is encoded entirely in prompt wording.
+ * `allowedStatuses` / `allowedLabels` are the values the agent may *set* —
+ * picked at config time from the workflow's GitHub trigger connection
+ * (Project v2 Status options + repo labels). The label that *gated* the run
+ * is removed automatically (see `resolveWritebackContext` — it's the stage
+ * the run just consumed), so the handoff is a remove-the-trigger-label,
+ * add-the-next-one swap without the template spelling out the removal.
+ *
+ * `allowedPrStates` is the PR-native state axis — repo-level, so it needs no
+ * project board. It carries two *orthogonal* sub-axes whose values share this
+ * one array: open/closed (`'open'`/`'closed'` — whether the PR is active) and
+ * draft/ready (`'draft'`/`'ready'` — whether it's marked ready for review). A
+ * PR is e.g. open+draft or open+ready, so the two are independent;
+ * `issueWritebackPrompt` partitions the array and emits a separate directive
+ * per sub-axis rather than one mutually-exclusive list. Both apply only to
+ * `pull_requests`-triggered runs (the UI offers them only there, and the prompt
+ * emits the directives only when the run is PR-shaped); on issue/cron runs the
+ * field is inert, and on GitLab it's inert too (MR-state writeback is out of
+ * scope). Merging is deliberately excluded — that's a heavier action with a
+ * merge method and conflict handling, out of scope here.
+ *
+ * At run time the picked values are interpolated verbatim into the trailing
+ * user message — no schema-level enforcement, no post-run validation. The
+ * allowlist is encoded entirely in prompt wording. The field name stays
+ * `issueWriteback` (no data migration); the feature is "issue / PR".
  */
 export const agentIssueWritebackSchema = z.object({
   allowedStatuses: z.array(z.string().min(1)).default([]),
   allowedLabels: z.array(z.string().min(1)).default([]),
+  allowedPrStates: z.array(z.enum(['open', 'closed', 'draft', 'ready'])).default([]),
 });
 export type AgentIssueWriteback = z.infer<typeof agentIssueWritebackSchema>;

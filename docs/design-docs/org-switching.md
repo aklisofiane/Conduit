@@ -67,7 +67,7 @@ After invalidation the switch flow navigates to `/`. Reasoning: every URL the us
 
 ## Invite-URL fallback
 
-Email transport is a cross-cutting TODO ([SPEC_PLAN](../../.specs/auth/SPEC_PLAN.md)); the v1 stand-in surfaces a copyable invite URL on the Organization settings page after `inviteMember` succeeds, and per-row on the Pending invitations list. The URL is built client-side as `<window.location.origin>/accept-invitation/<invitationId>` via `buildInviteUrl(invitationId)`. The recipient signs up (or signs in) at the URL, lands on `AcceptInvitationPage`, sees the org + inviter + role, and clicks Accept.
+Email transport is a cross-cutting TODO (see [authentication.md § Cross-cutting status](./authentication.md#cross-cutting-status)); the v1 stand-in surfaces a copyable invite URL on the Organization settings page after `inviteMember` succeeds, and per-row on the Pending invitations list. The URL is built client-side as `<window.location.origin>/accept-invitation/<invitationId>` via `buildInviteUrl(invitationId)`. The recipient signs up (or signs in) at the URL, lands on `AcceptInvitationPage`, sees the org + inviter + role, and clicks Accept.
 
 ## Accept does not auto-switch
 

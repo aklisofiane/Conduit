@@ -119,11 +119,12 @@ function* enumerateConnectionSlots(
   for (const server of def.mcpServers) {
     yield {
       value: server.connectionId,
-      // MCP filtering is platform-only in v1; per-preset scope-kind checks
-      // are a follow-up. Surfacing `'any'` here lets the from-template
-      // endpoint skip the kind check for MCP slots without losing the rule
-      // for trigger slots.
-      expectedScopeKind: 'any',
+      // Preset-backed servers are swapped to the bound connection's platform
+      // preset at instantiation, so the connection must be repo-scoped
+      // (github_repo | gitlab_project — the platforms that ship presets).
+      // User-defined transports stay `'any'`: platform-only matching, never
+      // rewritten.
+      expectedScopeKind: server.presetId ? 'repo' : 'any',
       set: (v) => {
         server.connectionId = v;
       },

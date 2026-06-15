@@ -4,14 +4,7 @@ How Conduit handles branches for iterative board-loop workflows. Covers the `tic
 
 ## Core principle: the board is the loop
 
-Iteration is expressed by board transitions, not by cycles in the workflow graph. A Worker workflow fires on `status = Dev`, commits to a persistent branch, and moves the ticket to `AIReview`. A Critic workflow fires on `status = AIReview` and either approves (moves to `ReadyToMerge`) or rejects (moves the ticket back to `Dev`, re-triggering the Worker).
-
-Cross-run state lives in two platform-native places:
-
-- **The branch** — code state, written by Worker agents via commits.
-- **The ticket / PR** — review state, written by Critic agents via comments.
-
-Conduit is stateless across runs. `.conduit/` remains intra-run only. No cycle edges, no loop nodes, no Conduit-owned cross-run blob store.
+Iteration is expressed by board transitions, not by cycles in the workflow graph (the model is owned by [VISION.md](../VISION.md#core-principles) and [node-system.md](./node-system.md#cross-run-iteration)). The branch-specific consequence: cross-run state lives in two platform-native places — **the branch** (code state, Worker commits) and **the ticket / PR** (review state, Critic comments). Conduit is stateless across runs; `.conduit/` stays intra-run only; no cycle edges, no loop nodes, no Conduit-owned blob store. AI-to-AI handoffs ride `conduit-*` labels (not board status) so the convention works identically on GitHub and GitLab — see [Label-gated signaling](./templates.md#label-gated-signaling); human-gesture entry points (a freshly opened issue) still gate on status.
 
 ## `ticket-branch` workspaces
 
@@ -75,16 +68,11 @@ Format: `conduit/<ticket-id>-<slug>`.
 
 ## Concurrency
 
-**Concurrent triggers on the same ticket (same workflow)**: one active run per `(workflow, ticket)` at a time. The workflow ID is deterministic: `run-<workflowId>-<ticketId>`. While a run is in flight, Temporal rejects a duplicate start with `WorkflowExecutionAlreadyStarted` — the trigger handler catches it, drops the trigger silently (no new `WorkflowRun` row, no error surfaced to the platform). Once the run terminates (any status), `WorkflowIdReusePolicy = ALLOW_DUPLICATE` lets the same ID be reused, so a ticket re-entering `Dev` fires the Worker again. This is what keeps board cycles (Dev → Review → Dev) working. Applies to every v1 workflow — every entry node is `ticket-branch`.
+**Concurrent triggers on the same ticket (same workflow)**: one active run per `(workflow, ticket)` at a time, enforced via the deterministic Temporal workflow ID — the mechanism (`run-<workflowId>-<ticketId>`, `WorkflowExecutionAlreadyStarted` drop, `ALLOW_DUPLICATE` reuse that keeps board cycles firing) is owned by [agent-execution.md](./agent-execution.md#per-ticket-concurrency). Applies to every v1 workflow — every entry node is `ticket-branch`. The branch-specific reason it matters: concurrent runs would otherwise race on `git worktree add` and `git push` against the same `conduit/*` branch.
 
 **Base-clone race on the same host**: two activities (different tickets, same repo) might call `git worktree add` against the shared base clone at the same moment. A local file lock on the base-clone path serializes these. Local-process only, not distributed.
 
 **Push conflicts**: if a retry-scenario causes two push attempts with different parents, git rejects the non-fast-forward push naturally. Conduit never force-pushes. The retried activity picks up the current remote state on its next worktree resolve.
-
-Deferred to a later phase (documented as known gaps):
-
-- Deduplication of redundant queued runs (e.g., collapsing a webhook storm into one run).
-- Backpressure on high-frequency triggers.
 
 ## Drift from `main`
 
@@ -108,17 +96,12 @@ Ticket-only platforms (Jira, Linear) are deferred further. Supporting them clean
 
 ## Gaps explicitly deferred
 
-- Auto-delete of `conduit/*` branches after PR merge + ticket close.
-- Auto-rebase on drift from `main`.
-- Deduplication of queued runs beyond the workflow-ID uniqueness gate.
-- Webhook storm collapse / backpressure.
-- Branch-protection automation on `conduit/*`.
+The cross-cutting deferrals — `conduit/*` auto-delete, auto-rebase on `main` drift, queued-run dedup / webhook-storm backpressure, and a save-time designated pusher — are tracked in [PLANS.md](../PLANS.md#phase-8--later). Branch-specific ones not listed there:
+
+- Branch-protection automation on `conduit/*` (opt-in, needs admin scope on the platform token).
 - Ticket-only platforms (Jira, Linear) where tickets and branches live on different hosts — requires a second connection on the workspace spec and a weaker Critic loop via flat comments.
 - `TicketBranch` row cleanup — rows accumulate monotonically in v1 (one per ticket ever touched). Rows are small and bounded by per-repo ticket volume; auto-cleanup lands alongside branch auto-deletion.
 
 ## Not features
 
-- No Conduit-owned cross-run blob store (DB blobs, extended `.conduit/` persistence).
-- No cycle edges or loop nodes in the workflow graph.
-- No runtime-owned push step. Agents push via git themselves.
-- No mandatory human push protection on `conduit/*`. Convention only.
+Stances, not roadmap items: no Conduit-owned cross-run blob store (DB blobs or extended `.conduit/` persistence); no cycle edges or loop nodes in the graph; no runtime-owned push step (agents push via git themselves); no mandatory human push protection on `conduit/*` (convention only).

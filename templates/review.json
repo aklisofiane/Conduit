@@ -1,12 +1,12 @@
 {
   "id": "review",
   "name": "Review",
-  "description": "Reviews an implementation branch and publishes a verdict. Pairs with the Develop template as the downstream gate in a board-driven workflow.",
+  "description": "Reviews an implementation branch and publishes a verdict. Gated on the \"conduit-review\" label, which the Develop template's QA agent applies on handoff. On approval Publish removes conduit-review and applies \"conduit-merge\" to the pull/merge request, handing off to the Merge template's human ready-for-review gate. On changes requested it removes conduit-review and parks the issue for a human with the \"Review\" label and a human-facing status (the same human-facing signal Analyze uses — visible on both GitHub Projects and GitLab label boards) — a human re-applies conduit-dev to retry. Pairs with the Develop and Merge templates as a label-gated pipeline.",
   "category": "review",
   "workflows": [
     {
       "name": "Review",
-      "description": "Polling on status=Review. Code Reviewer evaluates the branch, Publish submits the review verdict and moves the ticket.",
+      "description": "Polling on label=conduit-review. Code Reviewer evaluates the branch, Publish submits the review verdict and swaps labels: approve → conduit-merge on the PR; changes → remove conduit-review, apply the human-facing Review label and move status to a human column.",
       "definition": {
         "triggers": [
           {
@@ -17,7 +17,7 @@
             "boardConnectionId": "<github-board>",
             "type": "issues",
             "intervalSec": 60,
-            "filters": [{ "field": "status", "value": "Review" }]
+            "filters": [{ "field": "label", "value": "conduit-review" }]
           }
         ],
         "nodes": [
@@ -32,9 +32,10 @@
             "id": "agent-publish",
             "name": "Publish",
             "presetId": "publish",
-            "instructionsAppend": "Read the upstream Code Reviewer's verdict in `.conduit/`. Submit a PR review via the connected MCP server: APPROVE if the verdict recommends approval, or REQUEST_CHANGES with inline comments if changes are needed. After submitting the review, move the ticket: on approval move to \"ReadyToMerge\"; on changes requested move back to \"Dev\".",
+            "instructionsAppend": "Read the upstream Code Reviewer's verdict in `.conduit/`. Submit a review on the pull/merge request via the connected MCP server: approve, or request changes with inline comments, per the verdict. On approval, also apply \"conduit-merge\" to the pull/merge request (create it if absent) to hand off to the Merge workflow. On changes requested, do not apply conduit-merge; the issue parks for a human — the end-of-run step applies the human-facing \"Review\" label (visible on label-native boards like GitLab) and a human-facing status, and a human re-applies conduit-dev to retry.",
             "mcpServers": [{ "serverId": "github-mcp" }],
-            "skills": []
+            "skills": [],
+            "issueWriteback": { "allowedStatuses": ["ReadyToMerge", "In Progress"], "allowedLabels": ["Review"] }
           }
         ],
         "edges": [

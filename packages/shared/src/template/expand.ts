@@ -109,6 +109,9 @@ function expandMcpServer(
     transport: server.transport ?? preset.transport,
     connectionId: server.connectionId,
     discoveredTools: server.discoveredTools,
+    // Provenance only when the transport is the preset's own — a template
+    // that inlines a custom transport opts out of platform-follow swapping.
+    presetId: server.transport ? undefined : server.presetId,
   };
 }
 
@@ -117,40 +120,37 @@ function expandAgent(
   resolvePreset: PresetResolver,
   templateId: string,
 ): AgentConfig {
-  if (!agent.presetId) {
+  // Preserve every AgentConfig field by default; strip only the two
+  // template-only fields and override the preset-derived ones below. Rebuilding
+  // from an explicit field list silently dropped any AgentConfig field added
+  // later (this is how `issueWriteback` went missing) — spreading closes that
+  // whole class of bug, and the loader's post-expansion `agentConfigSchema`
+  // re-parse strips anything stray.
+  const { presetId, instructionsAppend, ...base } = agent;
+
+  if (!presetId) {
+    // No preset: provider/model/instructions are inlined on the node, and the
+    // schema's superRefine guarantees they're present (non-null asserted to
+    // satisfy the required AgentConfig type).
     return {
-      id: agent.id,
-      name: agent.name,
+      ...base,
       provider: agent.provider!,
       model: agent.model!,
       instructions: agent.instructions!,
-      mcpServers: agent.mcpServers,
-      skills: agent.skills,
-      webSearch: agent.webSearch,
-      workspace: agent.workspace,
-      constraints: agent.constraints,
     };
   }
 
-  const preset = resolvePreset(agent.presetId);
+  const preset = resolvePreset(presetId);
   if (!preset) {
-    throw new UnknownPresetError(agent.presetId, templateId, agent.name);
+    throw new UnknownPresetError(presetId, templateId, agent.name);
   }
 
-  const instructions = agent.instructionsAppend
-    ? `${preset.instructions}\n\n${agent.instructionsAppend}`
-    : preset.instructions;
-
   return {
-    id: agent.id,
-    name: agent.name,
+    ...base,
     provider: preset.provider,
     model: preset.model,
-    instructions,
-    mcpServers: agent.mcpServers,
-    skills: agent.skills,
-    webSearch: agent.webSearch,
-    workspace: agent.workspace,
-    constraints: agent.constraints,
+    instructions: instructionsAppend
+      ? `${preset.instructions}\n\n${instructionsAppend}`
+      : preset.instructions,
   };
 }

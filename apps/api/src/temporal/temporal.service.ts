@@ -53,6 +53,11 @@ export interface StartAgentWorkflowOptions {
    * run collide and the second start throws `DuplicateRunError`.
    */
   ticketLock?: TicketLock;
+  /**
+   * Frozen, human-readable slug woven in front of the run id as a cosmetic
+   * prefix. Resolved by the caller; omitted/empty → legacy slug-less id.
+   */
+  slug?: string;
 }
 
 export type WorkflowScheduleOptions =
@@ -62,6 +67,11 @@ export type WorkflowScheduleOptions =
       intervalSec: number;
       /** When false, the schedule is created/updated in a paused state. */
       active: boolean;
+      /**
+       * Frozen, human-readable slug woven into the schedule + poll-run ids as
+       * a cosmetic prefix. Omitted/empty → legacy slug-less ids.
+       */
+      slug?: string;
     }
   | {
       kind: 'cron';
@@ -70,6 +80,11 @@ export type WorkflowScheduleOptions =
       timezone: string;
       /** When false, the schedule is created/updated in a paused state. */
       active: boolean;
+      /**
+       * Frozen, human-readable slug woven into the schedule + cron-run ids as
+       * a cosmetic prefix. Omitted/empty → legacy slug-less ids.
+       */
+      slug?: string;
     };
 
 /**
@@ -117,7 +132,7 @@ export class TemporalService implements OnModuleInit, OnModuleDestroy {
     if (!this.client) {
       throw new Error('Temporal client not initialized — check TEMPORAL_ADDRESS');
     }
-    const temporalWorkflowId = agentWorkflowId(input.runId, opts.ticketLock);
+    const temporalWorkflowId = agentWorkflowId(input.runId, opts.ticketLock, opts.slug);
     try {
       // Temporal defaults already match what ticket-branch needs:
       //   - workflowIdReusePolicy = ALLOW_DUPLICATE — closed workflows' IDs
@@ -165,7 +180,7 @@ export class TemporalService implements OnModuleInit, OnModuleDestroy {
     if (!this.schedules) {
       throw new Error('Temporal client not initialized — check TEMPORAL_ADDRESS');
     }
-    const scheduleId = workflowScheduleId(opts.workflowId);
+    const scheduleId = workflowScheduleId(opts.workflowId, opts.slug);
     const scheduleDef = buildScheduleDefinition(opts);
 
     try {
@@ -186,11 +201,15 @@ export class TemporalService implements OnModuleInit, OnModuleDestroy {
   /**
    * Delete the schedule. Idempotent — 404 from Temporal is swallowed so
    * calling on a workflow that never had a schedule is a no-op.
+   *
+   * `slug` selects which schedule id to remove: callers pass the workflow's
+   * frozen `temporalSlug` so the id matches whatever the schedule was created
+   * under (a null/empty slug → the slug-less id).
    */
-  async deleteWorkflowSchedule(workflowId: string): Promise<void> {
+  async deleteWorkflowSchedule(workflowId: string, slug?: string): Promise<void> {
     if (!this.schedules) return;
     try {
-      await this.schedules.getHandle(workflowScheduleId(workflowId)).delete();
+      await this.schedules.getHandle(workflowScheduleId(workflowId, slug)).delete();
     } catch (err) {
       if (isScheduleNotFound(err)) return;
       throw err;
@@ -208,7 +227,7 @@ function buildScheduleDefinition(opts: WorkflowScheduleOptions) {
         workflowType: POLL_WORKFLOW_TYPE,
         args,
         taskQueue: config.temporal.taskQueue,
-        workflowId: pollWorkflowId(opts.workflowId),
+        workflowId: pollWorkflowId(opts.workflowId, opts.slug),
       },
       policies: { overlap: ScheduleOverlapPolicy.SKIP },
     };
@@ -224,7 +243,7 @@ function buildScheduleDefinition(opts: WorkflowScheduleOptions) {
       workflowType: CRON_WORKFLOW_TYPE,
       args,
       taskQueue: config.temporal.taskQueue,
-      workflowId: cronWorkflowId(opts.workflowId),
+      workflowId: cronWorkflowId(opts.workflowId, opts.slug),
     },
     policies: { overlap: ScheduleOverlapPolicy.SKIP },
   };

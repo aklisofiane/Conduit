@@ -9,8 +9,7 @@ Icons come from `lucide-react`. Call sites import the specific component they ne
 | Screen | Purpose |
 |---|---|
 | `/` | Workflow list (name, last run, status, active toggle) + "new workflow" + "from template" entry points |
-| `/workflows/:id` | Edit — canvas + config side panel (design only, no runtime data) |
-| `/workflows/:id/runs` | Run history list (status, trigger, duration, started at) |
+| `/workflows/:id` | Edit — canvas + config side panel (design only, no runtime data). Holds a build/runs tab toggle; the **Runs tab** renders the run history list (status, trigger, duration, started at) in-canvas — no separate route. |
 | `/runs/:runId` | Run detail — dedicated observation page with live logs (not on the canvas) |
 | `/settings` | Settings shell — left sidebar (`apps/web/src/components/layout/SettingsLayout.tsx`) reading from a config array (`apps/web/src/components/settings/settings-nav.ts`) + content outlet. Index redirects to `/settings/integrations`. The top-bar gear icon (`TopChrome`) lands here. |
 | `/settings/integrations` | `Credential` + `Connection` management stacked on one surface. Credentials feed connections (one credential can back many; rotation propagates), so they live together rather than as separate sidebar entries. Typed scope picker is unchanged (`github_repo` `{owner, repo}` / `github_projects_v2` `{ownerType, owner, number}` / `none`). OAuth-derived credentials (auto-created from GitHub sign-in) get an `oauth` badge next to the platform tag; rotating their secret with a PAT converts them to manual. Old `/credentials` and `/connections` paths redirect here. |
@@ -69,7 +68,7 @@ Visual tokens (palette, per-provider color/font/label, radii, the `providerStyle
 Opens on node click. Form driven by Zod schema from `@conduit/shared`.
 
 - **Trigger panels**: dispatched by `trigger.type`, sharing common chrome from `trigger-panel-common.tsx`. **Issues**: Repo connection → optional Board → interval → filter builder. **PR**: Repo connection → interval → filters (`pr_state` / `label`). **Cron**: Repo connection → branch (free-text) → cron expression → timezone → active toggle; no filters. **Webhook**: no panel (read-only placeholder node).
-- **Agent panel**: name field (identifier validation), preset picker (see below), provider + model dropdown, instructions textarea (monospace, generous height), **Web search** checkbox (off by default — toggles the provider's built-in web search/fetch; see [agent-execution.md](./design-docs/agent-execution.md#web-search)), **Issue writeback** control (opt-in checkbox + pill-toggle groups for allowed statuses + labels — see below), MCP server picker (presets with one-click add + custom server config), skill picker (see below), constraints (collapsible). No workspace picker — workspace is derived from graph position (see [node-system.md](./design-docs/node-system.md#workspace-inheritance)).
+- **Agent panel**: name field (identifier validation), preset picker (see below), provider + model dropdown, instructions textarea (monospace, generous height), **Web search** checkbox (off by default — toggles the provider's built-in web search/fetch; see [agent-execution.md](./design-docs/agent-execution.md#web-search)), **Issue / PR writeback** control (opt-in checkbox + pill-toggle groups for allowed statuses or PR state, plus labels — see below), MCP server picker (presets with one-click add + custom server config), skill picker (see below), constraints (collapsible). No workspace picker — workspace is derived from graph position (see [node-system.md](./design-docs/node-system.md#workspace-inheritance)).
 
 ### Agent preset picker
 
@@ -83,12 +82,13 @@ The agent config panel includes a skills section:
 - Click to attach/detach. Attached skills are copied into the workspace at runtime.
 - Skills are filtered by provider — Claude skills shown when provider is Claude, Codex skills when Codex. Skills present in both formats shown for either.
 
-### Issue writeback control
+### Issue / PR writeback control
 
-Above the MCP server picker, an opt-in control that lets an agent end its run by updating the triggering GitHub issue:
+Above the MCP server picker, an opt-in control that lets an agent end its run by setting Status / state / labels on GitHub issues or PRs. It's offered for any GitHub trigger — issue-driven (board/webhook), `pull_requests`, **and** cron (cron runs can write back to issues the agent creates during the run):
 
 - **Checkbox** — turns the feature on; presence of the field on `AgentConfig` (vs. `undefined`) is the on/off signal.
-- **Allowed statuses** pills — the trigger board's `Status` single-select options, fetched via `useListProjectBoards`.
+- **Allowed statuses** pills (issue / cron triggers) — the trigger board's `Status` single-select options, fetched via `useListProjectBoards`.
+- **Allowed PR states** pills (`pull_requests` triggers) — a fixed Open / Closed / Draft / Ready group (two orthogonal axes: open/closed and draft↔ready-for-review), shown in place of board statuses since PR triggers bind no board.
 - **Allowed labels** pills — the trigger repo's labels, fetched via `useListLabels` (`POST /api/workflows/:id/trigger/list-labels`).
 
 If the workflow has no GitHub trigger, the control collapses to a hint. With the checkbox on but nothing picked, a muted note warns that the runtime will skip the writeback turn. The runtime side is documented in [agent-execution.md > Issue writeback](./design-docs/agent-execution.md#issue-writeback).
@@ -109,9 +109,9 @@ The agent config panel includes an MCP server section:
 - **Canvas state** — Zustand. Tracks selection, dirty flags, pending edits not yet persisted. Persistent canvas state (node positions, viewport) lives in `Workflow.definition.ui`.
 - **Forms** — react-hook-form + Zod resolver, schemas imported directly from `@conduit/shared`.
 
-## Run history (`/workflows/:id/runs`)
+## Runs tab (inside `/workflows/:id`)
 
-List of runs for a workflow. Each row shows:
+Not a separate route — `CanvasPage` holds an `activeTab` (`'build' | 'runs'`) state, `WorkflowTabs` toggles between them, and `activeTab === 'runs'` swaps the canvas for `<WorkflowRunsList workflowId={id} />`. The list shows the workflow's runs; each row shows:
 - Status badge (pending / running / completed / failed / cancelled)
 - Trigger source + event (e.g., "GitHub · issues.opened")
 - Duration (or "running" timer for in-flight runs)

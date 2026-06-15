@@ -53,7 +53,7 @@
 |---|---|
 | `@conduit/shared` | Types + Zod schemas, plus the cross-process contracts API/worker/web all import (AES-256-GCM crypto, Redis run-updates channel, Temporal task queue name, `AgentEvent → ExecutionLogKind` mapping). `"sideEffects": false` so Vite tree-shakes `node:crypto` out of the web bundle. |
 | `@conduit/database` | Prisma schema + `PrismaClient` re-export. See [data-model.md](./data-model.md). |
-| `@conduit/agent` | Agent provider abstraction (`AgentProvider` interface), Claude + Codex providers, workspace manager (`ticket-branch` worktree resolution + `fixed-branch` checkout for cron triggers + parallel-`inherit` branched worktrees + merge-back), MCP config resolution (decrypt credentials, substitute `{{credential}}`, hand to SDK). **Core of the system.** |
+| `@conduit/agent` | Agent provider abstraction (`AgentProvider` interface), Claude + Codex providers, workspace manager (`ticket-branch` worktree resolution + `fixed-branch` checkout for cron triggers + parallel-`inherit` branched worktrees + merge-back; shared git helpers in `git-helpers.ts` for base-clone / fetch / ref operations), MCP config resolution (decrypt credentials, substitute `{{credential}}`, hand to SDK). **Core of the system.** |
 
 ## Dependency graph
 
@@ -214,14 +214,14 @@ Per-org Anthropic / OpenAI keys consumed directly by the agent runtime — separ
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/agent-presets` | List reusable agent prompts loaded from `/agent-presets/*.json` at boot — id, name, category, provider, model, instructions. Drives the canvas agent config panel's preset picker and template `presetId` expansion. See [agent-presets.md](./design-docs/agent-presets.md). |
+| `GET` | `/agent-presets` | List reusable agent prompts loaded from `/agent-presets/*.md` at boot — id, name, category, provider, model, instructions. Drives the canvas agent config panel's preset picker and template `presetId` expansion. See [agent-presets.md](./design-docs/agent-presets.md). |
 | `GET` | `/agent-presets/:id` | Fetch one preset by id. 404 if not loaded. |
 
 ### WebSocket
 
 | Namespace | Event | Description |
 |---|---|---|
-| `runs/<runId>` | `node-update` | `{ nodeName, event: AgentEvent }` — streamed live from Redis |
+| `/runs` | `node-update` | `{ nodeName, event: AgentEvent }` — streamed live from Redis. Single namespace; clients join a per-run room `run:<runId>` (the gateway re-emits each Redis message to that room). |
 
 ## Key conventions
 

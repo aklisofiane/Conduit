@@ -182,6 +182,17 @@ describe('Phase 5 — board loop (Worker ↔ Critic) over ticket-branch', () => 
       return rows.length >= expected ? rows : null;
     }, 30_000);
 
+  // The API freezes a human-readable slug into the schedule id, so the
+  // deterministic handle is `poll-<slug>-<id>`, not `poll-<id>`. Read the
+  // frozen slug back rather than recomputing it — the freeze captures the
+  // connection as it was at create time, before this test patches it in.
+  const slugScheduleId = async (workflowId: string): Promise<string> => {
+    const row = await harness.http.get<{ temporalSlug: string | null }>(
+      `/workflows/${workflowId}`,
+    );
+    return workflowScheduleId(workflowId, row.temporalSlug ?? undefined);
+  };
+
   beforeAll(async () => {
     github = await startMockGithubGraphql();
 
@@ -264,8 +275,8 @@ describe('Phase 5 — board loop (Worker ↔ Critic) over ticket-branch', () => 
       isActive: true,
     });
 
-    const workerSchedule = scheduleClient.getHandle(workflowScheduleId(worker.id));
-    const criticSchedule = scheduleClient.getHandle(workflowScheduleId(critic.id));
+    const workerSchedule = scheduleClient.getHandle(await slugScheduleId(worker.id));
+    const criticSchedule = scheduleClient.getHandle(await slugScheduleId(critic.id));
     await waitFor(() => workerSchedule.describe().then(() => true).catch(() => false), 15_000);
     await waitFor(() => criticSchedule.describe().then(() => true).catch(() => false), 15_000);
 

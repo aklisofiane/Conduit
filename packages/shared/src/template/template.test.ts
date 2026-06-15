@@ -281,6 +281,74 @@ describe('templateInputFileSchema + expandTemplate', () => {
       expandTemplate(PRESET_TEMPLATE, { agent: () => undefined, mcp: () => undefined }),
     ).toThrow(UnknownPresetError);
   });
+
+  it("expandTemplate preserves a preset-backed node's issueWriteback (pr-review shape)", () => {
+    // Mirror templates/pr-review.json: a preset node carrying a *partial*
+    // issueWriteback. Parse first (as the loader does) so the unspecified
+    // allowlists default to [], then expand. Rebuilding the AgentConfig from an
+    // explicit field list used to silently drop this field — regression guard.
+    const base = PRESET_TEMPLATE.workflows[0]!.definition.nodes[0]!;
+    const input = templateInputFileSchema.parse({
+      ...PRESET_TEMPLATE,
+      workflows: [
+        {
+          ...PRESET_TEMPLATE.workflows[0]!,
+          definition: {
+            ...PRESET_TEMPLATE.workflows[0]!.definition,
+            nodes: [{ ...base, issueWriteback: { allowedPrStates: ['draft', 'ready'] } }],
+          },
+        },
+      ],
+    });
+    const expanded = expandTemplate(input, resolveFromMap);
+    const node = expanded.workflows[0]!.definition.nodes[0]!;
+    expect(node.issueWriteback).toEqual({
+      allowedStatuses: [],
+      allowedLabels: [],
+      allowedPrStates: ['draft', 'ready'],
+    });
+    // Preset-derived fields still applied, template-only field stripped, and the
+    // result remains a valid runtime shape.
+    expect(node.instructions).toBe(RESEARCH_PRESET.instructions);
+    expect('presetId' in node).toBe(false);
+    expect(templateFileSchema.safeParse(expanded).success).toBe(true);
+  });
+
+  it("expandTemplate preserves an inline (preset-less) node's issueWriteback", () => {
+    const input = templateInputFileSchema.parse({
+      ...PRESET_TEMPLATE,
+      workflows: [
+        {
+          ...PRESET_TEMPLATE.workflows[0]!,
+          definition: {
+            ...PRESET_TEMPLATE.workflows[0]!.definition,
+            nodes: [
+              {
+                id: 'agent-a',
+                name: 'A',
+                provider: 'claude',
+                model: 'stub',
+                instructions: 'inline',
+                mcpServers: [],
+                skills: [],
+                webSearch: false,
+                issueWriteback: { allowedLabels: ['conduit-review'] },
+              },
+            ],
+          },
+        },
+      ],
+    });
+    const expanded = expandTemplate(input, resolveFromMap);
+    const node = expanded.workflows[0]!.definition.nodes[0]!;
+    expect(node.issueWriteback).toEqual({
+      allowedStatuses: [],
+      allowedLabels: ['conduit-review'],
+      allowedPrStates: [],
+    });
+    expect(node.instructions).toBe('inline');
+    expect(templateFileSchema.safeParse(expanded).success).toBe(true);
+  });
 });
 
 describe('mcp preset expansion', () => {
@@ -338,7 +406,50 @@ describe('mcp preset expansion', () => {
     expect(server.name).toBe(githubPreset.name);
     expect(server.transport).toEqual(githubPreset.transport);
     expect(server.connectionId).toBe('<github-repo>');
+    // Provenance survives expansion so instantiation can platform-swap.
+    expect(server.presetId).toBe('github');
     expect(templateFileSchema.safeParse(expanded).success).toBe(true);
+  });
+
+  it('expandTemplate drops presetId provenance when the template inlines a transport', () => {
+    const t = structuredClone(baseInput);
+    t.workflows[0]!.definition.mcpServers[0]!.transport = {
+      kind: 'stdio',
+      command: 'custom',
+      args: [],
+      env: {},
+    };
+    const expanded = expandTemplate(t, {
+      agent: () => RESEARCH_PRESET,
+      mcp: findMcpPreset,
+    });
+    expect(expanded.workflows[0]!.definition.mcpServers[0]!.presetId).toBeUndefined();
+  });
+
+  it('preset-backed mcp slots expect a repo-type scope; user transports stay any', () => {
+    const expanded = expandTemplate(baseInput, {
+      agent: () => RESEARCH_PRESET,
+      mcp: findMcpPreset,
+    });
+    const details = collectTemplatePlaceholderDetails(expanded);
+    const repoSlot = details.find((d) => d.alias === 'github-repo')!;
+    expect(repoSlot.expectedScopeKinds).toEqual(['repo']);
+
+    const userTransport = structuredClone(baseInput);
+    userTransport.workflows[0]!.definition.mcpServers[0]! = {
+      id: 'github-mcp',
+      name: 'Custom',
+      transport: { kind: 'stdio', command: 'custom', args: [], env: {} },
+      connectionId: '<custom-server>',
+    };
+    const expandedUser = expandTemplate(userTransport, {
+      agent: () => RESEARCH_PRESET,
+      mcp: findMcpPreset,
+    });
+    const userDetails = collectTemplatePlaceholderDetails(expandedUser);
+    expect(
+      userDetails.find((d) => d.alias === 'custom-server')!.expectedScopeKinds,
+    ).toEqual(['any']);
   });
 
   it('expandTemplate throws UnknownMcpPresetError when the mcp preset is missing', () => {

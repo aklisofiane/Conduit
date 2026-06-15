@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { prisma } from '../prisma';
+import { findOrphanedRunIds } from './orphans';
 
 /**
  * Docker is a hard requirement in phase 1 — the worker has no inproc
@@ -24,30 +24,18 @@ export async function dockerPreflight(): Promise<void> {
  * containers — Temporal restarts the activity from the top, so the old
  * container should never linger.
  *
- * Best-effort: a docker error or a missing run row never fails startup.
+ * Best-effort: a docker error or a missing run row never fails startup. A
+ * DB error skips the sweep entirely — it must not make live runs look
+ * missing and get their containers killed.
  */
 export async function sweepOrphans(): Promise<void> {
   const live = await listConduitContainers();
   if (live.length === 0) return;
 
-  const runIds = [...new Set(live.map((c) => c.runId))];
-  const rows = await prisma()
-    .workflowRun.findMany({
-      where: { id: { in: runIds } },
-      select: { id: true, status: true },
-    })
-    .catch(() => [] as Array<{ id: string; status: string }>);
-  const statusByRun = new Map(rows.map((r) => [r.id, r.status]));
+  const orphanedRunIds = await findOrphanedRunIds([...new Set(live.map((c) => c.runId))]);
+  if (orphanedRunIds === null) return; // DB unreachable — retry on the next boot
 
-  const orphans = live.filter((c) => {
-    const status = statusByRun.get(c.runId);
-    return (
-      status === 'COMPLETED' ||
-      status === 'FAILED' ||
-      status === 'CANCELLED' ||
-      status === undefined
-    );
-  });
+  const orphans = live.filter((c) => orphanedRunIds.has(c.runId));
   if (orphans.length === 0) return;
   await Promise.all(
     orphans.map((c) => runCommand('docker', ['kill', c.id]).catch(() => undefined)),

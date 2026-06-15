@@ -67,6 +67,7 @@ describe('formatUpstreamContextBlock', () => {
 describe('issueWritebackPrompt', () => {
   it('anchors to the triggering issue when issueNumber is set', () => {
     const out = issueWritebackPrompt({
+      platform: 'github',
       owner: 'acme',
       repo: 'web',
       issueNumber: '42',
@@ -79,10 +80,16 @@ describe('issueWritebackPrompt', () => {
     expect(out).toContain('"HumanReview"');
     expect(out).toContain('"bug"');
     expect(out).toContain("skip the update — don't pick a default");
+    // Writeback runs through the attached GitHub MCP server, never the
+    // unauthenticated gh CLI baked into the runner image.
+    expect(out).toContain('GitHub MCP tools');
+    expect(out).not.toContain('gh CLI');
+    expect(out).not.toContain('gh pr');
   });
 
   it('is repo-scoped when issueNumber is omitted (cron run)', () => {
     const out = issueWritebackPrompt({
+      platform: 'github',
       owner: 'acme',
       repo: 'web',
       allowedStatuses: ['AIDev', 'HumanReview'],
@@ -97,6 +104,7 @@ describe('issueWritebackPrompt', () => {
 
   it('omits the status constraint when no statuses are allowed', () => {
     const out = issueWritebackPrompt({
+      platform: 'github',
       owner: 'acme',
       repo: 'web',
       allowedStatuses: [],
@@ -104,5 +112,236 @@ describe('issueWritebackPrompt', () => {
     });
     expect(out).not.toContain('project Status');
     expect(out).toContain('"triage"');
+  });
+
+  it('instructs removal of the consumed (trigger) label and application of the next one', () => {
+    const out = issueWritebackPrompt({
+      platform: 'github',
+      owner: 'acme',
+      repo: 'web',
+      issueNumber: '42',
+      allowedStatuses: ['Review'],
+      allowedLabels: ['conduit-review'],
+      consumedLabels: ['conduit-dev'],
+    });
+    // Removes the gating label, applies the next.
+    expect(out).toContain('Remove the label that gated this run');
+    expect(out).toContain('"conduit-dev"');
+    expect(out).toContain('"conduit-review"');
+  });
+
+  it('has no removal directive when nothing was consumed (status-gated entry)', () => {
+    const out = issueWritebackPrompt({
+      platform: 'github',
+      owner: 'acme',
+      repo: 'web',
+      issueNumber: '7',
+      allowedStatuses: [],
+      allowedLabels: ['conduit-dev'],
+      consumedLabels: [],
+    });
+    expect(out).not.toContain('Remove the label that gated this run');
+    expect(out).toContain('"conduit-dev"');
+  });
+
+  it('can remove a consumed label even when nothing new is applied (terminal clear)', () => {
+    const out = issueWritebackPrompt({
+      platform: 'github',
+      owner: 'acme',
+      repo: 'web',
+      issueNumber: '9',
+      allowedStatuses: ['ReadyToMerge', 'In Progress'],
+      allowedLabels: [],
+      consumedLabels: ['conduit-review'],
+    });
+    expect(out).toContain('Remove the label that gated this run');
+    expect(out).toContain('"conduit-review"');
+    // The no-other-labels guard still fires off the removal directive alone,
+    // and phrases itself as remove-only (no phantom "apply" list).
+    expect(out).toContain('Leave every other label untouched');
+    expect(out).toContain("only remove what's listed above");
+    expect(out).not.toContain('only apply and remove');
+  });
+
+  it('switches to pull-request wording driven through the GitHub MCP when isPr', () => {
+    const out = issueWritebackPrompt({
+      platform: 'github',
+      owner: 'acme',
+      repo: 'web',
+      issueNumber: '7',
+      allowedStatuses: [],
+      allowedLabels: ['needs-changes'],
+      allowedPrStates: ['open', 'closed'],
+      isPr: true,
+    });
+    expect(out).toContain('update the GitHub pull request this run was triggered by');
+    expect(out).toContain('PR: acme/web#7');
+    // Drives writeback through the attached GitHub MCP server, not the
+    // unauthenticated gh CLI baked into the runner.
+    expect(out).toContain('GitHub MCP tools');
+    expect(out).not.toContain('gh pr');
+    expect(out).not.toContain('gh CLI');
+    // PR labels live on the shared issue number — the agent is pointed at the
+    // issue-label tools rather than a PR-only one.
+    expect(out).toContain('PR labels on the same number as issues');
+    // Open/closed directive is the repo-native state axis — no board needed.
+    expect(out).toContain("Set the pull request's open/closed state");
+    expect(out).toContain('"open"');
+    expect(out).toContain('"closed"');
+    // Labels still apply (GitHub treats PRs as issues for labels).
+    expect(out).toContain('"needs-changes"');
+    // Never the issue-shaped anchor.
+    expect(out).not.toContain('Issue: acme/web#7');
+  });
+
+  it('omits the PR-state directive on a non-PR run even if states are passed', () => {
+    const out = issueWritebackPrompt({
+      platform: 'github',
+      owner: 'acme',
+      repo: 'web',
+      issueNumber: '7',
+      allowedStatuses: [],
+      allowedLabels: ['bug'],
+      allowedPrStates: ['closed'],
+      isPr: false,
+    });
+    expect(out).toContain('Issue: acme/web#7');
+    expect(out).not.toContain('open/closed state');
+    expect(out).not.toContain('`gh pr');
+  });
+
+  it('skips the PR-state directive when no states are allowed (labels-only PR run)', () => {
+    const out = issueWritebackPrompt({
+      platform: 'github',
+      owner: 'acme',
+      repo: 'web',
+      issueNumber: '7',
+      allowedStatuses: [],
+      allowedLabels: ['needs-changes'],
+      allowedPrStates: [],
+      isPr: true,
+    });
+    // PR wording, but no state line because nothing was allowed.
+    expect(out).toContain('PR: acme/web#7');
+    expect(out).not.toContain('open/closed state');
+    expect(out).not.toContain('draft / ready-for-review state');
+    expect(out).toContain('"needs-changes"');
+  });
+
+  it('emits the draft/ready directive (and not open/closed) on a draft-only PR run', () => {
+    const out = issueWritebackPrompt({
+      platform: 'github',
+      owner: 'acme',
+      repo: 'web',
+      issueNumber: '7',
+      allowedStatuses: [],
+      allowedLabels: [],
+      allowedPrStates: ['draft', 'ready'],
+      isPr: true,
+    });
+    expect(out).toContain('PR: acme/web#7');
+    expect(out).toContain("Set the pull request's draft / ready-for-review state");
+    expect(out).toContain('"draft"');
+    // `'ready'` is expanded to the human phrase GitHub uses.
+    expect(out).toContain('"ready for review"');
+    // The draft/ready axis is not the open/closed axis — that line stays absent.
+    expect(out).not.toContain('open/closed state');
+  });
+
+  it('partitions open/closed and draft/ready into two separate directives', () => {
+    const out = issueWritebackPrompt({
+      platform: 'github',
+      owner: 'acme',
+      repo: 'web',
+      issueNumber: '7',
+      allowedStatuses: [],
+      allowedLabels: [],
+      allowedPrStates: ['closed', 'ready'],
+      isPr: true,
+    });
+    // Two distinct lines — the agent never sees one mutually-exclusive list.
+    expect(out).toContain("Set the pull request's open/closed state");
+    expect(out).toContain("Set the pull request's draft / ready-for-review state");
+    expect(out).toContain('"closed"');
+    expect(out).toContain('"ready for review"');
+    // The open/closed line only lists open/closed values; the draft/ready line
+    // only lists draft/ready values — neither leaks into the other.
+    expect(out).not.toMatch(/open\/closed state[^\n]*ready for review/);
+    expect(out).not.toMatch(/draft \/ ready-for-review state[^\n]*"closed"/);
+  });
+
+  it('drops the draft/ready directive on a non-PR run even if states are passed', () => {
+    const out = issueWritebackPrompt({
+      platform: 'github',
+      owner: 'acme',
+      repo: 'web',
+      issueNumber: '7',
+      allowedStatuses: [],
+      allowedLabels: ['bug'],
+      allowedPrStates: ['ready'],
+      isPr: false,
+    });
+    expect(out).toContain('Issue: acme/web#7');
+    expect(out).not.toContain('draft / ready-for-review state');
+  });
+});
+
+describe('issueWritebackPrompt — GitLab (labels-only)', () => {
+  it('addresses a GitLab issue and points at the attached MCP server, not a CLI', () => {
+    const out = issueWritebackPrompt({
+      platform: 'gitlab',
+      owner: 'acme',
+      repo: 'shop',
+      issueNumber: '42',
+      allowedStatuses: ['AIDev'], // inert for GitLab — no boards
+      allowedLabels: ['conduit-review'],
+      consumedLabels: ['conduit-dev'],
+    });
+    expect(out).toContain('update the GitLab issue this run was triggered by');
+    expect(out).toContain('Issue: acme/shop#42');
+    expect(out).toContain('GitLab (writeback)');
+    expect(out).toContain('MCP tools');
+    // Labels-only: the inert status is dropped and no CLI is referenced.
+    expect(out).not.toContain('project Status');
+    expect(out).not.toContain('"AIDev"');
+    expect(out).not.toContain('gh ');
+    expect(out).not.toContain('glab');
+    // Label handoff still works.
+    expect(out).toContain('"conduit-review"');
+    expect(out).toContain('Remove the label that gated this run');
+    expect(out).toContain('"conduit-dev"');
+  });
+
+  it('is repo-scoped for a GitLab run with no triggering issue', () => {
+    const out = issueWritebackPrompt({
+      platform: 'gitlab',
+      owner: 'acme',
+      repo: 'shop',
+      allowedStatuses: [],
+      allowedLabels: ['triage'],
+    });
+    expect(out).not.toContain('Issue: acme/shop#');
+    expect(out).toContain('every GitLab issue you created or updated in acme/shop');
+    expect(out).toContain('"triage"');
+  });
+
+  it('stays issue-shaped (no PR wording) for a GitLab MR-triggered run', () => {
+    // MR-state / MR-label writeback is out of scope: isPr must not flip GitLab
+    // to pull-request wording or the gh pr CLI.
+    const out = issueWritebackPrompt({
+      platform: 'gitlab',
+      owner: 'acme',
+      repo: 'shop',
+      allowedStatuses: [],
+      allowedLabels: ['needs-changes'],
+      allowedPrStates: ['closed', 'ready'],
+      isPr: true,
+    });
+    expect(out).not.toContain('pull request');
+    expect(out).not.toContain('PR: acme/shop#');
+    expect(out).not.toContain('open/closed state');
+    expect(out).not.toContain('draft / ready-for-review state');
+    expect(out).not.toContain('gh pr');
+    expect(out).toContain('"needs-changes"');
   });
 });

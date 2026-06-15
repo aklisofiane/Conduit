@@ -56,6 +56,18 @@ export function WorkflowRowItem({
     });
   };
 
+  const handleToggleActive = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (update.isPending) return;
+    update.mutate(
+      { isActive: !wf.isActive },
+      {
+        onError: (err) => alert(err instanceof Error ? err.message : String(err)),
+      },
+    );
+  };
+
   const handleDuplicate = () => {
     duplicate.mutate(wf.id, {
       onSuccess: (created) => navigate(`/workflows/${created.id}`),
@@ -117,13 +129,23 @@ export function WorkflowRowItem({
         )}
       </div>
       <div className="flex justify-end">
-        <span className={cn('pill', wf.isActive ? '' : 'opacity-40')}>
+        <button
+          type="button"
+          aria-label={wf.isActive ? 'Deactivate workflow' : 'Activate workflow'}
+          aria-pressed={wf.isActive}
+          onClick={handleToggleActive}
+          disabled={update.isPending}
+          className={cn(
+            'pill cursor-pointer transition-opacity hover:opacity-100 hover:ring-1 hover:ring-[var(--color-line)] disabled:cursor-default disabled:opacity-60',
+            wf.isActive ? '' : 'opacity-40',
+          )}
+        >
           <span
             className="dot"
             style={{ background: wf.isActive ? 'var(--color-success)' : 'var(--color-text-4)' }}
           />
           {wf.isActive ? 'on' : 'off'}
-        </span>
+        </button>
       </div>
       <div className="flex justify-end">
         {renaming ? null : (

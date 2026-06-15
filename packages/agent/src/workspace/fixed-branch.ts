@@ -1,7 +1,14 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { WorkspaceError } from '../errors/index';
-import { git, GitError } from './git';
+import { git } from './git';
+import {
+  addTrackingWorktree,
+  ensureBaseClone,
+  fetchWithAuth,
+  remoteBranchExists,
+  stripRemoteAuth,
+} from './git-helpers';
 import { withPathLock } from './lock';
 import { baseClonePath, nodeWorkspacePath } from './paths';
 import { dropConflictingWorktrees } from './worktree-cleanup';
@@ -50,31 +57,8 @@ export async function resolveFixedBranchWorkspace(
       );
     }
 
-    // `-B <branch> refs/remotes/origin/<branch>` resets the local branch to the
-    // just-fetched remote tip so the cron run works against the latest commits.
-    const startPoint = `refs/remotes/origin/${branch}`;
-    try {
-      await git(['worktree', 'add', '--force', '-B', branch, target, startPoint], { cwd: bare });
-    } catch (err) {
-      if (!(err instanceof GitError)) throw err;
-      // `-B` refuses to reset a branch still checked out in another worktree —
-      // typically a stale leftover from a crashed/retried run. Drop the
-      // conflicting worktree (by path or branch) and retry once.
-      try {
-        await dropConflictingWorktrees(bare, target, branch);
-        await git(['worktree', 'add', '--force', '-B', branch, target, startPoint], { cwd: bare });
-      } catch (recoveryErr) {
-        const recoveryStderr =
-          recoveryErr instanceof GitError ? recoveryErr.stderr.trim() : String(recoveryErr);
-        throw new WorkspaceError(
-          `git worktree add ${branch} into ${target} failed: ${err.stderr.trim()}; recovery: ${recoveryStderr}`,
-        );
-      }
-    }
-
-    await git(['remote', 'set-url', 'origin', connection.cloneUrl], { cwd: target }).catch(
-      () => undefined,
-    );
+    await addTrackingWorktree(bare, target, branch);
+    await stripRemoteAuth(target, connection.cloneUrl);
 
     const head = (await git(['rev-parse', 'HEAD'], { cwd: target })).trim();
     return {
@@ -85,52 +69,4 @@ export async function resolveFixedBranchWorkspace(
       remoteBranchExisted: true,
     };
   });
-}
-
-async function ensureBaseClone(bare: string, connection: ConnectionContext): Promise<void> {
-  const head = path.join(bare, 'HEAD');
-  try {
-    await fs.access(head);
-    return;
-  } catch {
-    // fall through to clone
-  }
-  await fs.mkdir(path.dirname(bare), { recursive: true });
-  const url = withTokenUrl(connection);
-  await git(['clone', '--bare', url, bare]);
-  await git(['remote', 'set-url', 'origin', connection.cloneUrl], { cwd: bare }).catch(
-    () => undefined,
-  );
-}
-
-async function fetchWithAuth(bare: string, connection: ConnectionContext): Promise<void> {
-  // Fetch into `refs/remotes/origin/*`, never `refs/heads/*` — the base clone
-  // is shared and hosts worktrees, and git refuses to update a ref that any
-  // worktree has checked out. See the longer note in `ticket-branch.ts`.
-  const remote = connection.token ? withTokenUrl(connection) : 'origin';
-  await git(['fetch', '--prune', remote, '+refs/heads/*:refs/remotes/origin/*'], { cwd: bare });
-}
-
-async function remoteBranchExists(bare: string, branchName: string): Promise<boolean> {
-  try {
-    const out = await git(['show-ref', '--verify', `refs/remotes/origin/${branchName}`], {
-      cwd: bare,
-    });
-    return out.trim().length > 0;
-  } catch (err) {
-    if (err instanceof GitError) return false;
-    throw err;
-  }
-}
-
-function withTokenUrl(connection: ConnectionContext): string {
-  if (!connection.token) return connection.cloneUrl;
-  try {
-    const u = new URL(connection.cloneUrl);
-    u.username = 'x-access-token';
-    u.password = connection.token;
-    return u.toString();
-  } catch {
-    return connection.cloneUrl;
-  }
 }

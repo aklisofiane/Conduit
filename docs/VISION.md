@@ -13,7 +13,7 @@ Think: *"n8n's canvas UX, but every node is a Claude/Codex session with a worksp
 - **Agents do the work.** Platform integrations (GitHub, Slack, etc.) are tools the agent calls — not separate node types. One powerful node type beats a library of thin wrappers.
 - **Cross-workflow context flows through the issue.** The Analyze workflow updates the issue description with its analysis; the Fix workflow reads it. No Conduit-level cross-workflow state needed.
 - **Completion = agent action.** The workflow's agent moves the issue to the next column, posts a comment, opens a PR — all via MCP tools. No special "on-complete" workflow config.
-- **`.conduit/` folder for inter-agent handoff.** Each agent writes a freeform markdown summary to `.conduit/<NodeName>.md` in the workspace. Downstream agents read it directly. No schemas, no JSON validation, no runtime injection — agents communicate through the workspace.
+- **`.conduit/` folder for inter-agent handoff.** Each agent writes a freeform markdown summary to `.conduit/<NodeName>.md` in the workspace. Downstream agents read it directly — and the runtime auto-injects a direct-upstream node's summary into its successor's prompt (`workflow/direct-upstream.ts`). No schemas, no JSON validation — agents communicate through the workspace, not through typed contracts.
 - **Canvas for orchestration.** The visual editor earns its keep for multi-agent pipelines: fan-out, parallel execution, workspace inheritance. Not for chaining API calls.
 - **Temporal for durability.** Long-running agent sessions need heartbeats, crash recovery, cancellation, and retries. Temporal provides all of this out of the box.
 
@@ -28,5 +28,6 @@ Think: *"n8n's canvas UX, but every node is a Claude/Codex session with a worksp
 
 - Custom agent provider SDK (Claude + Codex only for v1)
 - Visual debugging of tool calls mid-run beyond the live trace
-- Multi-tenant / org-level RBAC
 - GitLab / Jira board triggers (GitHub first; platform abstraction layer planned from the start)
+
+(Scope grew past the original v1 plan: a multi-tenant org model shipped — `orgId` on every business row, org membership, and flat v1-RBAC are live. See [design-docs/authentication.md](./design-docs/authentication.md).)

@@ -189,12 +189,7 @@ Credentials are injected as environment variables when spawning `stdio` servers,
 
 ### Workspace inheritance
 
-The key primitive for multi-agent pipelines. If *Triage* lands the ticket's worktree and classifies the issue, an edge `Triage → Fix` causes derivation to emit `{ kind: 'inherit', fromNode: 'Triage' }` for *Fix* — which then operates on the same worktree. The runtime:
-
-- For **sequential** inheritance: passes the worktree path directly.
-- For **parallel** inheritance (fan-out): each downstream node gets its **own worktree branched from the upstream's HEAD**, so parallel agents don't stomp on each other.
-
-**Merge-back after parallel execution**: after all parallel agents in a group complete, the runtime runs merge-back steps **sequentially** as separate activities — one agent at a time merges its worktree back to the target branch, resolving conflicts. Since `.conduit/` is gitignored, the runtime copies `.conduit/` files from each parallel worktree into the target workspace after merging code (simple file copy, no git involved).
+The key primitive for multi-agent pipelines. If *Triage* lands the ticket's worktree and classifies the issue, an edge `Triage → Fix` causes derivation to emit `{ kind: 'inherit', fromNode: 'Triage' }` for *Fix* — which then operates on the same worktree (sequential), or its own branch off the upstream's HEAD (parallel fan-out), with sibling worktrees squash-merged back one at a time afterward. Runtime details — sequential vs. parallel resolution, the deterministic sequential merge-back, and `.conduit/` copy — live in [agent-execution.md](./agent-execution.md#parallel-execution--merge-back). A merge that conflicts aborts the run (`MergeConflictError`); there is no automatic resolution in v1.
 
 Rule: `inherit` always points at the trigger-connected entry node or another `inherit` — there are no other arms in the schema. The derivation guarantees the upstream exists (it walks the edge graph) so this is structurally enforced, not separately validated.
 
@@ -205,9 +200,7 @@ One of two entry kinds. Two arms inside the resolver, dispatched by the trigger 
 - **Issue trigger** (`issues.opened` webhook, polling on board status): persists a branch `conduit/<ticket-id>-<slug>` across runs on the same ticket. The slug is derived from the issue title on first create and cached in the `TicketBranch` row, so iteration N+1 reads the same branch name. Each run adds a worktree from the current remote branch state, so iteration N+1 sees iteration N's commits.
 - **PR trigger** (`pull_request.opened` webhook or `pull_request.detected` from PR-scope polling): lands directly on `pr.headRef`. No row is created — the head ref is the canonical name. For Conduit-internal flows where a Worker pushed and opened a PR, this naturally lands the Reviewer on the same `conduit/<id>-<slug>` branch the Worker built; for external/human-opened PRs, on whatever branch the contributor opened from.
 
-The agent commits and pushes via normal git; runtime sets up the push auth in-env at activity start. See [branch-management.md](./branch-management.md) for ownership, lifecycle, and concurrency.
-
-Agents inheriting from a `ticket-branch` upstream — sequentially or via parallel fan-out — receive the same push env and credential helper; any agent in the chain can `git push`. Convention is that the agent responsible for the final commit also pushes, typically after reading upstream `.conduit/` summaries and handling ticket/comment updates. The runtime does not enforce which agent pushes — DAGs with multiple terminal agents work fine (fast-forward push is idempotent) — and the unpushed-commits check at run end surfaces the "nobody pushed" footgun. Save-time enforcement of a single designated pusher is deferred; see [PLANS.md](../PLANS.md).
+The agent commits and pushes via normal git; runtime sets up the push auth in-env at activity start, and the push env + credential helper flow through the inherit chain so any agent in the chain can `git push`. Ownership, the branch-naming spec, who-pushes convention, the "nobody pushed" footgun, and concurrency all live in [branch-management.md](./branch-management.md); runtime resolution details: see [agent-execution.md](./agent-execution.md#runagentnode-lifecycle).
 
 ### `fixed-branch` workspaces
 
@@ -301,7 +294,7 @@ type NodeOutput = {
 1. At most one trigger (`triggers.length > 1` is rejected; zero is a legal in-flight state during the swap-by-delete UX — the API gate `assertActivatable` prevents an empty-trigger workflow from activating).
 2. Trigger and agent names are unique within their combined namespace and are valid identifiers (`^[A-Za-z_][A-Za-z0-9_]*$`). A name collision between a trigger and an agent is rejected.
 3. Every `Edge.from` references a known trigger or agent; every `Edge.to` references an agent (triggers can't be edge destinations).
-4. No cycles within a single workflow graph. Cross-run cycles — via board transitions that re-trigger the same workflow — are the intended loop mechanism; see "Cross-run iteration" below.
+4. No cycles within a single workflow graph. Cross-run cycles — via board transitions that re-trigger the same workflow — are the intended loop mechanism; see [branch-management.md](./branch-management.md#core-principle-the-board-is-the-loop).
 5. Agents are *allowed* to be unreachable from any trigger — orphans don't fail save, they just don't execute (the runtime topo-sort drops them). This keeps edits incremental: dropping an agent on the canvas before wiring it doesn't immediately invalidate the workflow.
 6. Every trigger surfaces an issue or PR identifier — `type: 'webhook'` triggers whose `event` doesn't carry one (`push`, `release`, `workflow_run`, `board.column.changed`) are rejected. `type: 'issues'` and `type: 'pull_requests'` always pull issue identity from the GraphQL response and pass unconditionally.
 7. All triggers in a workflow share the same `connectionId` (and the same `boardConnectionId`, when present). v1 has a single trigger today; multi-trigger workflows must still target a single repo + at most one board connection.
@@ -313,8 +306,4 @@ type NodeOutput = {
 
 ## Cross-run iteration
 
-Iteration across runs is expressed by **board transitions, not cycles in the graph**. A Worker workflow fires on `status = Dev`, commits to the ticket branch, and moves the ticket to `AIReview`. A Critic workflow fires on `status = AIReview`, reviews the branch, and either approves or moves the ticket back to `Dev` — which re-triggers the Worker.
-
-The polling trigger's set-diff dedup (see [Dedup for polling](#dedup-for-polling) above) is what makes this natural: when a ticket re-enters a matching column it looks "new to the set" and triggers again. That existing behavior is the loop primitive; the persistent `conduit/<ticket>` branch is what makes the iteration stateful.
-
-Webhook triggers also re-enter — each column move fires its own event — but without polling's dedup layer they're more exposed to storm scenarios. Polling is the more robust mode for board-loop workflows in v1.
+Iteration across runs is expressed by **board transitions, not cycles in the graph** — the polling set-diff dedup ([Dedup for polling](#dedup-for-polling)) re-fires when a ticket re-enters a matching column, and the persistent `conduit/<ticket>` branch makes the iteration stateful. The full board-loop model is owned by [branch-management.md](./branch-management.md#core-principle-the-board-is-the-loop) and [VISION.md](../VISION.md#core-principles).

@@ -7,10 +7,12 @@ import {
 } from '@nestjs/common';
 import {
   connectionScopeSchema,
+  findMcpPresetByPlatform,
   isScheduledTrigger,
   platformForScopeKind,
   resolveTemplate,
   type ConnectionScopeKind,
+  type Platform,
   type TemplatePlaceholder,
   type TemplateSummary,
   type WorkflowDefinition,
@@ -19,6 +21,7 @@ import { PrismaService } from '../../common/prisma.service';
 import { assertDefinitionValid } from '../../common/assert-definition-valid';
 import { errMessage } from '../../common/err-message';
 import { TemporalService } from '../../temporal/temporal.service';
+import { resolveTemporalSlug } from '../../temporal/temporal-slug';
 import { AgentPresetsService } from '../agent-presets/agent-presets.service';
 import { loadTemplates, type LoadedTemplate } from './template-loader';
 import type { CreateFromTemplateDto, TemplateBinding } from './dto';
@@ -114,6 +117,35 @@ export class TemplatesService implements OnModuleInit {
             if (derived) trigger.platform = derived;
           }
         }
+        // Preset-backed MCP servers follow the bound connection's platform,
+        // same idea as the trigger.platform rewrite above: the template JSON
+        // ships a GitHub default, but a GitLab binding gets the GitLab preset.
+        for (const server of resolvedDefinition.mcpServers) {
+          if (!server.presetId || !server.connectionId) continue;
+          const conn = await tx.connection.findUnique({
+            where: { id: server.connectionId },
+            select: { scope: true },
+          });
+          if (!conn) continue;
+          const parsed = connectionScopeSchema.parse(conn.scope);
+          const source = platformForScopeKind(parsed.kind);
+          const platform = source
+            ? (source.toUpperCase() as Platform)
+            : undefined;
+          const preset = platform
+            ? findMcpPresetByPlatform(platform)
+            : undefined;
+          if (!preset) {
+            throw new BadRequestException(
+              `MCP server "${server.name}" is preset-backed, but the bound connection's scope kind "${parsed.kind}" has no matching MCP preset.`,
+            );
+          }
+          if (preset.id !== server.presetId) {
+            server.presetId = preset.id;
+            server.name = preset.name;
+            server.transport = structuredClone(preset.transport);
+          }
+        }
         assertDefinitionValid(resolvedDefinition);
 
         const finalWf = await tx.workflow.create({
@@ -135,10 +167,18 @@ export class TemplatesService implements OnModuleInit {
     // Schedules live outside the DB — upsert after commit so a Temporal hiccup
     // doesn't roll back the workflow rows.
     await Promise.allSettled(
-      created.map(async ({ id, definition, isActive }) => {
+      created.map(async ({ id, name, definition, isActive }) => {
         const trigger = definition.triggers[0];
         if (!isScheduledTrigger(trigger)) return;
         try {
+          // Freeze the slug for this freshly created workflow so its schedule
+          // (and the poll/cron runs it spawns) carry the human-readable prefix.
+          const slug = await resolveTemporalSlug(this.prisma, {
+            id,
+            name,
+            definition,
+            temporalSlug: null,
+          });
           if (trigger.type === 'cron') {
             await this.temporal.upsertWorkflowSchedule({
               kind: 'cron',
@@ -146,6 +186,7 @@ export class TemplatesService implements OnModuleInit {
               cron: trigger.cron,
               timezone: trigger.timezone,
               active: isActive,
+              slug,
             });
           } else {
             await this.temporal.upsertWorkflowSchedule({
@@ -153,6 +194,7 @@ export class TemplatesService implements OnModuleInit {
               workflowId: id,
               intervalSec: trigger.intervalSec,
               active: isActive,
+              slug,
             });
           }
         } catch (err) {

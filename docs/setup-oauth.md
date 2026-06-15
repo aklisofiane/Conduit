@@ -2,7 +2,7 @@
 
 How to register an OAuth app with a third-party provider and wire it into Conduit so the sign-in screen shows that provider's button. OAuth is **optional** — email/password works out of the box; this is the path that gives you a working GitHub credential (for repos and Projects v2) without pasting a Personal Access Token.
 
-Conduit currently supports GitHub. GitLab and others land in this same doc when implemented.
+This doc walks through GitHub end to end. GitLab OAuth is also wired (`socialProviders.gitlab.scope: ['api', 'read_user']` in `auth.config.ts`) — the GitLab button appears once `GITLAB_CLIENT_ID` / `GITLAB_CLIENT_SECRET` are set, following the same shape as the GitHub steps below; a dedicated GitLab walkthrough lands here later.
 
 For the architecture behind the sign-in flow and the OAuth → `Credential` mirror, see [design-docs/auth-integration.md](./design-docs/auth-integration.md) and [design-docs/connections.md](./design-docs/connections.md#oauth-derived-credentials).
 
@@ -48,7 +48,7 @@ The button now appears on the sign-in screen. The first time a user signs in via
 
 ### Scopes
 
-The provider is wired to request `repo`, `project`, `read:org` (`apps/api/src/auth/auth.config.ts:197`). These cover the surface Conduit's workflows need: code read+write, Projects v2 read+write (workflows update item status, not just read), org-scoped lookups. Existing OAuth users who sign in after a scope change see GitHub's consent screen again — that's expected.
+The provider is wired to request `repo`, `project`, `read:org` (the `socialProviders.github.scope` array in `apps/api/src/auth/auth.config.ts`). These cover the surface Conduit's workflows need: code read+write, Projects v2 read+write (workflows update item status, not just read), org-scoped lookups. Existing OAuth users who sign in after a scope change see GitHub's consent screen again — that's expected.
 
 You don't configure scopes on the OAuth App itself; GitHub records what the app *requested* on first consent. To force a re-consent prompt during development, revoke the app at https://github.com/settings/applications and sign in again.
 

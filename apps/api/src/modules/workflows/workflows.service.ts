@@ -16,6 +16,7 @@ import { PrismaService } from '../../common/prisma.service';
 import { assertDefinitionValid } from '../../common/assert-definition-valid';
 import { errMessage } from '../../common/err-message';
 import { DuplicateRunError, TemporalService } from '../../temporal/temporal.service';
+import { resolveTemporalSlug } from '../../temporal/temporal-slug';
 import { encrypt } from '../credentials/crypto';
 import type { CreateWorkflowDto, UpdateWorkflowDto } from './dto';
 import { defaultDefinition } from './defaults';
@@ -39,16 +40,20 @@ export class WorkflowsService implements OnModuleInit {
 
   private async reconcileWorkflowSchedules(): Promise<void> {
     const workflows = await this.prisma.workflow.findMany({
-      select: { id: true, definition: true, isActive: true },
+      select: {
+        id: true,
+        name: true,
+        definition: true,
+        isActive: true,
+        temporalSlug: true,
+      },
     });
     const scheduled = workflows.filter((wf) =>
       isScheduledTrigger(
         (wf.definition as Partial<WorkflowDefinition> | null)?.triggers?.[0],
       ),
     );
-    await Promise.allSettled(
-      scheduled.map((wf) => this.syncWorkflowSchedule(wf.id, wf.definition, wf.isActive)),
-    );
+    await Promise.allSettled(scheduled.map((wf) => this.syncWorkflowSchedule(wf)));
   }
 
   async list(orgId: string) {
@@ -89,7 +94,7 @@ export class WorkflowsService implements OnModuleInit {
         isActive: false,
       },
     });
-    await this.syncWorkflowSchedule(wf.id, wf.definition, wf.isActive);
+    await this.syncWorkflowSchedule(wf);
     return wf;
   }
 
@@ -128,7 +133,7 @@ export class WorkflowsService implements OnModuleInit {
     }
     const wf = await this.prisma.workflow.findUniqueOrThrow({ where: { id } });
     if (dto.isActive !== undefined || dto.definition !== undefined) {
-      await this.syncWorkflowSchedule(wf.id, wf.definition, wf.isActive);
+      await this.syncWorkflowSchedule(wf);
     }
     return wf;
   }
@@ -151,6 +156,13 @@ export class WorkflowsService implements OnModuleInit {
   }
 
   async delete(orgId: string, id: string) {
+    // Read the frozen slug before the row is gone so we can compute the
+    // slugged schedule id to remove. Null (never frozen) → undefined →
+    // `deleteWorkflowSchedule` targets the legacy slug-less schedule instead.
+    const existing = await this.prisma.workflow.findFirst({
+      where: { id, orgId },
+      select: { temporalSlug: true },
+    });
     const result = await this.prisma.workflow.deleteMany({
       where: { id, orgId },
     });
@@ -161,7 +173,7 @@ export class WorkflowsService implements OnModuleInit {
     // would fire against a missing workflow and self-recover at next reconcile.
     // Don't promote a Temporal error to a 500 after the DB delete succeeded.
     try {
-      await this.temporal.deleteWorkflowSchedule(id);
+      await this.temporal.deleteWorkflowSchedule(id, existing?.temporalSlug ?? undefined);
     } catch (err) {
       this.logger.warn(
         `Deleting schedule for workflow ${id} failed: ${errMessage(err)}`,
@@ -195,7 +207,7 @@ export class WorkflowsService implements OnModuleInit {
       },
     });
 
-    await this.syncWorkflowSchedule(created.id, created.definition, created.isActive);
+    await this.syncWorkflowSchedule(created);
     return created;
   }
 
@@ -241,36 +253,47 @@ export class WorkflowsService implements OnModuleInit {
    * Schedule failures are logged but never block the workflow write — an
    * inconsistent schedule will be re-reconciled on next save or boot.
    */
-  private async syncWorkflowSchedule(
-    workflowId: string,
-    definition: unknown,
-    isActive: boolean,
-  ): Promise<void> {
-    const trigger = (definition as Partial<WorkflowDefinition> | null)?.triggers?.[0];
+  private async syncWorkflowSchedule(wf: {
+    id: string;
+    name: string;
+    definition: unknown;
+    isActive: boolean;
+    temporalSlug: string | null;
+  }): Promise<void> {
+    const trigger = (wf.definition as Partial<WorkflowDefinition> | null)?.triggers?.[0];
     try {
       if (!isScheduledTrigger(trigger)) {
-        await this.temporal.deleteWorkflowSchedule(workflowId);
+        // Teardown: target whatever id the schedule was created under by
+        // reading the already-frozen slug. Never re-resolve here — that would
+        // freeze a fresh slug and delete the wrong (non-existent) id, leaking
+        // the real schedule.
+        await this.temporal.deleteWorkflowSchedule(wf.id, wf.temporalSlug ?? undefined);
         return;
       }
+      // Materialize: freeze the slug once (no-op read after the first call) so
+      // the schedule + the poll/cron runs it spawns all carry the prefix.
+      const slug = await resolveTemporalSlug(this.prisma, wf);
       if (trigger.type === 'cron') {
         await this.temporal.upsertWorkflowSchedule({
           kind: 'cron',
-          workflowId,
+          workflowId: wf.id,
           cron: trigger.cron,
           timezone: trigger.timezone,
-          active: isActive,
+          active: wf.isActive,
+          slug,
         });
       } else {
         await this.temporal.upsertWorkflowSchedule({
           kind: 'polling',
-          workflowId,
+          workflowId: wf.id,
           intervalSec: trigger.intervalSec,
-          active: isActive,
+          active: wf.isActive,
+          slug,
         });
       }
     } catch (err) {
       this.logger.warn(
-        `Sync schedule for workflow ${workflowId} failed: ${errMessage(err)}`,
+        `Sync schedule for workflow ${wf.id} failed: ${errMessage(err)}`,
       );
     }
   }
@@ -292,6 +315,9 @@ export class WorkflowsService implements OnModuleInit {
     const ticketLock = definition.success
       ? ticketLockFor(definition.data, workflowId, triggerEvent)
       : undefined;
+    // Freeze (or read) the slug so the agent-run id carries the same prefix
+    // as the workflow's schedule/poll/cron ids.
+    const slug = await resolveTemporalSlug(this.prisma, wf);
 
     const run = await this.prisma.workflowRun.create({
       data: {
@@ -304,7 +330,7 @@ export class WorkflowsService implements OnModuleInit {
     try {
       const { temporalWorkflowId, temporalRunId } = await this.temporal.startAgentWorkflow(
         { workflowId, runId: run.id, triggerEvent },
-        { ticketLock },
+        { ticketLock, slug },
       );
       return this.prisma.workflowRun.update({
         where: { id: run.id },

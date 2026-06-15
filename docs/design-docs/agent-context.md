@@ -43,18 +43,7 @@ Example user message the provider receives:
 
 ## `.conduit/` folder
 
-Each agent writes `.conduit/<NodeName>.md` in the workspace as a final step. Content is freeform markdown with light guidelines:
-
-- What the agent did
-- Issues encountered
-- Anything relevant for downstream agents
-
-The `.conduit/` folder is:
-- **Gitignored** — never committed. Ephemeral, internal-only.
-- **Deleted** at the end of the workflow run.
-- **Copied** by the runtime from parallel worktrees into the target workspace after merge-back (since it's not part of git).
-
-No schema, no validation. Agents write what they want; downstream agents read what they need.
+Each agent writes a freeform `.conduit/<NodeName>.md` summary that downstream agents read — gitignored, deleted at run end, copied between worktrees by the runtime, no schema. The folder contract is owned by [node-system.md](./node-system.md#conduit-folder--inter-agent-communication).
 
 ## Referencing upstream in instructions
 
@@ -81,8 +70,6 @@ Sequencing nodes carry an implicit contract: an upstream finishes, writes its su
 
 ## Why this approach
 
-- **No engine needed.** Files in a folder. Agents already have file tools.
-- **No schema burden.** Agents write freeform markdown. No JSON Schema to define, validate, or retry on mismatch.
-- **Natural for agents.** LLMs are good at reading and writing prose summaries. Better than forcing structured JSON.
-- **Workspace-native.** The workspace is always there. `.conduit/` is just another directory in it.
-- **Simple runtime.** No `context.upstream` field, no output parsing, no schema validation. The runtime copies `.conduit/` files between worktrees and injects the direct-upstream summaries into the user turn — both operate on the same plain markdown files; neither imposes a schema.
+- **No engine, no schema.** Files in a folder the agents' file tools already reach; freeform markdown, so nothing to define, validate, or retry on mismatch — and LLMs write prose summaries better than structured JSON anyway.
+- **Workspace-native.** The workspace is always there; `.conduit/` is just another directory in it.
+- **Simple runtime.** No `context.upstream` field, no output parsing. Copying `.conduit/` files between worktrees and injecting direct-upstream summaries into the user turn both operate on the same plain markdown files; neither imposes a schema.
