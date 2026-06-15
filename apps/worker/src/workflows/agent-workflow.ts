@@ -12,7 +12,14 @@ import { topoSortGroups } from './topo-sort';
 // On timeout/failure, fail the run rather than retry from scratch and waste tokens.
 const { runAgentNode } = proxyActivities<typeof activities>({
   startToCloseTimeout: '2 hours',
-  heartbeatTimeout: '60s',
+  // Temporal throttles heartbeat flushes to min(0.8 × heartbeatTimeout, 60s),
+  // so the 30s in-activity timer only buys margin if the flush window has slack.
+  // At 60s that effective margin is ~12s — thin enough that a burst of large
+  // event-payload parsing on the worker loop can miss the deadline and fail a
+  // live run. 120s lifts the throttle to its 60s cap (~60s of real margin); the
+  // only cost is noticing a truly dead worker ~60s later, which is free under
+  // maxAttempts: 1 (the 2h start-to-close still bounds a genuine hang).
+  heartbeatTimeout: '120s',
   retry: {
     maximumAttempts: 1,
   },

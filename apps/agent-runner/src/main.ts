@@ -3,6 +3,7 @@ import path from 'node:path';
 import { readConduitSummary, resolveProvider, git } from '@conduit/agent';
 import { runnerRequestSchema, type RunnerEvent } from '@conduit/shared/runner';
 import type { AgentEvent, AgentRequest } from '@conduit/shared';
+import { capAgentEvent } from './payload-cap';
 
 /**
  * Per-run agent execution sandbox. One process per agent node:
@@ -93,7 +94,7 @@ async function main(): Promise<void> {
 
 async function drive(events: AsyncIterable<AgentEvent>): Promise<void> {
   for await (const event of events) {
-    emit({ kind: 'agent', event });
+    emit({ kind: 'agent', event: capAgentEvent(event) });
   }
 }
 
