@@ -55,7 +55,7 @@ type BoardRef = Omit<GithubProjectsV2Scope, 'kind'>;
 
 **`type: 'webhook'`**: platform sends an event to `POST /api/hooks/:workflowId`. Conduit verifies the signature, normalizes the event, checks filters, and starts a run if matched. GitHub webhooks currently normalize four events: `issues.opened`, `pull_request.opened`, `issue_comment.created` (PR-scoped), and `board.column.changed` (from `projects_v2_item.edited` single-select field moves). The `board.column.changed` webhook carries only the Projects v2 item's `content_node_id` — no issue number — so it can't drive a workflow on its own; the `'issues'` variant with a board connection is the supported shape for board-driven flows. The webhook variant is preserved in the schema but **has no UI on-ramp today** — the `WebhooksController` is mounted and `matchesTrigger` honors the `event` name, but no picker creates a webhook trigger. Default-created workflows land on `type: 'issues'`.
 
-**`type: 'issues'`** and **`type: 'pull_requests'`**: a Temporal Schedule fires `pollWorkflow` every `intervalSec` seconds. The activity queries the platform API (GitHub GraphQL for v1), filters on the returned items, and starts a run for each new match. The board-vs-repo dispatch reads `boardConnectionId` presence — no separate `source` axis. See [agent-execution.md](./agent-execution.md#polling-pipeline) for the activity lifecycle.
+**`type: 'issues'`** and **`type: 'pull_requests'`**: a Temporal Schedule fires `pollWorkflow` every `intervalSec` seconds. The activity queries the platform API (GitHub GraphQL for v1) in two phases: a lightweight metadata fetch first (no issue/PR body), then a batched body hydration via `nodes(ids:)` only for items that survive dedup and `matchesTrigger()` filtering. This avoids transferring large bodies for already-seen or filtered-out items. The board-vs-repo dispatch reads `boardConnectionId` presence — no separate `source` axis. See [agent-execution.md](./agent-execution.md#polling-pipeline) for the activity lifecycle.
 
 `type` together with `boardConnectionId` presence picks *what* to watch and *where* to query:
 
@@ -80,7 +80,13 @@ type TriggerEvent = {
   event: string;                          // e.g. 'status.changed', 'issues.opened', 'cron.fired'
   payload: Record<string, unknown>;       // platform-specific fields, normalized by mapper
   repo?: { owner: string; name: string }; // present for repo-scoped events
-  issue?: { id: string; key: string; title: string; url: string }; // present for issue-scoped events — `key` is the user-visible identifier as a string
+  issue?: {
+    id: string;                           // platform opaque id (e.g. GitHub node_id)
+    key: string;                          // user-visible identifier as a string
+    title: string;
+    url: string;
+    body?: string;                        // issue/PR body at trigger-fire time; capped at 64 KB
+  };
   actor?: string;                         // who/what triggered the event
 };
 ```
@@ -88,6 +94,8 @@ type TriggerEvent = {
 Each platform has its own mapper that normalizes the raw event/API response into this shape. The Zod schema in `@conduit/shared` is the source of truth for `payload` shapes per platform. `mode: 'scheduled'` guarantees `issue` and `pr` are absent (cron-only).
 
 `issue.id` is the platform's opaque identifier (e.g., GitHub's `node_id`) — used for API calls. `issue.key` is the user-visible identifier as a string: `"42"` for GitHub, `"PROJ-123"` for Jira (matches Jira's native "issue key" term). Downstream code that needs a stable, human-readable ticket identifier (branch names, DB keys, Temporal workflow IDs) reads `issue.key`, never `issue.id`.
+
+`issue.body` carries the issue or PR body text at the time the trigger fired. Bodies exceeding 64 KB are truncated and suffixed with `\n\n[truncated]` so agents can detect the cap. The cap is enforced by `capTriggerBody` (`@conduit/shared/trigger`) and applied uniformly in both polling and webhook paths. Consumers should treat absence as "body unknown" — older triggers and platforms that haven't been wired yet won't carry it.
 
 **UI**: each trigger variant gets its own React Flow node type (`trigger-issues`, `trigger-pull-requests`, `trigger-cron`, `trigger-webhook` placeholder) and focused config panel. Trigger kind is chosen from the `NodePalette` at creation; swapping means delete-then-add. One trigger per workflow — palette cards disable when a trigger exists.
 

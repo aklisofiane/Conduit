@@ -1,4 +1,5 @@
 import type { TriggerEvent } from '../trigger/event';
+import { capTriggerBody } from '../trigger/event';
 
 /**
  * Normalize a GitHub webhook delivery into our cross-platform `TriggerEvent`.
@@ -16,10 +17,7 @@ import type { TriggerEvent } from '../trigger/event';
  * Other actions on those same event types (edited, closed, labeled…) are
  * intentionally dropped for now; wire them in when a workflow needs them.
  */
-export function normalizeGithubWebhook(
-  eventName: string,
-  payload: unknown,
-): TriggerEvent | null {
+export function normalizeGithubWebhook(eventName: string, payload: unknown): TriggerEvent | null {
   const p = payload as GithubWebhookPayload | null | undefined;
   if (!p || typeof p !== 'object') return null;
 
@@ -39,7 +37,7 @@ export function normalizeGithubWebhook(
         key: String(p.issue.number ?? ''),
         title: String(p.issue.title ?? ''),
         url: String(p.issue.html_url ?? ''),
-        ...(typeof p.issue.body === 'string' ? { body: p.issue.body } : {}),
+        ...(typeof p.issue.body === 'string' ? { body: capTriggerBody(p.issue.body) } : {}),
       },
       actor,
     };
@@ -57,7 +55,9 @@ export function normalizeGithubWebhook(
         key: String(p.pull_request.number ?? ''),
         title: String(p.pull_request.title ?? ''),
         url: String(p.pull_request.html_url ?? ''),
-        ...(typeof p.pull_request.body === 'string' ? { body: p.pull_request.body } : {}),
+        ...(typeof p.pull_request.body === 'string'
+          ? { body: capTriggerBody(p.pull_request.body) }
+          : {}),
       },
       pr: extractPr(p.pull_request),
       actor,
@@ -86,7 +86,7 @@ export function normalizeGithubWebhook(
         key: String(p.issue.number ?? ''),
         title: String(p.issue.title ?? ''),
         url: String(p.issue.html_url ?? ''),
-        ...(typeof p.issue.body === 'string' ? { body: p.issue.body } : {}),
+        ...(typeof p.issue.body === 'string' ? { body: capTriggerBody(p.issue.body) } : {}),
       },
       actor,
     };
@@ -171,9 +171,7 @@ interface GithubWebhookPayload {
   organization?: { login?: string };
 }
 
-function extractRepo(
-  r: GithubWebhookPayload['repository'],
-): TriggerEvent['repo'] {
+function extractRepo(r: GithubWebhookPayload['repository']): TriggerEvent['repo'] {
   if (!r?.owner?.login || !r.name) return undefined;
   return { owner: r.owner.login, name: r.name };
 }
@@ -183,9 +181,7 @@ function extractRepo(
  * surfaced when the head lives in a different repo (fork PR) — same-repo PRs
  * leave it undefined so consumers can treat presence as the fork signal.
  */
-function extractPr(
-  pr: NonNullable<GithubWebhookPayload['pull_request']>,
-): TriggerEvent['pr'] {
+function extractPr(pr: NonNullable<GithubWebhookPayload['pull_request']>): TriggerEvent['pr'] {
   const headRef = pr.head?.ref;
   const baseRef = pr.base?.ref;
   if (!headRef || !baseRef) return undefined;
