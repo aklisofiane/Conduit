@@ -25,7 +25,7 @@
             "id": "agent-planner",
             "name": "Planner",
             "presetId": "planner",
-            "instructionsAppend": "Convention for this workflow: Dev owns production code only, Tests owns test files only. (Docs and QA run after the parallel group and are not part of your dispatch.)",
+            "instructionsAppend": "Convention for this workflow: Dev owns production code only, Tests owns test files only. (Docs and QA run after the parallel group and are not part of your dispatch.) If this issue already has a linked draft pull/merge request carrying a \"changes requested\" review (a loop-back from Review), read that PR's latest review feedback first via the connected MCP server and scope Dev's and Tests' work to addressing it.",
             "mcpServers": [{ "serverId": "github-mcp" }],
             "skills": []          },
           {
@@ -52,9 +52,10 @@
             "id": "agent-qa",
             "name": "QA",
             "presetId": "qa",
+            "instructionsAppend": "On a loop-back from Review, reuse the existing draft pull/merge request for this branch/issue if one already exists — only open a new PR when none does. After opening or reusing the PR, apply the \"conduit-review\" label to it in prose via the connected MCP server (you just created or found it, so no lookup beyond the trigger is needed). The final writeback step applies \"conduit-review\" to the linked issue and removes the consumed \"conduit-dev\"; do not change the issue's status.",
             "mcpServers": [{ "serverId": "github-mcp" }],
             "skills": [],
-            "issueWriteback": { "allowedStatuses": ["Review"], "allowedLabels": ["conduit-review"] }
+            "issueWriteback": { "allowedLabels": ["conduit-review"] }
           }
         ],
         "edges": [

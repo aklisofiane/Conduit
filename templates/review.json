@@ -1,12 +1,12 @@
 {
   "id": "review",
   "name": "Review",
-  "description": "Reviews an implementation branch and publishes a verdict. Gated on the \"conduit-review\" label, which the Develop template's QA agent applies on handoff. On approval Publish removes conduit-review and applies \"conduit-merge\" to the pull/merge request, handing off to the Merge template's human ready-for-review gate. On changes requested it removes conduit-review and parks the issue for a human with the \"Review\" label and a human-facing status (the same human-facing signal Analyze uses — visible on both GitHub Projects and GitLab label boards) — a human re-applies conduit-dev to retry. Pairs with the Develop and Merge templates as a label-gated pipeline.",
+  "description": "Reviews the diff of a pull/merge request and routes it to one of three outcomes. Gated on the \"conduit-review\" label, which the Develop template's QA agent applies to the PR/MR (and the linked issue) on handoff. Code Reviewer evaluates the PR diff and writes a structured verdict; Publish submits that verdict as a self-contained summary review and routes: (1) all good → apply \"conduit-merge\" and mark the PR ready, handing off to the Merge template; (2) agent-fixable → set the PR back to draft and re-apply \"conduit-dev\" to the issue, looping back to Develop for an automatic fix; (3) needs human → set the PR to draft and park the issue with the human-facing \"Review\" status and label. Every outcome removes \"conduit-review\" from both the PR and the issue. After it has requested agent-fixes twice on the same reused PR, it forces the human-park instead of looping again. Pairs with the Develop and Merge templates as a label-gated pipeline.",
   "category": "review",
   "workflows": [
     {
       "name": "Review",
-      "description": "Polling on label=conduit-review. Code Reviewer evaluates the branch, Publish submits the review verdict and swaps labels: approve → conduit-merge on the PR; changes → remove conduit-review, apply the human-facing Review label and move status to a human column.",
+      "description": "Polling on label=conduit-review over pull/merge requests (draft PRs included — no pr_state filter). Code Reviewer reads the PR diff and writes a structured verdict to `.conduit/`; Publish submits it as a self-contained summary review and applies the three-outcome routing in prose (so GitHub and GitLab both work), with a loop guard that caps agent-fix retries at two before parking for a human.",
       "definition": {
         "triggers": [
           {
@@ -15,7 +15,7 @@
             "platform": "github",
             "connectionId": "<github-repo>",
             "boardConnectionId": "<github-board>",
-            "type": "issues",
+            "type": "pull_requests",
             "intervalSec": 60,
             "filters": [{ "field": "label", "value": "conduit-review" }]
           }
@@ -25,6 +25,7 @@
             "id": "agent-review",
             "name": "Review",
             "presetId": "code-reviewer",
+            "instructionsAppend": "You are reviewing a pull/merge request that carries the \"conduit-review\" label — evaluate the diff against the base branch (focus on what the PR changed, not the whole tree). Write your verdict to `.conduit/` organized by file, with confirmed strengths and specific, actionable feedback that a coding agent could act on WITHOUT seeing the diff — name the file, the symbol, what's wrong, and the fix (do not rely on line numbers or inline anchors). End the verdict with an explicit classification on its own line, exactly one of: APPROVE (no blocking issues), REQUEST_CHANGES_AGENT (blocking issues a coding agent can resolve from your written feedback alone), or REQUEST_CHANGES_HUMAN (issues needing human judgement — design/product calls, ambiguous requirements, risky tradeoffs). Do not interact with any external service — the downstream Publish agent submits the review and performs all labels and routing.",
             "mcpServers": [],
             "skills": []
           },
@@ -32,10 +33,14 @@
             "id": "agent-publish",
             "name": "Publish",
             "presetId": "publish",
-            "instructionsAppend": "Read the upstream Code Reviewer's verdict in `.conduit/`. Submit a review on the pull/merge request via the connected MCP server: approve, or request changes with inline comments, per the verdict. On approval, also apply \"conduit-merge\" to the pull/merge request (create it if absent) to hand off to the Merge workflow. On changes requested, do not apply conduit-merge; the issue parks for a human — the end-of-run step applies the human-facing \"Review\" label (visible on label-native boards like GitLab) and a human-facing status, and a human re-applies conduit-dev to retry.",
+            "instructionsAppend": "Read the Code Reviewer's verdict in `.conduit/`, including its final classification (APPROVE / REQUEST_CHANGES_AGENT / REQUEST_CHANGES_HUMAN). The trigger object is the pull/merge request; locate the linked issue from its body or metadata (e.g. a `Closes #N` / `Fixes #N` reference or a linked-issue relation). Every platform write happens here, via the connected MCP server.\n\nSubmit a single summary review on the PR/MR carrying the reviewer's per-file feedback: APPROVE → approve; either REQUEST_CHANGES classification → request changes. This review is the durable record the fix loop reads, so make the feedback self-contained (file, symbol, what's wrong, the fix) — do not depend on inline line anchors.\n\nLoop guard: before routing, count how many \"changes requested\" reviews already exist from this workflow on this PR/MR (QA reuses the same PR across loop-backs, so its review history is the counter). If there are already two, treat the verdict as REQUEST_CHANGES_HUMAN regardless of how the reviewer classified it — do not loop a third time.\n\nThen apply exactly one outcome, performing every label/state change in prose via the connected MCP server (so GitHub and GitLab both work — do not rely on automatic writeback, which is GitHub-only reinforcement):\n\nOutcome 1 — APPROVE: on the PR/MR apply the \"conduit-merge\" label, mark it ready for review, and remove \"conduit-review\". On the linked issue remove \"conduit-review\" and leave its status untouched. This hands off to the Merge workflow.\n\nOutcome 2 — REQUEST_CHANGES_AGENT and under the loop cap: on the PR/MR set it back to draft and remove \"conduit-review\". On the linked issue apply \"conduit-dev\" and remove \"conduit-review\". This loops back to the Develop workflow for an automatic fix.\n\nOutcome 3 — REQUEST_CHANGES_HUMAN, or the loop cap is hit: on the PR/MR set it back to draft and remove \"conduit-review\". On the linked issue set the human-facing \"Review\" status and apply the \"Review\" label, then remove \"conduit-review\" to park it for a human.\n\nAlways remove \"conduit-review\" from BOTH the PR/MR and the linked issue on every outcome — otherwise the board goes stale or the trigger re-fires.",
             "mcpServers": [{ "serverId": "github-mcp" }],
             "skills": [],
-            "issueWriteback": { "allowedStatuses": ["ReadyToMerge", "In Progress"], "allowedLabels": ["Review"] }
+            "issueWriteback": {
+              "allowedLabels": ["conduit-merge"],
+              "allowedPrStates": ["draft", "ready"],
+              "allowedStatuses": []
+            }
           }
         ],
         "edges": [

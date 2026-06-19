@@ -80,7 +80,7 @@ Templates reference presets via `presetId` instead of inlining literal prompts. 
 
 `TemplatesService.onModuleInit` runs expansion before caching the template. Templates that reference an unknown preset are logged and **skipped** — they don't appear in `GET /templates`. See [templates.md](./templates.md) for the full template lifecycle.
 
-`instructionsAppend` requires `presetId` (Zod `superRefine` rejects the combo with literal instructions). Workflow-specific guidance — e.g. review's ticket-status transitions, develop's Planner→fan-out handoff, pr-review's PR-branch checkout — lives in `instructionsAppend` so the base preset stays generic.
+`instructionsAppend` requires `presetId` (Zod `superRefine` rejects the combo with literal instructions). Workflow-specific guidance — e.g. review's three-outcome routing + loop guard on its Publish node, develop's Planner→fan-out handoff — lives in `instructionsAppend` so the base preset stays generic.
 
 ## Presets shipped with v1
 
@@ -89,7 +89,6 @@ Templates reference presets via `presetId` instead of inlining literal prompts. 
 | `research.md` | research | claude / claude-opus-4-6 | `analyze` (Research) |
 | `planner.md` | research | claude / claude-opus-4-6 | `develop` (Planner) |
 | `scope.md` | research | claude / claude-sonnet-4-6 | `nightly-review` (Scope) |
-| `pr-reviewer.md` | review | codex / gpt-5.5 | `pr-review` (Review) |
 | `plan-reviewer.md` | review | codex / gpt-5.5 | `analyze` (Review) |
 | `code-reviewer.md` | review | codex / gpt-5.5 | `review` (Review) |
 | `code-analyst.md` | review | codex / gpt-5.5 | `nightly-review` (Security, Quality, Refactor, Performance) |
@@ -101,11 +100,11 @@ Templates reference presets via `presetId` instead of inlining literal prompts. 
 | `issue-publisher.md` | publish | claude / claude-sonnet-4-6 | `nightly-review` (Publisher) |
 | `publish.md` | publish | claude / claude-sonnet-4-6 | `analyze` (Publish), `review` (Publish) |
 
-The three review presets are platform-agnostic — they describe what the agent reads, evaluates, and produces without referencing specific platforms. Platform-specific actions (review submission states, ticket column names, issue-body markers) live in template `instructionsAppend`. PR review submission (COMMENT vs APPROVE) is controlled at the template level: `pr-review` specifies COMMENT-only via `instructionsAppend`; `review`'s Publish agent submits APPROVE or REQUEST_CHANGES based on the upstream verdict.
+The review presets are platform-agnostic — they describe what the agent reads, evaluates, and produces without referencing specific platforms. Platform-specific actions (review submission states, ticket column names, issue-body markers) live in template `instructionsAppend`. In `review`, the `code-reviewer` agent classifies the diff (`APPROVE` / `REQUEST_CHANGES_AGENT` / `REQUEST_CHANGES_HUMAN`) into `.conduit/`, and the downstream `publish` agent submits APPROVE or REQUEST_CHANGES and performs the label/state routing — keeping every platform write in one node.
 
 Two prompt directives are load-bearing across the catalog and worth calling out:
 
-- **Pattern comparison.** When a request introduces a new instance of a kind that already exists in the repo (a new provider, a new node type, a new transport, …), the Research preset requires the agent to compare the proposal against each existing implementation along the same dimensions and quote the relevant files. The three review presets (`pr-reviewer`, `plan-reviewer`, `code-reviewer`) enforce this from the other side — if upstream skipped the comparison and an obvious one was available, raise it as a gap.
+- **Pattern comparison.** When a request introduces a new instance of a kind that already exists in the repo (a new provider, a new node type, a new transport, …), the Research preset requires the agent to compare the proposal against each existing implementation along the same dimensions and quote the relevant files. The review presets (`plan-reviewer`, `code-reviewer`) enforce this from the other side — if upstream skipped the comparison and an obvious one was available, raise it as a gap.
 - **Unverified-claim flagging.** Research and the review presets treat factual claims about external dependencies as unverified by default. Research lists them under "Unverified claims" rather than relaying as fact (using web search to verify when the agent has it enabled); the review presets treat unverified third-party claims as gaps unless they can be confirmed from the workspace.
 
 Both directives live in the preset prompt, not in node config, so workflow authors don't have to re-state them per agent. Tightening them was a response to repeated runs that accepted issue framings as fact and missed in-repo divergences even when the existing patterns sat in the same workspace.
