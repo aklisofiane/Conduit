@@ -185,7 +185,7 @@ export function issueWritebackPrompt(args: {
       : null;
   const labelLine =
     allowedLabels.length > 0
-      ? `- Apply whichever of these labels best fit (you may apply more than one, or none if none apply): ${allowedLabels.map((l) => `"${l}"`).join(', ')}.`
+      ? `- Apply exactly one of these labels — the single best fit: ${allowedLabels.map((l) => `"${l}"`).join(', ')}.`
       : null;
   const removeLabelLine =
     consumedLabels.length > 0

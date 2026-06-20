@@ -128,6 +128,9 @@ describe('issueWritebackPrompt', () => {
     expect(out).toContain('Remove the label that gated this run');
     expect(out).toContain('"conduit-dev"');
     expect(out).toContain('"conduit-review"');
+    // Hand-off: apply exactly one next-stage label, not "whichever fit / or none".
+    expect(out).toContain('Apply exactly one of these labels');
+    expect(out).not.toContain('or none if none apply');
   });
 
   it('has no removal directive when nothing was consumed (status-gated entry)', () => {
@@ -142,6 +145,8 @@ describe('issueWritebackPrompt', () => {
     });
     expect(out).not.toContain('Remove the label that gated this run');
     expect(out).toContain('"conduit-dev"');
+    // Always apply exactly one label.
+    expect(out).toContain('Apply exactly one of these labels');
   });
 
   it('can remove a consumed label even when nothing new is applied (terminal clear)', () => {
