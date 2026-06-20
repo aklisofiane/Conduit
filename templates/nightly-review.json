@@ -69,7 +69,7 @@
             "instructionsAppend": "The upstream reviewers for this pipeline are: Security, Quality, Refactor, Performance. Read `.conduit/Security.md`, `.conduit/Quality.md`, `.conduit/Refactor.md`, and `.conduit/Performance.md`.",
             "mcpServers": [{ "serverId": "github-mcp" }],
             "skills": [],
-            "issueWriteback": { "allowedStatuses": ["AIDev", "Review"], "allowedLabels": [] }
+            "issueWriteback": { "allowedStatuses": ["Review"], "allowedLabels": ["conduit-dev"] }
           }
         ],
         "edges": [

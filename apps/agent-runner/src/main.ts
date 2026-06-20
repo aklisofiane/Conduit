@@ -2,8 +2,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { readConduitSummary, resolveProvider, git } from '@conduit/agent';
 import { runnerRequestSchema, type RunnerEvent } from '@conduit/shared/runner';
-import type { AgentEvent, AgentRequest } from '@conduit/shared';
-import { capAgentEvent } from './payload-cap';
+import type { AgentRequest } from '@conduit/shared';
+import { runAgentTurns } from './turns';
 
 /**
  * Per-run agent execution sandbox. One process per agent node:
@@ -62,11 +62,7 @@ async function main(): Promise<void> {
     const agentRequest: AgentRequest = agent;
     const session = adapter.startSession(agentRequest, abort.signal);
     try {
-      await drive(session.run(prompts.main));
-      if (prompts.issueWriteback !== undefined) {
-        await drive(session.run(prompts.issueWriteback));
-      }
-      await drive(session.run(prompts.summary));
+      await runAgentTurns({ session, prompts, emit, abort });
     } finally {
       await session.dispose();
     }
@@ -90,12 +86,6 @@ async function main(): Promise<void> {
   // orchestrator otherwise misses the trailing exit event under load.
   await flushStdout();
   process.exit(exitCode);
-}
-
-async function drive(events: AsyncIterable<AgentEvent>): Promise<void> {
-  for await (const event of events) {
-    emit({ kind: 'agent', event: capAgentEvent(event) });
-  }
 }
 
 function emit(event: RunnerEvent): void {
