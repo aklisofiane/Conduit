@@ -159,6 +159,10 @@ export interface DiscoveredSkill {
   path: string;
   source: 'repo' | 'worker';
   provider: SkillProviderTag;
+  /** Display bucket — a plugin name, or the synthetic `Worker` / `Repo` groups. */
+  group: string;
+  /** Marketplace a plugin skill came from, when applicable. */
+  marketplace?: string;
 }
 
 export type { AgentEvent, DiscoveredTool, RunStatus, NodeType, ExecutionLogKind };

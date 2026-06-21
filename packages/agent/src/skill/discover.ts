@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import type { AgentProviderId, SkillProviderTag } from '@conduit/shared';
+import { discoverPluginSkillRoots } from './plugins';
 
 /**
  * A skill discovered on disk via its `SKILL.md` front-matter. Kept flat so
@@ -19,7 +20,18 @@ export interface DiscoveredSkill {
   source: 'repo' | 'worker';
   /** Which provider's directory convention picked this up. */
   provider: SkillProviderTag;
+  /**
+   * Display bucket the UI groups by — a plugin name (e.g. `vercel`), or the
+   * synthetic `Worker` / `Repo` groups for loose `.claude/skills` dirs.
+   */
+  group: string;
+  /** Marketplace a plugin skill came from (e.g. `claude-plugins-official`). */
+  marketplace?: string;
 }
+
+/** Synthetic group labels for skills that don't belong to a plugin. */
+const WORKER_GROUP = 'Worker';
+const REPO_GROUP = 'Repo';
 
 export interface DiscoverOptions {
   /** Extra repo paths to scan (e.g. the workspace of a currently-selected connection). */
@@ -40,22 +52,51 @@ const REPO_ROOTS = [
 export async function discoverSkills(opts: DiscoverOptions = {}): Promise<DiscoveredSkill[]> {
   const out: DiscoveredSkill[] = [];
   const seen = new Map<string, DiscoveredSkill>();
-  const roots: Array<{ base: string; source: 'repo' | 'worker'; provider: AgentProviderId }> = [];
+  const roots: Array<{
+    base: string;
+    source: 'repo' | 'worker';
+    provider: AgentProviderId;
+    group: string;
+    marketplace?: string;
+  }> = [];
 
   const home = os.homedir();
   for (const r of WORKER_ROOTS) {
-    roots.push({ base: path.join(home, r.dir), source: 'worker', provider: r.provider });
+    roots.push({
+      base: path.join(home, r.dir),
+      source: 'worker',
+      provider: r.provider,
+      group: WORKER_GROUP,
+    });
+  }
+
+  // Enabled Claude Code plugins each ship a `skills/` dir at the host level.
+  // They're Claude-convention and host-scoped, so they tag as worker/claude
+  // and dedup against `~/.claude/skills` by the shared `${source}:${id}` key.
+  for (const r of await discoverPluginSkillRoots(home)) {
+    roots.push({
+      base: r.base,
+      source: 'worker',
+      provider: 'claude',
+      group: r.plugin,
+      marketplace: r.marketplace,
+    });
   }
 
   const repos = [opts.cwd ?? process.cwd(), ...(opts.repoRoots ?? [])];
   for (const repo of repos) {
     for (const r of REPO_ROOTS) {
-      roots.push({ base: path.join(repo, r.dir), source: 'repo', provider: r.provider });
+      roots.push({
+        base: path.join(repo, r.dir),
+        source: 'repo',
+        provider: r.provider,
+        group: REPO_GROUP,
+      });
     }
   }
 
   for (const root of roots) {
-    const skills = await scanRoot(root.base, root.source, root.provider);
+    const skills = await scanRoot(root.base, root.source, root.provider, root.group, root.marketplace);
     for (const skill of skills) {
       const key = `${skill.source}:${skill.id}`;
       const existing = seen.get(key);
@@ -80,6 +121,8 @@ async function scanRoot(
   base: string,
   source: 'repo' | 'worker',
   provider: AgentProviderId,
+  group: string,
+  marketplace: string | undefined,
 ): Promise<DiscoveredSkill[]> {
   const entries = await fs.readdir(base, { withFileTypes: true }).catch(() => []);
   const dirs = entries.filter((e) => e.isDirectory());
@@ -96,6 +139,8 @@ async function scanRoot(
         path: dir,
         source,
         provider,
+        group,
+        marketplace,
       };
     }),
   );

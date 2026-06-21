@@ -17,6 +17,7 @@ import { providerStyle } from '../../styles/theme.js';
 import { Select, type SelectItem } from '../common/Select.js';
 import { X } from 'lucide-react';
 import { McpServerPicker } from './McpServerPicker.js';
+import { SkillPicker } from './SkillPicker.js';
 
 const CUSTOM_PRESET_ID = '__custom__';
 
@@ -65,7 +66,6 @@ export function AgentConfigPanel({
         p.provider === agent.provider,
     )?.id ?? '';
   const ps = providerStyle(agent.provider);
-  const selectedSkillIds = new Set(agent.skills.map((s) => s.skillId));
 
   const applyPreset = (presetId: string) => {
     if (!presetId || presetId === matchedPresetId) return;
@@ -216,45 +216,17 @@ export function AgentConfigPanel({
             />
           </Field>
 
-          <Field label="Skills" hint="from .claude/skills/">
+          <Field label="Skills" hint="from .claude/skills/ + plugins">
             {providerSkills.length === 0 ? (
               <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
-                No skills discovered. Add SKILL.md files under .claude/skills/ on the worker or in a connected repo.
+                No skills discovered. Add SKILL.md files under .claude/skills/ on the worker or in a connected repo, or install a Claude Code plugin.
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-1.5">
-                {providerSkills.map((skill) => {
-                  const selected = selectedSkillIds.has(skill.id);
-                  return (
-                    <button
-                      key={skill.id}
-                      onClick={() =>
-                        onChange({
-                          skills: selected
-                            ? agent.skills.filter((s) => s.skillId !== skill.id)
-                            : [...agent.skills, { skillId: skill.id, source: skill.source }],
-                        })
-                      }
-                      className={cn(
-                        'rounded-[var(--radius)] border p-2 text-left transition-colors',
-                        selected
-                          ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)]'
-                          : 'border-[var(--color-divider)] bg-[var(--color-bg)] hover:border-[var(--color-text-muted)]',
-                      )}
-                    >
-                      <div className="flex items-center gap-2 font-sans text-[12px] font-medium text-[var(--color-text)]">
-                        <span style={{ color: ps.mark }}>✶</span>
-                        {skill.name}
-                      </div>
-                      {skill.description && (
-                        <div className="mt-1 font-mono text-[10.5px] text-[var(--color-text-muted)]">
-                          {skill.description}
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
+              <SkillPicker
+                skills={providerSkills}
+                selected={agent.skills}
+                onChange={(skills) => onChange({ skills })}
+              />
             )}
           </Field>
         </div>
