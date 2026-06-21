@@ -253,6 +253,21 @@ function sanitizeEnvPart(value: string): string {
 }
 
 /**
+ * Codex's transport layer (tonic) logs `Reconnecting... N/M (reason)` while
+ * it recovers a dropped channel — e.g. `Reconnecting... 2/5 (timeout waiting
+ * for child process to exit)`. It surfaces these notices as `turn.failed` /
+ * `error` stream events but keeps retrying up to M attempts. Treating an
+ * intermediate attempt (N < M) as fatal throws away a turn codex would have
+ * recovered on its own. We skip the notice and let codex's retry loop run;
+ * a genuine terminal failure arrives as a non-reconnect message and still
+ * throws. The notice is already forwarded to the worker log via the runner's
+ * stderr tail, so it isn't lost.
+ */
+function isTransientReconnect(message: string): boolean {
+  return /Reconnecting\.\.\.\s*\d+\/\d+/.test(message);
+}
+
+/**
  * Translate one SDK `ThreadEvent` into zero or more `AgentEvent`s. Mutates
  * `seenText` / `openToolCalls` to compute incremental text deltas and
  * pair-up tool call/result events.
@@ -294,11 +309,13 @@ function translate(
     case 'turn.failed': {
       const message =
         typeof ev.error === 'object' && ev.error?.message ? ev.error.message : 'Codex turn failed';
+      if (isTransientReconnect(message)) return [];
       throw new Error(message);
     }
 
     case 'error': {
       const message = typeof ev.message === 'string' ? ev.message : 'Codex stream error';
+      if (isTransientReconnect(message)) return [];
       throw new Error(message);
     }
 
