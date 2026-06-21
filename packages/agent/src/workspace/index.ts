@@ -28,3 +28,9 @@ export { mergeBranchedWorktree, MergeConflictError } from './merge';
 export { deriveSlug, formatBranchName } from './slug';
 export { withPathLock } from './lock';
 export { installPushCredentials } from './push-auth';
+export {
+  touchWorktreeHeartbeat,
+  isWorktreeAlive,
+  WORKTREE_HEARTBEAT_INTERVAL_MS,
+  WORKTREE_STALE_MS,
+} from './worktree-heartbeat';

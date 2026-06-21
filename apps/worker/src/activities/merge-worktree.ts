@@ -1,4 +1,10 @@
-import { git, GitError, mergeBranchedWorktree, MergeConflictError } from '@conduit/agent';
+import {
+  git,
+  GitError,
+  mergeBranchedWorktree,
+  MergeConflictError,
+  touchWorktreeHeartbeat,
+} from '@conduit/agent';
 import { writeSystemLog } from '../runtime/log-writer';
 
 export interface MergeWorktreeInput {
@@ -28,6 +34,11 @@ export async function mergeWorktreeActivity(input: MergeWorktreeInput): Promise<
   const { runId, orgId, sourceWorkspacePath, targetWorkspacePath, sourceNodeName, targetNodeName } = input;
   const log = (body: string, level?: 'WARN' | 'ERROR') =>
     writeSystemLog(runId, orgId, targetNodeName, `merge ${sourceNodeName} → ${targetNodeName}: ${body}`, level);
+
+  // Keep the target worktree's liveness heartbeat fresh — merges run between
+  // node sessions, outside the run-agent-node heartbeater, and a concurrent
+  // same-branch resolve must not treat this gap as a dead owner.
+  await touchWorktreeHeartbeat(targetWorkspacePath);
 
   // Bail cleanly if source isn't a git tree (e.g. fresh tmpdir).
   try {

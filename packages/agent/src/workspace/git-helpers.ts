@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { WorkspaceError } from '../errors/index';
+import { BranchBusyError, WorkspaceError } from '../errors/index';
 import { git, GitError } from './git';
 import { dropConflictingWorktrees } from './worktree-cleanup';
 import type { ConnectionContext } from './types';
@@ -98,6 +98,9 @@ export async function addTrackingWorktree(
         cwd: bare,
       });
     } catch (recoveryErr) {
+      // A live owner holds the branch — propagate so the activity wait loop
+      // can retry; do not swallow it into a generic WorkspaceError.
+      if (recoveryErr instanceof BranchBusyError) throw recoveryErr;
       const recoveryStderr =
         recoveryErr instanceof GitError ? recoveryErr.stderr.trim() : String(recoveryErr);
       throw new WorkspaceError(
@@ -133,6 +136,9 @@ export async function createTrackingWorktree(
         cwd: bare,
       });
     } catch (recoveryErr) {
+      // A live owner holds the branch — propagate so the activity wait loop
+      // can retry; do not swallow it into a generic WorkspaceError.
+      if (recoveryErr instanceof BranchBusyError) throw recoveryErr;
       const recoveryStderr =
         recoveryErr instanceof GitError ? recoveryErr.stderr.trim() : String(recoveryErr);
       throw new WorkspaceError(

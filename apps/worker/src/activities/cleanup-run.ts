@@ -33,7 +33,20 @@ export async function cleanupRunActivity(input: {
   });
   const orgId = run?.orgId;
   if (orgId) {
-    await warnOnUnpushedTicketBranchCommits(runId, orgId);
+    // Best-effort: this pass spawns git inside per-node worktrees, any of
+    // which a concurrent run may have evicted. A failure here must never
+    // prevent the terminal-status write below, or the run hangs in RUNNING.
+    try {
+      await warnOnUnpushedTicketBranchCommits(runId, orgId);
+    } catch (err) {
+      await writeSystemLog(
+        runId,
+        orgId,
+        null,
+        `unpushed-commit check failed: ${err instanceof Error ? err.message : String(err)}`,
+        'WARN',
+      );
+    }
   }
 
   const manager = new WorkspaceManager();
@@ -116,6 +129,21 @@ async function countCommitsAhead(
     return Number.isFinite(n) ? n : null;
   } catch (err) {
     if (err instanceof GitError) return null;
+    // A vanished worktree (a concurrent run evicted it) makes git's spawn
+    // fail with ENOENT on the missing cwd — a plain Error, not a GitError.
+    // Treat it as "can't check" rather than letting it escape cleanup.
+    if (isMissingWorkspaceError(err)) return null;
     throw err;
   }
+}
+
+/** True for the `spawn git ENOENT` Node raises when a process's cwd no longer
+ *  exists — distinct from a non-zero git exit (which is a `GitError`). */
+function isMissingWorkspaceError(err: unknown): boolean {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    'code' in err &&
+    (err as { code?: string }).code === 'ENOENT'
+  );
 }

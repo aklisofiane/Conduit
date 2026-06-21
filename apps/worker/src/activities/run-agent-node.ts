@@ -15,6 +15,7 @@ import {
   resolveMcpServers,
   runDir,
   serializeAgentContext,
+  touchWorktreeHeartbeat,
 } from '@conduit/agent';
 import {
   type AgentConfig,
@@ -43,6 +44,7 @@ import { prisma } from '../runtime/prisma';
 import { loadProviderConfig } from '../runtime/provider-config';
 import { resolveRunnerSpawner } from '../runtime/runner';
 import { makeTicketBranchStore } from '../runtime/ticket-branch-store';
+import { abortableDelay, resolveWithGraceWindow } from './branch-busy-wait';
 import {
   agentReferencesWritebackMcp,
   buildSyntheticWritebackMcp,
@@ -135,19 +137,38 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
   try {
     const entryInputs = await resolveEntryWorkspaceInputs(node, triggers, triggerEvent);
 
-    const workspace = await workspaceManager.resolve({
-      runId,
-      nodeName: node.name,
-      spec: node.workspace,
-      orgId,
-      connection: entryInputs?.connection,
-      upstreamPath: upstreamWorkspacePath,
-      upstreamHead,
-      parallelBranch,
-      ticket: entryInputs?.ticket,
-      ticketBranchStore: entryInputs?.store,
-      pr: entryInputs?.pr,
-    });
+    // A concurrent run resolving the same ticket-branch may hold it live;
+    // resolution then fails fast with BranchBusyError. Wait out a bounded
+    // grace window here (the Temporal heartbeater hasn't started yet, so we
+    // emit heartbeats from the loop), failing the node only if the owner
+    // doesn't release within the deadline.
+    const workspace = await resolveWithGraceWindow(
+      () =>
+        workspaceManager.resolve({
+          runId,
+          nodeName: node.name,
+          spec: node.workspace,
+          orgId,
+          connection: entryInputs?.connection,
+          upstreamPath: upstreamWorkspacePath,
+          upstreamHead,
+          parallelBranch,
+          ticket: entryInputs?.ticket,
+          ticketBranchStore: entryInputs?.store,
+          pr: entryInputs?.pr,
+        }),
+      {
+        sleep: (ms) => abortableDelay(ms, ctx.cancellationSignal),
+        now: () => Date.now(),
+        heartbeat: (info) => ctx.heartbeat({ nodeName: node.name, ...info }),
+      },
+    );
+
+    // Claim the worktree for liveness: a fresh heartbeat tells a concurrent
+    // run resolving the same ticket-branch that this run is alive, so its
+    // eviction throws BranchBusyError instead of stealing our cwd. Refreshed
+    // by the heartbeater below for the duration of the agent session.
+    await touchWorktreeHeartbeat(workspace.path);
 
     if (workspace.ticketBranchId) {
       await entryInputs?.store?.markRunStart(workspace.ticketBranchId);
@@ -310,6 +331,10 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
     // doesn't trip Temporal's liveness check.
     const heartbeater = setInterval(() => {
       ctx.heartbeat({ nodeName: node.name, usage });
+      // Keep the worktree's liveness heartbeat fresh while the agent runs so
+      // a concurrent same-branch resolve sees us as alive. Fire-and-forget —
+      // touchWorktreeHeartbeat never throws.
+      void touchWorktreeHeartbeat(workspace.path);
     }, 30_000);
 
     const spawner = resolveRunnerSpawner();

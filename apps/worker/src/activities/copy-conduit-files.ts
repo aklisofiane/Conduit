@@ -1,4 +1,4 @@
-import { copyConduitSummaries } from '@conduit/agent';
+import { copyConduitSummaries, touchWorktreeHeartbeat } from '@conduit/agent';
 import { writeSystemLog } from '../runtime/log-writer';
 
 export interface CopyConduitFilesInput {
@@ -26,6 +26,10 @@ export interface CopyConduitFilesInput {
 export async function copyConduitFilesActivity(input: CopyConduitFilesInput): Promise<void> {
   const { runId, orgId, sources, targetWorkspacePath, targetNodeName } = input;
   if (sources.length === 0) return;
+  // Refresh the target worktree's liveness heartbeat — this runs in the
+  // inter-node gap after a merge, covering it against a concurrent
+  // same-branch resolve that would otherwise see a stale owner.
+  await touchWorktreeHeartbeat(targetWorkspacePath);
   const copied = await copyConduitSummaries(sources, targetWorkspacePath);
   await writeSystemLog(
     runId,
