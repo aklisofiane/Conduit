@@ -624,4 +624,34 @@ describe('CodexProvider', () => {
       output: 'kimi agent sdk npm',
     });
   });
+
+  it('forwards modelReasoningEffort to startThread when set, omits it when unset', async () => {
+    const drive = async (effort?: string): Promise<Record<string, unknown> | undefined> => {
+      let threadOptions: Record<string, unknown> | undefined;
+      installStub({
+        scriptedEvents: [{ type: 'turn.completed', usage: { input_tokens: 1, output_tokens: 1 } }],
+        onStartThread: (options) => {
+          threadOptions = options;
+        },
+      });
+      const session = new CodexProvider().startSession(
+        {
+          model: 'gpt-5-codex',
+          systemPrompt: '',
+          mcpServers: [],
+          workspacePath: '/tmp',
+          webSearch: false,
+          effort,
+          constraints: {},
+        } as never,
+        new AbortController().signal,
+      );
+      for await (const _ of session.run('')) void _;
+      return threadOptions;
+    };
+
+    expect((await drive('minimal'))?.modelReasoningEffort).toBe('minimal');
+    const unset = await drive(undefined);
+    expect(unset && 'modelReasoningEffort' in unset).toBe(false);
+  });
 });

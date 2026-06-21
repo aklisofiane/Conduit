@@ -261,6 +261,7 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
       // pushing from the agent requires that path to be writable too.
       additionalDirectories: [runDir(runId), baseClonesRoot()],
       webSearch: node.webSearch,
+      effort: node.effort,
       constraints: node.constraints ?? {},
     };
 

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { resolvedMcpServerSchema } from '../mcp/index';
-import { agentConstraintsSchema } from '../agent/index';
+import { agentConstraintsSchema, effortLevelSchema } from '../agent/index';
 
 /**
  * Provider-facing session setup. Populated by `runAgentNode` after workspace
@@ -27,6 +27,12 @@ export const agentRequestSchema = z.object({
    * `webSearchEnabled` on `ThreadOptions`. Stub ignores it.
    */
   webSearch: z.boolean().default(false),
+  /**
+   * Reasoning effort. Claude wires this to the SDK's `effort` option; Codex
+   * to `modelReasoningEffort` on `ThreadOptions`. Omitted → SDK default; Stub
+   * ignores it.
+   */
+  effort: effortLevelSchema.optional(),
   constraints: agentConstraintsSchema,
 });
 export type AgentRequest = z.infer<typeof agentRequestSchema>;

@@ -1,7 +1,9 @@
 import {
+  PROVIDER_EFFORT_LEVELS,
   PROVIDER_MODELS,
   type AgentConfig,
   type AgentIssueWriteback,
+  type EffortLevel,
   type TriggerConfig,
 } from '@conduit/shared';
 import {
@@ -20,6 +22,8 @@ import { McpServerPicker } from './McpServerPicker.js';
 import { SkillPicker } from './SkillPicker.js';
 
 const CUSTOM_PRESET_ID = '__custom__';
+/** Sentinel for "no explicit effort" — the Select can't carry `undefined`. */
+const EFFORT_DEFAULT = '__default__';
 
 interface AgentConfigPanelProps {
   agent: AgentConfig;
@@ -157,7 +161,13 @@ export function AgentConfigPanel({
                   const provider = v as AgentConfig['provider'];
                   const models = PROVIDER_MODELS[provider];
                   const model = models.includes(agent.model) ? agent.model : models[0];
-                  onChange({ provider, model });
+                  // Clamp effort the same way as model — drop it if the new
+                  // provider doesn't accept the current level.
+                  const effort =
+                    agent.effort && PROVIDER_EFFORT_LEVELS[provider].includes(agent.effort)
+                      ? agent.effort
+                      : undefined;
+                  onChange({ provider, model, effort });
                 }}
                 options={[
                   { value: 'claude', label: 'Claude' },
@@ -174,6 +184,23 @@ export function AgentConfigPanel({
                 }))}
               />
             </div>
+          </Field>
+
+          <Field label="Reasoning effort" hint="omit to use the model default">
+            <Select
+              ariaLabel="Reasoning effort"
+              value={agent.effort ?? EFFORT_DEFAULT}
+              onValueChange={(v) =>
+                onChange({ effort: v === EFFORT_DEFAULT ? undefined : (v as EffortLevel) })
+              }
+              options={[
+                { value: EFFORT_DEFAULT, label: 'Default' },
+                ...PROVIDER_EFFORT_LEVELS[agent.provider].map((e) => ({
+                  value: e,
+                  label: e,
+                })),
+              ]}
+            />
           </Field>
 
           <Field label="Instructions" hint="system prompt">

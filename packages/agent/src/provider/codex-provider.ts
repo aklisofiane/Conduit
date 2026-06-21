@@ -70,6 +70,8 @@ export class CodexProvider implements AgentProvider {
       });
       thread = codex.startThread({
         model: req.model,
+        // Omit when unset so the Codex CLI applies its configured default.
+        ...(req.effort ? { modelReasoningEffort: req.effort } : {}),
         workingDirectory: req.workspacePath,
         // The runner container is the sandbox: non-root UID, only the run
         // dir + bare clone bind-mounted, default bridge networking. Codex's

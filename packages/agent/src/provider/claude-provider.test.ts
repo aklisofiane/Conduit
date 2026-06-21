@@ -9,6 +9,7 @@ interface CapturedOptions {
   canUseTool: SdkCanUseTool;
   mcpServers: Record<string, unknown>;
   disallowedTools?: string[];
+  effort?: string;
 }
 
 function installStub(events: unknown[] = [{ type: 'result' }]): {
@@ -135,6 +136,43 @@ describe('ClaudeProvider', () => {
     for await (const _ of session.run('hi')) void _;
 
     expect(captured.capturedOptions?.disallowedTools).toBeUndefined();
+  });
+
+  it('forwards effort to query() when set', async () => {
+    const captured = installStub();
+    const session = new ClaudeProvider().startSession(
+      {
+        model: 'claude-sonnet-4-6',
+        systemPrompt: 'sys',
+        mcpServers: [],
+        workspacePath: '/tmp/x',
+        webSearch: false,
+        effort: 'xhigh',
+        constraints: {},
+      },
+      new AbortController().signal,
+    );
+    for await (const _ of session.run('hi')) void _;
+
+    expect(captured.capturedOptions?.effort).toBe('xhigh');
+  });
+
+  it('omits effort from query() when unset so the SDK default applies', async () => {
+    const captured = installStub();
+    const session = new ClaudeProvider().startSession(
+      {
+        model: 'claude-sonnet-4-6',
+        systemPrompt: 'sys',
+        mcpServers: [],
+        workspacePath: '/tmp/x',
+        webSearch: false,
+        constraints: {},
+      },
+      new AbortController().signal,
+    );
+    for await (const _ of session.run('hi')) void _;
+
+    expect(captured.capturedOptions && 'effort' in captured.capturedOptions).toBe(false);
   });
 
   it('throws when the Claude SDK returns an error result', async () => {

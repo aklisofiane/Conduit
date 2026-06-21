@@ -4,6 +4,7 @@ import { skillRefSchema } from '../skill/index';
 import { workspaceSpecSchema } from '../workspace/index';
 import { nodeNameSchema } from './node-name';
 import { agentProviderIdSchema } from './provider';
+import { effortLevelSchema } from './effort';
 import { agentConstraintsSchema } from './constraints';
 import { agentIssueWritebackSchema } from './issue-writeback';
 
@@ -20,6 +21,12 @@ export const agentConfigSchema = z.object({
   name: nodeNameSchema,
   provider: agentProviderIdSchema,
   model: z.string().min(1),
+  /**
+   * Reasoning effort forwarded to the provider SDK. Omitted → SDK default.
+   * Validated against the provider's level set at the UI layer (the dropdown
+   * filters by `PROVIDER_EFFORT_LEVELS` and clamps on provider switch).
+   */
+  effort: effortLevelSchema.optional(),
   instructions: z.string(),
   mcpServers: z.array(mcpServerRefSchema).default([]),
   skills: z.array(skillRefSchema).default([]),

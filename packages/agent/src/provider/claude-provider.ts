@@ -61,6 +61,9 @@ export class ClaudeProvider implements AgentProvider {
         prompt: input,
         options: {
           model: req.model,
+          // Omit entirely when unset so the SDK applies its own default
+          // (`high`) and silently downgrades on models without effort support.
+          ...(req.effort ? { effort: req.effort } : {}),
           systemPrompt: { type: 'preset', preset: 'claude_code', append: req.systemPrompt },
           cwd: req.workspacePath,
           additionalDirectories: req.additionalDirectories,
