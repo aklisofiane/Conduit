@@ -75,12 +75,12 @@
         ],
         "ui": {
           "nodePositions": {
-            "DevelopTrigger": { "x": 60, "y": 60 },
-            "Planner": { "x": 240, "y": 60 },
-            "Dev": { "x": 140, "y": 240 },
-            "Tests": { "x": 340, "y": 240 },
-            "Docs": { "x": 240, "y": 420 },
-            "QA": { "x": 240, "y": 600 }
+            "DevelopTrigger": { "x": 60, "y": 240 },
+            "Planner": { "x": 300, "y": 240 },
+            "Dev": { "x": 540, "y": 120 },
+            "Tests": { "x": 540, "y": 360 },
+            "Docs": { "x": 780, "y": 240 },
+            "QA": { "x": 1020, "y": 240 }
           },
           "viewport": { "x": 0, "y": 0, "zoom": 1 }
         }
