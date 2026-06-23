@@ -175,7 +175,21 @@ export async function pollBoardActivity(input: PollWorkflowInput): Promise<PollC
   if (platform === 'github' && eventsToStart.length > 0) {
     const idsToHydrate = eventsToStart.map((e) => e.issue?.id).filter((id): id is string => !!id);
     if (idsToHydrate.length > 0) {
-      const bodies = await hydrateGithubItemBodies(idsToHydrate, token);
+      // Body hydration is best-effort enrichment, not a prerequisite for
+      // starting a workflow. A transient GitHub error (rate limit, network
+      // hiccup) must not abort the whole poll cycle — a workflow started
+      // without a body is degraded but functional, whereas a cycle that
+      // starts nothing is a complete miss. Swallow and proceed; whatever the
+      // map returns (full, partial, or empty) is applied where present.
+      let bodies = new Map<string, string>();
+      try {
+        bodies = await hydrateGithubItemBodies(idsToHydrate, token);
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        console.warn(
+          `pollBoardActivity[${workflowId}]: body hydration failed, starting workflows without bodies: ${errMsg}`,
+        );
+      }
       for (const event of eventsToStart) {
         if (event.issue?.id) {
           const body = bodies.get(event.issue.id);
