@@ -242,6 +242,12 @@ describe('normalizeGithubWebhook', () => {
     expect(evt?.issue?.body).toBeDefined();
     expect(evt?.issue?.body).toMatch(/\n\n\[truncated\]$/);
     expect(evt?.issue?.body?.length).toBe(64 * 1024 + '\n\n[truncated]'.length);
+
+    // The raw payload must not silently reintroduce the uncapped body — it
+    // flows into WorkflowRun.trigger and the Temporal workflow input.
+    const rawIssue = (evt?.payload as { issue?: { body?: string } }).issue;
+    expect(rawIssue?.body).toMatch(/\n\n\[truncated\]$/);
+    expect(rawIssue?.body?.length).toBe(64 * 1024 + '\n\n[truncated]'.length);
   });
 
   it('truncates oversized PR body on pull_request.opened', () => {
@@ -271,6 +277,59 @@ describe('normalizeGithubWebhook', () => {
     expect(evt?.issue?.body).toBeDefined();
     expect(evt?.issue?.body).toMatch(/\n\n\[truncated\]$/);
     expect(evt?.issue?.body?.length).toBe(64 * 1024 + '\n\n[truncated]'.length);
+
+    const rawPr = (evt?.payload as { pull_request?: { body?: string } }).pull_request;
+    expect(rawPr?.body).toMatch(/\n\n\[truncated\]$/);
+    expect(rawPr?.body?.length).toBe(64 * 1024 + '\n\n[truncated]'.length);
+  });
+
+  it('truncates oversized issue and comment bodies in the raw payload on PR issue_comment.created', () => {
+    const longIssueBody = 'i'.repeat(64 * 1024 + 500);
+    const longCommentBody = 'c'.repeat(64 * 1024 + 500);
+    const evt = normalizeGithubWebhook('issue_comment', {
+      action: 'created',
+      repository: BASE_REPO,
+      sender: { login: 'carol' },
+      issue: {
+        number: 7,
+        node_id: 'PR_kgDO',
+        title: 'Wire up checkout retry',
+        html_url: 'https://github.com/acme/shop/issues/7',
+        body: longIssueBody,
+        pull_request: { url: 'https://api.github.com/...' },
+      },
+      comment: { body: longCommentBody },
+    });
+
+    expect(evt?.event).toBe('issue_comment.created');
+    expect(evt?.issue?.body).toMatch(/\n\n\[truncated\]$/);
+
+    const raw = evt?.payload as {
+      issue?: { body?: string };
+      comment?: { body?: string };
+    };
+    expect(raw.issue?.body).toMatch(/\n\n\[truncated\]$/);
+    expect(raw.issue?.body?.length).toBe(64 * 1024 + '\n\n[truncated]'.length);
+    expect(raw.comment?.body).toMatch(/\n\n\[truncated\]$/);
+    expect(raw.comment?.body?.length).toBe(64 * 1024 + '\n\n[truncated]'.length);
+  });
+
+  it('does not mutate the input payload when capping bodies', () => {
+    const longBody = 'z'.repeat(64 * 1024 + 500);
+    const input = {
+      action: 'opened',
+      repository: BASE_REPO,
+      issue: {
+        node_id: 'I_kgMUT',
+        number: 55,
+        title: 'Mutation check',
+        html_url: 'https://github.com/acme/shop/issues/55',
+        body: longBody,
+      },
+    };
+    normalizeGithubWebhook('issues', input);
+    // The original object the caller passed in must be left untouched.
+    expect(input.issue.body).toBe(longBody);
   });
 
   it('passes through normal-sized body unchanged on issues.opened', () => {

@@ -30,7 +30,7 @@ export function normalizeGithubWebhook(eventName: string, payload: unknown): Tri
       source: 'github',
       mode: 'webhook',
       event: 'issues.opened',
-      payload: p as Record<string, unknown>,
+      payload: capPayloadBodies(p),
       repo,
       issue: {
         id: String(p.issue.node_id ?? p.issue.id ?? ''),
@@ -48,7 +48,7 @@ export function normalizeGithubWebhook(eventName: string, payload: unknown): Tri
       source: 'github',
       mode: 'webhook',
       event: 'pull_request.opened',
-      payload: p as Record<string, unknown>,
+      payload: capPayloadBodies(p),
       repo,
       issue: {
         id: String(p.pull_request.node_id ?? p.pull_request.id ?? ''),
@@ -79,7 +79,7 @@ export function normalizeGithubWebhook(eventName: string, payload: unknown): Tri
       source: 'github',
       mode: 'webhook',
       event: 'issue_comment.created',
-      payload: p as Record<string, unknown>,
+      payload: capPayloadBodies(p),
       repo,
       issue: {
         id: String(p.issue.node_id ?? p.issue.id ?? ''),
@@ -152,6 +152,9 @@ interface GithubWebhookPayload {
       } | null;
     };
   };
+  comment?: {
+    body?: string;
+  };
   changes?: {
     field_value?: {
       field_name?: string;
@@ -169,6 +172,30 @@ interface GithubWebhookPayload {
     project_node_id?: string;
   };
   organization?: { login?: string };
+}
+
+/**
+ * The normalized `issue.body` is capped via `capTriggerBody`, but the raw
+ * payload is stored verbatim on `TriggerEvent.payload` — which flows into the
+ * `WorkflowRun.trigger` DB column and the Temporal workflow input. Cap the
+ * user-controlled `body` fields inside the stored payload too, so the raw
+ * clone can't silently reintroduce uncapped content past the ingest boundary.
+ *
+ * Returns a shallow clone with only the body-bearing sub-objects replaced;
+ * the `labels`/`status`/`changes` fields that trigger filters read stay intact.
+ */
+function capPayloadBodies(p: GithubWebhookPayload): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...(p as Record<string, unknown>) };
+  if (p.issue && typeof p.issue.body === 'string') {
+    out.issue = { ...p.issue, body: capTriggerBody(p.issue.body) };
+  }
+  if (p.pull_request && typeof p.pull_request.body === 'string') {
+    out.pull_request = { ...p.pull_request, body: capTriggerBody(p.pull_request.body) };
+  }
+  if (p.comment && typeof p.comment.body === 'string') {
+    out.comment = { ...p.comment, body: capTriggerBody(p.comment.body) };
+  }
+  return out;
 }
 
 function extractRepo(r: GithubWebhookPayload['repository']): TriggerEvent['repo'] {
