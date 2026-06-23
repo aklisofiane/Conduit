@@ -92,6 +92,13 @@ npm run build                   # builds TS dist + the agent-runner Docker image
 
 Sign-in works with email and password out of the box. To enable OAuth sign-in providers (GitHub today, others later), see [docs/setup-oauth.md](docs/setup-oauth.md).
 
+### Board credentials
+
+Agents reach your board through a platform credential (a token, encrypted at rest with AES-256-GCM). There are two ways to provide one:
+
+- **GitHub OAuth** — if you've enabled GitHub OAuth sign-in (above), signing in with GitHub automatically mirrors your access token into a credential. Nothing else to do.
+- **Personal access token** — otherwise, create a token on your platform (for GitHub: **Settings → Developer settings → Personal access tokens**, with `repo` and `project` scopes), then add it in Conduit under **Settings → Integrations** (`/settings/integrations`). The same flow works for GitLab, Jira, Slack, and Discord, including self-hosted instances.
+
 `apps/agent-runner` is the per-run container the worker spawns for every agent execution. Its `build` script chains `tsc` and `docker build -t agent-runner:dev`, so any workspace build keeps the image current. CI tags via `CONDUIT_RUNNER_IMAGE`. Force a clean image rebuild with `npm run docker:agent-runner:build`.
 
 If you authenticate via OAuth instead of API keys:
@@ -110,14 +117,12 @@ Common scripts (all run through Turborepo where applicable):
 
 Workspaces: `packages/*` (libraries) and `apps/*` (services). A single root `.env` is read by every app — `dotenv-cli` forwards it into the Prisma CLI.
 
-### Running the Phase 1 stack
+### Running the stack
 
-After `infra:up` and `db:push`, boot the three apps in separate terminals:
+After `infra:up` and `db:push`, a single command boots all three apps (API on :3000, Temporal worker, and the Vite dev server on :5173):
 
 ```bash
-npm --workspace @conduit/api dev        # Nest API + Socket.IO on :3000
-npm --workspace @conduit/worker dev     # Temporal worker (task queue: conduit-workflows)
-npm --workspace @conduit/web dev        # Vite dev server on :5173
+npm run dev
 ```
 
 Open http://localhost:5173, create a workflow, drop an agent, save, and click **Test run**. The run detail page streams `ExecutionLog` events over Socket.IO as the agent executes.
