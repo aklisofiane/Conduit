@@ -92,13 +92,13 @@
         ],
         "ui": {
           "nodePositions": {
-            "NightlyTrigger": { "x": 60, "y": 280 },
-            "Scope": { "x": 280, "y": 280 },
-            "Security": { "x": 540, "y": 60 },
-            "Quality": { "x": 540, "y": 200 },
-            "Refactor": { "x": 540, "y": 340 },
-            "Performance": { "x": 540, "y": 480 },
-            "Publisher": { "x": 820, "y": 280 }
+            "NightlyTrigger": { "x": 60, "y": 480 },
+            "Scope": { "x": 360, "y": 480 },
+            "Security": { "x": 820, "y": 0 },
+            "Quality": { "x": 820, "y": 320 },
+            "Refactor": { "x": 820, "y": 640 },
+            "Performance": { "x": 820, "y": 960 },
+            "Publisher": { "x": 1280, "y": 480 }
           },
           "viewport": { "x": 0, "y": 0, "zoom": 1 }
         }
