@@ -55,6 +55,7 @@ import { WorkflowActions } from '../components/layout/WorkflowActions.js';
 import { WorkflowRunsList } from '../components/run/WorkflowRunsList.js';
 import { useConnections, useUpdateWorkflow, useWorkflow } from '../api/hooks.js';
 import type { ConnectionRow } from '../api/types.js';
+import { downloadWorkflowExport } from '../lib/export-workflow.js';
 import { useWorkflowEditor } from '../state/workflow-editor.js';
 import { useTopbarSlots } from '../state/topbar-slots.js';
 import { relativeFromNow } from '../lib/time.js';
@@ -370,6 +371,14 @@ function CanvasInner() {
     await updateWorkflow.mutateAsync({ definition: draft });
   }, [draft, id, updateWorkflow]);
 
+  const handleExport = useCallback(() => {
+    if (!draft || !wf) return;
+    downloadWorkflowExport(
+      { name: wf.name, description: wf.description, definition: draft },
+      allConnections,
+    );
+  }, [draft, wf, allConnections]);
+
   const tabsSlot = useMemo(
     () => <WorkflowTabs active={activeTab} onChange={setActiveTab} />,
     [activeTab],
@@ -381,9 +390,10 @@ function CanvasInner() {
         dirty={dirty}
         saving={updateWorkflow.isPending}
         onSave={handleSave}
+        onExport={handleExport}
       />
     ),
-    [wf?.isActive, dirty, updateWorkflow.isPending, handleSave],
+    [wf?.isActive, dirty, updateWorkflow.isPending, handleSave, handleExport],
   );
   useTopbarSlots({ center: tabsSlot, actions: actionsSlot });
 

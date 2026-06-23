@@ -40,7 +40,7 @@ A template can contain **one or more workflow definitions**. All shipped templat
 
 Each entry's `definition` matches `Workflow.definition` in the DB **after preset expansion**. Two schemas govern this: `templateInputFileSchema` validates the on-disk shape (where agents may use `presetId`), and `templateFileSchema` validates the post-expansion shape (concrete `instructions`/`model`/`provider`). Connection placeholder strings pass structural validation because they satisfy `z.string().min(1)`; semantic validation (`validateWorkflowDefinition`) runs only after placeholder resolution, on the per-workflow path. The template's top-level `name`/`description`/`category` describe the bundle; each entry's `name`/`description` become the created `Workflow` row's fields.
 
-**Category** is one of `triage | develop | review | merge` (`packages/shared/src/template/schema.ts`) — a display-only hint for grouping in the picker.
+**Category** is one of `triage | develop | review | merge | custom` (`packages/shared/src/template/schema.ts`) — a display-only hint for grouping in the picker. Shipped templates use the four task-shaped categories; `custom` is reserved for bundles produced by [workflow export](#export-and-import) and never appears on disk.
 
 ### Agent shape
 
@@ -123,6 +123,8 @@ Placeholders are **bundle-scoped**: the same `<github-repo>` alias in workflow A
 
 ## The instantiation endpoint
 
+Two endpoints feed a bundle through the **same instantiation core** (`TemplatesService.instantiate`): the catalog path looks the bundle up by id, the [import path](#export-and-import) takes it from the request body. Both derive placeholder details authoritatively on the server, materialize connections, resolve + validate every workflow inside one transaction, and upsert schedules after commit — they differ only in where the `TemplateFile` comes from.
+
 `POST /api/workflows/from-template/:templateId` accepts:
 
 ```ts
@@ -157,6 +159,31 @@ A bundle of N workflows that all reference `<github-repo>` produces **one** `Con
 ### Created workflows are paused
 
 `Workflow.isActive` is `false` on creation. Polling schedules are created paused (`upsertPollSchedule` passes `paused: !isActive`). Webhook deliveries skip inactive workflows. The user reviews the generated definition on the canvas, then flips the workflow active.
+
+## Export and import
+
+A live workflow can be reduced to a portable template bundle and an uploaded bundle can be instantiated back into workflows — the same `<alias>` placeholder mechanism runs in both directions, so a workflow can move between orgs without carrying any org-specific connection ids.
+
+```
+ export:   Workflow.definition  ──workflowToTemplate──▶  custom TemplateFile  ──▶  download <slug>.json
+ import:   upload <file>.json  ──templateFileSchema──▶  POST /workflows/import  ──instantiate──▶  paused workflows
+```
+
+### Export — `workflowToTemplate`
+
+`workflowToTemplate` (`packages/shared/src/template/export-workflow.ts`) is the exact inverse of `resolveTemplate`: both walk the same `enumerateConnectionSlots`, so the two directions can't drift. Export writes an `<alias>` over every concrete connection id; resolve writes a real id back over every placeholder. The helper is pure and substitution-only — the caller owns alias naming (it has the connection names) and passes an `aliasFor(connectionId)` callback. Agents are already in runtime shape (concrete `provider`/`model`/`instructions`), so nothing else is stripped. The result is a single-workflow `TemplateFile` with `category: 'custom'`. Export is **idempotent**: a definition that already carries placeholders passes through untouched.
+
+The web app does the naming and the download client-side (`apps/web/src/lib/export-workflow.ts`): it kebab-cases each bound connection's name into an alias (falling back to the slot kind — `repo` / `board` — or `conn-N` when the connection is unnamed or gone), serializes the bundle, and triggers a Blob download of `<slug>.json`. **No secrets leave the browser** — a definition carries none once connection ids become placeholders, and credentials were never in the definition to begin with.
+
+### Import — `POST /api/workflows/import`
+
+```ts
+{ template: TemplateFile; bindings: Record<alias, TemplateBinding> }
+```
+
+The uploaded bundle is parsed against `templateFileSchema` — the *same* post-expansion schema the disk loader uses — by the controller's Zod pipe before it reaches the service. The service then **ignores any client-supplied summary** and re-derives placeholder details from the bundle itself (`collectTemplatePlaceholderDetails`), wraps it in an in-memory `LoadedTemplate`, and runs the shared `instantiate` core. So an imported bundle goes through the identical binding → resolve → per-workflow `validateWorkflowDefinition` → create path as a catalog template, including the same scope-kind checks and the same paused-on-create behavior. Same binding response shape: `{ templateId, workflows: [{ id, name }] }`.
+
+`summarizeTemplate` (`packages/shared/src/template/resolve.ts`) is the one place both the API catalog path and the web import preview derive a `TemplateSummary` (placeholders, `boardAliases`, `workflowCount`) from a `TemplateFile`, so the binding form looks identical whether the bundle came from disk or an upload.
 
 ## Templates shipped with v1
 

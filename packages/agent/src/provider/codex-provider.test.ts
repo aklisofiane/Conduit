@@ -278,6 +278,71 @@ describe('CodexProvider', () => {
     }).rejects.toThrow(/codex blew up/);
   });
 
+  it('skips a transient reconnect notice and keeps draining the turn', async () => {
+    // Codex reports `Reconnecting... N/M (...)` mid-recovery as a turn.failed /
+    // error event but keeps retrying; we must not treat attempt N<M as fatal.
+    installStub({
+      scriptedEvents: [
+        { type: 'thread.started', thread_id: 't_1' },
+        { type: 'turn.started' },
+        {
+          type: 'error',
+          message: 'Reconnecting... 2/5 (timeout waiting for child process to exit)',
+        },
+        {
+          type: 'item.updated',
+          item: { id: 'msg_1', type: 'agent_message', text: 'recovered' },
+        },
+        { type: 'turn.completed', usage: { input_tokens: 1, output_tokens: 1 } },
+      ],
+    });
+
+    const events: unknown[] = [];
+    const p = new CodexProvider();
+    const session = p.startSession(
+      {
+        model: 'gpt-5-codex',
+        systemPrompt: '',
+        mcpServers: [],
+        workspacePath: '/tmp',
+        constraints: {},
+      } as never,
+      new AbortController().signal,
+    );
+    for await (const e of session.run('')) {
+      events.push(e);
+    }
+
+    expect(events).toContainEqual({ type: 'text', delta: 'recovered' });
+    expect(events).toContainEqual({ type: 'done' });
+  });
+
+  it('still throws on a turn.failed that is not a reconnect notice', async () => {
+    installStub({
+      scriptedEvents: [
+        { type: 'thread.started', thread_id: 't_1' },
+        { type: 'turn.failed', error: { message: 'context window exceeded' } },
+      ],
+    });
+
+    const p = new CodexProvider();
+    const session = p.startSession(
+      {
+        model: 'gpt-5-codex',
+        systemPrompt: '',
+        mcpServers: [],
+        workspacePath: '/tmp',
+        constraints: {},
+      } as never,
+      new AbortController().signal,
+    );
+    await expect(async () => {
+      for await (const _ of session.run('')) {
+        void _;
+      }
+    }).rejects.toThrow(/context window exceeded/);
+  });
+
   it('handles command_execution items as tool_call / tool_result', async () => {
     installStub({
       scriptedEvents: [

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { DiscoveredTool, McpTransport, WorkflowDefinition } from '@conduit/shared';
+import type { TemplateFile } from '@conduit/shared/template';
 import type {
   ProjectBoardSummary,
   RepoLabel,
@@ -407,6 +408,21 @@ export function useCreateFromTemplate() {
       bindings: Record<string, TemplateBinding>;
     }) =>
       api.post<CreatedFromTemplate>(`/workflows/from-template/${args.templateId}`, {
+        bindings: args.bindings,
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: WORKFLOWS }),
+  });
+}
+
+export function useImportTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: {
+      template: TemplateFile;
+      bindings: Record<string, TemplateBinding>;
+    }) =>
+      api.post<CreatedFromTemplate>('/workflows/import', {
+        template: args.template,
         bindings: args.bindings,
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: WORKFLOWS }),

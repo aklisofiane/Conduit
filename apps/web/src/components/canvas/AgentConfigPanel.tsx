@@ -17,8 +17,10 @@ import type { AgentPreset } from '../../api/types.js';
 import { cn } from '../../lib/cn.js';
 import { providerStyle } from '../../styles/theme.js';
 import { Select, type SelectItem } from '../common/Select.js';
-import { X } from 'lucide-react';
+import { Maximize2, X } from 'lucide-react';
+import { useState } from 'react';
 import { McpServerPicker } from './McpServerPicker.js';
+import { PromptEditorDialog, promptCounts } from './PromptEditorDialog.js';
 import { SkillPicker } from './SkillPicker.js';
 
 const CUSTOM_PRESET_ID = '__custom__';
@@ -70,6 +72,7 @@ export function AgentConfigPanel({
         p.provider === agent.provider,
     )?.id ?? '';
   const ps = providerStyle(agent.provider);
+  const [promptEditorOpen, setPromptEditorOpen] = useState(false);
 
   const applyPreset = (presetId: string) => {
     if (!presetId || presetId === matchedPresetId) return;
@@ -203,15 +206,40 @@ export function AgentConfigPanel({
             />
           </Field>
 
-          <Field label="Instructions" hint="system prompt">
+          <div>
+            <div className="field-label">
+              Instructions
+              <span className="hint">system prompt</span>
+              <button
+                type="button"
+                onClick={() => setPromptEditorOpen(true)}
+                className="ml-auto inline-flex items-center gap-1 rounded-[var(--radius-sm)] px-1.5 py-0.5 font-mono text-[10px] tracking-normal text-[var(--color-accent)] normal-case transition-colors hover:bg-[var(--color-pill-bg)]"
+              >
+                <Maximize2 size={11} strokeWidth={1.75} />
+                Expand
+              </button>
+            </div>
             <textarea
               className="field-input"
               rows={8}
               value={agent.instructions}
               onChange={(e) => onChange({ instructions: e.target.value })}
+              onKeyDown={(e) => {
+                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                  e.preventDefault();
+                  setPromptEditorOpen(true);
+                }
+              }}
               placeholder="You are an agent that…"
             />
-          </Field>
+            <div className="mt-1 flex items-center justify-between font-mono text-[10px] text-[var(--color-text-muted)]">
+              <span>
+                {promptCounts(agent.instructions).chars} chars ·{' '}
+                {promptCounts(agent.instructions).lines} lines
+              </span>
+              <span className="kbd">⌘↵</span>
+            </div>
+          </div>
 
           <Field label="Web search">
             <label className="flex cursor-pointer items-center gap-2 font-mono text-[12px]">
@@ -267,6 +295,15 @@ export function AgentConfigPanel({
           {saving ? 'Saving…' : 'Save changes'}
         </button>
       </div>
+
+      <PromptEditorDialog
+        open={promptEditorOpen}
+        onOpenChange={setPromptEditorOpen}
+        value={agent.instructions}
+        name={agent.name}
+        contextLabel={`${ps.label} · ${agent.model}`}
+        onCommit={(instructions) => onChange({ instructions })}
+      />
     </>
   );
 }

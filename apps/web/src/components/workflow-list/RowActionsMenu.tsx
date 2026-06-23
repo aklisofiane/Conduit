@@ -6,11 +6,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../common/DropdownMenu.js';
-import { Copy, Pencil, Trash2 } from 'lucide-react';
+import { Copy, Download, Pencil, Trash2 } from 'lucide-react';
 
 interface RowActionsMenuProps {
   onRename: () => void;
   onDuplicate: () => void;
+  onExport: () => void;
   onDelete: () => void;
   duplicating?: boolean;
   deleting?: boolean;
@@ -20,6 +21,7 @@ interface RowActionsMenuProps {
 export function RowActionsMenu({
   onRename,
   onDuplicate,
+  onExport,
   onDelete,
   duplicating,
   deleting,
@@ -40,6 +42,10 @@ export function RowActionsMenu({
         <DropdownMenuItem onSelect={onDuplicate} disabled={duplicating}>
           <Copy size={12} strokeWidth={1.5} />
           {duplicating ? 'Duplicating…' : 'Duplicate'}
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={onExport}>
+          <Download size={12} strokeWidth={1.5} />
+          Export
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={onDelete} disabled={deleting} tone="danger">

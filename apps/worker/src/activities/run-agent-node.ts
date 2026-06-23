@@ -363,7 +363,13 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
       throw new Error(`agent-runner exited without a terminal event for node "${node.name}"`);
     }
     if (!terminal.ok) {
-      throw new Error(terminal.error.message);
+      // Forward the runner's own stack (which points at the failing
+      // turn/provider frame, e.g. codex-provider's translate) instead of
+      // synthesizing one that only points here — otherwise Temporal's
+      // stackTrace truncates to this rethrow and hides the real origin.
+      const err = new Error(terminal.error.message);
+      if (terminal.error.stack) err.stack = terminal.error.stack;
+      throw err;
     }
 
     const output: NodeOutput = {

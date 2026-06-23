@@ -1,11 +1,18 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { ConnectionScope } from '@conduit/shared';
+import {
+  summarizeTemplate,
+  templateFileSchema,
+  type TemplateFile,
+} from '@conduit/shared/template';
+import { Upload } from 'lucide-react';
 import { ApiError } from '../../api/client.js';
 import {
   useConnections,
   useCreateFromTemplate,
   useCredentials,
+  useImportTemplate,
   useListProjectBoards,
   useListViewerOrgs,
   useListViewerRepos,
@@ -97,11 +104,18 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
   const { data: credentials = [] } = useCredentials();
   const { data: connections = [] } = useConnections();
   const createFromTemplate = useCreateFromTemplate();
+  const importTemplate = useImportTemplate();
   const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [selected, setSelected] = useState<TemplateSummary | null>(null);
+  // Set when the selection came from an uploaded file rather than the catalog;
+  // drives the create branch (import endpoint vs catalog endpoint).
+  const [importedFile, setImportedFile] = useState<TemplateFile | null>(null);
   const [bindings, setBindings] = useState<Record<string, TemplateBinding>>({});
   const [error, setError] = useState<string | null>(null);
+
+  const pending = createFromTemplate.isPending || importTemplate.isPending;
 
   const boardAliasSet = useMemo(
     () => new Set(selected?.boardAliases ?? []),
@@ -157,7 +171,7 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
         return Boolean(b.name && b.credentialId && b.scope);
       })());
 
-  const handlePick = (t: TemplateSummary) => {
+  const selectSummary = (t: TemplateSummary) => {
     setSelected(t);
     const boards = new Set(t.boardAliases);
     setBindings(
@@ -173,6 +187,36 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
     setError(null);
   };
 
+  const handlePick = (t: TemplateSummary) => {
+    setImportedFile(null);
+    selectSummary(t);
+  };
+
+  const handleBack = () => {
+    setSelected(null);
+    setImportedFile(null);
+  };
+
+  const handleImportFile = async (file: File) => {
+    setError(null);
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(await file.text());
+    } catch {
+      setError('Not a valid workflow export.');
+      return;
+    }
+    const result = templateFileSchema.safeParse(parsed);
+    if (!result.success) {
+      setError('Not a valid workflow export.');
+      return;
+    }
+    setImportedFile(result.data);
+    // The server re-derives placeholders authoritatively at create time; this
+    // client-side summary just drives the binding form.
+    selectSummary(summarizeTemplate(result.data));
+  };
+
   const handleCreate = async () => {
     if (!selected) return;
     setError(null);
@@ -181,10 +225,15 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
       delete finalBindings[boardAlias];
     }
     try {
-      const result = await createFromTemplate.mutateAsync({
-        templateId: selected.id,
-        bindings: finalBindings,
-      });
+      const result = importedFile
+        ? await importTemplate.mutateAsync({
+            template: importedFile,
+            bindings: finalBindings,
+          })
+        : await createFromTemplate.mutateAsync({
+            templateId: selected.id,
+            bindings: finalBindings,
+          });
       onClose();
       if (result.workflows[0]) {
         navigate(`/workflows/${result.workflows[0].id}`);
@@ -230,6 +279,33 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
         </header>
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
+          {!selected && (
+            <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-dashed border-[var(--color-line)] bg-[var(--color-bg-2)] px-4 py-3">
+              <div className="font-mono text-[11.5px] text-[var(--color-text-2)]">
+                Have a workflow export? Import a <code>.json</code> bundle.
+              </div>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Upload size={12} strokeWidth={1.5} />
+                Import from file
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="application/json,.json"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = '';
+                  if (file) void handleImportFile(file);
+                }}
+              />
+            </div>
+          )}
+
           {isLoading && <div className="font-mono text-[12px] text-[var(--color-text-3)]">Loading templates…</div>}
 
           {!selected && !isLoading && templates.length === 0 && (
@@ -286,16 +362,16 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
           )}
           <div className="flex items-center gap-2">
             {selected && (
-              <button className="btn" onClick={() => setSelected(null)} disabled={createFromTemplate.isPending}>
+              <button className="btn" onClick={handleBack} disabled={pending}>
                 ← Back
               </button>
             )}
             <button
               className="btn primary"
               onClick={handleCreate}
-              disabled={!selected || !canCreate || createFromTemplate.isPending}
+              disabled={!selected || !canCreate || pending}
             >
-              {createFromTemplate.isPending
+              {pending
                 ? 'Creating…'
                 : selected
                   ? `Create ${selected.workflowCount === 1 ? 'workflow' : `${selected.workflowCount} workflows`}`

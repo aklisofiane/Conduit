@@ -6,13 +6,18 @@ import {
   type OnModuleInit,
 } from '@nestjs/common';
 import {
+  collectTemplatePlaceholderDetails,
   connectionScopeSchema,
+  enumerateConnectionSlots,
   findMcpPresetByPlatform,
   isScheduledTrigger,
+  placeholderAlias,
   platformForScopeKind,
   resolveTemplate,
+  summarizeTemplate,
   type ConnectionScopeKind,
   type Platform,
+  type TemplateFile,
   type TemplatePlaceholder,
   type TemplateSummary,
   type WorkflowDefinition,
@@ -24,7 +29,11 @@ import { TemporalService } from '../../temporal/temporal.service';
 import { resolveTemporalSlug } from '../../temporal/temporal-slug';
 import { AgentPresetsService } from '../agent-presets/agent-presets.service';
 import { loadTemplates, type LoadedTemplate } from './template-loader';
-import type { CreateFromTemplateDto, TemplateBinding } from './dto';
+import type {
+  CreateFromTemplateDto,
+  ImportTemplateDto,
+  TemplateBinding,
+} from './dto';
 
 export interface CreatedFromTemplate {
   templateId: string;
@@ -58,6 +67,7 @@ export class TemplatesService implements OnModuleInit {
     return toSummary(t);
   }
 
+  /** Catalog path: instantiate a Conduit-shipped template by id. */
   async createFromTemplate(
     orgId: string,
     templateId: string,
@@ -65,16 +75,50 @@ export class TemplatesService implements OnModuleInit {
   ): Promise<CreatedFromTemplate> {
     const loaded = this.templates.get(templateId);
     if (!loaded) throw new NotFoundException(`Template ${templateId} not found`);
+    return this.instantiate(orgId, loaded, dto.bindings);
+  }
 
-    this.assertBindingsCoverPlaceholders(loaded, dto.bindings);
-    await this.assertExistingBindingsValid(orgId, loaded, dto.bindings);
+  /**
+   * Import path: instantiate a user-uploaded bundle. `dto.template` has already
+   * passed `templateFileSchema` at the controller; we derive placeholder
+   * details here (authoritatively, ignoring any client-side summary) and run
+   * the identical instantiation core — including the per-workflow
+   * `assertDefinitionValid` guard inside the transaction.
+   */
+  async importTemplate(
+    orgId: string,
+    dto: ImportTemplateDto,
+  ): Promise<CreatedFromTemplate> {
+    this.assertNoConcreteConnectionIds(dto.template);
+    const placeholderDetails = collectTemplatePlaceholderDetails(dto.template);
+    const loaded: LoadedTemplate = {
+      file: dto.template,
+      placeholders: placeholderDetails.map((p) => p.alias),
+      placeholderDetails,
+    };
+    return this.instantiate(orgId, loaded, dto.bindings);
+  }
+
+  /**
+   * Shared instantiation core for both the catalog and import paths. Takes an
+   * in-memory `LoadedTemplate` (whether looked up by id or built from an upload)
+   * plus the org and the binding choices, materializes connections, resolves +
+   * validates every workflow, persists them paused, and upserts schedules.
+   */
+  private async instantiate(
+    orgId: string,
+    loaded: LoadedTemplate,
+    bindings: Record<string, TemplateBinding>,
+  ): Promise<CreatedFromTemplate> {
+    this.assertBindingsCoverPlaceholders(loaded, bindings);
+    await this.assertExistingBindingsValid(orgId, loaded, bindings);
 
     const created = await this.prisma.$transaction(async (tx) => {
       // Materialize "new" bindings into real Connection rows once per
       // template-apply (shared across all workflows in the bundle).
       const aliasToConnId: Record<string, string> = {};
       for (const placeholder of loaded.placeholderDetails) {
-        const binding = dto.bindings[placeholder.alias];
+        const binding = bindings[placeholder.alias];
         if (!binding) continue;
         if (binding.mode === 'existing') {
           aliasToConnId[placeholder.alias] = binding.connectionId;
@@ -206,9 +250,31 @@ export class TemplatesService implements OnModuleInit {
     );
 
     return {
-      templateId,
+      templateId: loaded.file.id,
       workflows: created.map(({ id, name }) => ({ id, name })),
     };
+  }
+
+  /**
+   * Reject uploaded bundles that carry literal Connection ids in any
+   * connection slot. A genuine export only ever emits `<alias>` placeholders
+   * (every concrete id is stripped by `workflowToTemplate`), so a non-empty,
+   * non-placeholder slot means a hand-crafted bundle smuggling a foreign id
+   * past the binding flow. Those slots are not re-grounded by `resolveTemplate`
+   * and would otherwise be persisted verbatim — a cross-org reference. The
+   * catalog path never reaches here; its templates come from trusted disk.
+   */
+  private assertNoConcreteConnectionIds(template: TemplateFile): void {
+    for (const wf of template.workflows) {
+      for (const slot of enumerateConnectionSlots(wf.definition)) {
+        if (!slot.value) continue;
+        if (placeholderAlias(slot.value)) continue;
+        throw new BadRequestException(
+          `Imported workflow "${wf.name}" contains a literal connection id; ` +
+            `exports must reference connections via <alias> placeholders only.`,
+        );
+      }
+    }
   }
 
   private assertBindingsCoverPlaceholders(
@@ -322,17 +388,7 @@ export class TemplatesService implements OnModuleInit {
 }
 
 function toSummary(t: LoadedTemplate): TemplateSummary {
-  return {
-    id: t.file.id,
-    name: t.file.name,
-    description: t.file.description,
-    category: t.file.category,
-    workflowCount: t.file.workflows.length,
-    placeholders: t.placeholders,
-    boardAliases: t.placeholderDetails
-      .filter((p) => p.expectedScopeKinds.includes('github_projects_v2'))
-      .map((p) => p.alias),
-  };
+  return summarizeTemplate(t.file);
 }
 
 function diff(want: Set<string>, found: { id: string }[]): string[] {

@@ -1,6 +1,6 @@
 import type { WorkflowDefinition } from '../workflow/definition';
 import type { ConnectionScopeKind } from '../connection/scope';
-import type { TemplateFile, TemplateWorkflow } from './schema';
+import type { TemplateFile, TemplateSummary, TemplateWorkflow } from './schema';
 import { placeholderAlias } from './placeholder';
 
 /** Per-slot expected scope; `'repo'` = github_repo | gitlab_project; `'any'` = skip check. */
@@ -83,7 +83,28 @@ function resolveOne(
   return { name: wf.name, description: wf.description, definition };
 }
 
-interface ConnectionSlot {
+/**
+ * Pure summary of a template bundle: identity fields plus the unique
+ * connection placeholders and the board-typed subset (optional bindings).
+ * Shared so the API catalog path and the web import path derive an identical
+ * `TemplateSummary` from the same file.
+ */
+export function summarizeTemplate(file: TemplateFile): TemplateSummary {
+  const placeholderDetails = collectTemplatePlaceholderDetails(file);
+  return {
+    id: file.id,
+    name: file.name,
+    description: file.description,
+    category: file.category,
+    workflowCount: file.workflows.length,
+    placeholders: placeholderDetails.map((p) => p.alias),
+    boardAliases: placeholderDetails
+      .filter((p) => p.expectedScopeKinds.includes('github_projects_v2'))
+      .map((p) => p.alias),
+  };
+}
+
+export interface ConnectionSlot {
   value: string | undefined;
   expectedScopeKind: ExpectedSlotKind;
   optional?: boolean;
@@ -91,7 +112,14 @@ interface ConnectionSlot {
   clear?: () => void;
 }
 
-function* enumerateConnectionSlots(
+/**
+ * Walks every connection-bearing slot in a definition — trigger
+ * `connectionId`, trigger `boardConnectionId`, and MCP-server `connectionId`.
+ * `resolveTemplate` uses it to write real ids into placeholders; export uses
+ * it to write placeholders over real ids. Keeping a single enumerator means
+ * the two directions can never drift apart.
+ */
+export function* enumerateConnectionSlots(
   def: WorkflowDefinition,
 ): Generator<ConnectionSlot> {
   for (const trigger of def.triggers) {

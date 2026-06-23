@@ -30,10 +30,14 @@ Form pages use `react-hook-form` + `@hookform/resolvers/zod` + Conduit's design 
 
 The workflow list's header row has a **"From template"** button next to **"New workflow"**. Clicking it opens `TemplatePickerDialog` (`apps/web/src/components/templates/TemplatePickerDialog.tsx`), a two-step modal:
 
-1. **Pick** — grid of template cards (name, category, workflow count, description) sourced from `useTemplates()` → `GET /api/templates`.
-2. **Bind** — one row per unique `<alias>` placeholder in the picked template. Each row toggles between **New** (name + credential picker + scope-kind-specific fields — `owner/repo` for `<github-repo>`, `ownerType/owner/number` for `<github-board>`) and **Existing** (pick from connections whose `scope.kind` matches the placeholder's expected slot kind). Submit calls `useCreateFromTemplate()` → `POST /api/workflows/from-template/:id` and navigates to the first created workflow.
+1. **Pick** — grid of template cards (name, category, workflow count, description) sourced from `useTemplates()` → `GET /api/templates`. The pick step also has an **"Import from file"** entry that reads a `.json` export, validates it client-side against `templateFileSchema`, and routes it into the same bind step as a catalog template.
+2. **Bind** — one row per unique `<alias>` placeholder in the picked template. Each row toggles between **New** (name + credential picker + scope-kind-specific fields — `owner/repo` for `<github-repo>`, `ownerType/owner/number` for `<github-board>`) and **Existing** (pick from connections whose `scope.kind` matches the placeholder's expected slot kind). Submit calls `useCreateFromTemplate()` → `POST /api/workflows/from-template/:id` for a catalog template, or `useImportTemplate()` → `POST /api/workflows/import` when the bundle came from an uploaded file, then navigates to the first created workflow.
 
 Created workflows are paused — the user reviews the generated canvas before activating. See [design-docs/templates.md](./design-docs/templates.md) for the full flow.
+
+### Exporting a workflow
+
+The inverse of import: any live workflow can be downloaded as a shareable template bundle. An **Export** action appears in two places — the canvas header (`WorkflowActions`) and each workflow list row's `…` menu (`RowActionsMenu`). Both call `downloadWorkflowExport` (`apps/web/src/lib/export-workflow.ts`), which is fully client-side: it rewrites connection ids to `<alias>` placeholders and triggers a Blob download of `<slug>.json`. No request hits the server, and the file carries no secrets. See [design-docs/templates.md](./design-docs/templates.md#export-and-import).
 
 ## Canvas
 
