@@ -1,8 +1,11 @@
+import { Download } from 'lucide-react';
+
 interface WorkflowActionsProps {
   isActive: boolean;
   dirty: boolean;
   saving: boolean;
   onSave: () => void;
+  onExport: () => void;
 }
 
 export function WorkflowActions({
@@ -10,6 +13,7 @@ export function WorkflowActions({
   dirty,
   saving,
   onSave,
+  onExport,
 }: WorkflowActionsProps) {
   return (
     <div className="flex items-center gap-3">
@@ -27,6 +31,15 @@ export function WorkflowActions({
           {isActive ? 'active' : 'paused'}
         </span>
       </span>
+      <button
+        type="button"
+        className="btn"
+        onClick={onExport}
+        title="Export this workflow as a shareable template JSON"
+      >
+        <Download size={12} strokeWidth={1.5} />
+        Export
+      </button>
       <button
         type="button"
         className="btn"

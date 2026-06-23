@@ -27,6 +27,9 @@ export const templateCategorySchema = z.enum([
   'develop',
   'review',
   'merge',
+  // User-authored bundles produced by workflow export; shipped templates keep
+  // the four task-shaped categories above.
+  'custom',
 ]);
 export type TemplateCategory = z.infer<typeof templateCategorySchema>;
 

@@ -1,11 +1,13 @@
 import { Link, useNavigate } from 'react-router-dom';
 import {
+  useConnections,
   useDeleteWorkflow,
   useDuplicateWorkflow,
   useUpdateWorkflow,
 } from '../../api/hooks.js';
 import type { WorkflowRow } from '../../api/types.js';
 import { cn } from '../../lib/cn.js';
+import { downloadWorkflowExport } from '../../lib/export-workflow.js';
 import { duration, relativeFromNow } from '../../lib/time.js';
 import { statusClass } from '../../lib/status.js';
 import { MoreVertical } from 'lucide-react';
@@ -34,6 +36,7 @@ export function WorkflowRowItem({
   const update = useUpdateWorkflow(wf.id);
   const del = useDeleteWorkflow();
   const duplicate = useDuplicateWorkflow();
+  const { data: connections = [] } = useConnections();
   const navigate = useNavigate();
 
   const handleRenameCommit = (next: string) => {
@@ -65,6 +68,13 @@ export function WorkflowRowItem({
       {
         onError: (err) => alert(err instanceof Error ? err.message : String(err)),
       },
+    );
+  };
+
+  const handleExport = () => {
+    downloadWorkflowExport(
+      { name: wf.name, description: wf.description, definition: wf.definition },
+      connections,
     );
   };
 
@@ -152,6 +162,7 @@ export function WorkflowRowItem({
           <RowActionsMenu
             onRename={onStartRename}
             onDuplicate={handleDuplicate}
+            onExport={handleExport}
             onDelete={handleDelete}
             duplicating={duplicate.isPending}
             deleting={del.isPending}

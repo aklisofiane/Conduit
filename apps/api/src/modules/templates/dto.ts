@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { connectionScopeSchema } from '@conduit/shared';
+import { connectionScopeSchema, templateFileSchema } from '@conduit/shared';
 
 export const templateBindingSchema = z.union([
   z.object({
@@ -19,3 +19,15 @@ export const createFromTemplateDtoSchema = z.object({
   bindings: z.record(z.string(), templateBindingSchema).default({}),
 });
 export type CreateFromTemplateDto = z.infer<typeof createFromTemplateDtoSchema>;
+
+/**
+ * Body for `POST /workflows/import`: an uploaded template bundle plus the
+ * binding choices. Unlike the catalog path, the bundle arrives in the request
+ * instead of being looked up by id, so it is parsed against the same
+ * `templateFileSchema` the disk loader uses before instantiation.
+ */
+export const importTemplateDtoSchema = z.object({
+  template: templateFileSchema,
+  bindings: z.record(z.string(), templateBindingSchema).default({}),
+});
+export type ImportTemplateDto = z.infer<typeof importTemplateDtoSchema>;

@@ -5,7 +5,9 @@ import { ZodBodyPipe } from '../../common/zod-body.pipe';
 import { TemplatesService } from './templates.service';
 import {
   createFromTemplateDtoSchema,
+  importTemplateDtoSchema,
   type CreateFromTemplateDto,
+  type ImportTemplateDto,
 } from './dto';
 
 /**
@@ -39,5 +41,19 @@ export class TemplatesController {
     @Body(new ZodBodyPipe(createFromTemplateDtoSchema)) dto: CreateFromTemplateDto,
   ) {
     return this.svc.createFromTemplate(orgId, id, dto);
+  }
+
+  /**
+   * Import path: the bundle arrives in the request body (uploaded by the web
+   * app) instead of being read from disk by id. The Zod pipe enforces
+   * `templateFileSchema`; the service re-derives placeholders and validates
+   * every resolved workflow before persisting.
+   */
+  @Post('workflows/import')
+  import(
+    @OrgId() orgId: string,
+    @Body(new ZodBodyPipe(importTemplateDtoSchema)) dto: ImportTemplateDto,
+  ) {
+    return this.svc.importTemplate(orgId, dto);
   }
 }
