@@ -643,14 +643,6 @@ describe('hydrateGithubItemBodies', () => {
     expect(called).toBe(false);
   });
 
-  it('throws on GraphQL error response', async () => {
-    const canned = { errors: [{ message: 'Bad credentials' }] };
-    const fakeFetch = makeFetch([canned]);
-    await expect(hydrateGithubItemBodies(['I_1'], 'tok', fakeFetch)).rejects.toThrow(
-      /Bad credentials/,
-    );
-  });
-
   it('skips nodes that are null or missing body', async () => {
     const canned = {
       data: {
@@ -661,6 +653,58 @@ describe('hydrateGithubItemBodies', () => {
     const map = await hydrateGithubItemBodies(['I_1', 'I_2', 'I_3'], 'tok', fakeFetch);
     expect(map.size).toBe(1);
     expect(map.get('I_2')).toBe('text');
+  });
+
+  it('chunks ids into multiple requests below the GitHub node limit', async () => {
+    const ids = Array.from({ length: 120 }, (_, i) => `I_${i}`);
+    const chunkSizes: number[] = [];
+    // Echo each requested chunk back as hydrated bodies so we can assert coverage.
+    const fakeFetch: typeof fetch = (async (_url, init) => {
+      const body = JSON.parse(String((init as RequestInit)?.body ?? '{}')) as {
+        variables?: { ids?: string[] };
+      };
+      const reqIds = body.variables?.ids ?? [];
+      chunkSizes.push(reqIds.length);
+      return new Response(
+        JSON.stringify({ data: { nodes: reqIds.map((id) => ({ id, body: `body ${id}` })) } }),
+        { status: 200 },
+      );
+    }) as typeof fetch;
+
+    const map = await hydrateGithubItemBodies(ids, 'tok', fakeFetch);
+
+    expect(chunkSizes.length).toBeGreaterThan(1);
+    expect(Math.max(...chunkSizes)).toBeLessThanOrEqual(50);
+    expect(chunkSizes.reduce((a, b) => a + b, 0)).toBe(120);
+    expect(map.size).toBe(120);
+    expect(map.get('I_0')).toBe('body I_0');
+    expect(map.get('I_119')).toBe('body I_119');
+  });
+
+  it('returns partial results when one chunk fails without throwing', async () => {
+    const ids = Array.from({ length: 120 }, (_, i) => `I_${i}`);
+    let call = 0;
+    // First chunk errors; remaining chunks succeed.
+    const fakeFetch: typeof fetch = (async (_url, init) => {
+      const body = JSON.parse(String((init as RequestInit)?.body ?? '{}')) as {
+        variables?: { ids?: string[] };
+      };
+      const reqIds = body.variables?.ids ?? [];
+      const isFirst = call === 0;
+      call += 1;
+      const page = isFirst
+        ? { errors: [{ message: 'Bad credentials' }] }
+        : { data: { nodes: reqIds.map((id) => ({ id, body: `body ${id}` })) } };
+      return new Response(JSON.stringify(page), { status: 200 });
+    }) as typeof fetch;
+
+    const map = await hydrateGithubItemBodies(ids, 'tok', fakeFetch);
+
+    // First 50 ids were in the failed chunk; the rest still hydrate.
+    expect(map.has('I_0')).toBe(false);
+    expect(map.get('I_50')).toBe('body I_50');
+    expect(map.get('I_119')).toBe('body I_119');
+    expect(map.size).toBe(70);
   });
 });
 

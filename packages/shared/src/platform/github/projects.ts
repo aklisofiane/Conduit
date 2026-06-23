@@ -779,6 +779,13 @@ interface HydrateNodesResponse {
   nodes?: Array<{ id?: string; body?: string } | null>;
 }
 
+// GitHub's `nodes(ids:)` lookup is documented to accept ~100 ids per request;
+// going over fails the whole query. A first poll (or a post-reset snapshot) can
+// hand us thousands of ids at once, so we chunk well under the limit. Partial
+// failure is isolated per chunk: a transient error on one batch logs and is
+// skipped rather than aborting the entire poll cycle.
+const HYDRATE_CHUNK_SIZE = 50;
+
 export async function hydrateGithubItemBodies(
   nodeIds: string[],
   token: string,
@@ -787,19 +794,32 @@ export async function hydrateGithubItemBodies(
   const bodies = new Map<string, string>();
   if (nodeIds.length === 0) return bodies;
 
-  const payload: GraphQLResponse<HydrateNodesResponse> = await callGraphQL(
-    { query: HYDRATE_BODIES_QUERY, variables: { ids: nodeIds } },
-    token,
-    fetchImpl,
-  );
+  for (let i = 0; i < nodeIds.length; i += HYDRATE_CHUNK_SIZE) {
+    const chunk = nodeIds.slice(i, i + HYDRATE_CHUNK_SIZE);
+    try {
+      const payload: GraphQLResponse<HydrateNodesResponse> = await callGraphQL(
+        { query: HYDRATE_BODIES_QUERY, variables: { ids: chunk } },
+        token,
+        fetchImpl,
+      );
 
-  if (payload.errors?.length) {
-    throw new Error(`GitHub GraphQL error: ${payload.errors.map((e) => e.message).join('; ')}`);
-  }
+      if (payload.errors?.length) {
+        throw new Error(`GitHub GraphQL error: ${payload.errors.map((e) => e.message).join('; ')}`);
+      }
 
-  for (const node of payload.data?.nodes ?? []) {
-    if (node?.id && typeof node.body === 'string') {
-      bodies.set(node.id, node.body);
+      for (const node of payload.data?.nodes ?? []) {
+        if (node?.id && typeof node.body === 'string') {
+          bodies.set(node.id, node.body);
+        }
+      }
+    } catch (err) {
+      // Skip this chunk and keep the bodies we already hydrated. Missing bodies
+      // degrade gracefully downstream (the trigger body is simply left unset).
+      console.warn(
+        `hydrateGithubItemBodies: chunk ${i / HYDRATE_CHUNK_SIZE} failed, continuing with partial results: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
     }
   }
   return bodies;
