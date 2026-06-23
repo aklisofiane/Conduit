@@ -4,6 +4,7 @@ import { readConduitSummary, resolveProvider, git } from '@conduit/agent';
 import { runnerRequestSchema, type RunnerEvent } from '@conduit/shared/runner';
 import type { AgentRequest } from '@conduit/shared';
 import { runAgentTurns } from './turns';
+import { createSecretRedactor, type SecretEntry } from './secret-redactor';
 
 /**
  * Per-run agent execution sandbox. One process per agent node:
@@ -59,10 +60,14 @@ async function main(): Promise<void> {
       openaiApiKey: provider.openaiApiKey,
       baseUrl: provider.baseUrl,
     });
+    // Redact the credentials we just injected from any tool payload that echoes
+    // them, before events reach ExecutionLog / the live UI. Exact-match only —
+    // these are the values the runner controls for this run.
+    const redactor = createSecretRedactor(collectInjectedSecrets(provider));
     const agentRequest: AgentRequest = agent;
     const session = adapter.startSession(agentRequest, abort.signal);
     try {
-      await runAgentTurns({ session, prompts, emit, abort });
+      await runAgentTurns({ session, prompts, emit, abort, redactor });
     } finally {
       await session.dispose();
     }
@@ -109,6 +114,33 @@ function readAllStdin(): Promise<string> {
     process.stdin.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
     process.stdin.on('error', reject);
   });
+}
+
+/**
+ * The credentials the runner injects for this run — exactly what
+ * {@link createSecretRedactor} scrubs from tool payloads. MCP transport
+ * headers/env also carry substituted credentials, but the resolved request
+ * drops the marker that says which fields were substituted, so redacting those
+ * blind would over-redact benign values (`application/json`, a region). That's
+ * a separate follow-up; here we cover the unambiguous provider secrets.
+ */
+function collectInjectedSecrets(provider: {
+  anthropicApiKey?: string;
+  openaiApiKey?: string;
+  claudeCodeOauthToken?: string;
+  extraEnv?: Record<string, string>;
+}): SecretEntry[] {
+  const secrets: SecretEntry[] = [];
+  if (provider.anthropicApiKey)
+    secrets.push({ label: 'ANTHROPIC_API_KEY', value: provider.anthropicApiKey });
+  if (provider.openaiApiKey)
+    secrets.push({ label: 'OPENAI_API_KEY', value: provider.openaiApiKey });
+  if (provider.claudeCodeOauthToken)
+    secrets.push({ label: 'CLAUDE_CODE_OAUTH_TOKEN', value: provider.claudeCodeOauthToken });
+  for (const [key, value] of Object.entries(provider.extraEnv ?? {})) {
+    secrets.push({ label: key, value });
+  }
+  return secrets;
 }
 
 async function ensureConduitSummaryPlaceholder(

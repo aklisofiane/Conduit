@@ -1,6 +1,7 @@
 import type { AgentEvent } from '@conduit/shared';
 import type { RunnerEvent } from '@conduit/shared/runner';
 import { capAgentEvent } from './payload-cap';
+import type { SecretRedactor } from './secret-redactor';
 
 /** A provider session, narrowed to what the turn loop needs. */
 export interface TurnSession {
@@ -18,6 +19,11 @@ export interface RunTurnsOptions {
   abort: AbortController;
   /** Best-effort budget for the cosmetic summary turn. */
   summaryTimeoutMs?: number;
+  /**
+   * Redacts the run's known injected secrets from tool payloads before they're
+   * emitted. Omitted when the run injected nothing worth redacting.
+   */
+  redactor?: SecretRedactor;
 }
 
 /** Twice the runner heartbeat interval — ample for a normal summary turn. */
@@ -36,11 +42,11 @@ export const SUMMARY_TURN_TIMEOUT_MS = 60_000;
  * and cancelled its siblings — this keeps that work.)
  */
 export async function runAgentTurns(opts: RunTurnsOptions): Promise<void> {
-  const { session, prompts, emit, abort } = opts;
+  const { session, prompts, emit, abort, redactor } = opts;
 
   const drive = async (events: AsyncIterable<AgentEvent>): Promise<void> => {
     for await (const event of events) {
-      emit({ kind: 'agent', event: capAgentEvent(event) });
+      emit({ kind: 'agent', event: capAgentEvent(event, redactor) });
     }
   };
 
