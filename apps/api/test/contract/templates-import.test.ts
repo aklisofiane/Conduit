@@ -83,6 +83,21 @@ describe('TemplatesService.importTemplate', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  it('rejects a bundle that smuggles a literal connection id past the placeholders', async () => {
+    // A genuine export only emits <alias> placeholders; a hand-crafted bundle
+    // could embed a concrete (possibly cross-org) id that resolveTemplate would
+    // never re-ground. Build a valid export, then poke a literal id back in.
+    const file = workflowToTemplate(
+      { name: 'Smuggled', definition: liveDefinition('conn_repo') },
+      { aliasFor: () => 'repo' },
+    );
+    file.workflows[0]!.definition.triggers[0]!.connectionId =
+      fixture.orgB.connectionId;
+    await expect(
+      svc.importTemplate(fixture.orgA.id, { template: file, bindings: {} }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
   it('schema-rejects JSON that is not a valid workflow export', () => {
     const result = importTemplateDtoSchema.safeParse({
       template: { not: 'a template' },

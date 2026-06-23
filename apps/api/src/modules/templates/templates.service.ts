@@ -8,13 +8,16 @@ import {
 import {
   collectTemplatePlaceholderDetails,
   connectionScopeSchema,
+  enumerateConnectionSlots,
   findMcpPresetByPlatform,
   isScheduledTrigger,
+  placeholderAlias,
   platformForScopeKind,
   resolveTemplate,
   summarizeTemplate,
   type ConnectionScopeKind,
   type Platform,
+  type TemplateFile,
   type TemplatePlaceholder,
   type TemplateSummary,
   type WorkflowDefinition,
@@ -86,6 +89,7 @@ export class TemplatesService implements OnModuleInit {
     orgId: string,
     dto: ImportTemplateDto,
   ): Promise<CreatedFromTemplate> {
+    this.assertNoConcreteConnectionIds(dto.template);
     const placeholderDetails = collectTemplatePlaceholderDetails(dto.template);
     const loaded: LoadedTemplate = {
       file: dto.template,
@@ -249,6 +253,28 @@ export class TemplatesService implements OnModuleInit {
       templateId: loaded.file.id,
       workflows: created.map(({ id, name }) => ({ id, name })),
     };
+  }
+
+  /**
+   * Reject uploaded bundles that carry literal Connection ids in any
+   * connection slot. A genuine export only ever emits `<alias>` placeholders
+   * (every concrete id is stripped by `workflowToTemplate`), so a non-empty,
+   * non-placeholder slot means a hand-crafted bundle smuggling a foreign id
+   * past the binding flow. Those slots are not re-grounded by `resolveTemplate`
+   * and would otherwise be persisted verbatim — a cross-org reference. The
+   * catalog path never reaches here; its templates come from trusted disk.
+   */
+  private assertNoConcreteConnectionIds(template: TemplateFile): void {
+    for (const wf of template.workflows) {
+      for (const slot of enumerateConnectionSlots(wf.definition)) {
+        if (!slot.value) continue;
+        if (placeholderAlias(slot.value)) continue;
+        throw new BadRequestException(
+          `Imported workflow "${wf.name}" contains a literal connection id; ` +
+            `exports must reference connections via <alias> placeholders only.`,
+        );
+      }
+    }
   }
 
   private assertBindingsCoverPlaceholders(
