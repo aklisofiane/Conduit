@@ -1,12 +1,12 @@
 {
   "id": "nightly-review",
   "name": "Nightly Code Review",
-  "description": "Scheduled nightly review of recent changes. Scope agent identifies what changed, four parallel reviewers (Security, Quality, Refactor, Performance) analyze their domain, and Publisher creates one issue per finding routed by confidence to Review or AIDev.",
+  "description": "Scheduled nightly review of recent changes.\n\nScope agent identifies what changed, four parallel reviewers (Security, Quality, Refactor, Performance) analyze their domain, and Publisher creates one issue per finding — routed by confidence to \"conduit-dev\" (auto-chain into Develop) or the \"Review\" status + \"conduit-human-review\" label (park for a human).",
   "category": "review",
   "workflows": [
     {
       "name": "Nightly Code Review",
-      "description": "Cron-triggered nightly. Scope identifies changed files, four parallel reviewers assess their domain, Publisher creates issues with confidence-based board status routing.",
+      "description": "Cron-triggered nightly. Scope identifies changed files, four parallel reviewers assess their domain, Publisher creates issues with confidence-based label/status routing.",
       "definition": {
         "triggers": [
           {
@@ -69,7 +69,7 @@
             "instructionsAppend": "The upstream reviewers for this pipeline are: Security, Quality, Refactor, Performance. Read `.conduit/Security.md`, `.conduit/Quality.md`, `.conduit/Refactor.md`, and `.conduit/Performance.md`.\n\n**Severity gate:** Only publish findings with a severity of `medium`, `high`, or `critical`. Skip any finding marked `low` severity entirely — do not create an issue for it. If a finding omits its severity, treat it as `low` and skip it. If every finding across all reviewers is `low` (or there are no findings), stop and create nothing.",
             "mcpServers": [{ "serverId": "github-mcp" }],
             "skills": [],
-            "issueWriteback": { "allowedStatuses": ["Review"], "allowedLabels": ["conduit-dev"] }
+            "issueWriteback": { "allowedStatuses": ["Review"], "allowedLabels": ["conduit-dev", "conduit-human-review"] }
           }
         ],
         "edges": [

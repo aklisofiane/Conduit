@@ -335,9 +335,16 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
 
           {selected && (
             <div className="flex flex-col gap-4">
-              <p className="font-mono text-[12px] text-[var(--color-text-2)]">
-                {selected.description}
-              </p>
+              <div className="flex flex-col gap-2">
+                {selected.description.split('\n\n').map((para, i) => (
+                  <p
+                    key={i}
+                    className="font-mono text-[12px] leading-relaxed text-[var(--color-text-2)]"
+                  >
+                    {para}
+                  </p>
+                ))}
+              </div>
               {orderedAliases.length === 0 ? (
                 <div className="rounded-md border border-[var(--color-line)] bg-[var(--color-bg-2)] px-3 py-2 font-mono text-[12px] text-[var(--color-text-2)]">
                   No connection bindings needed.
@@ -416,8 +423,8 @@ function TemplateCard({
           {t.category} · {t.workflowCount} wf
         </span>
       </div>
-      <span className="font-mono text-[11.5px] leading-relaxed text-[var(--color-text-2)]">
-        {t.description}
+      <span className="line-clamp-2 font-mono text-[11.5px] leading-relaxed text-[var(--color-text-2)]">
+        {t.description.split('\n\n')[0]}
       </span>
     </button>
   );

@@ -16,8 +16,9 @@ The flagship workflow: Conduit reviews your codebase on a schedule, files an iss
    └────────────────┬──────────────────┘
                      ▼
        one GitHub issue per finding
-       (board Status set by confidence:
-        high → AIDev, low → Review)
+       (routed by confidence:
+        high → conduit-dev label,
+        low → Review status + conduit-human-review)
                      ▼
           you triage on the board ◀── the only human step
                      ▼

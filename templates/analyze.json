@@ -1,7 +1,7 @@
 {
   "id": "analyze",
   "name": "Analyze",
-  "description": "Analyze a new issue, internally review the plan for gaps, and update the issue description with a grounded implementation approach. Triggered when an issue enters the \"Todo\" board column — a human-gesture entry point, so it gates on status rather than a label (a freshly opened issue has no label yet; rename the trigger filter to match your board's column or label names). On completion Publish branches: a clear analysis applies the \"conduit-dev\" label and sets status \"In Progress\" to auto-chain into Develop; if open questions still need the user, it sets a human-facing \"Review\" status and applies the \"conduit-human-review\" label instead so the issue parks for a human. Convention: status/state filters for human-gesture entry, conduit-* labels for AI handoffs (with conduit-human-review the writeback target that parks an issue for a human).",
+  "description": "Analyze a new issue, internally review the plan for gaps, and rewrite its description with a grounded implementation approach.\n\nTriggered when an issue enters the \"Todo\" board column — a human-gesture entry point, so it gates on status rather than a label. Rename the trigger filter to match your board's column or label names.\n\nOn completion: a clear analysis applies \"conduit-dev\" and sets status \"In Progress\" to auto-chain into Develop; open questions instead park the issue for a human with the \"Review\" status and \"conduit-human-review\" label.\n\nConvention: status/state filters for human-gesture entry, conduit-* labels for AI handoffs.",
   "category": "triage",
   "workflows": [
     {

@@ -1,7 +1,7 @@
 {
   "id": "develop",
   "name": "Develop",
-  "description": "Multi-agent development pipeline: Planner dispatches Dev + Tests in parallel, Docs documents the result, QA merges and opens a draft pull/merge request. Gated on the \"conduit-dev\" label — Analyze applies it to auto-chain an opened issue into a draft PR untouched, and a human can re-apply it to re-run. On completion QA swaps the label to \"conduit-review\" to hand off to the Review workflow. GitHub Projects users who prefer drag-to-column can swap the trigger filter to status=Dev; GitLab boards are label-native, so the label default works out of the box.",
+  "description": "Multi-agent development pipeline: Planner dispatches Dev + Tests in parallel, Docs writes it up, QA merges and opens a draft pull/merge request.\n\nGated on the \"conduit-dev\" label — Analyze applies it to auto-chain an opened issue into a draft PR; re-apply it to re-run.\n\nOn completion QA swaps the label to \"conduit-review\" to hand off to Review. Projects users who prefer drag-to-column can swap the trigger to status=Dev; GitLab boards are label-native out of the box.",
   "category": "develop",
   "workflows": [
     {

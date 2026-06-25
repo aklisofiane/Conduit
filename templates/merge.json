@@ -1,7 +1,7 @@
 {
   "id": "merge",
   "name": "Merge",
-  "description": "Merges a pull/merge request once a human opts it in: label it \"conduit-merge\", then mark it ready for review — on this workflow, labeled + ready means \"merge it\". Checks must be green. Minor mechanical conflicts are resolved automatically; semantic conflicts are escalated by converting the PR/MR back to draft with an analysis comment (re-marking ready retries). Closes the linked issue after merging. Pairs with the Develop and Review templates as the final stage of a board-driven pipeline, or runs standalone.",
+  "description": "Merges a pull/merge request once a human opts in: label it \"conduit-merge\", then mark it ready — labeled + ready means \"merge it\".\n\nChecks must be green. Minor mechanical conflicts resolve automatically; semantic conflicts escalate by converting the PR/MR back to draft with an analysis comment (re-marking ready retries).\n\nCloses the linked issue after merging. Pairs with Develop and Review as the final stage of a board-driven pipeline, or runs standalone.",
   "category": "merge",
   "workflows": [
     {
