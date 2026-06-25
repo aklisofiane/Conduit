@@ -91,6 +91,76 @@ describe('fetchProjectBoardItems', () => {
     expect(items[1]?.repo).toBeUndefined();
   });
 
+  it('drops closed issues and closed/merged PRs (still carded on the board)', async () => {
+    const canned = {
+      data: {
+        owner: {
+          projectV2: {
+            items: {
+              pageInfo: { hasNextPage: false, endCursor: null },
+              nodes: [
+                {
+                  id: 'PVTI_open_issue',
+                  content: {
+                    __typename: 'Issue',
+                    id: 'I_open',
+                    number: 1,
+                    title: 'Open issue',
+                    url: 'https://github.com/acme/shop/issues/1',
+                    state: 'OPEN',
+                    repository: { name: 'shop', owner: { login: 'acme' } },
+                  },
+                  fieldValues: { nodes: [] },
+                },
+                {
+                  id: 'PVTI_closed_issue',
+                  content: {
+                    __typename: 'Issue',
+                    id: 'I_closed',
+                    number: 2,
+                    title: 'Closed issue',
+                    url: 'https://github.com/acme/shop/issues/2',
+                    state: 'CLOSED',
+                    repository: { name: 'shop', owner: { login: 'acme' } },
+                  },
+                  fieldValues: { nodes: [] },
+                },
+                {
+                  id: 'PVTI_merged_pr',
+                  content: {
+                    __typename: 'PullRequest',
+                    id: 'PR_merged',
+                    number: 3,
+                    title: 'Merged PR',
+                    url: 'https://github.com/acme/shop/pull/3',
+                    state: 'MERGED',
+                    repository: { name: 'shop', owner: { login: 'acme' } },
+                    headRefName: 'feature',
+                    baseRefName: 'main',
+                  },
+                  fieldValues: { nodes: [] },
+                },
+                {
+                  id: 'PVTI_draft',
+                  content: { __typename: 'DraftIssue', id: 'DI_1', title: 'No state' },
+                  fieldValues: { nodes: [] },
+                },
+              ],
+            },
+          },
+        },
+      },
+    };
+
+    const items = await fetchProjectBoardItems(
+      { ownerType: 'org', owner: 'acme', projectNumber: 5, token: 't' },
+      makeFetch([canned]),
+    );
+
+    // Only the open issue and the stateless draft survive.
+    expect(items.map((i) => i.itemNodeId)).toEqual(['PVTI_open_issue', 'PVTI_draft']);
+  });
+
   it('follows pagination via endCursor', async () => {
     const page1 = {
       data: {

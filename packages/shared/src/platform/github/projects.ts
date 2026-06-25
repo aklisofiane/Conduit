@@ -113,6 +113,8 @@ interface RawProjectItem {
     title?: string;
     url?: string;
     body?: string;
+    // Issue: OPEN | CLOSED. PullRequest: OPEN | CLOSED | MERGED.
+    state?: string;
     repository?: { name: string; owner: { login: string } };
     labels?: { nodes: Array<{ name?: string } | null> };
     // PullRequest-only fields
@@ -152,6 +154,7 @@ function buildItemsQuery(ownerType: 'user' | 'org'): string {
                   number
                   title
                   url
+                  state
                   repository { name owner { login } }
                   labels(first: 20) { nodes { name } }
                 }
@@ -160,6 +163,7 @@ function buildItemsQuery(ownerType: 'user' | 'org'): string {
                   number
                   title
                   url
+                  state
                   repository { name owner { login } }
                   labels(first: 20) { nodes { name } }
                   isDraft
@@ -251,6 +255,7 @@ export async function fetchProjectBoardItems(
 
     for (const raw of project.items.nodes) {
       if (!raw) continue;
+      if (isClosedContent(raw.content)) continue;
       items.push(toItem(raw));
     }
 
@@ -327,6 +332,22 @@ async function callGraphQL<T>(
     throw new Error(`GitHub GraphQL error: ${payload.errors.map((e) => e.message).join('; ')}`);
   }
   return payload;
+}
+
+/**
+ * Closing a GitHub issue (or closing/merging a PR) does *not* remove its card
+ * from a Projects v2 board, and the board `items` connection has no server-side
+ * state filter. Drop closed content here so board polling matches the "open
+ * only" intent of the repo-scoped queries, which pin `states: [OPEN]`.
+ * Draft and content-less cards have no state and are kept.
+ */
+function isClosedContent(content: RawProjectItem['content']): boolean {
+  if (!content) return false;
+  if (content.__typename === 'Issue') return content.state === 'CLOSED';
+  if (content.__typename === 'PullRequest') {
+    return content.state === 'CLOSED' || content.state === 'MERGED';
+  }
+  return false;
 }
 
 function toItem(raw: RawProjectItem): ProjectBoardItem {
