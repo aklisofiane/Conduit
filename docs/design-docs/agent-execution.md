@@ -319,7 +319,7 @@ Ownership angle (why `conduit/*` is one-run-at-a-time): [branch-management.md](.
 
 ## Constraints enforcement
 
-`AgentConstraints` (max turns, tokens, tool calls, timeout) are enforced **inside the provider adapter** — it counts events and throws `ConstraintExceededError` when breached. Timeout is a Temporal activity-level `startToCloseTimeout` *and* a provider-level wall-clock guard (belt + suspenders).
+`AgentConstraints` (max turns, tokens, tool calls, timeout) are enforced **cumulatively across all turns within a session** via a shared `ConstraintState` object (`packages/agent/src/provider/constraints.ts`). Each provider's `startSession` creates one `ConstraintState` (counters + wall-clock start time) and passes it to every `enforceConstraints` call — so when a session runs its main turn, optional writeback turn, and summary turn, the limits apply to the aggregate, not per-turn. `enforceConstraints` wraps the provider's raw `AgentEvent` stream, counting events and throwing `ConstraintExceededError` when breached. Timeout is a Temporal activity-level `startToCloseTimeout` *and* a provider-level wall-clock guard (belt + suspenders).
 
 ## Polling pipeline
 

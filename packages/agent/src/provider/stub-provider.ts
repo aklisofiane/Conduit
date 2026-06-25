@@ -7,7 +7,7 @@ import type {
   AgentRequest,
   ProviderCapabilities,
 } from '@conduit/shared';
-import { enforceConstraints } from './constraints';
+import { createConstraintState, enforceConstraints } from './constraints';
 import type { AgentProvider, AgentSession } from './types';
 
 /**
@@ -129,6 +129,7 @@ export class StubProvider implements AgentProvider {
   }
 
   startSession(req: AgentRequest, signal: AbortSignal): AgentSession {
+    const constraintState = createConstraintState();
     let turns: StubScript[] | undefined;
     const getTurns = async (): Promise<StubScript[]> => {
       if (turns) return turns;
@@ -190,7 +191,7 @@ export class StubProvider implements AgentProvider {
     };
 
     const run = (_userMessage: string): AsyncIterable<AgentEvent> =>
-      enforceConstraints(runScript(), req);
+      enforceConstraints(runScript(), req, constraintState);
 
     const dispose = (): void => {};
 

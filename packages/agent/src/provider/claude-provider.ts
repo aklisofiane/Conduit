@@ -5,7 +5,7 @@ import {
   type ProviderCapabilities,
 } from '@conduit/shared';
 import { AsyncQueue } from './async-queue';
-import { enforceConstraints } from './constraints';
+import { createConstraintState, enforceConstraints } from './constraints';
 import { makeLazySdkLoader } from './lazy-sdk';
 import type { AgentProvider, AgentSession } from './types';
 
@@ -42,6 +42,7 @@ export class ClaudeProvider implements AgentProvider {
     const canUseTool = makeCanUseTool(req.mcpServers);
     const input = new AsyncQueue<SdkUserMessage>();
     let iterator: AsyncIterator<unknown> | undefined;
+    const constraintState = createConstraintState();
 
     const ensureIterator = async (): Promise<AsyncIterator<unknown>> => {
       if (iterator) return iterator;
@@ -95,7 +96,7 @@ export class ClaudeProvider implements AgentProvider {
     };
 
     const run = (userMessage: string): AsyncIterable<AgentEvent> =>
-      enforceConstraints(runTurn(userMessage), req);
+      enforceConstraints(runTurn(userMessage), req, constraintState);
 
     const dispose = (): void => {
       input.close();
