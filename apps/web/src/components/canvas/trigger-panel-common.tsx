@@ -7,11 +7,11 @@ import type {
 } from '@conduit/shared';
 import { isConduitLabel } from '@conduit/shared/label';
 import type { ProjectBoardSummary } from '@conduit/shared/platform';
-import { ApiError } from '../../api/client.js';
+import { ApiError, apiErrorMessage } from '../../api/client.js';
 import { useEnsureRepoLabels } from '../../api/hooks.js';
 import type { useListProjectBoards } from '../../api/hooks.js';
 import { cn } from '../../lib/cn.js';
-import { scopeSummary } from '../../lib/connection.js';
+import { scopeSummary, type EnsureLabelTarget } from '../../lib/connection.js';
 import { Select } from '../common/Select.js';
 
 /**
@@ -186,38 +186,6 @@ const FIELD_LABELS: Record<TriggerFilter['field'], string> = {
 function emptyFilter(field: TriggerFilter['field']): TriggerFilter {
   if (field === 'pr_state') return { field: 'pr_state', value: 'any' };
   return { field, value: '' };
-}
-
-/**
- * The repo/project a missing `conduit-*` label can be created on. Threaded
- * down to the label filter's value input so it can offer an inline "create
- * label" action. Undefined when no repo/project connection is selected.
- */
-export interface EnsureLabelTarget {
-  connectionId: string;
-  /** Display string for the button, e.g. `owner/repo` or a GitLab path. */
-  scopeLabel: string;
-}
-
-/**
- * Build the create-label target for the selected connection — present only
- * when the connection is bound to a repo/project (labels live there).
- */
-export function ensureLabelTarget(
-  connections: { id: string; name: string; scope: ConnectionScope }[],
-  connectionId: string,
-): EnsureLabelTarget | undefined {
-  const conn = connections.find((c) => c.id === connectionId);
-  if (
-    !conn ||
-    (conn.scope.kind !== 'github_repo' && conn.scope.kind !== 'gitlab_project')
-  ) {
-    return undefined;
-  }
-  return {
-    connectionId: conn.id,
-    scopeLabel: scopeSummary(conn.scope) || conn.name,
-  };
 }
 
 export function FilterEditor({
@@ -421,9 +389,7 @@ function CreateLabelAction({
   const result = ensure.data?.[0];
   const failed = result?.status === 'failed';
   const errorText = ensure.error
-    ? ensure.error instanceof ApiError
-      ? ensure.error.message
-      : String(ensure.error)
+    ? apiErrorMessage(ensure.error)
     : failed
       ? (result?.error ?? 'Failed to create label')
       : null;

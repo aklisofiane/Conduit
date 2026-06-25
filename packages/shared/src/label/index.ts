@@ -51,12 +51,23 @@ export const CONDUIT_LABELS: readonly ConduitLabel[] = [
   },
 ] as const;
 
-/** True when `name` is one of Conduit's canonical labels (exact match). */
-export function isConduitLabel(name: string): boolean {
-  return CONDUIT_LABELS.some((l) => l.name === name);
-}
-
 /** The registry entry for `name`, or `undefined` if it isn't a Conduit label. */
 export function getConduitLabel(name: string): ConduitLabel | undefined {
   return CONDUIT_LABELS.find((l) => l.name === name);
+}
+
+/** True when `name` is one of Conduit's canonical labels (exact match). */
+export function isConduitLabel(name: string): boolean {
+  return !!getConduitLabel(name);
+}
+
+/**
+ * Per-label outcome of an ensure-labels call (one entry per requested name).
+ * Shared so the API service and the web hook describe the
+ * `POST /trigger/ensure-labels` response with one contract.
+ */
+export interface EnsureLabelResult {
+  name: string;
+  status: 'created' | 'exists' | 'failed';
+  error?: string;
 }

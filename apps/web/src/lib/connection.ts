@@ -23,6 +23,38 @@ export function repoScopeKindFor(platform: string): ConnectionScopeKind {
   return platform === 'gitlab' ? 'gitlab_project' : 'github_repo';
 }
 
+/**
+ * The repo/project a missing `conduit-*` label can be created on. Consumed by
+ * the trigger panel's inline "create label" action and the connection-time
+ * label prompt. Undefined when the connection isn't bound to a repo/project.
+ */
+export interface EnsureLabelTarget {
+  connectionId: string;
+  /** Display string for the button, e.g. `owner/repo` or a GitLab path. */
+  scopeLabel: string;
+}
+
+/**
+ * Build the create-label target for a connection — present only when it's
+ * bound to a repo/project (labels live there).
+ */
+export function ensureLabelTarget(
+  connections: { id: string; name: string; scope: ConnectionScope }[],
+  connectionId: string,
+): EnsureLabelTarget | undefined {
+  const conn = connections.find((c) => c.id === connectionId);
+  if (
+    !conn ||
+    (conn.scope.kind !== 'github_repo' && conn.scope.kind !== 'gitlab_project')
+  ) {
+    return undefined;
+  }
+  return {
+    connectionId: conn.id,
+    scopeLabel: scopeSummary(conn.scope) || conn.name,
+  };
+}
+
 export function connectionLabel(c: {
   name: string;
   credential: { platform: string; hostUrl?: string | null };

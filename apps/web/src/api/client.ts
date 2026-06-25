@@ -17,6 +17,12 @@ export class ApiError extends Error {
   }
 }
 
+/** Best-effort human message from a thrown value: the server-provided
+ *  `ApiError.message` where we have one, else the stringified error. */
+export function apiErrorMessage(e: unknown): string {
+  return e instanceof ApiError ? e.message : String(e);
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(`${BASE_URL}/api${path}`, {
     ...init,

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { DiscoveredTool, McpTransport, WorkflowDefinition } from '@conduit/shared';
 import type { TemplateFile } from '@conduit/shared/template';
+import type { EnsureLabelResult } from '@conduit/shared/label';
 import type {
   ProjectBoardSummary,
   RepoLabel,
@@ -377,12 +378,6 @@ export function useListLabels(args: { connectionId: string; enabled: boolean }) 
     staleTime: 30_000,
     retry: false,
   });
-}
-
-export interface EnsureLabelResult {
-  name: string;
-  status: 'created' | 'exists' | 'failed';
-  error?: string;
 }
 
 /**

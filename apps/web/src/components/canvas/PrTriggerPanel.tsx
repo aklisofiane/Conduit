@@ -5,12 +5,12 @@ import { useConnections, useListLabels } from '../../api/hooks.js';
 import {
   ActiveToggleField,
   ConnectionSelect,
-  ensureLabelTarget,
   Field,
   FilterEditor,
   PanelFooter,
   PanelHeader,
 } from './trigger-panel-common.js';
+import { ensureLabelTarget } from '../../lib/connection.js';
 
 type PrTrigger = Extract<TriggerConfig, { type: 'pull_requests' }>;
 

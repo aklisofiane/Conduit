@@ -10,12 +10,12 @@ import {
   ActiveToggleField,
   BoardPickerHint,
   ConnectionSelect,
-  ensureLabelTarget,
   Field,
   FilterEditor,
   PanelFooter,
   PanelHeader,
 } from './trigger-panel-common.js';
+import { ensureLabelTarget } from '../../lib/connection.js';
 
 type IssuesTrigger = Extract<TriggerConfig, { type: 'issues' }>;
 

@@ -3,7 +3,7 @@ import type { ConnectionScope, ConnectionScopeKind } from '@conduit/shared';
 import { CONDUIT_LABELS } from '@conduit/shared/label';
 import { isCloudHost } from '@conduit/shared/platform';
 import type { Platform } from '@conduit/shared/platform';
-import { ApiError } from '../../api/client.js';
+import { ApiError, apiErrorMessage } from '../../api/client.js';
 import {
   useConnections,
   useCreateConnection,
@@ -15,7 +15,11 @@ import {
   useListViewerOrgs,
 } from '../../api/hooks.js';
 import type { ConnectionRow, CredentialRow } from '../../api/types.js';
-import { scopeSummary } from '../../lib/connection.js';
+import {
+  ensureLabelTarget,
+  scopeSummary,
+  type EnsureLabelTarget,
+} from '../../lib/connection.js';
 import { SearchSelect } from '../common/SearchSelect.js';
 import { Select } from '../common/Select.js';
 
@@ -38,10 +42,7 @@ export function ConnectionsSection() {
   const [creating, setCreating] = useState(false);
   // After a repo/project connection is created, offer to add Conduit's labels
   // to it so label-gated templates work without hand-creating labels.
-  const [labelPrompt, setLabelPrompt] = useState<{
-    connectionId: string;
-    scopeLabel: string;
-  } | null>(null);
+  const [labelPrompt, setLabelPrompt] = useState<EnsureLabelTarget | null>(null);
 
   return (
     <section className="rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-1)]">
@@ -66,17 +67,9 @@ export function ConnectionsSection() {
             try {
               const conn = await create.mutateAsync(body);
               setCreating(false);
-              if (
-                conn.scope.kind === 'github_repo' ||
-                conn.scope.kind === 'gitlab_project'
-              ) {
-                setLabelPrompt({
-                  connectionId: conn.id,
-                  scopeLabel: scopeSummary(conn.scope) || conn.name,
-                });
-              }
+              setLabelPrompt(ensureLabelTarget([conn], conn.id) ?? null);
             } catch (e) {
-              alert(e instanceof ApiError ? e.message : String(e));
+              alert(apiErrorMessage(e));
             }
           }}
         />
@@ -128,7 +121,7 @@ function LabelPrompt({
   target,
   onDismiss,
 }: {
-  target: { connectionId: string; scopeLabel: string };
+  target: EnsureLabelTarget;
   onDismiss: () => void;
 }) {
   const ensure = useEnsureRepoLabels();
@@ -150,18 +143,11 @@ function LabelPrompt({
     });
 
   const add = () => {
-    const names = CONDUIT_LABELS.map((l) => l.name).filter((n) =>
-      selected.has(n),
-    );
+    const names = [...selected];
     if (names.length > 0) ensure.mutate({ connectionId: target.connectionId, names });
   };
 
-  const topLevelError =
-    ensure.error instanceof ApiError
-      ? ensure.error.message
-      : ensure.error
-        ? String(ensure.error)
-        : null;
+  const topLevelError = ensure.error ? apiErrorMessage(ensure.error) : null;
 
   return (
     <div className="border-b border-[var(--color-line)] px-4 py-4">

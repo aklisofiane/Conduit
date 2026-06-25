@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { expectScopeKind } from '@conduit/shared';
+import type { ConnectionScope, ConnectionScopeKind } from '@conduit/shared';
 import {
   listProjectBoards,
   listViewerRepositories,
@@ -15,7 +16,7 @@ import {
   type GitlabProjectSummary,
   type RepoLabel,
 } from '@conduit/shared/platform';
-import { getConduitLabel } from '@conduit/shared/label';
+import { getConduitLabel, type EnsureLabelResult } from '@conduit/shared/label';
 import { errMessage } from '../../common/err-message';
 import { ConnectionsService } from '../connections/connections.service';
 import { CredentialsService } from '../credentials/credentials.service';
@@ -26,13 +27,6 @@ import type {
   ListViewerReposDto,
   ListViewerOrgsDto,
 } from './dto';
-
-/** Per-label outcome of an ensure call (one entry per requested name). */
-export interface EnsureLabelResult {
-  name: string;
-  status: 'created' | 'exists' | 'failed';
-  error?: string;
-}
 
 /**
  * Color/description fall back to a neutral gray for names not in the registry,
@@ -150,14 +144,12 @@ export class TriggerService {
     ]);
 
     if (binding.platform === 'GITLAB') {
-      let glScope;
-      try {
-        glScope = expectScopeKind(binding.scope, 'gitlab_project');
-      } catch {
-        throw new BadRequestException({
-          message: `Connection ${dto.connectionId} is not bound to a GitLab project (scope.kind = ${binding.scope.kind})`,
-        });
-      }
+      const glScope = this.expectScopeOr400(
+        binding.scope,
+        'gitlab_project',
+        dto.connectionId,
+        'GitLab project',
+      );
       try {
         return await listGitlabProjectLabels({
           hostUrl: binding.hostUrl ?? 'gitlab.com',
@@ -174,14 +166,12 @@ export class TriggerService {
     }
 
     // Default: GitHub (existing behavior).
-    let repoScope;
-    try {
-      repoScope = expectScopeKind(binding.scope, 'github_repo');
-    } catch {
-      throw new BadRequestException({
-        message: `Connection ${dto.connectionId} is not bound to a GitHub repo (scope.kind = ${binding.scope.kind})`,
-      });
-    }
+    const repoScope = this.expectScopeOr400(
+      binding.scope,
+      'github_repo',
+      dto.connectionId,
+      'GitHub repo',
+    );
     try {
       return await listRepoLabels({
         owner: repoScope.owner,
@@ -217,57 +207,74 @@ export class TriggerService {
     ]);
 
     if (binding.platform === 'GITLAB') {
-      let glScope;
-      try {
-        glScope = expectScopeKind(binding.scope, 'gitlab_project');
-      } catch {
-        throw new BadRequestException({
-          message: `Connection ${dto.connectionId} is not bound to a GitLab project (scope.kind = ${binding.scope.kind})`,
-        });
-      }
-      return this.ensureEach(dto.names, async (name) => {
-        const { color, description } = labelSpec(name);
-        return createGitlabProjectLabel({
+      const glScope = this.expectScopeOr400(
+        binding.scope,
+        'gitlab_project',
+        dto.connectionId,
+        'GitLab project',
+      );
+      return this.ensureEach(dto.names, (name, { color, description }) =>
+        createGitlabProjectLabel({
           hostUrl: binding.hostUrl ?? 'gitlab.com',
           projectPath: glScope.projectPath,
           token: binding.token,
           name,
           color,
           description,
-        });
-      });
+        }),
+      );
     }
 
     // Default: GitHub (mirrors listLabels).
-    let repoScope;
-    try {
-      repoScope = expectScopeKind(binding.scope, 'github_repo');
-    } catch {
-      throw new BadRequestException({
-        message: `Connection ${dto.connectionId} is not bound to a GitHub repo (scope.kind = ${binding.scope.kind})`,
-      });
-    }
-    return this.ensureEach(dto.names, async (name) => {
-      const { color, description } = labelSpec(name);
-      return createRepoLabel({
+    const repoScope = this.expectScopeOr400(
+      binding.scope,
+      'github_repo',
+      dto.connectionId,
+      'GitHub repo',
+    );
+    return this.ensureEach(dto.names, (name, { color, description }) =>
+      createRepoLabel({
         owner: repoScope.owner,
         repo: repoScope.repo,
         token: binding.token,
         name,
         color,
         description,
+      }),
+    );
+  }
+
+  /**
+   * Narrow `scope` to `kind`, re-raising `expectScopeKind`'s failure as the
+   * 400 the trigger-config UI shows inline. Shared by `listLabels` and
+   * `ensureLabels`, which both gate on a repo/project-bound connection.
+   */
+  private expectScopeOr400<K extends ConnectionScopeKind>(
+    scope: ConnectionScope,
+    kind: K,
+    connectionId: string,
+    noun: string,
+  ): Extract<ConnectionScope, { kind: K }> {
+    try {
+      return expectScopeKind(scope, kind);
+    } catch {
+      throw new BadRequestException({
+        message: `Connection ${connectionId} is not bound to a ${noun} (scope.kind = ${scope.kind})`,
       });
-    });
+    }
   }
 
   private async ensureEach(
     names: string[],
-    create: (name: string) => Promise<'created' | 'exists'>,
+    create: (
+      name: string,
+      spec: { color: string; description?: string },
+    ) => Promise<'created' | 'exists'>,
   ): Promise<EnsureLabelResult[]> {
     const results: EnsureLabelResult[] = [];
     for (const name of names) {
       try {
-        const status = await create(name);
+        const status = await create(name, labelSpec(name));
         results.push({ name, status });
       } catch (e: unknown) {
         const error = errMessage(e);
