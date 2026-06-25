@@ -6,7 +6,7 @@ import {
   type ProviderCapabilities,
   type ResolvedMcpServer,
 } from '@conduit/shared';
-import { enforceConstraints } from './constraints';
+import { createConstraintState, enforceConstraints } from './constraints';
 import { makeLazySdkLoader } from './lazy-sdk';
 import type { AgentProvider, AgentSession } from './types';
 
@@ -53,6 +53,7 @@ export class CodexProvider implements AgentProvider {
     const plan = planCodexConfig(req.mcpServers);
     let thread: CodexThread | undefined;
     let firstTurn = true;
+    const constraintState = createConstraintState();
 
     const ensureThread = async (): Promise<CodexThread> => {
       if (thread) return thread;
@@ -111,7 +112,7 @@ export class CodexProvider implements AgentProvider {
     };
 
     const run = (userMessage: string): AsyncIterable<AgentEvent> =>
-      enforceConstraints(runTurn(userMessage), req);
+      enforceConstraints(runTurn(userMessage), req, constraintState);
 
     const dispose = (): void => {
       // Codex SDK has no explicit thread teardown — dropping the reference

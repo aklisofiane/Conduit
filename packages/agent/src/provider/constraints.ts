@@ -8,6 +8,18 @@ interface ProviderCounters {
   outputTokens: number;
 }
 
+export interface ConstraintState {
+  counters: ProviderCounters;
+  startedAt: number;
+}
+
+export function createConstraintState(): ConstraintState {
+  return {
+    counters: { turns: 0, toolCalls: 0, inputTokens: 0, outputTokens: 0 },
+    startedAt: Date.now(),
+  };
+}
+
 /**
  * Wrap a provider's raw `AgentEvent` stream with constraint enforcement so the
  * adapters stay dumb — they only translate SDK events; counting turns/tools/
@@ -17,9 +29,9 @@ interface ProviderCounters {
 export async function* enforceConstraints(
   source: AsyncIterable<AgentEvent>,
   req: AgentRequest,
+  state: ConstraintState,
 ): AsyncIterable<AgentEvent> {
-  const counters: ProviderCounters = { turns: 0, toolCalls: 0, inputTokens: 0, outputTokens: 0 };
-  const startedAt = Date.now();
+  const { counters, startedAt } = state;
   for await (const event of source) {
     // `text` / `tool_result` events (the bulk of a stream) never move a
     // counter, so only re-check the count limits when one actually changed.
