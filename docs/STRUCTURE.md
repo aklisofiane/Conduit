@@ -45,7 +45,7 @@ src/
     provider-configs/                  per-org LLM provider API keys — distinct from Credential;
                                        see docs/data-model.md > ProviderConfig
     trigger/                           POST /trigger/list-projects + /trigger/list-labels
-                                       config-time helpers
+                                       + /trigger/ensure-labels config-time helpers
     webhooks/                          POST /hooks/:workflowId — HMAC-verify, normalize, match,
                                        start run
     mcp/                               POST /mcp/introspect — live tools/list
@@ -182,6 +182,10 @@ src/
               (per-agent allowlist for end-of-run GitHub issue updates)
   connection/ ConnectionScope discriminated union (github_repo /
               github_projects_v2 / none) + expectScopeKind helper. Web-bundle safe.
+  label/      Canonical registry of Conduit's own `conduit-*` labels
+              (CONDUIT_LABELS + isConduitLabel / getConduitLabel) — single
+              source of truth for which labels are ours; read by the ensure
+              endpoint and the label UI affordances. Web-bundle safe.
   trigger/    TriggerEvent + TriggerConfig (issues / pull_requests / cron /
               webhook), filter/match logic, `poll.ts` (PollWorkflowInput +
               PollCycleResult)
@@ -204,8 +208,10 @@ src/
   platform/   Platform enum + per-platform connection shapes. Under `github/`,
               shared HTTP plumbing (`http.ts` — lazy URL/header helpers, web-bundle
               safe), the Projects v2 GraphQL client (`projects.ts`), and the
-              repo-labels REST client (`labels.ts`, used by the agent panel's
-              issue-writeback picker)
+              labels REST client (`labels.ts` — `listRepoLabels` for the agent
+              panel's issue-writeback picker + idempotent `createRepoLabel`).
+              `gitlab/labels.ts` mirrors it (`listGitlabProjectLabels` +
+              `createGitlabProjectLabel`), returning the same `RepoLabel` shape
   runtime/    AgentEvent → ExecutionLogKind mapping, Redis channel name
   temporal/   task queue name + workflow-type constants + deterministic id helpers
               (`workflowScheduleId` / `pollWorkflowId` / `cronWorkflowId` /
