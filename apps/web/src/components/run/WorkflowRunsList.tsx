@@ -1,5 +1,6 @@
-import { Link } from 'react-router-dom';
-import { useWorkflowRuns } from '../../api/hooks.js';
+import { type MouseEvent, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useRerunRun, useWorkflowRuns } from '../../api/hooks.js';
 import type { RunTrigger, WorkflowRunListItem } from '../../api/types.js';
 import { cn } from '../../lib/cn.js';
 import { statusClass } from '../../lib/status.js';
@@ -33,6 +34,9 @@ export function WorkflowRunsList({ workflowId }: WorkflowRunsListProps) {
 }
 
 function RunRow({ run }: { run: WorkflowRunListItem }) {
+  const navigate = useNavigate();
+  const rerun = useRerunRun();
+  const [note, setNote] = useState<string | null>(null);
   const total = run.nodes.length;
   const done = run.nodes.filter((n) => n.status === 'COMPLETED').length;
   const dur =
@@ -43,10 +47,25 @@ function RunRow({ run }: { run: WorkflowRunListItem }) {
   const isError = run.status === 'FAILED' && Boolean(run.error);
   const subtitle = isError ? run.error : triggerSubtitle(run.trigger);
 
+  async function handleRerun(e: MouseEvent) {
+    // The whole row is a Link — keep the click from navigating to the
+    // (stale) failed run while we kick off a fresh one.
+    e.preventDefault();
+    e.stopPropagation();
+    setNote(null);
+    try {
+      const next = await rerun.mutateAsync(run.id);
+      if (next) navigate(`/runs/${next.id}`);
+      else setNote('newer run active');
+    } catch {
+      setNote('rerun failed');
+    }
+  }
+
   return (
     <Link
       to={`/runs/${run.id}`}
-      className="grid grid-cols-[20px_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_140px] items-center gap-4 border-b border-[var(--color-line)] px-4 py-3 transition-colors last:border-b-0 hover:bg-[var(--color-bg-2)]"
+      className="group grid grid-cols-[20px_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_140px] items-center gap-4 border-b border-[var(--color-line)] px-4 py-3 transition-colors last:border-b-0 hover:bg-[var(--color-bg-2)]"
     >
       <span className={cn('status-dot', statusClass(run.status))} />
       <div className="min-w-0">
@@ -80,7 +99,22 @@ function RunRow({ run }: { run: WorkflowRunListItem }) {
       <div className="font-mono text-[11px] text-[var(--color-text-2)]">
         {relativeFromNow(run.startedAt)}
       </div>
-      <div className="text-right font-mono text-[11px] text-[var(--color-text-2)]">{dur}</div>
+      <div className="flex items-center justify-end gap-2 text-right font-mono text-[11px] text-[var(--color-text-2)]">
+        {run.status === 'FAILED' &&
+          (note ? (
+            <span className="text-[var(--color-text-3)]">{note}</span>
+          ) : (
+            <button
+              type="button"
+              className="btn opacity-0 transition-opacity group-hover:opacity-100"
+              onClick={handleRerun}
+              disabled={rerun.isPending}
+            >
+              {rerun.isPending ? '…' : 'Rerun'}
+            </button>
+          ))}
+        <span>{dur}</span>
+      </div>
     </Link>
   );
 }

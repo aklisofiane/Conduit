@@ -158,6 +158,23 @@ export function useCancelRun() {
   });
 }
 
+/**
+ * Rerun a FAILED run. The API replays the original trigger and returns the
+ * new run — or an empty body (`undefined`) when a newer run for the same
+ * ticket is already in flight (ticket-branch dedup). The caller navigates to
+ * the new run on a truthy result and surfaces the dedup case otherwise.
+ */
+export function useRerunRun() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (runId: string) =>
+      api.post<{ id: string; workflowId: string } | undefined>(`/runs/${runId}/rerun`),
+    onSuccess: (run) => {
+      if (run) qc.invalidateQueries({ queryKey: runsKey(run.workflowId) });
+    },
+  });
+}
+
 export function useCredentials() {
   return useQuery({
     queryKey: ['credentials'],

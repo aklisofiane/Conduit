@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import type { PrismaClient } from '@conduit/database';
 import { RunsService } from '../../src/modules/runs/runs.service';
 import { PrismaService } from '../../src/common/prisma.service';
 import { TemporalService } from '../../src/temporal/temporal.service';
+import { WorkflowsService } from '../../src/modules/workflows/workflows.service';
 import { seedTwoOrgs, type TwoOrgFixture } from '../../../../test/fixtures/orgs/two-orgs';
 import { clearTenantData, makePrisma } from './setup';
 
@@ -16,14 +17,17 @@ describe('RunsService cross-org isolation', () => {
   let prisma: PrismaClient;
   let svc: RunsService;
   let fixture: TwoOrgFixture;
+  let startRunCalls: Array<{ orgId: string; workflowId: string; trigger: unknown }>;
 
   beforeEach(async () => {
     prisma = makePrisma();
     await clearTenantData(prisma);
     fixture = await seedTwoOrgs(prisma);
+    startRunCalls = [];
     svc = new RunsService(
       prisma as unknown as PrismaService,
       fakeTemporal() as unknown as TemporalService,
+      fakeWorkflows(startRunCalls) as unknown as WorkflowsService,
     );
   });
 
@@ -58,10 +62,56 @@ describe('RunsService cross-org isolation', () => {
     const rows = await svc.logs(fixture.orgA.id, fixture.orgB.runId, {});
     expect(rows).toEqual([]);
   });
+
+  it('rerun on a sibling-org run id throws NotFound', async () => {
+    await expect(svc.rerun(fixture.orgA.id, fixture.orgB.runId)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(startRunCalls).toEqual([]);
+  });
+
+  it('rerun rejects a non-FAILED run (the seeded runs are COMPLETED)', async () => {
+    await expect(svc.rerun(fixture.orgA.id, fixture.orgA.runId)).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+    expect(startRunCalls).toEqual([]);
+  });
+
+  it('rerun replays the persisted trigger of a FAILED run through startRun', async () => {
+    const trigger = { source: 'github', mode: 'webhook', event: 'issues' };
+    const failed = await prisma.workflowRun.create({
+      data: {
+        orgId: fixture.orgA.id,
+        workflowId: fixture.orgA.workflowId,
+        status: 'FAILED',
+        trigger,
+        error: 'boom',
+        finishedAt: new Date(),
+      },
+    });
+
+    const result = await svc.rerun(fixture.orgA.id, failed.id);
+
+    expect(startRunCalls).toEqual([
+      { orgId: fixture.orgA.id, workflowId: fixture.orgA.workflowId, trigger },
+    ]);
+    expect(result).toMatchObject({ id: 'new-run' });
+  });
 });
 
 function fakeTemporal() {
   return {
     cancelAgentWorkflow: async () => undefined,
+  };
+}
+
+function fakeWorkflows(
+  calls: Array<{ orgId: string; workflowId: string; trigger: unknown }>,
+) {
+  return {
+    startRun: async (orgId: string, workflowId: string, trigger: unknown) => {
+      calls.push({ orgId, workflowId, trigger });
+      return { id: 'new-run', workflowId };
+    },
   };
 }

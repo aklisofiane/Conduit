@@ -28,6 +28,11 @@ export class RunsController {
     return this.svc.cancel(orgId, runId);
   }
 
+  @Post('runs/:runId/rerun')
+  rerun(@OrgId() orgId: string, @Param('runId') runId: string) {
+    return this.svc.rerun(orgId, runId);
+  }
+
   @Get('runs/:runId/logs')
   logs(
     @OrgId() orgId: string,

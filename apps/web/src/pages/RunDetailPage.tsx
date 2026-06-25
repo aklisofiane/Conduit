@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { useCancelRun, useRun, useRunLogs } from '../api/hooks.js';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useCancelRun, useRerunRun, useRun, useRunLogs } from '../api/hooks.js';
 import type { ExecutionLogRow, NodeRunRow } from '../api/types.js';
 import { ChangedFiles } from '../components/run/ChangedFiles.js';
 import { NodeError } from '../components/run/NodeError.js';
@@ -22,11 +22,26 @@ const NODE_TABS: Array<{ id: NodeTab; label: string }> = [
 
 export function RunDetailPage() {
   const { runId } = useParams<{ runId: string }>();
+  const navigate = useNavigate();
   const { data: run } = useRun(runId);
   const cancelRun = useCancelRun();
+  const rerunRun = useRerunRun();
+  const [rerunNote, setRerunNote] = useState<string | null>(null);
   const latestFrame = useRunUpdates(runId);
   const [selectedNode, setSelectedNode] = useState<string | undefined>(undefined);
   const [activeTab, setActiveTab] = useState<NodeTab>('timeline');
+
+  async function handleRerun() {
+    if (!runId) return;
+    setRerunNote(null);
+    try {
+      const next = await rerunRun.mutateAsync(runId);
+      if (next) navigate(`/runs/${next.id}`);
+      else setRerunNote('A newer run for this ticket is already active.');
+    } catch {
+      setRerunNote('Rerun failed — please try again.');
+    }
+  }
 
   useEffect(() => {
     const first = run?.nodes?.[0]?.nodeName;
@@ -130,16 +145,26 @@ export function RunDetailPage() {
               )}
             </div>
           </div>
-          <div className="flex gap-2">
-            {run.trigger.issue && (
-              <a className="btn" href={run.trigger.issue.url} target="_blank" rel="noreferrer">
-                Open issue ↗
-              </a>
-            )}
-            {streaming && (
-              <button className="btn danger" onClick={() => cancelRun.mutate(runId)} disabled={cancelRun.isPending}>
-                {cancelRun.isPending ? 'Cancelling…' : 'Cancel run'}
-              </button>
+          <div className="flex flex-col items-end gap-1">
+            <div className="flex gap-2">
+              {run.trigger.issue && (
+                <a className="btn" href={run.trigger.issue.url} target="_blank" rel="noreferrer">
+                  Open issue ↗
+                </a>
+              )}
+              {streaming && (
+                <button className="btn danger" onClick={() => cancelRun.mutate(runId)} disabled={cancelRun.isPending}>
+                  {cancelRun.isPending ? 'Cancelling…' : 'Cancel run'}
+                </button>
+              )}
+              {status === 'FAILED' && (
+                <button className="btn" onClick={handleRerun} disabled={rerunRun.isPending}>
+                  {rerunRun.isPending ? 'Rerunning…' : 'Rerun'}
+                </button>
+              )}
+            </div>
+            {rerunNote && (
+              <span className="font-mono text-[11px] text-[var(--color-text-3)]">{rerunNote}</span>
             )}
           </div>
         </div>
