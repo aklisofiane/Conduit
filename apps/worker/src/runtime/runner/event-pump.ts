@@ -1,5 +1,6 @@
 import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 import type { RunnerEvent } from '@conduit/shared/runner';
+import { errorMessage } from '@conduit/shared/runtime';
 import { readRunnerEvents } from './json-line-iterator';
 
 /**
@@ -38,17 +39,20 @@ export async function* pumpEvents(
   child.stdout.on('data', () => {
     lastTouch = Date.now();
   });
-  const liveness = setInterval(() => {
-    if (Date.now() - lastTouch > livenessMs) {
-      livenessFired = true;
-      clearInterval(liveness);
-      void cancel();
-    }
-  }, Math.max(1_000, Math.floor(livenessMs / 4)));
+  const liveness = setInterval(
+    () => {
+      if (Date.now() - lastTouch > livenessMs) {
+        livenessFired = true;
+        clearInterval(liveness);
+        void cancel();
+      }
+    },
+    Math.max(1_000, Math.floor(livenessMs / 4)),
+  );
 
   const onMalformed = (line: string, err: unknown): void => {
     process.stderr.write(
-      `[runner] malformed event line dropped: ${truncate(line, 200)} (${err instanceof Error ? err.message : String(err)})\n`,
+      `[runner] malformed event line dropped: ${truncate(line, 200)} (${errorMessage(err)})\n`,
     );
   };
 

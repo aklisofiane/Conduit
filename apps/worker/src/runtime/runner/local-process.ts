@@ -1,12 +1,9 @@
 import { spawn } from 'node:child_process';
 import { runDir } from '@conduit/agent';
 import type { RunnerEvent, RunnerRequest } from '@conduit/shared/runner';
+import { errorMessage } from '@conduit/shared/runtime';
 import { pumpEvents, STDERR_TAIL_BYTES, TailBuffer } from './event-pump';
-import {
-  killProcessGroup,
-  removeRunnerPidfile,
-  writeRunnerPidfile,
-} from './process-admin';
+import { killProcessGroup, removeRunnerPidfile, writeRunnerPidfile } from './process-admin';
 import type { RunnerHandle, RunnerSpawner } from './spawner';
 
 /**
@@ -113,9 +110,7 @@ export class LocalProcessSpawner implements RunnerSpawner {
       await writeRunnerPidfile(runDirPath, req.run.nodeName, pid);
     } catch (err) {
       await cancel();
-      throw new Error(
-        `failed to write runner pidfile under ${runDirPath}: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      throw new Error(`failed to write runner pidfile under ${runDirPath}: ${errorMessage(err)}`);
     }
 
     // A runner that dies before draining stdin (e.g. a module-load failure

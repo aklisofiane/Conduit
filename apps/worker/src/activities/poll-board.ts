@@ -1,7 +1,4 @@
-import { WorkflowExecutionAlreadyStartedError } from '@temporalio/client';
 import {
-  AGENT_WORKFLOW_TYPE,
-  agentWorkflowId,
   connectionScopeSchema,
   expectScopeKind,
   matchesTrigger,
@@ -14,9 +11,8 @@ import {
   workflowDefinitionSchema,
 } from '@conduit/shared';
 import { decryptSecret, loadEncryptionKey } from '@conduit/shared/crypto';
-import { config } from '../config';
+import { errorMessage } from '@conduit/shared/runtime';
 import { prisma } from '../runtime/prisma';
-import { writeSystemLog } from '../runtime/log-writer';
 import {
   fetchProjectBoardItems,
   fetchRepositoryIssues,
@@ -25,8 +21,8 @@ import {
   fetchGitlabProjectIssues,
   fetchGitlabProjectMergeRequests,
 } from '@conduit/shared/platform';
-import { getTemporalClient } from '../runtime/temporal-client';
 import { itemPassesFilters, toTriggerEvent } from './poll-board-helpers';
+import { startAgentRun } from './start-agent-run';
 
 /**
  * One poll cycle. Diffs the current matching set against `PollSnapshot`;
@@ -185,9 +181,8 @@ export async function pollBoardActivity(input: PollWorkflowInput): Promise<PollC
       try {
         bodies = await hydrateGithubItemBodies(idsToHydrate, token);
       } catch (err) {
-        const errMsg = err instanceof Error ? err.message : String(err);
         console.warn(
-          `pollBoardActivity[${workflowId}]: body hydration failed, starting workflows without bodies: ${errMsg}`,
+          `pollBoardActivity[${workflowId}]: body hydration failed, starting workflows without bodies: ${errorMessage(err)}`,
         );
       }
       for (const event of eventsToStart) {
@@ -288,60 +283,21 @@ async function startAgentWorkflow(
   triggerEvent: TriggerEvent,
   slug?: string,
 ): Promise<StartOutcome> {
-  const ticketLock = ticketLockFor(definition, workflowId, triggerEvent);
   const issueKey = triggerEvent.issue?.key;
-  const run = await prisma().workflowRun.create({
-    data: {
-      workflowId,
-      orgId,
-      status: 'PENDING',
-      trigger: triggerEvent as unknown as object,
-    },
+  const result = await startAgentRun({
+    workflowId,
+    orgId,
+    triggerEvent,
+    slug,
+    ticketLock: ticketLockFor(definition, workflowId, triggerEvent),
+    logLabel: 'pollBoardActivity',
   });
-  try {
-    const client = await getTemporalClient();
-    // Read-only: the slug was frozen by the API before this schedule existed.
-    // Never recompute from the live name — that would diverge from the frozen
-    // value and break ticket-branch dedup against an in-flight run.
-    const temporalWorkflowId = agentWorkflowId(run.id, ticketLock, slug);
-    const handle = await client.workflow.start(AGENT_WORKFLOW_TYPE, {
-      args: [{ workflowId, runId: run.id, triggerEvent }],
-      taskQueue: config.temporal.taskQueue,
-      workflowId: temporalWorkflowId,
-    });
-    await prisma().workflowRun.update({
-      where: { id: run.id },
-      data: {
-        status: 'RUNNING',
-        temporalWorkflowId,
-        temporalRunId: handle.firstExecutionRunId,
-      },
-    });
-    return { ok: true, runId: run.id };
-  } catch (err) {
-    if (err instanceof WorkflowExecutionAlreadyStartedError) {
-      // Another Conduit start is in flight for this ticket — drop this one.
-      await prisma()
-        .workflowRun.delete({ where: { id: run.id } })
-        .catch(() => undefined);
+  switch (result.status) {
+    case 'started':
+      return { ok: true, runId: result.runId };
+    case 'duplicate':
       return { ok: false, reason: 'duplicate', issueKey };
-    }
-    const errMsg = err instanceof Error ? err.message : String(err);
-    await prisma().workflowRun.update({
-      where: { id: run.id },
-      data: {
-        status: 'FAILED',
-        error: errMsg,
-        finishedAt: new Date(),
-      },
-    });
-    await writeSystemLog(
-      run.id,
-      orgId,
-      null,
-      `pollBoardActivity: failed to start agentWorkflow: ${errMsg}`,
-      'ERROR',
-    );
-    return { ok: false, reason: 'error', error: errMsg, issueKey };
+    case 'error':
+      return { ok: false, reason: 'error', error: result.error, issueKey };
   }
 }

@@ -1,4 +1,5 @@
 import { WorkspaceManager, git, GitError } from '@conduit/agent';
+import { errorMessage } from '@conduit/shared/runtime';
 import { prisma } from '../runtime/prisma';
 import { writeSystemLog } from '../runtime/log-writer';
 
@@ -43,7 +44,7 @@ export async function cleanupRunActivity(input: {
         runId,
         orgId,
         null,
-        `unpushed-commit check failed: ${err instanceof Error ? err.message : String(err)}`,
+        `unpushed-commit check failed: ${errorMessage(err)}`,
         'WARN',
       );
     }
@@ -54,13 +55,7 @@ export async function cleanupRunActivity(input: {
     await manager.cleanupRun(runId);
   } catch (err) {
     if (orgId) {
-      await writeSystemLog(
-        runId,
-        orgId,
-        null,
-        `cleanupRun failed: ${err instanceof Error ? err.message : String(err)}`,
-        'WARN',
-      );
+      await writeSystemLog(runId, orgId, null, `cleanupRun failed: ${errorMessage(err)}`, 'WARN');
     }
   }
   await prisma().workflowRun.update({
@@ -93,25 +88,35 @@ async function warnOnUnpushedTicketBranchCommits(runId: string, orgId: string): 
     },
   });
 
-  for (const node of nodes) {
-    const output = node.output as {
-      workspaceKind?: string;
-      branchName?: string;
-      head?: string;
-    } | null;
-    const kind = output?.workspaceKind;
-    if (kind !== 'ticket-branch' && kind !== 'fixed-branch') continue;
-    if (!node.workspacePath || !output?.head || !output.branchName) continue;
+  // Each node's check spawns its own `git rev-list`; they're independent, so
+  // fan them out and await once instead of serializing a process per node.
+  // Logs are still emitted in node order below so the run timeline is stable.
+  const warnings = await Promise.all(
+    nodes.map(async (node) => {
+      const output = node.output as {
+        workspaceKind?: string;
+        branchName?: string;
+        head?: string;
+      } | null;
+      const kind = output?.workspaceKind;
+      if (kind !== 'ticket-branch' && kind !== 'fixed-branch') return null;
+      if (!node.workspacePath || !output?.head || !output.branchName) return null;
 
-    const unpushed = await countCommitsAhead(node.workspacePath, output.head);
-    if (unpushed === null || unpushed === 0) continue;
+      const unpushed = await countCommitsAhead(node.workspacePath, output.head);
+      if (unpushed === null || unpushed === 0) return null;
+      return { nodeName: node.nodeName, kind, unpushed, branchName: output.branchName };
+    }),
+  );
+
+  for (const w of warnings) {
+    if (!w) continue;
     await writeSystemLog(
       runId,
       orgId,
-      node.nodeName,
-      kind === 'fixed-branch'
-        ? `fixed-branch: ${unpushed} commit${unpushed === 1 ? '' : 's'} on ${output.branchName} past the resolved base — verify the agent pushed.`
-        : `ticket-branch: ${unpushed} commit${unpushed === 1 ? '' : 's'} on ${output.branchName} past the resolved base — if no agent ran \`git push\`, this work is lost on the next iteration.`,
+      w.nodeName,
+      w.kind === 'fixed-branch'
+        ? `fixed-branch: ${w.unpushed} commit${w.unpushed === 1 ? '' : 's'} on ${w.branchName} past the resolved base — verify the agent pushed.`
+        : `ticket-branch: ${w.unpushed} commit${w.unpushed === 1 ? '' : 's'} on ${w.branchName} past the resolved base — if no agent ran \`git push\`, this work is lost on the next iteration.`,
       'WARN',
     );
   }

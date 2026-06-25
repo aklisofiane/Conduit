@@ -1,3 +1,4 @@
+export * from './error';
 export * from './event';
 export * from './request';
 export * from './capabilities';

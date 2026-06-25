@@ -1,10 +1,6 @@
 import { proxyActivities } from '@temporalio/workflow';
-import type {
-  AgentConfigWithWorkspace,
-  NodeOutput,
-  TriggerEvent,
-} from '@conduit/shared';
-import { directUpstreamOf, parallelDownstreamOf } from '@conduit/shared';
+import type { AgentConfigWithWorkspace, NodeOutput, TriggerEvent } from '@conduit/shared';
+import { directUpstreamOf, errorMessage, parallelDownstreamOf } from '@conduit/shared';
 import type * as activities from '../activities/index';
 import { topoSortGroups } from './topo-sort';
 
@@ -25,26 +21,22 @@ const { runAgentNode } = proxyActivities<typeof activities>({
   },
 });
 
-const {
-  loadGraphActivity,
-  cleanupRunActivity,
-  mergeWorktreeActivity,
-  copyConduitFilesActivity,
-} = proxyActivities<typeof activities>({
-  startToCloseTimeout: '5 minutes',
-  retry: {
-    initialInterval: '2s',
-    backoffCoefficient: 2,
-    maximumInterval: '60s',
-    maximumAttempts: 3,
-    nonRetryableErrorTypes: [
-      'ValidationError',
-      'ConstraintExceededError',
-      'UnauthorizedError',
-      'MergeConflictError',
-    ],
-  },
-});
+const { loadGraphActivity, cleanupRunActivity, mergeWorktreeActivity, copyConduitFilesActivity } =
+  proxyActivities<typeof activities>({
+    startToCloseTimeout: '5 minutes',
+    retry: {
+      initialInterval: '2s',
+      backoffCoefficient: 2,
+      maximumInterval: '60s',
+      maximumAttempts: 3,
+      nonRetryableErrorTypes: [
+        'ValidationError',
+        'ConstraintExceededError',
+        'UnauthorizedError',
+        'MergeConflictError',
+      ],
+    },
+  });
 
 export interface AgentWorkflowInput {
   workflowId: string;
@@ -150,7 +142,7 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<void> {
       }
     }
   } catch (err) {
-    error = err instanceof Error ? err.message : String(err);
+    error = errorMessage(err);
     throw err;
   } finally {
     await cleanupRunActivity({
@@ -166,9 +158,7 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<void> {
  * A key with >1 values means that upstream is being fanned out — the
  * siblings need branched worktrees plus a merge-back pass.
  */
-function inheritSiblingsByUpstream(
-  group: AgentConfigWithWorkspace[],
-): Map<string, string[]> {
+function inheritSiblingsByUpstream(group: AgentConfigWithWorkspace[]): Map<string, string[]> {
   const byUpstream = new Map<string, string[]>();
   for (const node of group) {
     if (node.workspace.kind !== 'inherit') continue;

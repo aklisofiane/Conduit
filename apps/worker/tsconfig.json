@@ -13,6 +13,7 @@
       "@conduit/shared/crypto": ["../../packages/shared/src/crypto/index.ts"],
       "@conduit/shared/platform": ["../../packages/shared/src/platform/index.ts"],
       "@conduit/shared/runner": ["../../packages/shared/src/runner/index.ts"],
+      "@conduit/shared/runtime": ["../../packages/shared/src/runtime/index.ts"],
       "@conduit/shared/webhook": ["../../packages/shared/src/webhook/index.ts"],
       "@conduit/shared/workflow": ["../../packages/shared/src/workflow/index.ts"]
     }

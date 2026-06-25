@@ -8,6 +8,7 @@ dotenv.config({ path: path.resolve(__dirname, '../../../.env.local') });
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
 import { NativeConnection, Worker } from '@temporalio/worker';
+import { errorMessage } from '@conduit/shared/runtime';
 import * as activities from './activities/index';
 import { config } from './config';
 import { closeEventBus } from './runtime/event-bus';
@@ -58,16 +59,15 @@ async function run(): Promise<void> {
   // labelled with a settled run, and process groups whose pidfile points at
   // one. Both sweeps run regardless of today's mode: orphans belong to
   // whichever mode the *previous* session ran in, and each sweep no-ops
-  // cheaply when its substrate is absent (no Docker / no runs root).
-  // Best-effort; never blocks startup.
-  for (const sweep of [sweepOrphans, sweepOrphanProcessGroups]) {
-    await sweep().catch((err: unknown) => {
-      console.warn(
-        'Orphan sweep failed:',
-        err instanceof Error ? err.message : String(err),
-      );
-    });
-  }
+  // cheaply when its substrate is absent (no Docker / no runs root). They're
+  // independent, so run them concurrently. Best-effort; never blocks startup.
+  await Promise.all(
+    [sweepOrphans, sweepOrphanProcessGroups].map((sweep) =>
+      sweep().catch((err: unknown) => {
+        console.warn('Orphan sweep failed:', errorMessage(err));
+      }),
+    ),
+  );
 
   const connection = await NativeConnection.connect({ address: config.temporal.address });
 

@@ -28,6 +28,7 @@ import {
   type WorkflowMcpServer,
 } from '@conduit/shared';
 import type { RunnerEvent, RunnerRequest } from '@conduit/shared/runner';
+import { errorMessage } from '@conduit/shared/runtime';
 import { gitlabApiUrl } from '@conduit/shared/platform';
 import type {
   ConnectionContext,
@@ -409,7 +410,7 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
 
     return output;
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = errorMessage(err);
     await prisma().nodeRun.update({
       where: { id: nodeRun.id },
       data: {

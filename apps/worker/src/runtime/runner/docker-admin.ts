@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { errorMessage } from '@conduit/shared/runtime';
 import { findOrphanedRunIds } from './orphans';
 
 /**
@@ -84,7 +85,7 @@ function runCommand(cmd: string, args: string[]): Promise<CmdResult> {
       resolve({
         code: -1,
         stdout: Buffer.concat(stdout).toString('utf8'),
-        stderr: err instanceof Error ? err.message : String(err),
+        stderr: errorMessage(err),
       });
     });
     child.on('exit', (code) => {

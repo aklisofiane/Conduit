@@ -20,6 +20,7 @@ export const sharedVitestConfig = defineConfig({
       '@conduit/shared/runner': path.resolve(__dirname, 'packages/shared/src/runner/index.ts'),
       '@conduit/shared/platform': path.resolve(__dirname, 'packages/shared/src/platform/index.ts'),
       '@conduit/shared/crypto': path.resolve(__dirname, 'packages/shared/src/crypto/index.ts'),
+      '@conduit/shared/runtime': path.resolve(__dirname, 'packages/shared/src/runtime/index.ts'),
       '@conduit/shared/webhook': path.resolve(__dirname, 'packages/shared/src/webhook/index.ts'),
       '@conduit/shared/workflow': path.resolve(__dirname, 'packages/shared/src/workflow/index.ts'),
       '@conduit/shared/label': path.resolve(__dirname, 'packages/shared/src/label/index.ts'),

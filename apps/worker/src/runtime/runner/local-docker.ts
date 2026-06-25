@@ -6,6 +6,7 @@ import { bareCloneOf, runDir } from '@conduit/agent';
 import type { RunnerRequest } from '@conduit/shared/runner';
 import { resolveAgentAuthMode, type AgentAuthMode } from './auth-mode';
 import { pumpEvents, STDERR_TAIL_BYTES, TailBuffer } from './event-pump';
+import { sanitizeNameSegment } from './names';
 import type { RunnerHandle, RunnerSpawner } from './spawner';
 
 export type { AgentAuthMode };
@@ -249,18 +250,16 @@ async function resolveOauthMounts(): Promise<AuthMount[]> {
   const codexAuth = path.join(os.homedir(), '.codex', 'auth.json');
   try {
     await fs.stat(codexAuth);
-    return [
-      { source: codexAuth, target: path.join(HOME_IN_CONTAINER, '.codex', 'auth.json') },
-    ];
+    return [{ source: codexAuth, target: path.join(HOME_IN_CONTAINER, '.codex', 'auth.json') }];
   } catch {
     return [];
   }
 }
 
 function makeContainerName(runId: string, nodeName: string): string {
-  // Docker container names accept [a-zA-Z0-9_.-]. Node names are already
-  // restricted by `nodeNameSchema`; sanitize defensively for the runId.
-  const safeRun = runId.replace(/[^a-zA-Z0-9_.-]/g, '-');
-  const safeNode = nodeName.replace(/[^a-zA-Z0-9_.-]/g, '-');
-  return `conduit-runner-${safeRun}-${safeNode}`.slice(0, 200);
+  // Docker container names accept [a-zA-Z0-9_.-]; sanitize both segments.
+  return `conduit-runner-${sanitizeNameSegment(runId)}-${sanitizeNameSegment(nodeName)}`.slice(
+    0,
+    200,
+  );
 }

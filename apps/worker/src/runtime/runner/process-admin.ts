@@ -5,6 +5,7 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 import { runDir, runsRoot } from '@conduit/agent';
 import { findOrphanedRunIds } from './orphans';
+import { sanitizeNameSegment } from './names';
 
 const execFileP = promisify(execFile);
 
@@ -33,10 +34,7 @@ interface PidfileContents {
 }
 
 export function runnerPidfilePath(runDirPath: string, nodeName: string): string {
-  // Node names are already restricted by `nodeNameSchema`; sanitize
-  // defensively, same as `makeContainerName` in local-docker.ts.
-  const safeNode = nodeName.replace(/[^a-zA-Z0-9_.-]/g, '-');
-  return path.join(runDirPath, `runner-${safeNode}.pid`);
+  return path.join(runDirPath, `runner-${sanitizeNameSegment(nodeName)}.pid`);
 }
 
 export async function writeRunnerPidfile(

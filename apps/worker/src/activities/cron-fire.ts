@@ -1,7 +1,4 @@
-import { WorkflowExecutionAlreadyStartedError } from '@temporalio/client';
 import {
-  AGENT_WORKFLOW_TYPE,
-  agentWorkflowId,
   connectionScopeSchema,
   expectScopeKind,
   workflowDefinitionSchema,
@@ -9,10 +6,8 @@ import {
   type TriggerEvent,
 } from '@conduit/shared';
 import { splitProjectPath } from '@conduit/shared/platform';
-import { config } from '../config';
 import { prisma } from '../runtime/prisma';
-import { writeSystemLog } from '../runtime/log-writer';
-import { getTemporalClient } from '../runtime/temporal-client';
+import { startAgentRun } from './start-agent-run';
 
 /**
  * One cron tick. Re-reads the workflow + trigger config so a config edit
@@ -85,56 +80,24 @@ export async function cronFireActivity(input: CronWorkflowInput): Promise<CronFi
     repo,
   };
 
-  const run = await prisma().workflowRun.create({
-    data: {
-      workflowId,
-      orgId: wf.orgId,
-      status: 'PENDING',
-      trigger: triggerEvent as unknown as object,
-    },
+  // Cron has no ticket dimension to dedup on, so no `ticketLock` — a
+  // `duplicate` outcome here would mean a per-run id collision, which can't
+  // happen. Surface it the same way the old code did (null run, 'duplicate').
+  const result = await startAgentRun({
+    workflowId,
+    orgId: wf.orgId,
+    triggerEvent,
+    slug: wf.temporalSlug ?? undefined,
+    logLabel: 'cronFireActivity',
   });
-  try {
-    const client = await getTemporalClient();
-    // Read-only: the slug was frozen by the API when the schedule was created.
-    // Cron has no ticket dimension, so this is purely the cosmetic prefix.
-    const temporalWorkflowId = agentWorkflowId(run.id, undefined, wf.temporalSlug ?? undefined);
-    const handle = await client.workflow.start(AGENT_WORKFLOW_TYPE, {
-      args: [{ workflowId, runId: run.id, triggerEvent }],
-      taskQueue: config.temporal.taskQueue,
-      workflowId: temporalWorkflowId,
-    });
-    await prisma().workflowRun.update({
-      where: { id: run.id },
-      data: {
-        status: 'RUNNING',
-        temporalWorkflowId,
-        temporalRunId: handle.firstExecutionRunId,
-      },
-    });
-    return { workflowId, startedRunId: run.id };
-  } catch (err) {
-    if (err instanceof WorkflowExecutionAlreadyStartedError) {
-      // Should not happen — agentWorkflowId is per-run when no ticketLock.
-      // Treat as a duplicate and drop the placeholder row.
-      await prisma().workflowRun.delete({ where: { id: run.id } }).catch(() => undefined);
+  switch (result.status) {
+    case 'started':
+      return { workflowId, startedRunId: result.runId };
+    case 'duplicate':
       return { workflowId, startedRunId: null, error: 'duplicate' };
-    }
-    const errMsg = err instanceof Error ? err.message : String(err);
-    await prisma().workflowRun.update({
-      where: { id: run.id },
-      data: {
-        status: 'FAILED',
-        error: errMsg,
-        finishedAt: new Date(),
-      },
-    }).catch(() => undefined);
-    await writeSystemLog(
-      run.id,
-      wf.orgId,
-      null,
-      `cronFireActivity: failed to start agentWorkflow: ${errMsg}`,
-      'ERROR',
-    ).catch(() => undefined);
-    throw err;
+    case 'error':
+      // Re-throw so the Temporal activity fails and its retry policy applies —
+      // the row is already marked FAILED and logged by startAgentRun.
+      throw new Error(result.error);
   }
 }
