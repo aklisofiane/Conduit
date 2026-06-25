@@ -24,7 +24,7 @@ import {
   type NodeChange,
   type NodeTypes,
 } from '@xyflow/react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import {
   DEFAULT_MODEL,
   type AgentConfig,
@@ -89,7 +89,22 @@ function CanvasInner() {
   const connectionsQuery = useConnections();
   const allConnections = useMemo(() => connectionsQuery.data ?? [], [connectionsQuery.data]);
   const rf = useReactFlow();
-  const [activeTab, setActiveTab] = useState<WorkflowTabId>('build');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab: WorkflowTabId = searchParams.get('tab') === 'runs' ? 'runs' : 'build';
+  const setActiveTab = useCallback(
+    (tab: WorkflowTabId) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (tab === 'runs') next.set('tab', 'runs');
+          else next.delete('tab');
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
 
   const draft = useWorkflowEditor((s) => s.draft);
   const selectedNodeId = useWorkflowEditor((s) => s.selectedNodeId);

@@ -92,7 +92,14 @@ export function RunDetailPage() {
           <Link to={`/workflows/${run.workflowId}`} className="hover:text-[var(--color-text)]">
             {run.workflow.name}
           </Link>{' '}
-          / runs / <span className="text-[var(--color-text)]">{run.id}</span>
+          /{' '}
+          <Link
+            to={`/workflows/${run.workflowId}?tab=runs`}
+            className="hover:text-[var(--color-text)]"
+          >
+            runs
+          </Link>{' '}
+          / <span className="text-[var(--color-text)]">{run.id}</span>
         </div>
         <div className="mt-2 flex items-start gap-4">
           <div className="flex-1">
