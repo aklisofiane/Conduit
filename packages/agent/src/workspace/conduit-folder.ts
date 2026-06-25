@@ -21,13 +21,23 @@ export async function readConduitSummaries(
   return out;
 }
 
-/** Read a single `.conduit/<NodeName>.md` — returns null if missing. */
+/**
+ * Read a single `.conduit/<NodeName>.md` — returns null only when the file is
+ * absent (`ENOENT`). Any other read failure (permissions, a corrupted path,
+ * unexpected I/O) is rethrown so callers can't mistake a real error for a
+ * legitimately-missing summary and silently drop required handoff context.
+ */
 export async function readConduitSummary(
   workspacePath: string,
   nodeName: string,
 ): Promise<string | null> {
   const file = path.join(workspacePath, CONDUIT_DIR, `${nodeName}.md`);
-  return fs.readFile(file, 'utf8').catch(() => null);
+  try {
+    return await fs.readFile(file, 'utf8');
+  } catch (err) {
+    if (isNotFound(err)) return null;
+    throw err;
+  }
 }
 
 /**

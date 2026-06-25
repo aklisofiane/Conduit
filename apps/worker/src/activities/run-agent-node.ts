@@ -246,17 +246,31 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
     });
 
     // Auto-inject direct-upstream handoff summaries into the main user turn.
-    // Best-effort: a predecessor whose `.conduit/<name>.md` isn't present in
-    // this workspace is silently skipped (the copy machinery places them for
-    // the standard sequential/fan-in shapes). Read in edge-declaration order.
-    const upstreamSummaries = (
-      await Promise.all(
-        (directUpstream ?? []).map(async (name) => {
-          const body = await readConduitSummary(workspace.path, name);
-          return body === null ? null : { nodeName: name, body };
-        }),
-      )
-    ).filter((s): s is { nodeName: string; body: string } => s !== null);
+    // A predecessor whose `.conduit/<name>.md` isn't present in this workspace
+    // is skipped — but logged as a WARN, since running without a predecessor's
+    // handoff context wastes tokens on uninformed work (the copy machinery
+    // places summaries for the standard sequential/fan-in shapes). A hard read
+    // error (permissions, corrupted path) instead throws and fails the node
+    // outright. Read in edge-declaration order.
+    const upstreamReads = await Promise.all(
+      (directUpstream ?? []).map(async (name) => ({
+        name,
+        body: await readConduitSummary(workspace.path, name),
+      })),
+    );
+    const upstreamSummaries = upstreamReads
+      .filter((r): r is { name: string; body: string } => r.body !== null)
+      .map((r) => ({ nodeName: r.name, body: r.body }));
+    const missingUpstream = upstreamReads.filter((r) => r.body === null).map((r) => r.name);
+    if (missingUpstream.length > 0) {
+      await writeSystemLog(
+        runId,
+        orgId,
+        node.name,
+        `direct-upstream handoff summary missing, skipped: ${missingUpstream.join(', ')}`,
+        'WARN',
+      );
+    }
     const upstreamBlock = formatUpstreamContextBlock(upstreamSummaries);
     const mainPrompt = upstreamBlock
       ? `${upstreamBlock}\n\n${serializeAgentContext(agentCtx)}`

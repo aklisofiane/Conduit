@@ -248,6 +248,31 @@ describe('parallel `inherit` + merge-back + .conduit copy', () => {
   });
 });
 
+describe('readConduitSummary error contract', () => {
+  let dir: string;
+
+  beforeEach(async () => {
+    dir = await fs.mkdtemp(path.join(os.tmpdir(), 'conduit-summary-'));
+  });
+
+  afterEach(async () => {
+    await fs.rm(dir, { recursive: true, force: true });
+  });
+
+  it('returns null when the summary file is absent', async () => {
+    await expect(readConduitSummary(dir, 'Missing')).resolves.toBeNull();
+  });
+
+  it('rethrows non-ENOENT read errors instead of masking them as missing', async () => {
+    // A `.conduit/<name>.md` that is a directory makes fs.readFile fail with
+    // EISDIR — a hard error that must surface, not be swallowed as "missing".
+    await fs.mkdir(path.join(dir, '.conduit', 'Broken.md'), { recursive: true });
+    await expect(readConduitSummary(dir, 'Broken')).rejects.toMatchObject({
+      code: 'EISDIR',
+    });
+  });
+});
+
 function makeFakeStore(): TicketBranchStore {
   const rows = new Map<string, TicketBranchRow>();
   const key = (p: string, o: string, r: string, t: string) => `${p}:${o}/${r}:${t}`;
