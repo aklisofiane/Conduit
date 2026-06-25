@@ -1,4 +1,5 @@
 import type { DiscoveredTool, McpTransport } from '@conduit/shared';
+import { errorMessage } from '@conduit/shared/runtime';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
@@ -118,6 +119,5 @@ async function withTimeout<T>(p: Promise<T>, ms: number, phase: string): Promise
 
 function wrap(e: unknown): McpIntrospectionError {
   if (e instanceof McpIntrospectionError) return e;
-  const msg = e instanceof Error ? e.message : String(e);
-  return new McpIntrospectionError(`MCP introspection failed: ${msg}`, e);
+  return new McpIntrospectionError(`MCP introspection failed: ${errorMessage(e)}`, e);
 }

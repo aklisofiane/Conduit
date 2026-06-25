@@ -5,7 +5,8 @@ import {
   type ProviderCapabilities,
 } from '@conduit/shared';
 import { AsyncQueue } from './async-queue';
-import { applyCounters, checkConstraints, newCounters } from './constraints';
+import { enforceConstraints } from './constraints';
+import { makeLazySdkLoader } from './lazy-sdk';
 import type { AgentProvider, AgentSession } from './types';
 
 /**
@@ -35,8 +36,6 @@ export class ClaudeProvider implements AgentProvider {
   }
 
   startSession(req: AgentRequest, signal: AbortSignal): AgentSession {
-    const counters = newCounters();
-    const startedAt = Date.now();
     const mcpServers = Object.fromEntries(
       req.mcpServers.map((s) => [s.id, sdkMcpConfig(s)]),
     );
@@ -56,7 +55,7 @@ export class ClaudeProvider implements AgentProvider {
       if (this.opts.baseUrl) {
         process.env.ANTHROPIC_BASE_URL = this.opts.baseUrl;
       }
-      const sdk = await loadClaudeSdk();
+      const sdk = await claudeSdk.load();
       const stream = sdk.query({
         prompt: input,
         options: {
@@ -80,7 +79,7 @@ export class ClaudeProvider implements AgentProvider {
       return iterator;
     };
 
-    const run = async function* (userMessage: string): AsyncIterable<AgentEvent> {
+    const runTurn = async function* (userMessage: string): AsyncIterable<AgentEvent> {
       if (signal.aborted) return;
       input.push({
         type: 'user',
@@ -91,15 +90,12 @@ export class ClaudeProvider implements AgentProvider {
         if (signal.aborted) return;
         const next = await iter.next();
         if (next.done) return;
-        const events = translate(next.value);
-        for (const event of events) {
-          applyCounters(event, counters);
-          checkConstraints(req, counters, startedAt);
-          yield event;
-          if (event.type === 'done') return;
-        }
+        yield* translate(next.value);
       }
     };
+
+    const run = (userMessage: string): AsyncIterable<AgentEvent> =>
+      enforceConstraints(runTurn(userMessage), req);
 
     const dispose = (): void => {
       input.close();
@@ -115,34 +111,15 @@ type ClaudeSdk = {
   query(args: unknown): AsyncIterable<unknown>;
 };
 
-let _sdk: ClaudeSdk | undefined;
-let _loader: (() => Promise<ClaudeSdk>) | undefined;
+const claudeSdk = makeLazySdkLoader<ClaudeSdk>('@anthropic-ai/claude-agent-sdk', () =>
+  import('@anthropic-ai/claude-agent-sdk'),
+);
 
-async function loadClaudeSdk(): Promise<ClaudeSdk> {
-  if (_sdk) return _sdk;
-  if (_loader) {
-    _sdk = await _loader();
-    return _sdk;
-  }
-  const mod: unknown = await import('@anthropic-ai/claude-agent-sdk').catch((err: unknown) => {
-    throw new Error(
-      `@anthropic-ai/claude-agent-sdk is not installed. Install it in the worker app. Original: ${String(err)}`,
-    );
-  });
-  _sdk = mod as ClaudeSdk;
-  return _sdk;
-}
-
-/**
- * Test-only: inject a custom SDK loader and reset the cached module. Mirrors
- * the seam on `CodexProvider` so unit tests can stub `query()` without
- * needing the real Claude Agent SDK installed.
- */
+/** Test-only: inject a custom SDK loader and reset the cached module. */
 export function __setClaudeSdkLoaderForTests(
   loader: (() => Promise<ClaudeSdk>) | undefined,
 ): void {
-  _loader = loader;
-  _sdk = undefined;
+  claudeSdk.setLoaderForTests(loader);
 }
 
 /** Map our ResolvedMcpServer shape into the SDK's expected config shape. */

@@ -161,62 +161,78 @@ export function issueWritebackPrompt(args: {
   // unauthenticated binary.
   const isGitlab = platform === 'gitlab';
   const providerName = isGitlab ? 'GitLab' : 'GitHub';
-  const noun = !isGitlab && isPr ? 'pull request' : 'issue';
-  const statusLine =
-    !isGitlab && allowedStatuses.length > 0
-      ? `- Set the project Status to whichever of these values best fits: ${allowedStatuses.map((s) => `"${s}"`).join(', ')}.`
-      : null;
-  // PR state has two orthogonal sub-axes, both repo-native (no board) and
-  // GitHub-only: open/closed (whether the PR is active) and draft/ready (whether
-  // it's marked ready for review). They share `allowedPrStates`, so partition it
-  // and emit one directive per sub-axis — a single "whichever fits: open, draft"
-  // list would read as mutually exclusive. Emitted only for PR-shaped GitHub
-  // runs; on issue/cron runs the field is inert by config, and GitLab MR-state
-  // writeback is out of scope.
+  // GitLab never takes PR wording (MR writeback is out of scope), so PR-shaped
+  // is GitHub-only — every PR-specific axis below keys off this single flag.
+  const prShaped = !isGitlab && isPr;
+  const noun = prShaped ? 'pull request' : 'issue';
+  const quoted = (xs: string[]): string => xs.map((x) => `"${x}"`).join(', ');
+
+  // Each writeback axis carries its directive line(s) and the matching no-op
+  // guard together, so the two can't drift. Assembly below emits all
+  // directives first, then all no-ops — never interleaved.
+  const axes: Array<{ directives: string[]; noop: string }> = [];
+
+  // Project Status — GitHub only (GitLab v1 has no Projects-v2 board).
+  if (!isGitlab && allowedStatuses.length > 0) {
+    axes.push({
+      directives: [
+        `- Set the project Status to whichever of these values best fits: ${quoted(allowedStatuses)}.`,
+      ],
+      noop: `- Do not set any project Status that isn't in the list above.`,
+    });
+  }
+
+  // PR state has two orthogonal, repo-native (no board), GitHub-only sub-axes
+  // sharing `allowedPrStates`: open/closed and draft/ready. Partition and emit
+  // one directive per sub-axis — a single "whichever fits: open, draft" list
+  // would read as mutually exclusive.
   const prOpenClosed = allowedPrStates.filter((s) => s === 'open' || s === 'closed');
+  if (prShaped && prOpenClosed.length > 0) {
+    axes.push({
+      directives: [
+        `- Set the pull request's open/closed state to whichever of these fits: ${quoted(prOpenClosed)}. This is the PR's open/closed field, not a label.`,
+      ],
+      noop: `- Don't move the pull request to any open/closed state that isn't listed above; if it's already in the right state, leave it.`,
+    });
+  }
   const prDraftReady = allowedPrStates.filter((s) => s === 'draft' || s === 'ready');
-  const prOpenClosedLine =
-    !isGitlab && isPr && prOpenClosed.length > 0
-      ? `- Set the pull request's open/closed state to whichever of these fits: ${prOpenClosed.map((s) => `"${s}"`).join(', ')}. This is the PR's open/closed field, not a label.`
-      : null;
-  const prDraftReadyLine =
-    !isGitlab && isPr && prDraftReady.length > 0
-      ? `- Set the pull request's draft / ready-for-review state to whichever of these fits: ${prDraftReady.map((s) => (s === 'ready' ? '"ready for review"' : `"${s}"`)).join(', ')}. This is the PR's draft flag (mark a draft ready for review, or convert it back to a draft) — not a label, and not the open/closed field.`
-      : null;
-  const labelLine =
-    allowedLabels.length > 0
-      ? `- Apply exactly one of these labels — the single best fit: ${allowedLabels.map((l) => `"${l}"`).join(', ')}.`
-      : null;
-  const removeLabelLine =
-    consumedLabels.length > 0
-      ? `- Remove the label that gated this run, now consumed: ${consumedLabels.map((l) => `"${l}"`).join(', ')}.`
-      : null;
-  const noopStatusLine = statusLine
-    ? `- Do not set any project Status that isn't in the list above.`
-    : null;
-  const noopPrOpenClosedLine = prOpenClosedLine
-    ? `- Don't move the pull request to any open/closed state that isn't listed above; if it's already in the right state, leave it.`
-    : null;
-  const noopPrDraftReadyLine = prDraftReadyLine
-    ? `- Don't change the pull request's draft/ready state to anything not listed above; if it's already in the right state, leave it.`
-    : null;
-  // Phrase the no-op guard to match the directives actually present, so a
-  // pure-removal turn (labelLine null, removeLabelLine set) doesn't reference an
+  if (prShaped && prDraftReady.length > 0) {
+    const values = prDraftReady.map((s) => (s === 'ready' ? '"ready for review"' : `"${s}"`)).join(', ');
+    axes.push({
+      directives: [
+        `- Set the pull request's draft / ready-for-review state to whichever of these fits: ${values}. This is the PR's draft flag (mark a draft ready for review, or convert it back to a draft) — not a label, and not the open/closed field.`,
+      ],
+      noop: `- Don't change the pull request's draft/ready state to anything not listed above; if it's already in the right state, leave it.`,
+    });
+  }
+
+  // Labels: apply + remove share one no-op guard, phrased to match whichever
+  // directives are actually present — a pure-removal turn mustn't reference an
   // "apply" list that isn't there.
-  const noopLabelLine =
-    labelLine && removeLabelLine
-      ? `- Leave every other label untouched — only apply and remove what's listed above.`
-      : labelLine
-        ? `- Leave every other label untouched — only apply what's listed above.`
-        : removeLabelLine
-          ? `- Leave every other label untouched — only remove what's listed above; don't add any new label.`
-          : null;
+  const applyLabels = allowedLabels.length > 0;
+  const removeLabels = consumedLabels.length > 0;
+  if (applyLabels || removeLabels) {
+    const directives: string[] = [];
+    if (applyLabels) {
+      directives.push(`- Apply exactly one of these labels — the single best fit: ${quoted(allowedLabels)}.`);
+    }
+    if (removeLabels) {
+      directives.push(`- Remove the label that gated this run, now consumed: ${quoted(consumedLabels)}.`);
+    }
+    const noop =
+      applyLabels && removeLabels
+        ? `- Leave every other label untouched — only apply and remove what's listed above.`
+        : applyLabels
+          ? `- Leave every other label untouched — only apply what's listed above.`
+          : `- Leave every other label untouched — only remove what's listed above; don't add any new label.`;
+    axes.push({ directives, noop });
+  }
 
   const header = issueNumber
     ? [
         `Final step before you finish: update the ${providerName} ${noun} this run was triggered by.`,
         ``,
-        `${!isGitlab && isPr ? 'PR' : 'Issue'}: ${owner}/${repo}#${issueNumber}`,
+        `${prShaped ? 'PR' : 'Issue'}: ${owner}/${repo}#${issueNumber}`,
       ]
     : [
         `Final step before you finish: for every ${providerName} ${noun} you created or updated in ${owner}/${repo} during this run, constrain what you set as follows.`,
@@ -233,7 +249,7 @@ export function issueWritebackPrompt(args: {
   // reaches for the issue-label tools rather than hunting for a PR-only one.
   const toolingLine = isGitlab
     ? `Use the attached GitLab MCP tools (the \`GitLab (writeback)\` server auto-attached to this run) to read and update labels. Constraints:`
-    : isPr
+    : prShaped
       ? `Use the attached GitHub MCP tools (the \`GitHub (writeback)\` server auto-attached to this run) to read and update this pull request — GitHub stores PR labels on the same number as issues, so the issue-label tools apply, while open/closed and draft/ready are pull-request fields (set draft/ready via the PR-update tool's \`draft\` flag). Constraints:`
       : `Use the attached GitHub MCP tools (the \`GitHub (writeback)\` server auto-attached to this run) to read and update the ${noun}. Constraints:`;
 
@@ -241,19 +257,10 @@ export function issueWritebackPrompt(args: {
     ...header,
     ``,
     toolingLine,
-    statusLine,
-    prOpenClosedLine,
-    prDraftReadyLine,
-    labelLine,
-    removeLabelLine,
-    noopStatusLine,
-    noopPrOpenClosedLine,
-    noopPrDraftReadyLine,
-    noopLabelLine,
+    ...axes.flatMap((a) => a.directives),
+    ...axes.map((a) => a.noop),
     closing,
     ``,
     `When done, briefly state what you set and why.`,
-  ]
-    .filter((line): line is string => line !== null)
-    .join('\n');
+  ].join('\n');
 }

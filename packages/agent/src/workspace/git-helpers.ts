@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { errorMessage } from '@conduit/shared/runtime';
 import { BranchBusyError, WorkspaceError } from '../errors/index';
 import { git, GitError } from './git';
 import { dropConflictingWorktrees } from './worktree-cleanup';
@@ -83,31 +84,10 @@ export async function addTrackingWorktree(
   // just-fetched remote tip before checking it out, so iteration N+1 lands on
   // iteration N's pushed commits. (A plain `worktree add <branch>` would reuse
   // a stale local ref left by a prior add and miss them.)
-  const startPoint = `refs/remotes/origin/${branchName}`;
-  try {
-    await git(['worktree', 'add', '--force', '-B', branchName, target, startPoint], { cwd: bare });
-    return;
-  } catch (err) {
-    if (!(err instanceof GitError)) throw err;
-    // `-B` refuses to reset a branch that's still checked out in another
-    // worktree — typically a stale leftover from a crashed/retried run. Drop
-    // the conflicting worktree (by path or branch) and retry once.
-    try {
-      await dropConflictingWorktrees(bare, target, branchName);
-      await git(['worktree', 'add', '--force', '-B', branchName, target, startPoint], {
-        cwd: bare,
-      });
-    } catch (recoveryErr) {
-      // A live owner holds the branch — propagate so the activity wait loop
-      // can retry; do not swallow it into a generic WorkspaceError.
-      if (recoveryErr instanceof BranchBusyError) throw recoveryErr;
-      const recoveryStderr =
-        recoveryErr instanceof GitError ? recoveryErr.stderr.trim() : String(recoveryErr);
-      throw new WorkspaceError(
-        `git worktree add ${branchName} into ${target} failed: ${err.stderr.trim()}; recovery: ${recoveryStderr}`,
-      );
-    }
-  }
+  await addWorktree(bare, target, branchName, `refs/remotes/origin/${branchName}`, {
+    create: false,
+    describe: `git worktree add ${branchName} into ${target}`,
+  });
 }
 
 export async function createTrackingWorktree(
@@ -119,30 +99,52 @@ export async function createTrackingWorktree(
   // Base off the remote-tracking ref, not the local head — `fetchWithAuth`
   // now only advances `refs/remotes/origin/*`, so the local `refs/heads/<baseRef>`
   // (e.g. `main`) is frozen at clone time and would branch off a stale tip.
-  const startPoint = `refs/remotes/origin/${baseRef}`;
+  await addWorktree(bare, target, branchName, `refs/remotes/origin/${baseRef}`, {
+    create: true,
+    describe: `git worktree add -b ${branchName} from ${baseRef}`,
+  });
+}
+
+/**
+ * Add a worktree for `branchName` at `target`, with a single shared recovery
+ * path. The first attempt differs only by whether the branch is being created
+ * (`-b`, off a base ref) or reset to a just-fetched remote tip (`--force -B`).
+ *
+ * On a `GitError` — typically a stale ref/registration left by a crashed or
+ * retried run — drop the conflicting worktree (by path or branch) and retry
+ * once with `--force -B`. (The `-b` create path's failure also leaves the
+ * branch ref at its base, so resetting it is the right recovery; the caller
+ * confirmed the branch isn't on the remote, so a local-only ref is data we
+ * can't recover regardless.) A `BranchBusyError` means a live owner holds the
+ * branch — propagate it so the activity wait loop can retry rather than
+ * swallowing it into a generic `WorkspaceError`.
+ */
+async function addWorktree(
+  bare: string,
+  target: string,
+  branchName: string,
+  startPoint: string,
+  opts: { create: boolean; describe: string },
+): Promise<void> {
+  const firstAttempt = opts.create
+    ? ['worktree', 'add', '-b', branchName, target, startPoint]
+    : ['worktree', 'add', '--force', '-B', branchName, target, startPoint];
   try {
-    await git(['worktree', 'add', '-b', branchName, target, startPoint], { cwd: bare });
+    await git(firstAttempt, { cwd: bare });
     return;
   } catch (err) {
     if (!(err instanceof GitError)) throw err;
-    // Retry uses `--force -B` because the failed `add -b` creates the branch
-    // ref at `<baseRef>` before bailing; a stale loose ref from a crashed
-    // run can be in the same shape. Reset is safe — the caller confirmed
-    // the branch doesn't exist on the remote, so a local-only ref is data
-    // we can't recover regardless.
     try {
       await dropConflictingWorktrees(bare, target, branchName);
       await git(['worktree', 'add', '--force', '-B', branchName, target, startPoint], {
         cwd: bare,
       });
     } catch (recoveryErr) {
-      // A live owner holds the branch — propagate so the activity wait loop
-      // can retry; do not swallow it into a generic WorkspaceError.
       if (recoveryErr instanceof BranchBusyError) throw recoveryErr;
       const recoveryStderr =
-        recoveryErr instanceof GitError ? recoveryErr.stderr.trim() : String(recoveryErr);
+        recoveryErr instanceof GitError ? recoveryErr.stderr.trim() : errorMessage(recoveryErr);
       throw new WorkspaceError(
-        `git worktree add -b ${branchName} from ${baseRef} failed: ${err.stderr.trim()}; recovery: ${recoveryStderr}`,
+        `${opts.describe} failed: ${err.stderr.trim()}; recovery: ${recoveryStderr}`,
       );
     }
   }

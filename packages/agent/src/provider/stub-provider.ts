@@ -7,7 +7,7 @@ import type {
   AgentRequest,
   ProviderCapabilities,
 } from '@conduit/shared';
-import { applyCounters, checkConstraints, newCounters } from './constraints';
+import { enforceConstraints } from './constraints';
 import type { AgentProvider, AgentSession } from './types';
 
 /**
@@ -129,8 +129,6 @@ export class StubProvider implements AgentProvider {
   }
 
   startSession(req: AgentRequest, signal: AbortSignal): AgentSession {
-    const counters = newCounters();
-    const startedAt = Date.now();
     let turns: StubScript[] | undefined;
     const getTurns = async (): Promise<StubScript[]> => {
       if (turns) return turns;
@@ -138,7 +136,7 @@ export class StubProvider implements AgentProvider {
       return turns;
     };
 
-    const run = async function* (_userMessage: string): AsyncIterable<AgentEvent> {
+    const runScript = async function* (): AsyncIterable<AgentEvent> {
       if (signal.aborted) return;
       const queue = await getTurns();
       const script = queue.shift();
@@ -183,8 +181,6 @@ export class StubProvider implements AgentProvider {
         }
 
         const event = toEvent(step);
-        applyCounters(event, counters);
-        checkConstraints(req, counters, startedAt);
         yield event;
         if (event.type === 'done') return;
       }
@@ -192,6 +188,9 @@ export class StubProvider implements AgentProvider {
       // completes cleanly.
       yield { type: 'done' };
     };
+
+    const run = (_userMessage: string): AsyncIterable<AgentEvent> =>
+      enforceConstraints(runScript(), req);
 
     const dispose = (): void => {};
 

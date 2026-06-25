@@ -6,7 +6,8 @@ import {
   type ProviderCapabilities,
   type ResolvedMcpServer,
 } from '@conduit/shared';
-import { applyCounters, checkConstraints, newCounters } from './constraints';
+import { enforceConstraints } from './constraints';
+import { makeLazySdkLoader } from './lazy-sdk';
 import type { AgentProvider, AgentSession } from './types';
 
 /**
@@ -46,8 +47,6 @@ export class CodexProvider implements AgentProvider {
   }
 
   startSession(req: AgentRequest, signal: AbortSignal): AgentSession {
-    const counters = newCounters();
-    const startedAt = Date.now();
     const seenText = new Map<string, string>();
     const openToolCalls = new Set<string>();
     const todoSnapshots = new Map<string, number>();
@@ -62,7 +61,7 @@ export class CodexProvider implements AgentProvider {
       // the first run() in a try/finally that calls dispose, so writes are
       // guaranteed to be cleaned up.
       for (const { key, value } of plan.envBindings) process.env[key] = value;
-      const { Codex } = await loadCodexSdk();
+      const { Codex } = await codexSdk.load();
       const codex = new Codex({
         apiKey: this.opts.apiKey,
         baseUrl: this.opts.baseUrl,
@@ -96,7 +95,7 @@ export class CodexProvider implements AgentProvider {
       return thread;
     };
 
-    const run = async function* (userMessage: string): AsyncIterable<AgentEvent> {
+    const runTurn = async function* (userMessage: string): AsyncIterable<AgentEvent> {
       if (signal.aborted) return;
       const t = await ensureThread();
       const input = firstTurn
@@ -107,15 +106,12 @@ export class CodexProvider implements AgentProvider {
       const { events } = await t.runStreamed(input, { signal });
       for await (const raw of events) {
         if (signal.aborted) return;
-        const translated = translate(raw, seenText, openToolCalls, todoSnapshots);
-        for (const event of translated) {
-          applyCounters(event, counters);
-          checkConstraints(req, counters, startedAt);
-          yield event;
-          if (event.type === 'done') return;
-        }
+        yield* translate(raw, seenText, openToolCalls, todoSnapshots);
       }
     };
+
+    const run = (userMessage: string): AsyncIterable<AgentEvent> =>
+      enforceConstraints(runTurn(userMessage), req);
 
     const dispose = (): void => {
       // Codex SDK has no explicit thread teardown — dropping the reference
@@ -141,33 +137,15 @@ interface CodexSdkModule {
   Codex: new (options?: Record<string, unknown>) => CodexInstance;
 }
 
-let _sdk: CodexSdkModule | undefined;
-let _loader: (() => Promise<CodexSdkModule>) | undefined;
+const codexSdk = makeLazySdkLoader<CodexSdkModule>('@openai/codex-sdk', () =>
+  import('@openai/codex-sdk'),
+);
 
-async function loadCodexSdk(): Promise<CodexSdkModule> {
-  if (_sdk) return _sdk;
-  if (_loader) {
-    _sdk = await _loader();
-    return _sdk;
-  }
-  const mod = (await import('@openai/codex-sdk').catch((err: unknown) => {
-    throw new Error(
-      `@openai/codex-sdk is not installed. Install it in the worker app. Original: ${String(err)}`,
-    );
-  })) as CodexSdkModule;
-  _sdk = mod;
-  return mod;
-}
-
-/**
- * Test-only: inject a custom SDK loader and reset the cached module. Keeps
- * the unit test in this package from needing a real Codex binary.
- */
+/** Test-only: inject a custom SDK loader and reset the cached module. */
 export function __setCodexSdkLoaderForTests(
   loader: (() => Promise<CodexSdkModule>) | undefined,
 ): void {
-  _loader = loader;
-  _sdk = undefined;
+  codexSdk.setLoaderForTests(loader);
 }
 
 interface EnvBinding {
