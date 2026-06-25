@@ -11,6 +11,7 @@ import {
   type WorkflowDefinition,
 } from '@conduit/shared';
 import { PrismaService } from '../../common/prisma.service';
+import { orNotFound } from '../../common/or-not-found';
 import type { CreateConnectionDto, UpdateConnectionDto } from './dto';
 
 /** Shape returned by the list endpoint — safe to render directly in the UI. */
@@ -58,8 +59,7 @@ export class ConnectionsService {
       where: { id, orgId },
       include: { credential: { select: { id: true, name: true, platform: true, hostUrl: true } } },
     });
-    if (!row) throw new NotFoundException(`Connection ${id} not found`);
-    return toRow(row);
+    return toRow(orNotFound(row, 'Connection', id));
   }
 
   /**
@@ -122,7 +122,7 @@ export class ConnectionsService {
       where: { id, orgId },
       select: { id: true },
     });
-    if (!cred) throw new NotFoundException(`Credential ${id} not found`);
+    orNotFound(cred, 'Credential', id);
   }
 
   private async findOrThrow(orgId: string, id: string): Promise<void> {
@@ -130,7 +130,7 @@ export class ConnectionsService {
       where: { id, orgId },
       select: { id: true },
     });
-    if (!row) throw new NotFoundException(`Connection ${id} not found`);
+    orNotFound(row, 'Connection', id);
   }
 
   /**

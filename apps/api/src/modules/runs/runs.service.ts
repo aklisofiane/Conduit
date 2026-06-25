@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { ExecutionLogKind } from '@conduit/shared';
 import { PrismaService } from '../../common/prisma.service';
+import { orNotFound } from '../../common/or-not-found';
 import { TemporalService } from '../../temporal/temporal.service';
 
 export interface LogsQuery {
@@ -35,16 +36,18 @@ export class RunsService {
         nodes: true,
       },
     });
-    if (!run) throw new NotFoundException(`Run ${runId} not found`);
-    return run;
+    return orNotFound(run, 'Run', runId);
   }
 
   async cancel(orgId: string, runId: string) {
-    const run = await this.prisma.workflowRun.findFirst({
-      where: { id: runId, orgId },
-      select: { id: true, temporalWorkflowId: true },
-    });
-    if (!run) throw new NotFoundException(`Run ${runId} not found`);
+    const run = orNotFound(
+      await this.prisma.workflowRun.findFirst({
+        where: { id: runId, orgId },
+        select: { id: true, temporalWorkflowId: true },
+      }),
+      'Run',
+      runId,
+    );
     if (!run.temporalWorkflowId) {
       throw new NotFoundException(`Run ${runId} has no Temporal workflow id — already finished?`);
     }

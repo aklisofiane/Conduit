@@ -120,9 +120,15 @@ export function isCronTrigger(
  */
 export function isScheduledTrigger(
   trigger: Pick<TriggerConfig, 'type'> | null | undefined,
-): trigger is Extract<TriggerConfig, { type: 'issues' | 'pull_requests' | 'cron' }> {
+): trigger is ScheduledTrigger {
   return isPollingTrigger(trigger) || isCronTrigger(trigger);
 }
+
+/** Any trigger variant backed by a Temporal Schedule — see {@link isScheduledTrigger}. */
+export type ScheduledTrigger = Extract<
+  TriggerConfig,
+  { type: 'issues' | 'pull_requests' | 'cron' }
+>;
 
 /**
  * Filter fields legally settable for a given trigger variant. Mirrors the

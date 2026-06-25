@@ -9,24 +9,33 @@ export function formatZodIssues(error: ZodError): string {
     .join('; ');
 }
 
-export interface LoadJsonDirOpts<T> {
+export interface LoadDirOpts<T> {
   dir: string;
+  /** File extension to load, including the leading dot (e.g. ".json", ".md"). */
+  ext: string;
   /** Human-readable label used in log messages (e.g. "Template", "Agent preset"). */
   label: string;
   logger: Logger;
   /**
-   * Per-file parser. Return the loaded value, or `null` to skip the file
-   * silently. Throw to bubble — callers typically log + return null instead.
+   * Per-file parser, receiving the raw file contents (JSON.parse / front-matter
+   * parsing belongs here). Return the loaded value, or `null` to skip the file
+   * silently. Throw to skip with a logged warning.
    */
-  parse: (raw: unknown, entry: string) => T | null;
+  parse: (raw: string, entry: string) => T | null;
 }
 
-export async function loadJsonDir<T>({
+/**
+ * Load every `ext` file in `dir` through `parse`, tolerating a missing dir and
+ * per-file failures (logged + skipped). The shared skeleton behind the
+ * template and agent-preset loaders — each supplies its own `ext` + `parse`.
+ */
+export async function loadDir<T>({
   dir,
+  ext,
   label,
   logger,
   parse,
-}: LoadJsonDirOpts<T>): Promise<T[]> {
+}: LoadDirOpts<T>): Promise<T[]> {
   let entries: string[];
   try {
     entries = await fs.readdir(dir);
@@ -37,13 +46,12 @@ export async function loadJsonDir<T>({
     return [];
   }
 
-  const jsonFiles = entries.filter((e) => e.endsWith('.json')).sort();
+  const files = entries.filter((e) => e.endsWith(ext)).sort();
   const results: (T | null)[] = await Promise.all(
-    jsonFiles.map(async (entry) => {
+    files.map(async (entry) => {
       const filepath = path.join(dir, entry);
       try {
-        const raw = JSON.parse(await fs.readFile(filepath, 'utf8'));
-        return parse(raw, entry);
+        return parse(await fs.readFile(filepath, 'utf8'), entry);
       } catch (err) {
         logger.warn(`${label} ${entry} failed to load — skipping (${String(err)})`);
         return null;

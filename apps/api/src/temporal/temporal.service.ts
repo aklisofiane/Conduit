@@ -19,6 +19,7 @@ import {
   workflowScheduleId,
   type CronWorkflowInput,
   type PollWorkflowInput,
+  type ScheduledTrigger,
   type TicketLock,
   type TriggerEvent,
 } from '@conduit/shared';
@@ -86,6 +87,31 @@ export type WorkflowScheduleOptions =
        */
       slug?: string;
     };
+
+/**
+ * Map a schedule-backed trigger to the `WorkflowScheduleOptions` shape its
+ * variant needs — the single branch point shared by every caller that upserts
+ * a schedule (workflow save, template instantiation). Callers narrow with
+ * `isScheduledTrigger` first.
+ */
+export function scheduleOptionsForTrigger(
+  trigger: ScheduledTrigger,
+  workflowId: string,
+  active: boolean,
+  slug: string | undefined,
+): WorkflowScheduleOptions {
+  if (trigger.type === 'cron') {
+    return {
+      kind: 'cron',
+      workflowId,
+      cron: trigger.cron,
+      timezone: trigger.timezone,
+      active,
+      slug,
+    };
+  }
+  return { kind: 'polling', workflowId, intervalSec: trigger.intervalSec, active, slug };
+}
 
 /**
  * Thin wrapper around Temporal's `@temporalio/client`. Also owns the

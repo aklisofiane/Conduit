@@ -271,18 +271,21 @@ export class TriggerService {
       spec: { color: string; description?: string },
     ) => Promise<'created' | 'exists'>,
   ): Promise<EnsureLabelResult[]> {
-    const results: EnsureLabelResult[] = [];
-    for (const name of names) {
-      try {
-        const status = await create(name, labelSpec(name));
-        results.push({ name, status });
-      } catch (e: unknown) {
-        const error = errMessage(e);
-        this.logger.warn(`Ensure label "${name}" failed: ${error}`);
-        results.push({ name, status: 'failed', error });
-      }
-    }
-    return results;
+    // Labels are independent — fan out the platform calls concurrently. Each
+    // catches its own failure, so Promise.all never rejects and order (which
+    // the caller pairs back to the requested names) is preserved.
+    return Promise.all(
+      names.map(async (name): Promise<EnsureLabelResult> => {
+        try {
+          const status = await create(name, labelSpec(name));
+          return { name, status };
+        } catch (e: unknown) {
+          const error = errMessage(e);
+          this.logger.warn(`Ensure label "${name}" failed: ${error}`);
+          return { name, status: 'failed', error };
+        }
+      }),
+    );
   }
 }
 

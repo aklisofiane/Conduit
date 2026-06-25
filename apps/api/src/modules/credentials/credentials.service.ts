@@ -2,8 +2,9 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { connectionScopeSchema, type ConnectionScope } from '@conduit/shared';
 import type { Platform } from '@conduit/shared/platform';
 import { PrismaService } from '../../common/prisma.service';
+import { orNotFound } from '../../common/or-not-found';
 import type { CreateCredentialDto, UpdateCredentialDto } from './dto';
-import { decrypt, encrypt, redactedSuffix } from './crypto';
+import { decrypt, encrypt, redactSafely } from './crypto';
 
 @Injectable()
 export class CredentialsService {
@@ -170,8 +171,7 @@ export class CredentialsService {
       where: { id: credentialId, orgId },
       select: { secret: true },
     });
-    if (!cred) throw new NotFoundException(`Credential ${credentialId} not found`);
-    return decrypt(cred.secret);
+    return decrypt(orNotFound(cred, 'Credential', credentialId).secret);
   }
 
   /**
@@ -187,13 +187,11 @@ export class CredentialsService {
     platform: string;
     hostUrl: string | null;
   }> {
-    const conn = await this.prisma.connection.findUnique({
+    const found = await this.prisma.connection.findUnique({
       where: { id: connectionId },
       include: { credential: true },
     });
-    if (!conn) {
-      throw new NotFoundException(`Connection ${connectionId} not found`);
-    }
+    const conn = orNotFound(found, 'Connection', connectionId);
     const scope = connectionScopeSchema.parse(conn.scope);
     return {
       scope,
@@ -213,15 +211,6 @@ export class CredentialsService {
 
   private async findOrThrow(orgId: string, id: string) {
     const cred = await this.prisma.credential.findFirst({ where: { id, orgId } });
-    if (!cred) throw new NotFoundException(`Credential ${id} not found`);
-    return cred;
-  }
-}
-
-function redactSafely(encrypted: string): string {
-  try {
-    return redactedSuffix(decrypt(encrypted));
-  } catch {
-    return '****';
+    return orNotFound(cred, 'Credential', id);
   }
 }

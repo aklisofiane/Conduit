@@ -35,4 +35,14 @@ export function safeDecrypt(payload: string): string | undefined {
   }
 }
 
+/**
+ * Decrypt and return only the redacted suffix (e.g. `****abcd`) for display.
+ * A corrupt or undecryptable blob collapses to `****` rather than throwing —
+ * used by list/row mappers that must never 500 on a single bad secret.
+ */
+export function redactSafely(encrypted: string): string {
+  const plain = safeDecrypt(encrypted);
+  return plain === undefined ? '****' : redactedSuffix(plain);
+}
+
 export { redactedSuffix };

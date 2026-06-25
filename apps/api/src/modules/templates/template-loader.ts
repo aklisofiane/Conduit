@@ -12,7 +12,7 @@ import {
   type TemplateFile,
   type TemplatePlaceholder,
 } from '@conduit/shared';
-import { formatZodIssues, loadJsonDir } from '../../common/load-json-dir';
+import { formatZodIssues, loadDir } from '../../common/load-dir';
 
 function resolveTemplatesDir(): string {
   const override = process.env.CONDUIT_TEMPLATES_DIR;
@@ -34,11 +34,12 @@ export async function loadTemplates(
   logger: Logger,
   resolvePreset: PresetResolver,
 ): Promise<LoadedTemplate[]> {
-  return loadJsonDir({
+  return loadDir({
     dir: resolveTemplatesDir(),
+    ext: '.json',
     label: 'Template',
     logger,
-    parse: (raw, entry) => parseTemplate(raw, entry, resolvePreset, logger),
+    parse: (raw, entry) => parseTemplate(JSON.parse(raw), entry, resolvePreset, logger),
   });
 }
 

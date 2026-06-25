@@ -1,10 +1,6 @@
-import {
-  Injectable,
-  Logger,
-  NotFoundException,
-  type OnModuleInit,
-} from '@nestjs/common';
+import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import type { AgentPreset } from '@conduit/shared';
+import { orNotFound } from '../../common/or-not-found';
 import { loadAgentPresets } from './agent-preset-loader';
 
 @Injectable()
@@ -23,9 +19,7 @@ export class AgentPresetsService implements OnModuleInit {
   }
 
   get(id: string): AgentPreset {
-    const p = this.presets.get(id);
-    if (!p) throw new NotFoundException(`Agent preset ${id} not found`);
-    return p;
+    return orNotFound(this.presets.get(id), 'Agent preset', id);
   }
 
   resolve(id: string): AgentPreset | undefined {

@@ -25,7 +25,7 @@ import {
 import { PrismaService } from '../../common/prisma.service';
 import { assertDefinitionValid } from '../../common/assert-definition-valid';
 import { errMessage } from '../../common/err-message';
-import { TemporalService } from '../../temporal/temporal.service';
+import { TemporalService, scheduleOptionsForTrigger } from '../../temporal/temporal.service';
 import { resolveTemporalSlug } from '../../temporal/temporal-slug';
 import { AgentPresetsService } from '../agent-presets/agent-presets.service';
 import { loadTemplates, type LoadedTemplate } from './template-loader';
@@ -223,24 +223,9 @@ export class TemplatesService implements OnModuleInit {
             definition,
             temporalSlug: null,
           });
-          if (trigger.type === 'cron') {
-            await this.temporal.upsertWorkflowSchedule({
-              kind: 'cron',
-              workflowId: id,
-              cron: trigger.cron,
-              timezone: trigger.timezone,
-              active: isActive,
-              slug,
-            });
-          } else {
-            await this.temporal.upsertWorkflowSchedule({
-              kind: 'polling',
-              workflowId: id,
-              intervalSec: trigger.intervalSec,
-              active: isActive,
-              slug,
-            });
-          }
+          await this.temporal.upsertWorkflowSchedule(
+            scheduleOptionsForTrigger(trigger, id, isActive, slug),
+          );
         } catch (err) {
           this.logger.warn(
             `Upserting schedule for ${id} failed: ${errMessage(err)}`,

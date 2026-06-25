@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
-import { decrypt, encrypt, redactedSuffix } from '../credentials/crypto';
+import { encrypt, redactSafely } from '../credentials/crypto';
 import type {
   CreateProviderConfigDto,
   UpdateProviderConfigDto,
@@ -104,12 +104,4 @@ function toRow(row: {
     suffix: redactSafely(row.encryptedApiKey),
     updatedAt: row.updatedAt,
   };
-}
-
-function redactSafely(encrypted: string): string {
-  try {
-    return redactedSuffix(decrypt(encrypted));
-  } catch {
-    return '****';
-  }
 }

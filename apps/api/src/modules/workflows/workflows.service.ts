@@ -13,9 +13,14 @@ import {
   type WorkflowDefinition,
 } from '@conduit/shared';
 import { PrismaService } from '../../common/prisma.service';
+import { orNotFound } from '../../common/or-not-found';
 import { assertDefinitionValid } from '../../common/assert-definition-valid';
 import { errMessage } from '../../common/err-message';
-import { DuplicateRunError, TemporalService } from '../../temporal/temporal.service';
+import {
+  DuplicateRunError,
+  TemporalService,
+  scheduleOptionsForTrigger,
+} from '../../temporal/temporal.service';
 import { resolveTemporalSlug } from '../../temporal/temporal-slug';
 import { encrypt } from '../credentials/crypto';
 import type { CreateWorkflowDto, UpdateWorkflowDto } from './dto';
@@ -78,8 +83,7 @@ export class WorkflowsService implements OnModuleInit {
 
   async get(orgId: string, id: string) {
     const wf = await this.prisma.workflow.findFirst({ where: { id, orgId } });
-    if (!wf) throw new NotFoundException(`Workflow ${id} not found`);
-    return wf;
+    return orNotFound(wf, 'Workflow', id);
   }
 
   async create(orgId: string, dto: CreateWorkflowDto) {
@@ -106,11 +110,14 @@ export class WorkflowsService implements OnModuleInit {
     // peek at the *resulting* definition: the DTO may carry one, otherwise
     // fall back to what's already stored.
     if (dto.isActive === true) {
-      const existing = await this.prisma.workflow.findFirst({
-        where: { id, orgId },
-        select: { definition: true },
-      });
-      if (!existing) throw new NotFoundException(`Workflow ${id} not found`);
+      const existing = orNotFound(
+        await this.prisma.workflow.findFirst({
+          where: { id, orgId },
+          select: { definition: true },
+        }),
+        'Workflow',
+        id,
+      );
       const effective =
         (dto.definition as WorkflowDefinition | undefined) ??
         (existing.definition as WorkflowDefinition);
@@ -193,8 +200,11 @@ export class WorkflowsService implements OnModuleInit {
    * while reusing the same secret value.
    */
   async duplicate(orgId: string, id: string) {
-    const source = await this.prisma.workflow.findFirst({ where: { id, orgId } });
-    if (!source) throw new NotFoundException(`Workflow ${id} not found`);
+    const source = orNotFound(
+      await this.prisma.workflow.findFirst({ where: { id, orgId } }),
+      'Workflow',
+      id,
+    );
 
     const created = await this.prisma.workflow.create({
       data: {
@@ -273,24 +283,9 @@ export class WorkflowsService implements OnModuleInit {
       // Materialize: freeze the slug once (no-op read after the first call) so
       // the schedule + the poll/cron runs it spawns all carry the prefix.
       const slug = await resolveTemporalSlug(this.prisma, wf);
-      if (trigger.type === 'cron') {
-        await this.temporal.upsertWorkflowSchedule({
-          kind: 'cron',
-          workflowId: wf.id,
-          cron: trigger.cron,
-          timezone: trigger.timezone,
-          active: wf.isActive,
-          slug,
-        });
-      } else {
-        await this.temporal.upsertWorkflowSchedule({
-          kind: 'polling',
-          workflowId: wf.id,
-          intervalSec: trigger.intervalSec,
-          active: wf.isActive,
-          slug,
-        });
-      }
+      await this.temporal.upsertWorkflowSchedule(
+        scheduleOptionsForTrigger(trigger, wf.id, wf.isActive, slug),
+      );
     } catch (err) {
       this.logger.warn(
         `Sync schedule for workflow ${wf.id} failed: ${errMessage(err)}`,
