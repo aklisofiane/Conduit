@@ -129,10 +129,14 @@ function LabelPrompt({
     () => new Set(CONDUIT_LABELS.map((l) => l.name)),
   );
 
-  const done = ensure.isSuccess;
   const resultByName = new Map(
     (ensure.data ?? []).map((r) => [r.name, r] as const),
   );
+  // A 200 still carries per-label failures (e.g. a read-only token), so HTTP
+  // success isn't terminal — only treat it as done when nothing failed.
+  // Otherwise the prompt stays interactive so the failing labels can be retried.
+  const hasFailures = (ensure.data ?? []).some((r) => r.status === 'failed');
+  const done = ensure.isSuccess && !hasFailures;
 
   const toggle = (name: string) =>
     setSelected((prev) => {
@@ -212,7 +216,11 @@ function LabelPrompt({
                 disabled={ensure.isPending || selected.size === 0}
                 onClick={add}
               >
-                {ensure.isPending ? 'Adding…' : 'Add labels'}
+                {ensure.isPending
+                  ? 'Adding…'
+                  : hasFailures
+                    ? 'Retry'
+                    : 'Add labels'}
               </button>
             </>
           )}
