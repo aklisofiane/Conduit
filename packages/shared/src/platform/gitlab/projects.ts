@@ -8,6 +8,10 @@
 
 import type { ProjectBoardItem } from '../github/projects';
 import { gitlabApiUrl, gitlabAuthHeaders } from './http';
+import { splitProjectPath } from './path';
+
+// Re-exported so `@conduit/shared/platform` consumers keep their import path.
+export { splitProjectPath };
 
 const PAGE_SIZE = 100;
 const MAX_PAGES = 40; // 4000 items ceiling — matches github/projects.ts.
@@ -171,21 +175,4 @@ export async function listAccessibleGitlabProjects(
   }
 
   return items;
-}
-
-// ── Helpers ─────────────────────────────────────────────────────────────
-
-/**
- * Split a GitLab project path into `{ owner, name }`. For subgroup paths
- * like `group/subgroup/api`, the last segment is `name` and the rest is
- * joined back as `owner` — mirrors the two-part `{ owner, name }` shape
- * used by `ProjectBoardItem.repo`.
- */
-export function splitProjectPath(projectPath: string): { owner: string; name: string } {
-  const parts = projectPath.split('/');
-  if (parts.length < 2) return { owner: '', name: projectPath };
-  return {
-    owner: parts.slice(0, -1).join('/'),
-    name: parts[parts.length - 1]!,
-  };
 }

@@ -1,3 +1,4 @@
+import { splitProjectPath } from '../platform/gitlab/path';
 import type { TriggerEvent } from '../trigger/event';
 
 /**
@@ -124,20 +125,16 @@ interface GitlabWebhookPayload {
 }
 
 /**
- * Derive `{ owner, name }` from `project.path_with_namespace`. GitLab paths
- * may include subgroups (`group/subgroup/api`); the last segment is `name`
- * and everything before it is joined as `owner` — matching `splitProjectPath`
- * in the polling client so both code paths produce the same shape.
+ * Derive `{ owner, name }` from `project.path_with_namespace` via the shared
+ * `splitProjectPath` helper, so the webhook and polling paths produce the same
+ * shape. Returns undefined for paths without a namespace (single-segment).
  */
 function extractRepo(
   project: GitlabWebhookPayload['project'],
 ): TriggerEvent['repo'] {
   const full = project?.path_with_namespace;
   if (!full) return undefined;
-  const parts = full.split('/');
-  if (parts.length < 2) return undefined;
-  const name = parts[parts.length - 1]!;
-  const owner = parts.slice(0, -1).join('/');
+  const { owner, name } = splitProjectPath(full);
   if (!owner || !name) return undefined;
   return { owner, name };
 }

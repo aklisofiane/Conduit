@@ -140,18 +140,24 @@ export function validateWorkflowDefinition(
   );
   if (cronTriggerNames.size > 0) {
     const derived = deriveWorkspaces(definition);
+    // Index each node's upstream trigger names once, so the per-node checks
+    // below are lookups rather than full edge scans (O(nodes + edges) total).
     const cronEntryNodes = new Set<string>();
+    const upstreamTriggersByNode = new Map<string, string[]>();
     for (const edge of definition.edges) {
       if (cronTriggerNames.has(edge.from)) cronEntryNodes.add(edge.to);
+      if (triggerNames.has(edge.from)) {
+        const list = upstreamTriggersByNode.get(edge.to);
+        if (list) list.push(edge.from);
+        else upstreamTriggersByNode.set(edge.to, [edge.from]);
+      }
     }
     for (const node of derived.nodes) {
       if (!cronEntryNodes.has(node.name)) continue;
       // Skip if any *non-cron* trigger also feeds this node — mixed-trigger
       // setups are rejected elsewhere (shared-connection rule), and the
       // workspace shape they pick is unsupported anyway.
-      const upstreamTriggerNames = definition.edges
-        .filter((e) => e.to === node.name && triggerNames.has(e.from))
-        .map((e) => e.from);
+      const upstreamTriggerNames = upstreamTriggersByNode.get(node.name) ?? [];
       const hasNonCronTrigger = upstreamTriggerNames.some(
         (name) => !cronTriggerNames.has(name),
       );

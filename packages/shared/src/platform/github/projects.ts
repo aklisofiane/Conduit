@@ -242,10 +242,6 @@ export async function fetchProjectBoardItems(
       fetchImpl,
     );
 
-    if (payload.errors?.length) {
-      throw new Error(`GitHub GraphQL error: ${payload.errors.map((e) => e.message).join('; ')}`);
-    }
-
     const project = payload.data?.owner?.projectV2;
     if (!project) {
       throw new Error(
@@ -279,10 +275,6 @@ export async function listProjectBoards(
     q.token,
     fetchImpl,
   );
-
-  if (payload.errors?.length) {
-    throw new Error(`GitHub GraphQL error: ${payload.errors.map((e) => e.message).join('; ')}`);
-  }
 
   const owner = payload.data?.owner;
   if (!owner) {
@@ -330,7 +322,11 @@ async function callGraphQL<T>(
   if (!resp.ok) {
     throw new Error(`GitHub GraphQL HTTP ${resp.status}: ${await resp.text().catch(() => '')}`);
   }
-  return (await resp.json()) as GraphQLResponse<T>;
+  const payload = (await resp.json()) as GraphQLResponse<T>;
+  if (payload.errors?.length) {
+    throw new Error(`GitHub GraphQL error: ${payload.errors.map((e) => e.message).join('; ')}`);
+  }
+  return payload;
 }
 
 function toItem(raw: RawProjectItem): ProjectBoardItem {
@@ -444,10 +440,6 @@ export async function listViewerRepositories(
     fetchImpl,
   );
 
-  if (payload.errors?.length) {
-    throw new Error(`GitHub GraphQL error: ${payload.errors.map((e) => e.message).join('; ')}`);
-  }
-
   const repos: RepositorySummary[] = [];
   for (const node of payload.data?.viewer?.repositories?.nodes ?? []) {
     if (!node) continue;
@@ -499,10 +491,6 @@ export async function listViewerOrganizations(
     token,
     fetchImpl,
   );
-
-  if (payload.errors?.length) {
-    throw new Error(`GitHub GraphQL error: ${payload.errors.map((e) => e.message).join('; ')}`);
-  }
 
   const viewer = payload.data?.viewer;
   const entries: ViewerOrgEntry[] = [];
@@ -690,10 +678,6 @@ async function paginateRepoConnection<R, N>(
       fetchImpl,
     );
 
-    if (payload.errors?.length) {
-      throw new Error(`GitHub GraphQL error: ${payload.errors.map((e) => e.message).join('; ')}`);
-    }
-
     const repo = payload.data?.repository;
     if (!repo) {
       throw new Error(`Repository ${q.owner}/${q.name} not found (token may lack repo scope)`);
@@ -802,10 +786,6 @@ export async function hydrateGithubItemBodies(
         token,
         fetchImpl,
       );
-
-      if (payload.errors?.length) {
-        throw new Error(`GitHub GraphQL error: ${payload.errors.map((e) => e.message).join('; ')}`);
-      }
 
       for (const node of payload.data?.nodes ?? []) {
         if (node?.id && typeof node.body === 'string') {
