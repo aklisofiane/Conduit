@@ -1,10 +1,11 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { readConduitSummary, resolveProvider, git } from '@conduit/agent';
+import { readConduitSummary, resolveProvider, git, CONDUIT_DIR } from '@conduit/agent';
 import { runnerRequestSchema, type RunnerEvent } from '@conduit/shared/runner';
 import type { AgentRequest } from '@conduit/shared';
 import { runAgentTurns } from './turns';
 import { createSecretRedactor, type SecretEntry } from './secret-redactor';
+import { errorMessage } from './errors';
 
 /**
  * Per-run agent execution sandbox. One process per agent node:
@@ -72,14 +73,18 @@ async function main(): Promise<void> {
       await session.dispose();
     }
 
+    // Placeholder write is a barrier (readConduitSummary depends on it); the
+    // three reads are independent, so run them concurrently.
     await ensureConduitSummaryPlaceholder(agent.workspacePath, run.nodeName);
-    const head = await readHead(agent.workspacePath);
-    const changedFiles = await listChangedFiles(agent.workspacePath);
-    const conduitSummary = await readConduitSummary(agent.workspacePath, run.nodeName);
+    const [head, changedFiles, conduitSummary] = await Promise.all([
+      readHead(agent.workspacePath),
+      listChangedFiles(agent.workspacePath),
+      readConduitSummary(agent.workspacePath, run.nodeName),
+    ]);
     emit({ kind: 'exit', ok: true, head, changedFiles, conduitSummary });
   } catch (err) {
     exitCode = 1;
-    const message = err instanceof Error ? err.message : String(err);
+    const message = errorMessage(err);
     const stack = err instanceof Error ? err.stack : undefined;
     emit({ kind: 'exit', ok: false, error: { message, stack } });
   } finally {
@@ -147,7 +152,7 @@ async function ensureConduitSummaryPlaceholder(
   workspacePath: string,
   nodeName: string,
 ): Promise<void> {
-  const file = path.join(workspacePath, '.conduit', `${nodeName}.md`);
+  const file = path.join(workspacePath, CONDUIT_DIR, `${nodeName}.md`);
   await fs.mkdir(path.dirname(file), { recursive: true });
   try {
     await fs.writeFile(
@@ -178,7 +183,7 @@ async function listChangedFiles(workspacePath: string): Promise<string[]> {
 }
 
 main().catch((err: unknown) => {
-  const message = err instanceof Error ? err.message : String(err);
+  const message = errorMessage(err);
   emit({ kind: 'exit', ok: false, error: { message } });
   process.exit(1);
 });

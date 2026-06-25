@@ -2,6 +2,7 @@ import type { AgentEvent } from '@conduit/shared';
 import type { RunnerEvent } from '@conduit/shared/runner';
 import { capAgentEvent } from './payload-cap';
 import type { SecretRedactor } from './secret-redactor';
+import { errorMessage } from './errors';
 
 /** A provider session, narrowed to what the turn loop needs. */
 export interface TurnSession {
@@ -62,7 +63,7 @@ export async function runAgentTurns(opts: RunTurnsOptions): Promise<void> {
   try {
     await drive(session.run(prompts.summary));
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = errorMessage(err);
     emit({
       kind: 'system',
       message: `summary turn did not finish (${message}); completing node with work already produced`,

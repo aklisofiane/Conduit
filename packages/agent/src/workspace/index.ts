@@ -18,6 +18,7 @@ export {
   baseClonePath,
 } from './paths';
 export {
+  CONDUIT_DIR,
   readConduitSummaries,
   readConduitSummary,
   copyConduitSummaries,
