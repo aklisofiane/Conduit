@@ -34,13 +34,17 @@ export function RunDetailPage() {
   }, [run]);
 
   const selected = run?.nodes.find((n) => n.nodeName === selectedNode);
-  const autoSwitchedNode = useRef<string | undefined>(undefined);
+  const autoSwitchedNodes = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    // Reset the per-node auto-switch memory when viewing a different run.
+    autoSwitchedNodes.current.clear();
+  }, [runId]);
   useEffect(() => {
     // Auto-switch to Error tab the first time a failed node is shown so users
     // don't hunt for it — but only once per node, so they can still navigate
-    // back to Timeline afterwards.
-    if (selected?.status === 'FAILED' && autoSwitchedNode.current !== selected.nodeName) {
-      autoSwitchedNode.current = selected.nodeName;
+    // back to Timeline afterwards (even after visiting other failed nodes).
+    if (selected?.status === 'FAILED' && !autoSwitchedNodes.current.has(selected.nodeName)) {
+      autoSwitchedNodes.current.add(selected.nodeName);
       setActiveTab('error');
     }
   }, [selected?.status, selected?.nodeName]);
