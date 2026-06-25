@@ -111,6 +111,15 @@ export function RunTimeline({ events, streaming }: RunTimelineProps) {
 }
 
 function buildDisplay(events: ExecutionLogRow[]): DisplayItem[] {
+  return collapseToolGroups(flattenEvents(events));
+}
+
+/**
+ * Flatten the raw event log into display items: drop bookkeeping frames
+ * (usage/done/tool_result), merge consecutive same-node text deltas, and pair
+ * each tool call with its result.
+ */
+function flattenEvents(events: ExecutionLogRow[]): DisplayItem[] {
   // Index tool_results by id up front so out-of-order frames still pair.
   const resultsById = new Map<string, ToolResultPayload>();
   for (const ev of events) {
@@ -166,7 +175,11 @@ function buildDisplay(events: ExecutionLogRow[]): DisplayItem[] {
     });
   }
 
-  // Collapse runs of ≥ 2 consecutive same-tool items into a tool-group.
+  return flat;
+}
+
+/** Collapse runs of ≥ 2 consecutive same-tool items into a tool-group. */
+function collapseToolGroups(flat: DisplayItem[]): DisplayItem[] {
   const out: DisplayItem[] = [];
   let i = 0;
   while (i < flat.length) {

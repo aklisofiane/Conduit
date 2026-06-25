@@ -22,6 +22,7 @@ import {
   type EdgeChange,
   type Node as FlowNode,
   type NodeChange,
+  type NodeTypes,
 } from '@xyflow/react';
 import { useParams } from 'react-router-dom';
 import {
@@ -41,13 +42,12 @@ import {
   type PaletteDragPayload,
   type PaletteTriggerType,
 } from '../components/canvas/NodePalette.js';
-import { IssuesTriggerNode } from '../components/canvas/IssuesTriggerNode.js';
-import { PrTriggerNode } from '../components/canvas/PrTriggerNode.js';
-import { CronTriggerNode } from '../components/canvas/CronTriggerNode.js';
-import { WebhookTriggerPlaceholderNode } from '../components/canvas/WebhookTriggerPlaceholderNode.js';
-import { IssuesTriggerPanel } from '../components/canvas/IssuesTriggerPanel.js';
-import { PrTriggerPanel } from '../components/canvas/PrTriggerPanel.js';
-import { CronTriggerPanel } from '../components/canvas/CronTriggerPanel.js';
+import {
+  TRIGGER_NODE_TYPES,
+  flowTypeForTrigger,
+  makeDefaultTrigger,
+  triggerPanelComponent,
+} from '../components/canvas/trigger-registry.js';
 import { WorkflowEdge } from '../components/canvas/WorkflowEdge.js';
 import { WorkflowHeaderPill } from '../components/canvas/WorkflowHeaderPill.js';
 import { WorkflowTabs, type WorkflowTabId } from '../components/layout/WorkflowTabs.js';
@@ -60,33 +60,9 @@ import { useWorkflowEditor } from '../state/workflow-editor.js';
 import { useTopbarSlots } from '../state/topbar-slots.js';
 import { relativeFromNow } from '../lib/time.js';
 
-const NODE_TYPES = {
-  agent: AgentNode,
-  'trigger-issues': IssuesTriggerNode,
-  'trigger-pull-requests': PrTriggerNode,
-  'trigger-cron': CronTriggerNode,
-  'trigger-webhook': WebhookTriggerPlaceholderNode,
-} as const;
+const NODE_TYPES: NodeTypes = { agent: AgentNode, ...TRIGGER_NODE_TYPES };
 const EDGE_TYPES = { workflow: WorkflowEdge } as const;
 const WORKFLOW_EDGE_TYPE = 'workflow';
-
-/**
- * React Flow node-type name for a given trigger variant. Webhook is a
- * stored-only legacy variant; it gets a placeholder rendering until a
- * dedicated `WebhookTriggerNode` ships (out of scope here).
- */
-function flowTypeForTrigger(type: TriggerConfig['type']): string {
-  switch (type) {
-    case 'issues':
-      return 'trigger-issues';
-    case 'pull_requests':
-      return 'trigger-pull-requests';
-    case 'cron':
-      return 'trigger-cron';
-    case 'webhook':
-      return 'trigger-webhook';
-  }
-}
 
 const PANEL_WIDTH_KEY = 'conduit:canvas:inspector-width';
 const PANEL_DEFAULT_WIDTH = 320;
@@ -188,6 +164,15 @@ function CanvasInner() {
     if (wf) reset(wf.definition);
   }, [wf, reset]);
 
+  // Name⇄id lookups shared by the edge mappers and the drop-position
+  // handler. Trigger and agent names share one namespace (so `Edge.from`
+  // can reference either), so both collections feed both maps. Rebuilt only
+  // when the trigger/node sets change.
+  const { idByName, nameById } = useMemo(
+    () => buildNameIdMaps(draft),
+    [draft?.triggers, draft?.nodes],
+  );
+
   useEffect(() => {
     if (!draft) {
       setFlowNodes([]);
@@ -195,8 +180,8 @@ function CanvasInner() {
       return;
     }
     setFlowNodes((prev) => buildFlowNodes(draft, prev, allConnections));
-    setFlowEdges((prev) => buildFlowEdges(draft, prev));
-  }, [draft, allConnections]);
+    setFlowEdges((prev) => buildFlowEdges(draft, prev, idByName));
+  }, [draft, allConnections, idByName]);
 
   useEffect(() => {
     setFlowNodes((prev) => {
@@ -240,7 +225,7 @@ function CanvasInner() {
           for (const change of dropped) {
             const node = next.find((n) => n.id === change.id);
             if (!node) continue;
-            const key = nameForFlowId(updated, node.id) ?? node.id;
+            const key = nameById.get(node.id) ?? node.id;
             positions[key] = { x: node.position.x, y: node.position.y };
           }
           updated = { ...updated, ui: { ...updated.ui, nodePositions: positions } };
@@ -251,7 +236,7 @@ function CanvasInner() {
         return next;
       });
     },
-    [draft, setDraft],
+    [draft, nameById, setDraft],
   );
 
   const onEdgesChange = useCallback(
@@ -259,12 +244,12 @@ function CanvasInner() {
       setFlowEdges((current) => {
         const next = applyEdgeChanges(changes, current);
         if (draft && changes.some((c) => c.type === 'remove')) {
-          setDraft({ ...draft, edges: flowEdgesToDomain(next, draft) });
+          setDraft({ ...draft, edges: flowEdgesToDomain(next, draft, nameById) });
         }
         return next;
       });
     },
-    [draft, setDraft],
+    [draft, nameById, setDraft],
   );
 
   const onConnect = useCallback(
@@ -274,11 +259,42 @@ function CanvasInner() {
           { ...conn, type: WORKFLOW_EDGE_TYPE },
           current,
         );
-        if (draft) setDraft({ ...draft, edges: flowEdgesToDomain(next, draft) });
+        if (draft) setDraft({ ...draft, edges: flowEdgesToDomain(next, draft, nameById) });
         return next;
       });
     },
-    [draft, setDraft],
+    [draft, nameById, setDraft],
+  );
+
+  // Shared add-node flow: resolve a drop point (explicit, else canvas
+  // centre), pin the new node's position by name, commit the caller's
+  // collection change, and select it. `build` receives the resolved
+  // position and returns the new node's id plus the def patch to merge.
+  const addNode = useCallback(
+    (
+      name: string,
+      position: { x: number; y: number } | undefined,
+      build: (drop: { x: number; y: number }) => {
+        id: string;
+        patch: Partial<WorkflowDefinition>;
+      },
+    ) => {
+      if (!draft) return;
+      const drop =
+        position ??
+        rf.screenToFlowPosition({
+          x: window.innerWidth / 2,
+          y: window.innerHeight / 2,
+        });
+      const { id: nodeId, patch } = build(drop);
+      const ui = {
+        ...draft.ui,
+        nodePositions: { ...draft.ui.nodePositions, [name]: drop },
+      };
+      setDraft({ ...draft, ...patch, ui });
+      setSelected(nodeId);
+    },
+    [draft, rf, setDraft, setSelected],
   );
 
   const handleAddAgent = useCallback(
@@ -286,12 +302,6 @@ function CanvasInner() {
       if (!draft) return;
       const name = uniqueNodeName(draft, provider === 'claude' ? 'Agent' : 'Codex');
       const agentId = `agent_${Math.random().toString(36).slice(2, 10)}`;
-      const drop =
-        position ??
-        rf.screenToFlowPosition({
-          x: window.innerWidth / 2,
-          y: window.innerHeight / 2,
-        });
       const agent: AgentConfig = {
         id: agentId,
         name,
@@ -302,14 +312,12 @@ function CanvasInner() {
         skills: [],
         webSearch: false,
       };
-      const ui = {
-        ...draft.ui,
-        nodePositions: { ...draft.ui.nodePositions, [name]: drop },
-      };
-      setDraft({ ...draft, nodes: [...draft.nodes, agent], ui });
-      setSelected(agentId);
+      addNode(name, position, () => ({
+        id: agentId,
+        patch: { nodes: [...draft.nodes, agent] },
+      }));
     },
-    [draft, rf, setDraft, setSelected],
+    [draft, addNode],
   );
 
   const handleAddTrigger = useCallback(
@@ -320,21 +328,13 @@ function CanvasInner() {
       if (draft.triggers.length > 0) return;
       const name = uniqueNodeName(draft, 'Trigger');
       const triggerId = `trigger_${Math.random().toString(36).slice(2, 10)}`;
-      const drop =
-        position ??
-        rf.screenToFlowPosition({
-          x: window.innerWidth / 2,
-          y: window.innerHeight / 2,
-        });
       const trigger = makeDefaultTrigger(triggerType, triggerId, name);
-      const ui = {
-        ...draft.ui,
-        nodePositions: { ...draft.ui.nodePositions, [name]: drop },
-      };
-      setDraft({ ...draft, triggers: [trigger], ui });
-      setSelected(triggerId);
+      addNode(name, position, () => ({
+        id: triggerId,
+        patch: { triggers: [trigger] },
+      }));
     },
-    [draft, rf, setDraft, setSelected],
+    [draft, addNode],
   );
 
   const handleDragOver = useCallback((event: ReactDragEvent<HTMLDivElement>) => {
@@ -515,82 +515,50 @@ interface TriggerPanelByTypeProps {
 }
 
 function TriggerPanelByType({ trigger, onChange, ...rest }: TriggerPanelByTypeProps) {
-  switch (trigger.type) {
-    case 'issues':
-      return (
-        <IssuesTriggerPanel
-          trigger={trigger}
-          onChange={(patch) => onChange(patch)}
-          {...rest}
-        />
-      );
-    case 'pull_requests':
-      return (
-        <PrTriggerPanel
-          trigger={trigger}
-          onChange={(patch) => onChange(patch)}
-          {...rest}
-        />
-      );
-    case 'cron':
-      return (
-        <CronTriggerPanel
-          trigger={trigger}
-          onChange={(patch) => onChange(patch)}
-          {...rest}
-        />
-      );
-    case 'webhook':
-      return (
-        <div className="flex flex-1 flex-col gap-3 px-5 py-4 font-mono text-[11px] text-[var(--color-text-muted)]">
-          <div className="font-sans text-[12px] font-medium text-[var(--color-text)]">
-            Webhook trigger
-          </div>
-          <div>event: {trigger.event}</div>
-          <div>
-            No editor yet — delete this trigger and re-add an Issues, Pull requests, or Schedule
-            trigger from the palette.
-          </div>
-          <button className="btn mt-2" onClick={rest.onClose}>
-            Close
-          </button>
-        </div>
-      );
+  const Panel = triggerPanelComponent(trigger.type);
+  if (Panel) {
+    return <Panel trigger={trigger} onChange={onChange} {...rest} />;
   }
-}
-
-function nameForFlowId(def: WorkflowDefinition, id: string): string | undefined {
+  // No dedicated editor (today: the legacy `webhook` variant).
   return (
-    def.nodes.find((n) => n.id === id)?.name ??
-    def.triggers.find((t) => t.id === id)?.name
+    <div className="flex flex-1 flex-col gap-3 px-5 py-4 font-mono text-[11px] text-[var(--color-text-muted)]">
+      <div className="font-sans text-[12px] font-medium text-[var(--color-text)]">
+        Webhook trigger
+      </div>
+      <div>event: {trigger.type === 'webhook' ? trigger.event : ''}</div>
+      <div>
+        No editor yet — delete this trigger and re-add an Issues, Pull requests, or Schedule
+        trigger from the palette.
+      </div>
+      <button className="btn mt-2" onClick={rest.onClose}>
+        Close
+      </button>
+    </div>
   );
 }
 
-function makeDefaultTrigger(
-  triggerType: PaletteTriggerType,
-  id: string,
-  name: string,
-): TriggerConfig {
-  const shared = {
-    id,
-    name,
-    platform: 'github' as const,
-    connectionId: '',
-  };
-  switch (triggerType) {
-    case 'issues':
-      return { ...shared, type: 'issues', intervalSec: 60, filters: [] };
-    case 'pull_requests':
-      return { ...shared, type: 'pull_requests', intervalSec: 60, filters: [] };
-    case 'cron':
-      return {
-        ...shared,
-        type: 'cron',
-        cron: '0 9 * * *',
-        timezone: 'UTC',
-        branch: 'main',
-      };
+/**
+ * Name⇄id lookups over the shared trigger/agent namespace. Built once per
+ * draft change and threaded through the edge mappers and the drop-position
+ * handler so none of them re-scan `triggers`/`nodes` on every call.
+ */
+function buildNameIdMaps(def: WorkflowDefinition | undefined): {
+  idByName: Map<string, string>;
+  nameById: Map<string, string>;
+} {
+  const idByName = new Map<string, string>();
+  const nameById = new Map<string, string>();
+  if (def) {
+    for (const t of def.triggers) {
+      idByName.set(t.name, t.id);
+      nameById.set(t.id, t.name);
+    }
+    for (const n of def.nodes) {
+      idByName.set(n.name, n.id);
+      nameById.set(n.id, n.name);
+    }
   }
+  return { idByName, nameById };
 }
 
 function uniqueNodeName(def: WorkflowDefinition, prefix: string): string {
@@ -603,10 +571,11 @@ function uniqueNodeName(def: WorkflowDefinition, prefix: string): string {
   return `${prefix}${i}`;
 }
 
-function flowEdgesToDomain(edges: FlowEdge[], def: WorkflowDefinition): Edge[] {
-  const nameById = new Map<string, string>();
-  for (const t of def.triggers) nameById.set(t.id, t.name);
-  for (const n of def.nodes) nameById.set(n.id, n.name);
+function flowEdgesToDomain(
+  edges: FlowEdge[],
+  def: WorkflowDefinition,
+  nameById: Map<string, string>,
+): Edge[] {
   const result: Edge[] = [];
   const agentIds = new Set(def.nodes.map((n) => n.id));
   for (const edge of edges) {
@@ -663,11 +632,12 @@ function buildFlowNodes(
   return [...triggerNodes, ...agents];
 }
 
-function buildFlowEdges(draft: WorkflowDefinition, prev: FlowEdge[]): FlowEdge[] {
+function buildFlowEdges(
+  draft: WorkflowDefinition,
+  prev: FlowEdge[],
+  idByName: Map<string, string>,
+): FlowEdge[] {
   const prevById = new Map(prev.map((e) => [e.id, e]));
-  const idByName = new Map<string, string>();
-  for (const t of draft.triggers) idByName.set(t.name, t.id);
-  for (const n of draft.nodes) idByName.set(n.name, n.id);
 
   const edges: FlowEdge[] = [];
   for (const e of draft.edges) {

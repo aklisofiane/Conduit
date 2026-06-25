@@ -18,7 +18,7 @@ import { cn } from '../../lib/cn.js';
 import { providerStyle } from '../../styles/theme.js';
 import { Select, type SelectItem } from '../common/Select.js';
 import { Maximize2, X } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { McpServerPicker } from './McpServerPicker.js';
 import { PromptEditorDialog, promptCounts } from './PromptEditorDialog.js';
 import { SkillPicker } from './SkillPicker.js';
@@ -57,20 +57,24 @@ export function AgentConfigPanel({
   dirty,
 }: AgentConfigPanelProps) {
   const { data: skills = [] } = useSkills();
-  const providerSkills = skills.filter(
-    (s) => s.provider === 'both' || s.provider === agent.provider,
+  const providerSkills = useMemo(
+    () => skills.filter((s) => s.provider === 'both' || s.provider === agent.provider),
+    [skills, agent.provider],
   );
   const { data: presets = [] } = useAgentPresets();
-  const presetsByCategory = groupPresetsByCategory(presets);
+  const presetsByCategory = useMemo(() => groupPresetsByCategory(presets), [presets]);
   // Picker reflects the current agent by content match; falls back to
   // "Custom" once the user edits any of the three fields.
-  const matchedPresetId =
-    presets.find(
-      (p) =>
-        p.instructions === agent.instructions &&
-        p.model === agent.model &&
-        p.provider === agent.provider,
-    )?.id ?? '';
+  const matchedPresetId = useMemo(
+    () =>
+      presets.find(
+        (p) =>
+          p.instructions === agent.instructions &&
+          p.model === agent.model &&
+          p.provider === agent.provider,
+      )?.id ?? '',
+    [presets, agent.instructions, agent.model, agent.provider],
+  );
   const ps = providerStyle(agent.provider);
   const [promptEditorOpen, setPromptEditorOpen] = useState(false);
 
@@ -535,14 +539,10 @@ function PillToggleGroup({
   );
 }
 
-function groupPresetsByCategory(
-  presets: AgentPreset[],
-): [string, AgentPreset[]][] {
-  const groups = new Map<string, AgentPreset[]>();
-  for (const p of presets) {
-    const list = groups.get(p.category) ?? [];
-    list.push(p);
-    groups.set(p.category, list);
-  }
+function groupPresetsByCategory(presets: AgentPreset[]): [string, AgentPreset[]][] {
+  const groups = presets.reduce((acc, p) => {
+    (acc.get(p.category) ?? acc.set(p.category, []).get(p.category)!).push(p);
+    return acc;
+  }, new Map<string, AgentPreset[]>());
   return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
 }

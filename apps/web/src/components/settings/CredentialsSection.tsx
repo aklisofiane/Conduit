@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { defaultHostFor, isCloudHost, normalizeHostUrl } from '@conduit/shared/platform';
+import { isCloudHost, normalizeHostUrl } from '@conduit/shared/platform';
 import type { Platform } from '@conduit/shared/platform';
 import type { CredentialRow } from '../../api/types.js';
 import {
@@ -11,6 +11,7 @@ import {
 import { ApiError } from '../../api/client.js';
 import { relativeFromNow } from '../../lib/time.js';
 import { Select } from '../common/Select.js';
+import { SettingsSection } from '../common/SettingsSection.js';
 
 const PLATFORMS = ['GITHUB', 'GITLAB', 'JIRA', 'SLACK', 'DISCORD'] as const;
 
@@ -93,19 +94,12 @@ export function CredentialsSection() {
   };
 
   return (
-    <section className="rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-1)]">
-      <header className="flex items-center justify-between border-b border-[var(--color-line)] px-4 py-3">
-        <div className="flex flex-col gap-0.5">
-          <h2 className="font-mono text-[13px] font-semibold">Platform credentials</h2>
-          <p className="font-mono text-[11px] text-[var(--color-text-3)]">
-            Encrypted at rest with AES-256-GCM. Used by connections (a credential can back many).
-          </p>
-        </div>
-        <button className="btn shrink-0 whitespace-nowrap" onClick={() => setCreating((v) => !v)}>
-          {creating ? 'Cancel' : '+ New'}
-        </button>
-      </header>
-
+    <SettingsSection
+      title="Platform credentials"
+      description="Encrypted at rest with AES-256-GCM. Used by connections (a credential can back many)."
+      creating={creating}
+      onToggleCreate={() => setCreating((v) => !v)}
+    >
       {creating && (
         <>
           <div className="grid grid-cols-[120px_1fr_1fr_auto] items-end gap-3 border-b border-[var(--color-line)] px-4 py-3">
@@ -241,7 +235,7 @@ export function CredentialsSection() {
           />
         ))}
       </div>
-    </section>
+    </SettingsSection>
   );
 }
 

@@ -1,20 +1,19 @@
 import type { DragEvent as ReactDragEvent, ReactNode } from 'react';
 import type { AgentConfig } from '@conduit/shared';
 import { tokens, providerStyle, type ProviderId } from '../../styles/theme.js';
-import { CircleDot, Clock, GitPullRequest } from 'lucide-react';
 import { ProviderGlyph } from '../common/BrandGlyph.js';
+import { ADDABLE_TRIGGERS, type PaletteTriggerType } from './trigger-registry.js';
 
 export const PALETTE_DRAG_MIME = 'application/conduit-node';
+
+export type { PaletteTriggerType };
 
 /**
  * Drag payload contract between the palette and the canvas drop handler.
  * Triggers are typed at drag time so the canvas knows which default
- * config to materialize. Adding a future webhook card means extending the
- * `triggerType` union here and adding a corresponding case in the drop
- * handler.
+ * config to materialize. The addable trigger variants come from the
+ * trigger registry — adding one there extends the cards and this union.
  */
-export type PaletteTriggerType = 'issues' | 'pull_requests' | 'cron';
-
 export type PaletteDragPayload =
   | { kind: 'agent'; provider: AgentConfig['provider'] }
   | { kind: 'trigger'; triggerType: PaletteTriggerType };
@@ -41,30 +40,17 @@ export function NodePalette({
       }}
     >
       <PaletteSection title="Triggers">
-        <TriggerPaletteCard
-          name="Issues"
-          description="github issues — board or repo"
-          icon={<CircleDot size={11} color="#FFFFFF" strokeWidth={1.5} />}
-          disabled={triggerSlotFilled}
-          payload={{ kind: 'trigger', triggerType: 'issues' }}
-          onClick={() => onAddTrigger('issues')}
-        />
-        <TriggerPaletteCard
-          name="Pull requests"
-          description="open prs in the repo"
-          icon={<GitPullRequest size={11} color="#FFFFFF" strokeWidth={1.5} />}
-          disabled={triggerSlotFilled}
-          payload={{ kind: 'trigger', triggerType: 'pull_requests' }}
-          onClick={() => onAddTrigger('pull_requests')}
-        />
-        <TriggerPaletteCard
-          name="Schedule"
-          description="time-driven runs on a branch"
-          icon={<Clock size={11} color="#FFFFFF" strokeWidth={1.5} />}
-          disabled={triggerSlotFilled}
-          payload={{ kind: 'trigger', triggerType: 'cron' }}
-          onClick={() => onAddTrigger('cron')}
-        />
+        {ADDABLE_TRIGGERS.map(({ type, palette }) => (
+          <TriggerPaletteCard
+            key={type}
+            name={palette.name}
+            description={palette.description}
+            icon={palette.icon}
+            disabled={triggerSlotFilled}
+            payload={{ kind: 'trigger', triggerType: type }}
+            onClick={() => onAddTrigger(type)}
+          />
+        ))}
         {triggerSlotFilled && (
           <div className="px-[2px] font-mono text-[10px] leading-[1.3] text-[var(--color-text-muted)]">
             Delete the existing trigger to add a different kind.

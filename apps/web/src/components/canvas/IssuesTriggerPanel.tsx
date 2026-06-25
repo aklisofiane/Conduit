@@ -15,7 +15,7 @@ import {
   PanelFooter,
   PanelHeader,
 } from './trigger-panel-common.js';
-import { ensureLabelTarget } from '../../lib/connection.js';
+import { ensureLabelTarget, repoScopedConnections } from '../../lib/connection.js';
 
 type IssuesTrigger = Extract<TriggerConfig, { type: 'issues' }>;
 
@@ -44,10 +44,7 @@ export function IssuesTriggerPanel({
 }: IssuesTriggerPanelProps) {
   const { data: allConnections = [] } = useConnections();
   const repoConnections = useMemo(
-    () =>
-      allConnections.filter(
-        (c) => c.scope.kind === 'github_repo' || c.scope.kind === 'gitlab_project',
-      ),
+    () => repoScopedConnections(allConnections),
     [allConnections],
   );
   const boardConnections = useMemo(

@@ -24,6 +24,19 @@ export function repoScopeKindFor(platform: string): ConnectionScopeKind {
 }
 
 /**
+ * Keep only connections bound to a repo/project — the source binding the
+ * trigger panels offer in their connection picker. Excludes board
+ * (`github_projects_v2`) and unscoped (`none`) connections.
+ */
+export function repoScopedConnections<T extends { scope: ConnectionScope }>(
+  connections: T[],
+): T[] {
+  return connections.filter(
+    (c) => c.scope.kind === 'github_repo' || c.scope.kind === 'gitlab_project',
+  );
+}
+
+/**
  * The repo/project a missing `conduit-*` label can be created on. Consumed by
  * the trigger panel's inline "create label" action and the connection-time
  * label prompt. Undefined when the connection isn't bound to a repo/project.

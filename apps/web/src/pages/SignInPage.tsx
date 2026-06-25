@@ -1,10 +1,12 @@
-import { useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm, type UseFormSetError } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useAuthConfig } from '../api/auth-config.js';
 import { signIn } from '../lib/auth-client.js';
+import { FormField } from '../components/common/FormField.js';
+import { OAuthButton } from '../components/common/OAuthButton.js';
+import { useClearFormError } from '../hooks/use-clear-form-error.js';
 
 const schema = z.object({
   email: z.string().email('Enter a valid email'),
@@ -62,12 +64,7 @@ export function SignInPage() {
   });
 
   // Clear stale root error when the user edits any field.
-  useEffect(() => {
-    const sub = form.watch(() => {
-      if (form.formState.errors.root) form.clearErrors('root');
-    });
-    return () => sub.unsubscribe();
-  }, [form]);
+  useClearFormError(form);
 
   const rootError = form.formState.errors.root?.message;
 
@@ -92,7 +89,7 @@ export function SignInPage() {
       )}
 
       <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
-        <Field
+        <FormField
           label="Email"
           error={form.formState.errors.email?.message}
           inputProps={{
@@ -102,7 +99,7 @@ export function SignInPage() {
             ...form.register('email'),
           }}
         />
-        <Field
+        <FormField
           label="Password"
           error={form.formState.errors.password?.message}
           inputProps={{
@@ -150,26 +147,6 @@ export function SignInPage() {
   );
 }
 
-function Field({
-  label,
-  error,
-  inputProps,
-}: {
-  label: string;
-  error?: string;
-  inputProps: React.InputHTMLAttributes<HTMLInputElement>;
-}) {
-  return (
-    <label className="flex flex-col">
-      <span className="field-label">{label}</span>
-      <input className="field-input" {...inputProps} />
-      {error && (
-        <span className="mt-1 font-mono text-[10.5px] text-[var(--color-error)]">{error}</span>
-      )}
-    </label>
-  );
-}
-
 function Divider() {
   return (
     <div className="flex items-center gap-3">
@@ -179,21 +156,5 @@ function Divider() {
       </span>
       <div className="h-px flex-1 bg-[var(--color-divider)]" />
     </div>
-  );
-}
-
-function OAuthButton({ provider, label, callbackURL, errorCallbackURL }: { provider: string; label: string; callbackURL: string; errorCallbackURL?: string }) {
-  const handleClick = async () => {
-    // Relative callbackURLs resolve against the API origin, not the SPA.
-    await signIn.social({
-      provider: provider as 'github',
-      callbackURL: `${window.location.origin}${callbackURL}`,
-      errorCallbackURL: errorCallbackURL ? `${window.location.origin}${errorCallbackURL}` : undefined,
-    });
-  };
-  return (
-    <button type="button" className="btn justify-center" onClick={handleClick}>
-      {label}
-    </button>
   );
 }

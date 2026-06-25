@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   useConnections,
@@ -5,6 +6,7 @@ import {
   useDuplicateWorkflow,
   useUpdateWorkflow,
 } from '../../api/hooks.js';
+import { triggerSummary } from '../../lib/trigger-defaults.js';
 import type { WorkflowRow } from '../../api/types.js';
 import { cn } from '../../lib/cn.js';
 import { downloadWorkflowExport } from '../../lib/export-workflow.js';
@@ -31,7 +33,11 @@ export function WorkflowRowItem({
 }: WorkflowRowItemProps) {
   const lastRun = wf.runs[0];
   const agentCount = wf.definition?.nodes?.length ?? 0;
-  const providers = new Set(wf.definition?.nodes?.map((n) => n.provider) ?? []);
+  const providers = useMemo(
+    () => new Set(wf.definition?.nodes?.map((n) => n.provider) ?? []),
+    [wf.definition?.nodes],
+  );
+  const trigger = wf.definition?.triggers?.[0];
 
   const update = useUpdateWorkflow(wf.id);
   const del = useDeleteWorkflow();
@@ -112,12 +118,12 @@ export function WorkflowRowItem({
         </div>
       </div>
       <div className="truncate font-mono text-[11px] text-[var(--color-text-2)]">
-        {wf.definition?.triggers?.[0]?.platform ? (
+        {trigger?.platform ? (
           <>
             <b className="text-[var(--color-text)]">
-              {wf.definition.triggers[0].platform.toUpperCase()}
+              {trigger.platform.toUpperCase()}
             </b>{' '}
-            · {triggerSummary(wf.definition)}
+            · {triggerSummary(trigger)}
           </>
         ) : (
           <span className="text-[var(--color-text-4)]">— trigger not configured</span>
@@ -200,18 +206,3 @@ export function WorkflowRowItem({
 
 const rowClassName =
   'grid grid-cols-[20px_minmax(0,1fr)_minmax(0,1fr)_140px_60px_28px] items-center gap-4 border-b border-[var(--color-line)] px-4 py-3 last:border-b-0';
-
-function triggerSummary(def: WorkflowRow['definition']): string {
-  const trigger = def.triggers[0];
-  if (!trigger) return 'no trigger';
-  switch (trigger.type) {
-    case 'issues':
-      return `polling · every ${trigger.intervalSec}s`;
-    case 'pull_requests':
-      return `polling · every ${trigger.intervalSec}s · prs`;
-    case 'cron':
-      return `schedule · ${trigger.cron} · ${trigger.timezone}`;
-    case 'webhook':
-      return trigger.event;
-  }
-}

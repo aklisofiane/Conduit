@@ -24,7 +24,7 @@ import type {
   TemplateBinding,
   TemplateSummary,
 } from '../../api/types.js';
-import { connectionLabel } from '../../lib/connection.js';
+import { connectionLabel, repoScopedConnections } from '../../lib/connection.js';
 import { Dialog, DialogContent, DialogTitle } from '../common/Dialog.js';
 import { SearchSelect } from '../common/SearchSelect.js';
 import { Select, type SelectOption } from '../common/Select.js';
@@ -36,6 +36,25 @@ function credentialPlatform(
   const cred = credentials.find((c) => c.id === credentialId);
   if (!cred) return undefined;
   return cred.platform === 'GITLAB' ? 'GITLAB' : 'GITHUB';
+}
+
+/**
+ * Resolve the platform a single binding targets: for `new` bindings via its
+ * credential, for `existing` bindings via the bound connection's credential.
+ * Undefined when the binding is empty or unresolvable.
+ */
+function getPlatformForBinding(
+  binding: TemplateBinding | undefined,
+  credentials: CredentialRow[],
+  connections: ConnectionRow[],
+): 'GITHUB' | 'GITLAB' | undefined {
+  if (!binding) return undefined;
+  if (binding.mode === 'new') {
+    return credentialPlatform(binding.credentialId, credentials);
+  }
+  const conn = connections.find((c) => c.id === binding.connectionId);
+  if (!conn) return undefined;
+  return conn.credential.platform === 'GITLAB' ? 'GITLAB' : 'GITHUB';
 }
 
 function defaultRepoScope(platform: 'GITHUB' | 'GITLAB' | undefined): ConnectionScope {
@@ -74,9 +93,7 @@ function defaultBindingForRepo(
   credentials: CredentialRow[],
   connections: ConnectionRow[],
 ): TemplateBinding {
-  const eligible = connections.filter(
-    (c) => c.scope.kind === 'github_repo' || c.scope.kind === 'gitlab_project',
-  );
+  const eligible = repoScopedConnections(connections);
   const only = eligible.length === 1 ? eligible[0] : undefined;
   if (eligible.length > 0) {
     return { mode: 'existing', connectionId: only?.id ?? '' };
@@ -127,23 +144,17 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
   );
   const boardAlias = selected?.boardAliases?.[0];
 
-  const repoPlatform = (() => {
+  // GITHUB wins outright; otherwise the first resolvable platform across the
+  // repo bindings (board scope only applies to GitHub).
+  const repoPlatform = useMemo(() => {
     let found: 'GITHUB' | 'GITLAB' | undefined;
     for (const alias of repoAliases) {
-      const b = bindings[alias];
-      if (!b) continue;
-      let p: 'GITHUB' | 'GITLAB' | undefined;
-      if (b.mode === 'new') {
-        p = credentialPlatform(b.credentialId, credentials);
-      } else if (b.mode === 'existing') {
-        const conn = connections.find((c) => c.id === b.connectionId);
-        if (conn) p = conn.credential.platform === 'GITLAB' ? 'GITLAB' : 'GITHUB';
-      }
+      const p = getPlatformForBinding(bindings[alias], credentials, connections);
       if (p === 'GITHUB') return 'GITHUB' as const;
       if (p) found = p;
     }
     return found;
-  })();
+  }, [repoAliases, bindings, credentials, connections]);
   const showBoard = boardAlias != null && repoPlatform === 'GITHUB';
 
   useEffect(() => {
@@ -430,9 +441,7 @@ function BindingRow({
   const mode = binding?.mode ?? 'new';
   const eligibleConnections = isBoard
     ? connections.filter((c) => c.scope.kind === 'github_projects_v2')
-    : connections.filter(
-        (c) => c.scope.kind === 'github_repo' || c.scope.kind === 'gitlab_project',
-      );
+    : repoScopedConnections(connections);
 
   const handleNewClick = () => {
     const credId =

@@ -10,6 +10,7 @@ import type {
   ViewerOrgEntry,
 } from '@conduit/shared/platform';
 import { api } from './client.js';
+import { makeDefaultTrigger } from '../lib/trigger-defaults.js';
 import type {
   AgentPreset,
   ConnectionRow,
@@ -64,12 +65,12 @@ export function useCreateWorkflow() {
       if (connectionId && rest.triggerType && !rest.definition) {
         const id = `trigger_${Math.random().toString(36).slice(2, 10)}`;
         const name = 'Trigger1';
-        const platform = plat ?? 'github';
-        const shared = { id, name, platform, connectionId };
-        const trigger =
-          rest.triggerType === 'cron'
-            ? { ...shared, type: 'cron' as const, cron: '0 9 * * *', timezone: 'UTC', branch: 'main' }
-            : { ...shared, type: rest.triggerType, intervalSec: 60, filters: [] as never[] };
+        const trigger = makeDefaultTrigger(rest.triggerType, {
+          id,
+          name,
+          platform: plat ?? 'github',
+          connectionId,
+        });
         rest.definition = {
           triggers: [trigger],
           nodes: [],
@@ -161,6 +162,7 @@ export function useCredentials() {
   return useQuery({
     queryKey: ['credentials'],
     queryFn: () => api.get<CredentialRow[]>('/credentials'),
+    staleTime: 60_000,
   });
 }
 
@@ -256,6 +258,7 @@ export function useConnections(filter: ConnectionsFilter = {}) {
   return useQuery({
     queryKey: [...CONNECTIONS, filter.platform ?? null, filter.scopeKind ?? null] as const,
     queryFn: () => api.get<ConnectionRow[]>(`/connections${qs ? `?${qs}` : ''}`),
+    staleTime: 60_000,
   });
 }
 
@@ -407,6 +410,7 @@ export function useTemplates() {
   return useQuery({
     queryKey: ['templates'],
     queryFn: () => api.get<TemplateSummary[]>('/templates'),
+    staleTime: 60_000,
   });
 }
 

@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useUserInvitations } from '../api/organization.js';
 import { authClient, signOut, useSession } from '../lib/auth-client.js';
+import { FormField } from '../components/common/FormField.js';
 
 const passwordSchema = z
   .object({
@@ -154,7 +155,7 @@ function ChangePasswordSection() {
         <h2 className="font-mono text-[13px] font-semibold">Change password</h2>
       </header>
       <form onSubmit={onSubmit} className="flex flex-col gap-3 px-4 py-4" noValidate>
-        <Field
+        <FormField
           label="Current password"
           error={form.formState.errors.currentPassword?.message}
           inputProps={{
@@ -163,7 +164,7 @@ function ChangePasswordSection() {
             ...form.register('currentPassword'),
           }}
         />
-        <Field
+        <FormField
           label="New password"
           error={form.formState.errors.newPassword?.message}
           inputProps={{
@@ -172,7 +173,7 @@ function ChangePasswordSection() {
             ...form.register('newPassword'),
           }}
         />
-        <Field
+        <FormField
           label="Confirm new password"
           error={form.formState.errors.confirmPassword?.message}
           inputProps={{
@@ -236,25 +237,5 @@ function SignOutSection() {
         </button>
       </div>
     </section>
-  );
-}
-
-function Field({
-  label,
-  error,
-  inputProps,
-}: {
-  label: string;
-  error?: string;
-  inputProps: React.InputHTMLAttributes<HTMLInputElement>;
-}) {
-  return (
-    <label className="flex flex-col">
-      <span className="field-label">{label}</span>
-      <input className="field-input" {...inputProps} />
-      {error && (
-        <span className="mt-1 font-mono text-[10.5px] text-[var(--color-error)]">{error}</span>
-      )}
-    </label>
   );
 }

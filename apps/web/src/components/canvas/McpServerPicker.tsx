@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import type {
   AgentConfig,
   DiscoveredTool,
@@ -8,13 +8,12 @@ import type {
   WorkflowMcpServer,
 } from '@conduit/shared';
 import { MCP_PRESETS } from '@conduit/shared';
-import * as Popover from '@radix-ui/react-popover';
-import { ChevronDown, Search } from 'lucide-react';
 import { ApiError } from '../../api/client.js';
 import { useConnections, useIntrospectMcp } from '../../api/hooks.js';
 import { useWorkflowEditor } from '../../state/workflow-editor.js';
 import { cn } from '../../lib/cn.js';
 import { connectionLabel } from '../../lib/connection.js';
+import { CheckboxListPopover } from '../common/CheckboxListPopover.js';
 import { Select } from '../common/Select.js';
 
 interface Props {
@@ -226,6 +225,10 @@ function ServerCard({
   );
 }
 
+// Stable accessors so the popover's filter `useMemo` isn't invalidated each render.
+const toolName = (t: DiscoveredTool) => t.name;
+const toolDescription = (t: DiscoveredTool) => t.description;
+
 function ToolAllowList({
   tools,
   allowedTools,
@@ -235,28 +238,24 @@ function ToolAllowList({
   allowedTools: string[] | undefined;
   onChange: (next: string[] | undefined) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
-
   const allAllowed = allowedTools === undefined;
-  const selected = new Set(allowedTools ?? tools.map((t) => t.name));
+  const selected = useMemo(
+    () => new Set(allowedTools ?? tools.map((t) => t.name)),
+    [allowedTools, tools],
+  );
 
-  const filtered = query
-    ? tools.filter(
-        (t) =>
-          t.name.toLowerCase().includes(query.toLowerCase()) ||
-          t.description?.toLowerCase().includes(query.toLowerCase()),
-      )
-    : tools;
+  // `undefined` means "all tools" — normalize a full selection back to it so
+  // the stored allowlist stays compact and survives the server adding tools.
+  const setSelected = (next: Set<string>) => {
+    if (next.size === tools.length) onChange(undefined);
+    else onChange(Array.from(next));
+  };
 
   const toggle = (name: string) => {
     const next = new Set(selected);
     if (next.has(name)) next.delete(name);
     else next.add(name);
-
-    if (next.size === tools.length) onChange(undefined);
-    else onChange(Array.from(next));
+    setSelected(next);
   };
 
   const toggleAll = () => {
@@ -266,94 +265,32 @@ function ToolAllowList({
 
   return (
     <div className="mt-3 flex items-center gap-2 border-t border-[var(--color-line)] pt-3">
-      <Popover.Root
-        open={open}
-        onOpenChange={(next) => {
-          setOpen(next);
-          if (!next) setQuery('');
+      <CheckboxListPopover
+        items={tools}
+        getId={toolName}
+        getLabel={toolName}
+        getDescription={toolDescription}
+        selectedIds={selected}
+        onToggle={toggle}
+        onToggleMany={(names, select) => {
+          const next = new Set(selected);
+          for (const name of names) {
+            if (select) next.add(name);
+            else next.delete(name);
+          }
+          setSelected(next);
         }}
-      >
-        <Popover.Trigger
-          className={cn('select-trigger flex-1', open && 'search-select-open')}
-        >
-          <span className="search-select-value font-mono text-[11px]">
-            {allAllowed
-              ? `All tools (${tools.length})`
-              : `${selected.size} of ${tools.length} tools`}
-          </span>
-          <span className={cn('select-trigger-chevron', open && 'search-select-chevron-open')}>
-            <ChevronDown size={12} strokeWidth={1.5} />
-          </span>
-        </Popover.Trigger>
-
-        <Popover.Portal>
-          <Popover.Content
-            sideOffset={4}
-            align="start"
-            className="search-select-content"
-            style={{ maxHeight: 320 }}
-            onOpenAutoFocus={(e) => {
-              e.preventDefault();
-              inputRef.current?.focus();
-            }}
-          >
-            <div className="search-select-input-row">
-              <Search size={12} strokeWidth={1.5} className="search-select-icon" />
-              <input
-                ref={inputRef}
-                className="search-select-input"
-                placeholder="Filter tools…"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-            </div>
-
-            {!query && (
-              <div className="flex items-center justify-between border-b border-[var(--color-divider)] px-2 py-1.5">
-                <label className="flex items-center gap-2 font-mono text-[11px] text-[var(--color-text-3)]">
-                  <input
-                    type="checkbox"
-                    checked={allAllowed}
-                    onChange={toggleAll}
-                  />
-                  Select all
-                </label>
-              </div>
-            )}
-
-            <div className="search-select-list">
-              {filtered.length === 0 && (
-                <div className="search-select-empty">No matching tools</div>
-              )}
-              {filtered.map((tool) => (
-                <label
-                  key={tool.name}
-                  className={cn(
-                    'select-item',
-                    'flex items-start gap-2',
-                    selected.has(tool.name) && 'search-select-item-selected',
-                  )}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selected.has(tool.name)}
-                    onChange={() => toggle(tool.name)}
-                    className="mt-0.5 flex-shrink-0"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate font-mono text-[11px]">{tool.name}</div>
-                    {tool.description && (
-                      <div className="truncate font-mono text-[10px] text-[var(--color-text-3)]">
-                        {tool.description}
-                      </div>
-                    )}
-                  </div>
-                </label>
-              ))}
-            </div>
-          </Popover.Content>
-        </Popover.Portal>
-      </Popover.Root>
+        triggerClassName="flex-1"
+        maxHeight={320}
+        placeholder="Filter tools…"
+        emptyLabel="No matching tools"
+        triggerLabel={
+          allAllowed
+            ? `All tools (${tools.length})`
+            : `${selected.size} of ${tools.length} tools`
+        }
+        selectAll={{ checked: allAllowed, onToggle: toggleAll, label: 'Select all' }}
+      />
     </div>
   );
 }

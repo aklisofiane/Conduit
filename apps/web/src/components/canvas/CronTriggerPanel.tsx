@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { CRON_EXPRESSION_RE, type TriggerConfig } from '@conduit/shared';
 import { useConnections } from '../../api/hooks.js';
+import { repoScopedConnections } from '../../lib/connection.js';
 import { Select } from '../common/Select.js';
 import { CronScheduleBuilder } from './CronScheduleBuilder.js';
 import {
@@ -73,10 +74,7 @@ export function CronTriggerPanel({
 
   const { data: allConnections = [] } = useConnections();
   const repoConnections = useMemo(
-    () =>
-      allConnections.filter(
-        (c) => c.scope.kind === 'github_repo' || c.scope.kind === 'gitlab_project',
-      ),
+    () => repoScopedConnections(allConnections),
     [allConnections],
   );
 
