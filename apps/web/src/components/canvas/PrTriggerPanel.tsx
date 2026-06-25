@@ -5,6 +5,7 @@ import { useConnections, useListLabels } from '../../api/hooks.js';
 import {
   ActiveToggleField,
   ConnectionSelect,
+  ensureLabelTarget,
   Field,
   FilterEditor,
   PanelFooter,
@@ -50,6 +51,7 @@ export function PrTriggerPanel({
     enabled: !!trigger.connectionId,
   });
   const labelOptions = labelsQuery.data?.map((l) => l.name) ?? [];
+  const ensureTarget = ensureLabelTarget(repoConnections, trigger.connectionId);
 
   return (
     <>
@@ -98,6 +100,7 @@ export function PrTriggerPanel({
               offeredFields={offeredFilterFields(trigger)}
               statusOptions={[]}
               labelOptions={labelOptions}
+              ensureTarget={ensureTarget}
               onChange={(filters) =>
                 // offeredFilterFields restricts the editor to label/pr_state,
                 // so the produced array is always assignable back.

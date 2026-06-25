@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ConnectionScope, ConnectionScopeKind } from '@conduit/shared';
+import { CONDUIT_LABELS } from '@conduit/shared/label';
 import { isCloudHost } from '@conduit/shared/platform';
 import type { Platform } from '@conduit/shared/platform';
 import { ApiError } from '../../api/client.js';
@@ -8,6 +9,7 @@ import {
   useCreateConnection,
   useCredentials,
   useDeleteConnection,
+  useEnsureRepoLabels,
   useListProjectBoards,
   useListViewerRepos,
   useListViewerOrgs,
@@ -34,6 +36,12 @@ export function ConnectionsSection() {
   const del = useDeleteConnection();
 
   const [creating, setCreating] = useState(false);
+  // After a repo/project connection is created, offer to add Conduit's labels
+  // to it so label-gated templates work without hand-creating labels.
+  const [labelPrompt, setLabelPrompt] = useState<{
+    connectionId: string;
+    scopeLabel: string;
+  } | null>(null);
 
   return (
     <section className="rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-1)]">
@@ -56,12 +64,28 @@ export function ConnectionsSection() {
           onCancel={() => setCreating(false)}
           onSubmit={async (body) => {
             try {
-              await create.mutateAsync(body);
+              const conn = await create.mutateAsync(body);
               setCreating(false);
+              if (
+                conn.scope.kind === 'github_repo' ||
+                conn.scope.kind === 'gitlab_project'
+              ) {
+                setLabelPrompt({
+                  connectionId: conn.id,
+                  scopeLabel: scopeSummary(conn.scope) || conn.name,
+                });
+              }
             } catch (e) {
               alert(e instanceof ApiError ? e.message : String(e));
             }
           }}
+        />
+      )}
+
+      {labelPrompt && (
+        <LabelPrompt
+          target={labelPrompt}
+          onDismiss={() => setLabelPrompt(null)}
         />
       )}
 
@@ -90,6 +114,125 @@ export function ConnectionsSection() {
         />
       ))}
     </section>
+  );
+}
+
+/**
+ * Post-create prompt offering to add Conduit's four workflow labels to a
+ * freshly-created repo/project connection. Pre-checked checkboxes; Add calls
+ * the ensure endpoint and reports per-label outcome; Skip dismisses with no
+ * calls. `conduit-human-review` is included even though it's never a trigger
+ * value — it's a writeback target that must exist on the repo/project.
+ */
+function LabelPrompt({
+  target,
+  onDismiss,
+}: {
+  target: { connectionId: string; scopeLabel: string };
+  onDismiss: () => void;
+}) {
+  const ensure = useEnsureRepoLabels();
+  const [selected, setSelected] = useState<Set<string>>(
+    () => new Set(CONDUIT_LABELS.map((l) => l.name)),
+  );
+
+  const done = ensure.isSuccess;
+  const resultByName = new Map(
+    (ensure.data ?? []).map((r) => [r.name, r] as const),
+  );
+
+  const toggle = (name: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+
+  const add = () => {
+    const names = CONDUIT_LABELS.map((l) => l.name).filter((n) =>
+      selected.has(n),
+    );
+    if (names.length > 0) ensure.mutate({ connectionId: target.connectionId, names });
+  };
+
+  const topLevelError =
+    ensure.error instanceof ApiError
+      ? ensure.error.message
+      : ensure.error
+        ? String(ensure.error)
+        : null;
+
+  return (
+    <div className="border-b border-[var(--color-line)] px-4 py-4">
+      <div className="flex flex-col gap-3 rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-2,var(--color-bg-1))] p-3">
+        <div className="font-mono text-[12px]">
+          Connected{' '}
+          <code className="text-[var(--color-text)]">{target.scopeLabel}</code>{' '}
+          ✓
+        </div>
+        <div className="font-mono text-[11px] text-[var(--color-text-3)]">
+          Add Conduit's workflow labels to this repo/project?
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          {CONDUIT_LABELS.map((l) => {
+            const r = resultByName.get(l.name);
+            return (
+              <label
+                key={l.name}
+                className="flex items-center gap-2 font-mono text-[12px]"
+              >
+                <input
+                  type="checkbox"
+                  checked={selected.has(l.name)}
+                  disabled={ensure.isPending || done}
+                  onChange={() => toggle(l.name)}
+                />
+                <code className="text-[var(--color-text)]">{l.name}</code>
+                {r &&
+                  (r.status === 'failed' ? (
+                    <span className="text-[var(--color-danger,#dc322f)]">
+                      ✗ {r.error ?? 'failed'}
+                    </span>
+                  ) : (
+                    <span className="text-[var(--color-success,#2da44e)]">
+                      ✓ {r.status}
+                    </span>
+                  ))}
+              </label>
+            );
+          })}
+        </div>
+
+        {topLevelError && (
+          <div className="font-mono text-[11px] text-[var(--color-danger,#dc322f)]">
+            {topLevelError}
+          </div>
+        )}
+
+        <div className="flex justify-end gap-2">
+          {done ? (
+            <button className="btn" onClick={onDismiss}>
+              Done
+            </button>
+          ) : (
+            <>
+              <button className="btn" onClick={onDismiss}>
+                Skip
+              </button>
+              <button
+                className="btn"
+                disabled={ensure.isPending || selected.size === 0}
+                onClick={add}
+              >
+                {ensure.isPending ? 'Adding…' : 'Add labels'}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 

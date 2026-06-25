@@ -10,6 +10,7 @@ import {
   ActiveToggleField,
   BoardPickerHint,
   ConnectionSelect,
+  ensureLabelTarget,
   Field,
   FilterEditor,
   PanelFooter,
@@ -82,6 +83,7 @@ export function IssuesTriggerPanel({
   const statusOptions =
     selectedBoardSummary?.fields.find((f) => f.name === 'Status')?.options ?? [];
   const labelOptions = labelsQuery.data?.map((l) => l.name) ?? [];
+  const ensureTarget = ensureLabelTarget(repoConnections, trigger.connectionId);
 
   return (
     <>
@@ -185,6 +187,7 @@ export function IssuesTriggerPanel({
               offeredFields={offeredFilterFields(trigger)}
               statusOptions={statusOptions}
               labelOptions={labelOptions}
+              ensureTarget={ensureTarget}
               onChange={(filters) =>
                 // offeredFilterFields restricts the editor to label/status,
                 // so the produced array is always assignable back.

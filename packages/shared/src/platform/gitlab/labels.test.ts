@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { listGitlabProjectLabels } from './labels';
+import { createGitlabProjectLabel, listGitlabProjectLabels } from './labels';
 
 describe('listGitlabProjectLabels', () => {
   it('maps GitLab label fields and strips leading # from color', async () => {
@@ -158,6 +158,86 @@ describe('listGitlabProjectLabels', () => {
       fetchImpl: fakeFetch,
     });
     expect(labels).toEqual([]);
+  });
+});
+
+describe('createGitlabProjectLabel', () => {
+  it('POSTs to the project labels endpoint, prepends # to color, returns "created"', async () => {
+    let captured: { url: string; init: RequestInit } | undefined;
+    const fakeFetch: typeof fetch = (async (url: string, init: RequestInit) => {
+      captured = { url, init };
+      return new Response(JSON.stringify({ name: 'conduit-dev' }), { status: 201 });
+    }) as typeof fetch;
+
+    const status = await createGitlabProjectLabel({
+      hostUrl: 'gitlab.com',
+      projectPath: 'acme/api',
+      token: 't',
+      name: 'conduit-dev',
+      color: '1f6feb',
+      description: 'hand off to develop',
+      fetchImpl: fakeFetch,
+    });
+
+    expect(status).toBe('created');
+    expect(captured!.url).toBe(
+      'https://gitlab.com/api/v4/projects/acme%2Fapi/labels',
+    );
+    expect(captured!.init.method).toBe('POST');
+    expect(JSON.parse(captured!.init.body as string)).toEqual({
+      name: 'conduit-dev',
+      color: '#1f6feb',
+      description: 'hand off to develop',
+    });
+  });
+
+  it('does not double up the # when color already has one', async () => {
+    let body: string | undefined;
+    const fakeFetch: typeof fetch = (async (_url: string, init: RequestInit) => {
+      body = init.body as string;
+      return new Response('{}', { status: 201 });
+    }) as typeof fetch;
+
+    await createGitlabProjectLabel({
+      hostUrl: 'gitlab.com',
+      projectPath: 'acme/api',
+      token: 't',
+      name: 'conduit-dev',
+      color: '#1f6feb',
+      fetchImpl: fakeFetch,
+    });
+    expect(JSON.parse(body!).color).toBe('#1f6feb');
+  });
+
+  it('treats a 409 conflict as "exists" (ensure semantics)', async () => {
+    const fakeFetch: typeof fetch = (async () =>
+      new Response('Label already exists', { status: 409 })) as typeof fetch;
+
+    const status = await createGitlabProjectLabel({
+      hostUrl: 'gitlab.com',
+      projectPath: 'acme/api',
+      token: 't',
+      name: 'conduit-dev',
+      color: '1f6feb',
+      fetchImpl: fakeFetch,
+    });
+    expect(status).toBe('exists');
+  });
+
+  it('throws on other non-2xx (e.g. 403 read-only token)', async () => {
+    const fakeFetch: typeof fetch = (async () =>
+      new Response('Forbidden', { status: 403 })) as typeof fetch;
+
+    await expect(
+      createGitlabProjectLabel({
+        hostUrl: 'gitlab.com',
+        projectPath: 'acme/api',
+        token: 't',
+        name: 'conduit-dev',
+        color: '1f6feb',
+        fetchImpl: fakeFetch,
+      }),
+    ).rejects.toThrow(/GitLab REST HTTP 403 creating label "conduit-dev" for acme\/api/);
   });
 });
 

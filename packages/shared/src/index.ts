@@ -4,6 +4,7 @@ export * from './trigger/index';
 export * from './mcp/index';
 export * from './workspace/index';
 export * from './skill/index';
+export * from './label/index';
 export * from './agent/index';
 export * from './workflow/index';
 export * from './template/index';

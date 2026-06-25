@@ -48,4 +48,13 @@ describe('TriggerService cross-org isolation', () => {
       svc.listLabels(fixture.orgA.id, { connectionId: fixture.orgB.connectionId }),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
+
+  it('ensureLabels on a sibling-org connectionId throws NotFound before hitting GitHub', async () => {
+    await expect(
+      svc.ensureLabels(fixture.orgA.id, {
+        connectionId: fixture.orgB.connectionId,
+        names: ['conduit-dev'],
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
 });

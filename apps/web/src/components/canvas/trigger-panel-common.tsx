@@ -5,9 +5,11 @@ import type {
   TriggerConfig,
   TriggerFilter,
 } from '@conduit/shared';
+import { isConduitLabel } from '@conduit/shared/label';
 import type { ProjectBoardSummary } from '@conduit/shared/platform';
 import { ApiError } from '../../api/client.js';
-import { useListProjectBoards } from '../../api/hooks.js';
+import { useEnsureRepoLabels } from '../../api/hooks.js';
+import type { useListProjectBoards } from '../../api/hooks.js';
 import { cn } from '../../lib/cn.js';
 import { scopeSummary } from '../../lib/connection.js';
 import { Select } from '../common/Select.js';
@@ -186,17 +188,51 @@ function emptyFilter(field: TriggerFilter['field']): TriggerFilter {
   return { field, value: '' };
 }
 
+/**
+ * The repo/project a missing `conduit-*` label can be created on. Threaded
+ * down to the label filter's value input so it can offer an inline "create
+ * label" action. Undefined when no repo/project connection is selected.
+ */
+export interface EnsureLabelTarget {
+  connectionId: string;
+  /** Display string for the button, e.g. `owner/repo` or a GitLab path. */
+  scopeLabel: string;
+}
+
+/**
+ * Build the create-label target for the selected connection — present only
+ * when the connection is bound to a repo/project (labels live there).
+ */
+export function ensureLabelTarget(
+  connections: { id: string; name: string; scope: ConnectionScope }[],
+  connectionId: string,
+): EnsureLabelTarget | undefined {
+  const conn = connections.find((c) => c.id === connectionId);
+  if (
+    !conn ||
+    (conn.scope.kind !== 'github_repo' && conn.scope.kind !== 'gitlab_project')
+  ) {
+    return undefined;
+  }
+  return {
+    connectionId: conn.id,
+    scopeLabel: scopeSummary(conn.scope) || conn.name,
+  };
+}
+
 export function FilterEditor({
   filters,
   offeredFields,
   statusOptions,
   labelOptions,
+  ensureTarget,
   onChange,
 }: {
   filters: TriggerFilter[];
   offeredFields: Array<TriggerFilter['field']>;
   statusOptions: string[];
   labelOptions: string[];
+  ensureTarget?: EnsureLabelTarget;
   onChange: (filters: TriggerFilter[]) => void;
 }) {
   const replaceAt = useCallback(
@@ -227,6 +263,7 @@ export function FilterEditor({
           offeredFields={offeredFields}
           statusOptions={statusOptions}
           labelOptions={labelOptions}
+          ensureTarget={ensureTarget}
           onReplace={(next) => replaceAt(i, next)}
           onRemove={() => removeAt(i)}
         />
@@ -243,6 +280,7 @@ function FilterRow({
   offeredFields,
   statusOptions,
   labelOptions,
+  ensureTarget,
   onReplace,
   onRemove,
 }: {
@@ -250,6 +288,7 @@ function FilterRow({
   offeredFields: Array<TriggerFilter['field']>;
   statusOptions: string[];
   labelOptions: string[];
+  ensureTarget?: EnsureLabelTarget;
   onReplace: (next: TriggerFilter) => void;
   onRemove: () => void;
 }) {
@@ -286,6 +325,7 @@ function FilterRow({
           value={filter.value}
           options={labelOptions}
           emptyHint="(no labels — pick a connection bound to a repo)"
+          ensureTarget={ensureTarget}
           onChange={(value) => onReplace({ field: 'label', value })}
         />
       )}
@@ -322,11 +362,13 @@ function OptionsValueInput({
   value,
   options,
   emptyHint,
+  ensureTarget,
   onChange,
 }: {
   value: string;
   options: string[];
   emptyHint: string;
+  ensureTarget?: EnsureLabelTarget;
   onChange: (next: string) => void;
 }) {
   if (options.length === 0) {
@@ -340,16 +382,77 @@ function OptionsValueInput({
     );
   }
   const items = options.map((opt) => ({ value: opt, label: opt }));
-  if (value !== '' && !options.includes(value)) {
+  const unmatched = value !== '' && !options.includes(value);
+  if (unmatched) {
     items.unshift({ value, label: `${value} (not found)` });
   }
+  // A missing value that's one of *our* labels is fixable in place: offer to
+  // create it on the connection's repo/project rather than leaving a dead
+  // "(not found)" string. Non-Conduit unmatched values keep the plain text.
+  const showCreate = unmatched && !!ensureTarget && isConduitLabel(value);
   return (
-    <Select
-      placeholder="— select —"
-      value={value}
-      onValueChange={onChange}
-      options={items}
-    />
+    <div className="space-y-1.5">
+      <Select
+        placeholder="— select —"
+        value={value}
+        onValueChange={onChange}
+        options={items}
+      />
+      {showCreate && (
+        <CreateLabelAction
+          name={value}
+          target={ensureTarget}
+        />
+      )}
+    </div>
+  );
+}
+
+function CreateLabelAction({
+  name,
+  target,
+}: {
+  name: string;
+  target: EnsureLabelTarget;
+}) {
+  const ensure = useEnsureRepoLabels();
+  // On success the hook invalidates the labels query; the dropdown re-resolves
+  // and this whole affordance unmounts (the value is now a matched option).
+  const result = ensure.data?.[0];
+  const failed = result?.status === 'failed';
+  const errorText = ensure.error
+    ? ensure.error instanceof ApiError
+      ? ensure.error.message
+      : String(ensure.error)
+    : failed
+      ? (result?.error ?? 'Failed to create label')
+      : null;
+
+  return (
+    <div className="rounded-[var(--radius)] border border-[var(--color-warning,#b58900)]/40 bg-[var(--color-warning,#b58900)]/10 px-2 py-1.5">
+      <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
+        Label{' '}
+        <code className="text-[var(--color-text)]">{name}</code> isn't on{' '}
+        <code className="text-[var(--color-text)]">{target.scopeLabel}</code> yet.
+      </div>
+      <button
+        type="button"
+        className="btn mt-1.5"
+        disabled={ensure.isPending}
+        onClick={() =>
+          ensure.mutate({ connectionId: target.connectionId, names: [name] })
+        }
+      >
+        {ensure.isPending
+          ? 'Creating…'
+          : `+ Create "${name}" on ${target.scopeLabel}`}
+      </button>
+      {errorText && (
+        <div className="mt-1 font-mono text-[11px] text-[var(--color-danger,#dc322f)]">
+          {errorText}
+        </div>
+      )}
+    </div>
   );
 }
 

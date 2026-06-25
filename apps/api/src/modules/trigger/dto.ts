@@ -27,3 +27,9 @@ export const listLabelsDtoSchema = z.object({
   connectionId: z.string().min(1),
 });
 export type ListLabelsDto = z.infer<typeof listLabelsDtoSchema>;
+
+export const ensureLabelsDtoSchema = z.object({
+  connectionId: z.string().min(1),
+  names: z.array(z.string().min(1)).min(1),
+});
+export type EnsureLabelsDto = z.infer<typeof ensureLabelsDtoSchema>;

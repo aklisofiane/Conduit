@@ -56,3 +56,48 @@ export async function listGitlabProjectLabels(
 
   return labels;
 }
+
+export interface CreateGitlabProjectLabelQuery {
+  hostUrl: string;
+  projectPath: string;
+  token: string;
+  /** Label name to create. */
+  name: string;
+  /** 6-digit hex without a leading `#` — GitLab requires `#`, which we add. */
+  color: string;
+  description?: string;
+  fetchImpl?: typeof fetch;
+}
+
+/**
+ * Idempotent create: `POST /projects/{id}/labels`. GitLab requires a hex
+ * `color` (we prepend `#`) and returns `409` when the label already exists —
+ * treated as success (ensure semantics; never overwrites). Any other non-2xx
+ * throws with the same error-string style as `listGitlabProjectLabels`.
+ */
+export async function createGitlabProjectLabel(
+  q: CreateGitlabProjectLabelQuery,
+): Promise<'created' | 'exists'> {
+  const f = q.fetchImpl ?? fetch;
+  const base = gitlabApiUrl(q.hostUrl);
+  const encoded = encodeURIComponent(q.projectPath);
+  const url = `${base}/projects/${encoded}/labels`;
+
+  const resp = await f(url, {
+    method: 'POST',
+    headers: {
+      ...gitlabAuthHeaders(q.token),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      name: q.name,
+      color: `#${q.color.replace(/^#/, '')}`,
+      description: q.description ?? '',
+    }),
+  });
+  if (resp.ok) return 'created';
+  if (resp.status === 409) return 'exists';
+  throw new Error(
+    `GitLab REST HTTP ${resp.status} creating label "${q.name}" for ${q.projectPath}: ${await resp.text().catch(() => '')}`,
+  );
+}

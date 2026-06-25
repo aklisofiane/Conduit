@@ -61,3 +61,48 @@ export async function listRepoLabels(
   }
   return labels;
 }
+
+export interface CreateRepoLabelQuery {
+  owner: string;
+  repo: string;
+  token: string;
+  /** Label name to create. */
+  name: string;
+  /** 6-digit hex without a leading `#`. */
+  color: string;
+  description?: string;
+}
+
+/**
+ * Idempotent create: `POST /repos/{owner}/{repo}/labels`. GitHub returns
+ * `422` with an `already_exists` error code when the label is already present —
+ * we treat that as success (ensure semantics; never overwrites the existing
+ * label's color/description). Any other non-2xx throws with the same
+ * error-string style as `listRepoLabels`.
+ */
+export async function createRepoLabel(
+  q: CreateRepoLabelQuery,
+  fetchImpl: typeof fetch = fetch,
+): Promise<'created' | 'exists'> {
+  const url = `${githubRestUrl()}/repos/${encodeURIComponent(q.owner)}/${encodeURIComponent(q.repo)}/labels`;
+  const resp = await fetchImpl(url, {
+    method: 'POST',
+    headers: {
+      ...githubAuthHeaders(q.token),
+      'X-GitHub-Api-Version': '2022-11-28',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      name: q.name,
+      color: q.color,
+      description: q.description ?? '',
+    }),
+  });
+  if (resp.ok) return 'created';
+
+  const text = await resp.text().catch(() => '');
+  if (resp.status === 422 && text.includes('already_exists')) return 'exists';
+  throw new Error(
+    `GitHub REST HTTP ${resp.status} creating label "${q.name}" for ${q.owner}/${q.repo}: ${text}`,
+  );
+}

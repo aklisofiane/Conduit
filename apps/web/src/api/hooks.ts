@@ -379,6 +379,28 @@ export function useListLabels(args: { connectionId: string; enabled: boolean }) 
   });
 }
 
+export interface EnsureLabelResult {
+  name: string;
+  status: 'created' | 'exists' | 'failed';
+  error?: string;
+}
+
+/**
+ * Idempotently ensure labels exist on a connection's repo/project. Used by
+ * both the trigger-panel inline "create label" action (one name) and the
+ * connection-time prompt (the selected set). Invalidates the labels query on
+ * success so any open dropdown re-resolves and an unmatched value clears.
+ */
+export function useEnsureRepoLabels() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: { connectionId: string; names: string[] }) =>
+      api.post<EnsureLabelResult[]>('/trigger/ensure-labels', args),
+    onSuccess: (_res, { connectionId }) =>
+      qc.invalidateQueries({ queryKey: ['labels', connectionId] }),
+  });
+}
+
 export function useSkills() {
   return useQuery({
     queryKey: ['skills'],

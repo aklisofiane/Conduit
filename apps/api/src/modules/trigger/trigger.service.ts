@@ -5,7 +5,9 @@ import {
   listViewerRepositories,
   listViewerOrganizations,
   listRepoLabels,
+  createRepoLabel,
   listGitlabProjectLabels,
+  createGitlabProjectLabel,
   listAccessibleGitlabProjects,
   type ProjectBoardSummary,
   type RepositorySummary,
@@ -13,10 +15,30 @@ import {
   type GitlabProjectSummary,
   type RepoLabel,
 } from '@conduit/shared/platform';
+import { getConduitLabel } from '@conduit/shared/label';
 import { errMessage } from '../../common/err-message';
 import { ConnectionsService } from '../connections/connections.service';
 import { CredentialsService } from '../credentials/credentials.service';
-import type { ListLabelsDto, ListProjectsDto, ListViewerReposDto, ListViewerOrgsDto } from './dto';
+import type {
+  EnsureLabelsDto,
+  ListLabelsDto,
+  ListProjectsDto,
+  ListViewerReposDto,
+  ListViewerOrgsDto,
+} from './dto';
+
+/** Per-label outcome of an ensure call (one entry per requested name). */
+export interface EnsureLabelResult {
+  name: string;
+  status: 'created' | 'exists' | 'failed';
+  error?: string;
+}
+
+/**
+ * Color/description fall back to a neutral gray for names not in the registry,
+ * so the endpoint stays usable even if a caller passes a non-canonical name.
+ */
+const FALLBACK_COLOR = 'ededed';
 
 /**
  * Trigger-config-time helpers. Failures (bad token, missing scope, unknown
@@ -174,4 +196,93 @@ export class TriggerService {
       throw new BadRequestException({ message });
     }
   }
+
+  /**
+   * Idempotently ensure each requested label exists on the connection's
+   * repo/project. Resolves the binding/scope exactly like `listLabels` and
+   * branches GitHub vs GitLab on `binding.platform`; a scope that isn't a
+   * repo/project is a `BadRequestException` (same pattern as `listLabels`).
+   *
+   * Per-label failures (e.g. a read-only token) don't fail the whole call —
+   * they surface as `{ status: 'failed', error }` so callers can show partial
+   * success.
+   */
+  async ensureLabels(
+    orgId: string,
+    dto: EnsureLabelsDto,
+  ): Promise<EnsureLabelResult[]> {
+    const [, binding] = await Promise.all([
+      this.connections.assertInOrg(orgId, dto.connectionId),
+      this.credentials.getConnectionBinding(dto.connectionId),
+    ]);
+
+    if (binding.platform === 'GITLAB') {
+      let glScope;
+      try {
+        glScope = expectScopeKind(binding.scope, 'gitlab_project');
+      } catch {
+        throw new BadRequestException({
+          message: `Connection ${dto.connectionId} is not bound to a GitLab project (scope.kind = ${binding.scope.kind})`,
+        });
+      }
+      return this.ensureEach(dto.names, async (name) => {
+        const { color, description } = labelSpec(name);
+        return createGitlabProjectLabel({
+          hostUrl: binding.hostUrl ?? 'gitlab.com',
+          projectPath: glScope.projectPath,
+          token: binding.token,
+          name,
+          color,
+          description,
+        });
+      });
+    }
+
+    // Default: GitHub (mirrors listLabels).
+    let repoScope;
+    try {
+      repoScope = expectScopeKind(binding.scope, 'github_repo');
+    } catch {
+      throw new BadRequestException({
+        message: `Connection ${dto.connectionId} is not bound to a GitHub repo (scope.kind = ${binding.scope.kind})`,
+      });
+    }
+    return this.ensureEach(dto.names, async (name) => {
+      const { color, description } = labelSpec(name);
+      return createRepoLabel({
+        owner: repoScope.owner,
+        repo: repoScope.repo,
+        token: binding.token,
+        name,
+        color,
+        description,
+      });
+    });
+  }
+
+  private async ensureEach(
+    names: string[],
+    create: (name: string) => Promise<'created' | 'exists'>,
+  ): Promise<EnsureLabelResult[]> {
+    const results: EnsureLabelResult[] = [];
+    for (const name of names) {
+      try {
+        const status = await create(name);
+        results.push({ name, status });
+      } catch (e: unknown) {
+        const error = errMessage(e);
+        this.logger.warn(`Ensure label "${name}" failed: ${error}`);
+        results.push({ name, status: 'failed', error });
+      }
+    }
+    return results;
+  }
+}
+
+/** Registry color/description for a name, falling back to neutral gray. */
+function labelSpec(name: string): { color: string; description?: string } {
+  const entry = getConduitLabel(name);
+  return entry
+    ? { color: entry.color, description: entry.description }
+    : { color: FALLBACK_COLOR };
 }

@@ -35,6 +35,10 @@
       "types": "./dist/skill/index.d.ts",
       "default": "./dist/skill/index.js"
     },
+    "./label": {
+      "types": "./dist/label/index.d.ts",
+      "default": "./dist/label/index.js"
+    },
     "./agent": {
       "types": "./dist/agent/index.d.ts",
       "default": "./dist/agent/index.js"
