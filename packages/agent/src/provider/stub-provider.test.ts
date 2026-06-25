@@ -151,6 +151,39 @@ describe('StubProvider', () => {
     expect(await fs.readFile(path.join(workspace, '.conduit/Agent.md'), 'utf8')).toBe('# summary');
   });
 
+  it('enforces cumulative maxToolCalls across multiple run() calls', async () => {
+    queueStubSession({
+      turns: [
+        {
+          steps: [
+            { kind: 'tool_call', id: 't1', name: 'Bash', input: { cmd: 'ls' } },
+            { kind: 'usage', inputTokens: 10, outputTokens: 5 },
+            { kind: 'done' },
+          ],
+        },
+        {
+          steps: [
+            { kind: 'tool_call', id: 't2', name: 'Bash', input: { cmd: 'pwd' } },
+            { kind: 'usage', inputTokens: 10, outputTokens: 5 },
+            { kind: 'done' },
+          ],
+        },
+      ],
+    });
+    const req = baseRequest({
+      workspacePath: workspace,
+      constraints: { maxToolCalls: 1 },
+    });
+    const session = new StubProvider().startSession(req, new AbortController().signal);
+
+    const first = await collect(session.run('turn 1'));
+    expect(first.map((e) => e.type)).toEqual(['tool_call', 'usage', 'done']);
+
+    await expect(collect(session.run('turn 2'))).rejects.toBeInstanceOf(
+      ConstraintExceededError,
+    );
+  });
+
   it('synthesizes `done` on extra run() calls after the scripted turns are exhausted', async () => {
     queueStubScript({ steps: [{ kind: 'text', delta: 'only' }, { kind: 'done' }] });
     const session = new StubProvider().startSession(
