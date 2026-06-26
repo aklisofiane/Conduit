@@ -239,6 +239,7 @@ function ConnectionRowView({ conn, onDelete }: { conn: ConnectionRow; onDelete: 
   const status = analysis?.status;
   const running = status === 'PENDING' || status === 'ANALYZING';
   const ready = status === 'READY';
+  const imported = ready && !!analysis?.importedAt;
 
   const onAnalyze = async () => {
     try {
@@ -268,7 +269,7 @@ function ConnectionRowView({ conn, onDelete }: { conn: ConnectionRow; onDelete: 
           {isRepoScoped && ready && (
             <button type="button" className="pill" onClick={() => setGalleryOpen(true)}>
               <span className="dot" />
-              Suggestions ready
+              {imported ? 'Suggestions imported' : 'Suggestions ready'}
             </button>
           )}
           {isRepoScoped && (
@@ -293,8 +294,10 @@ function ConnectionRowView({ conn, onDelete }: { conn: ConnectionRow; onDelete: 
       {galleryOpen && analysis?.resultBundle && (
         <SuggestionsGalleryDialog
           connectionId={conn.id}
+          analysisId={analysis.id}
           bundle={analysis.resultBundle}
           droppedComponents={analysis.droppedComponents ?? []}
+          alreadyImported={imported}
           onClose={() => setGalleryOpen(false)}
         />
       )}

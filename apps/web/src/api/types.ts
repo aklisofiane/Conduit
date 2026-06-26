@@ -157,6 +157,8 @@ export interface ConnectionAnalysis {
   resultBundle: TemplateFile | null;
   droppedComponents: DroppedComponent[] | null;
   error: string | null;
+  /** ISO timestamp set once the user imports these suggestions; null otherwise. */
+  importedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }

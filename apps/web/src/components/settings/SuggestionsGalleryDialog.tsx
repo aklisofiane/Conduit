@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { CalendarClock } from 'lucide-react';
 import type { TemplateFile, TemplateWorkflow } from '@conduit/shared/template';
 import { apiErrorMessage } from '../../api/client.js';
-import { useImportTemplate } from '../../api/hooks.js';
+import { useImportTemplate, useMarkAnalysisImported } from '../../api/hooks.js';
 import type { DroppedComponent, TemplateBinding } from '../../api/types.js';
 import { formatCadence } from '../../lib/cron.js';
 import { Dialog, DialogContent, DialogTitle } from '../common/Dialog.js';
@@ -43,21 +43,30 @@ function cadenceOf(workflow: TemplateWorkflow): string | null {
  */
 export function SuggestionsGalleryDialog({
   connectionId,
+  analysisId,
   bundle,
   droppedComponents,
+  alreadyImported,
   onClose,
 }: {
   connectionId: string;
+  analysisId: string;
   bundle: TemplateFile;
   droppedComponents: DroppedComponent[];
+  /** This analysis's suggestions were already imported in a prior session. */
+  alreadyImported: boolean;
   onClose: () => void;
 }) {
   const importTemplate = useImportTemplate();
+  const markImported = useMarkAnalysisImported(connectionId);
   const [selected, setSelected] = useState<Set<number>>(
     () => new Set(bundle.workflows.map((_, i) => i)),
   );
   const [error, setError] = useState<string | null>(null);
-  const [imported, setImported] = useState(false);
+  // Seed from the persisted flag so re-opening an already-imported analysis
+  // shows the imported view instead of re-offering Import (which would create
+  // duplicate workflows — import is not idempotent server-side).
+  const [imported, setImported] = useState(alreadyImported);
 
   const toggle = (index: number) =>
     setSelected((prev) => {
@@ -78,6 +87,8 @@ export function SuggestionsGalleryDialog({
     try {
       await importTemplate.mutateAsync({ template, bindings });
       setImported(true);
+      // Persist the imported flag (best-effort — the UI already reflects it).
+      await markImported.mutateAsync(analysisId).catch(() => undefined);
     } catch (e) {
       setError(apiErrorMessage(e));
     }
@@ -115,8 +126,18 @@ export function SuggestionsGalleryDialog({
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {imported ? (
             <div className="rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-2)] px-4 py-3 font-mono text-[12px] text-[var(--color-text-2)]">
-              Imported {selectedCount} review{selectedCount === 1 ? '' : 's'}. Find them in
-              your workflow list — they're paused until you review and activate.
+              {importTemplate.isSuccess ? (
+                <>
+                  Imported {selectedCount} review{selectedCount === 1 ? '' : 's'}. Find them in
+                  your workflow list — they're paused until you review and activate.
+                </>
+              ) : (
+                <>
+                  These suggestions were already imported. Find the workflows in your list —
+                  they're paused until you review and activate. Re-analyze the repo to generate
+                  fresh suggestions.
+                </>
+              )}
             </div>
           ) : (
             <div className="flex flex-col gap-2">

@@ -343,6 +343,21 @@ export function useStartAnalysis() {
   });
 }
 
+/**
+ * Mark an analysis's suggestions as imported. Invalidates the analysis query so
+ * the gallery / pill reflect the imported state across reloads, preventing a
+ * re-opened gallery from silently re-importing the same workflows.
+ */
+export function useMarkAnalysisImported(connectionId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (analysisId: string) =>
+      api.post<void>(`/connections/${connectionId}/analysis/${analysisId}/imported`),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: connectionAnalysisKey(connectionId) }),
+  });
+}
+
 export function useSetWebhookSecret(workflowId: string) {
   const qc = useQueryClient();
   return useMutation({

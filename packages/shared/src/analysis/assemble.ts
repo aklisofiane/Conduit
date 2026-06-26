@@ -6,6 +6,7 @@ import {
   type TemplateWorkflow,
 } from '../template/schema';
 import { ANALYSIS_REPO_PLACEHOLDER } from './adapter';
+import { diffWindowFromCron } from './cadence';
 import { findReviewerDomain, type ReviewerDomain } from './reviewer-domains';
 import {
   type DroppedComponent,
@@ -204,18 +205,4 @@ function layout(domainNames: string[]) {
     nodePositions[name] = { x: 820, y: i * 320 };
   });
   return { nodePositions, viewport: { x: 0, y: 0, zoom: 1 } };
-}
-
-/**
- * Prose diff window aligned with the chosen cadence. The `scope` preset bakes
- * a 24h window, so the actual window rides on `instructionsAppend`. Coarse by
- * design — daily cadence → a day, weekly → a week, monthly → a month.
- */
-function diffWindowFromCron(cron: string): string {
-  const fields = cron.trim().split(/\s+/);
-  const dom = fields[2] ?? '*';
-  const dow = fields[4] ?? '*';
-  if (dom !== '*') return 'the last 30 days';
-  if (dow !== '*') return 'the last 7 days';
-  return 'the last 24 hours';
 }

@@ -43,6 +43,7 @@ export interface AnalysisView {
   resultBundle: unknown;
   droppedComponents: unknown;
   error: string | null;
+  importedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -125,15 +126,37 @@ export class ConnectionAnalysisService {
         presets,
       });
     } catch (err) {
+      // A *lost* start response throws here even though the workflow actually
+      // started server-side. Tearing the row down then would mark a live
+      // analysis FAILED and — because the in-progress guard only blocks
+      // PENDING/ANALYZING — let a second analyze() launch a duplicate run on
+      // the same repo. So confirm the workflow isn't really running first.
+      const live = await this.temporal
+        .describeRunningRepoAnalysis(minted.analysisId)
+        .catch(() => null);
+      if (live) {
+        await this.prisma.workflowRun
+          .update({
+            where: { id: minted.internalRunId },
+            data: { temporalWorkflowId: live.temporalWorkflowId, temporalRunId: live.temporalRunId },
+          })
+          .catch(() => undefined);
+        return { analysisId: minted.analysisId };
+      }
+      // Genuine start failure — tear down both rows in one transaction so we
+      // never strand the internal run RUNNING while the analysis is FAILED
+      // (a half-applied teardown would leave an unreconcilable phantom run).
       const message = errorMessage(err);
-      await this.prisma.repoAnalysis.update({
-        where: { id: minted.analysisId },
-        data: { status: 'FAILED', error: message },
-      });
-      await this.prisma.workflowRun.update({
-        where: { id: minted.internalRunId },
-        data: { status: 'FAILED', error: message, finishedAt: new Date() },
-      });
+      await this.prisma.$transaction([
+        this.prisma.repoAnalysis.update({
+          where: { id: minted.analysisId },
+          data: { status: 'FAILED', error: message },
+        }),
+        this.prisma.workflowRun.update({
+          where: { id: minted.internalRunId },
+          data: { status: 'FAILED', error: message, finishedAt: new Date() },
+        }),
+      ]);
       throw err;
     }
     await this.prisma.workflowRun
@@ -160,9 +183,29 @@ export class ConnectionAnalysisService {
       resultBundle: row.resultBundle,
       droppedComponents: row.droppedComponents,
       error: row.error,
+      importedAt: row.importedAt,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     };
+  }
+
+  /**
+   * Stamp `importedAt` once the user imports an analysis's suggestions, so the
+   * gallery / pill reflect "already imported" across reloads and re-opening the
+   * gallery can't silently create duplicate workflows. Scoped by org +
+   * connection + READY via `updateMany` so a cross-org or stale id is a no-op
+   * (never a cross-tenant write), and idempotent on repeat calls.
+   */
+  async markImported(
+    orgId: string,
+    connectionId: string,
+    analysisId: string,
+  ): Promise<void> {
+    await this.connections.assertInOrg(orgId, connectionId);
+    await this.prisma.repoAnalysis.updateMany({
+      where: { id: analysisId, orgId, connectionId, status: 'READY' },
+      data: { importedAt: new Date() },
+    });
   }
 
   private assemblyPresets(): AssemblyPresets {

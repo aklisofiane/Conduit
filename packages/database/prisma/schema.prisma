@@ -148,6 +148,10 @@ model RepoAnalysis {
   // Components that failed Design fan-out, surfaced in the gallery.
   droppedComponents Json?
   error             String?
+  // Set when the user imports this analysis's suggestions. Lets the gallery /
+  // pill reflect "already imported" across reloads so re-opening the gallery
+  // can't silently create duplicate workflows. Null until the first import.
+  importedAt        DateTime?
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
 

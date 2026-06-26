@@ -95,6 +95,16 @@ export class ConnectionsController {
   getAnalysis(@OrgId() orgId: string, @Param('id') id: string) {
     return this.analysis.getAnalysis(orgId, id);
   }
+
+  /** Mark an analysis's suggestions imported so the gallery can't re-import them. */
+  @Post(':id/analysis/:analysisId/imported')
+  markAnalysisImported(
+    @OrgId() orgId: string,
+    @Param('id') id: string,
+    @Param('analysisId') analysisId: string,
+  ) {
+    return this.analysis.markImported(orgId, id, analysisId);
+  }
 }
 
 function parsePlatform(s?: string): Platform | undefined {

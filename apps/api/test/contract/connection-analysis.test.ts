@@ -21,12 +21,17 @@ describe('ConnectionAnalysisService', () => {
   let fixture: TwoOrgFixture;
   let svc: ConnectionAnalysisService;
   let workflows: WorkflowsService;
+  let connections: ConnectionsService;
+  let presets: AgentPresetsService;
   const started: RepoAnalysisWorkflowInput[] = [];
 
   const fakeTemporal = {
     async startRepoAnalysisWorkflow(input: RepoAnalysisWorkflowInput) {
       started.push(input);
       return { temporalWorkflowId: `analysis-run-${input.analysisId}`, temporalRunId: 'run-1' };
+    },
+    async describeRunningRepoAnalysis() {
+      return null;
     },
   } as unknown as TemporalService;
 
@@ -35,9 +40,9 @@ describe('ConnectionAnalysisService', () => {
     started.length = 0;
     await clearTenantData(prisma);
     fixture = await seedTwoOrgs(prisma);
-    const presets = new AgentPresetsService();
+    presets = new AgentPresetsService();
     await presets.onModuleInit();
-    const connections = new ConnectionsService(prisma as unknown as PrismaService);
+    connections = new ConnectionsService(prisma as unknown as PrismaService);
     svc = new ConnectionAnalysisService(
       prisma as unknown as PrismaService,
       connections,
@@ -124,6 +129,92 @@ describe('ConnectionAnalysisService', () => {
     const view = await svc.getAnalysis(fixture.orgA.id, fixture.orgA.connectionId);
     expect(view?.id).toBe(analysisId);
     expect(view?.status).toBe('PENDING');
+  });
+
+  it('markImported stamps a READY analysis and is reflected by getAnalysis', async () => {
+    const { analysisId } = await svc.analyze(fixture.orgA.id, fixture.orgA.connectionId);
+    await prisma.repoAnalysis.update({ where: { id: analysisId }, data: { status: 'READY' } });
+
+    await svc.markImported(fixture.orgA.id, fixture.orgA.connectionId, analysisId);
+
+    const view = await svc.getAnalysis(fixture.orgA.id, fixture.orgA.connectionId);
+    expect(view?.importedAt).toBeInstanceOf(Date);
+  });
+
+  it('markImported never writes across orgs and only touches READY rows', async () => {
+    const { analysisId } = await svc.analyze(fixture.orgA.id, fixture.orgA.connectionId);
+    await prisma.repoAnalysis.update({ where: { id: analysisId }, data: { status: 'READY' } });
+
+    // Wrong org → assertInOrg 404s, no write.
+    await expect(
+      svc.markImported(fixture.orgB.id, fixture.orgA.connectionId, analysisId),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    // Right org but the row isn't READY → no-op (updateMany matches nothing).
+    await prisma.repoAnalysis.update({ where: { id: analysisId }, data: { status: 'PENDING' } });
+    await svc.markImported(fixture.orgA.id, fixture.orgA.connectionId, analysisId);
+    const row = await prisma.repoAnalysis.findUnique({ where: { id: analysisId } });
+    expect(row?.importedAt).toBeNull();
+  });
+
+  it('on a genuine start failure, fails both rows and rethrows the start error', async () => {
+    const boom = new Error('temporal unreachable');
+    const failingTemporal = {
+      async startRepoAnalysisWorkflow() {
+        throw boom;
+      },
+      async describeRunningRepoAnalysis() {
+        return null; // not actually running → tear down
+      },
+    } as unknown as TemporalService;
+    const failingSvc = new ConnectionAnalysisService(
+      prisma as unknown as PrismaService,
+      connections,
+      failingTemporal,
+      presets,
+    );
+
+    await expect(
+      failingSvc.analyze(fixture.orgA.id, fixture.orgA.connectionId),
+    ).rejects.toBe(boom);
+
+    const analysis = await prisma.repoAnalysis.findFirst({
+      where: { connectionId: fixture.orgA.connectionId },
+    });
+    expect(analysis?.status).toBe('FAILED');
+    const run = await prisma.workflowRun.findUnique({ where: { id: analysis!.internalRunId } });
+    expect(run?.status).toBe('FAILED');
+    expect(run?.finishedAt).toBeInstanceOf(Date);
+  });
+
+  it('keeps the analysis live when the start RPC was lost but the workflow is running', async () => {
+    // start() throws (lost response) yet the workflow actually started → describe
+    // reports RUNNING, so we must NOT tear the row down.
+    const lostStartTemporal = {
+      async startRepoAnalysisWorkflow() {
+        throw new Error('connection reset');
+      },
+      async describeRunningRepoAnalysis(analysisId: string) {
+        return { temporalWorkflowId: `analysis-run-${analysisId}`, temporalRunId: 'recovered-run' };
+      },
+    } as unknown as TemporalService;
+    const recoveringSvc = new ConnectionAnalysisService(
+      prisma as unknown as PrismaService,
+      connections,
+      lostStartTemporal,
+      presets,
+    );
+
+    const { analysisId } = await recoveringSvc.analyze(
+      fixture.orgA.id,
+      fixture.orgA.connectionId,
+    );
+
+    const analysis = await prisma.repoAnalysis.findUnique({ where: { id: analysisId } });
+    expect(analysis?.status).toBe('PENDING'); // not failed
+    const run = await prisma.workflowRun.findUnique({ where: { id: analysis!.internalRunId } });
+    expect(run?.status).toBe('RUNNING');
+    expect(run?.temporalRunId).toBe('recovered-run');
   });
 });
 
