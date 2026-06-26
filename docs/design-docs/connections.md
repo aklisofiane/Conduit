@@ -91,7 +91,7 @@ The canvas's trigger config panel (`apps/web/src/components/canvas/TriggerConfig
 
 ## API surface
 
-Connection / Credential CRUD and the `/workflows/:id/webhook-secret` endpoints live in [ARCHITECTURE.md > API surface](../ARCHITECTURE.md#api-surface).
+Connection / Credential CRUD and the `/workflows/:id/webhook-secret` endpoints live in [ARCHITECTURE.md > API surface](../ARCHITECTURE.md#api-surface). Repo connections also expose a connection-scoped analyze action (`POST/GET /connections/:id/analyze|analysis`) — see [repo-analysis.md](./repo-analysis.md).
 
 ## Where the code lives
 

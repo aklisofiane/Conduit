@@ -41,7 +41,9 @@ src/
     credentials/                       Credential CRUD + AES-256-GCM (crypto.ts) +
                                        getConnectionBinding (Connection→Credential join)
     connections/                       global Connection CRUD over the typed scope union;
-                                       refuses delete when a workflow definition references the row
+                                       refuses delete when a workflow definition references the row.
+                                       `connection-analysis.service.ts` owns the analyze action
+                                       (POST/GET :id/analyze|analysis) — see design-docs/repo-analysis.md
     provider-configs/                  per-org LLM provider API keys — distinct from Credential;
                                        see docs/data-model.md > ProviderConfig
     trigger/                           POST /trigger/list-projects + /trigger/list-labels
@@ -69,6 +71,11 @@ src/
                                        by the API via Temporal Schedule
     cron-workflow.ts                   sandboxed shell for cron triggers — one tick per
                                        Temporal Schedule fire
+    repo-analysis-workflow.ts          sandboxed — dynamic fan-out over discovered
+                                       components (clone → Discover → Design ≤12 → Assemble →
+                                       cleanup); see design-docs/repo-analysis.md
+    repo-analysis-nodes.ts             pure module — inlined Discover/Design analyzer prompts
+                                       + node builders (no agent-presets/*.md for the analyzer)
     topo-sort.ts                       pure graph ordering
   activities/
     run-agent-node.ts                  invokes provider, streams events via heartbeat + Redis
@@ -81,6 +88,12 @@ src/
     copy-conduit-files.ts              copies .conduit/<Node>.md across parallel siblings
     poll-board.ts                      one poll cycle: fetch, filter, set-diff against
                                        PollSnapshot, start agentWorkflow per new match
+    clone-analysis-workspace.ts        prime the base bare clone + probe default branch
+    read-analysis-artifacts.ts         read + Zod-validate the analyzer's JSON artifacts
+                                       (ComponentManifest / WorkflowDraft)
+    update-analysis-phase.ts           write RepoAnalysis status/phase from the workflow
+    assemble-suggestions.ts            stitch drafts → validated TemplateFile, persist on
+                                       RepoAnalysis (see design-docs/repo-analysis.md)
   runtime/                             activity-side helpers — Prisma, Redis event bus, log writer,
                                        connection/credential lookup, `temporal-client.ts` (singleton
                                        that starts agentWorkflows from inside pollBoardActivity),
@@ -141,7 +154,9 @@ src/
     settings/                          CredentialsSection + ConnectionsSection (→ IntegrationsPage),
                                        ApiKeysSection (→ ApiKeysPage), settings-nav.ts (sidebar
                                        config — add an entry + a child route in router.tsx to
-                                       slot in new sections)
+                                       slot in new sections). ConnectionsSection hosts the repo
+                                       Analyze action + progress card; SuggestionsGalleryDialog
+                                       imports the result (see design-docs/repo-analysis.md)
     layout/                            TopChrome (topbar shell, reads slot store), AppLayout,
                                        AuthLayout, SettingsLayout (sidebar + outlet at /settings),
                                        RequireAuth + RedirectIfAuthed (session gates), UserMenuPill
@@ -180,6 +195,10 @@ Zod schemas + cross-process contracts. Domain directories line up with subpath e
 src/
   agent/      AgentEvent, provider contract types, `issue-writeback.ts`
               (per-agent allowlist for end-of-run GitHub issue updates)
+  analysis/   Repo-analysis contracts (see design-docs/repo-analysis.md):
+              ComponentManifest + WorkflowDraft schemas, the reviewer-domain
+              catalog, the analysis adapter (synthetic `analysis` trigger +
+              fixed artifact paths), and pure `assembleSuggestionBundle`
   connection/ ConnectionScope discriminated union (github_repo /
               github_projects_v2 / none) + expectScopeKind helper. Web-bundle safe.
   label/      Canonical registry of Conduit's own `conduit-*` labels
