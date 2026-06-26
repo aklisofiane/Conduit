@@ -21,7 +21,10 @@ describe('dropConflictingWorktrees', () => {
 
   beforeEach(async () => {
     originalHome = process.env.CONDUIT_HOME;
-    conduitHome = await fs.mkdtemp(path.join(os.tmpdir(), 'conduit-wt-cleanup-'));
+    // Resolve symlinks (macOS `/var/folders` → `/private/var/folders`): git
+    // reports worktree paths as realpaths, so `isRegistered`'s string match
+    // must compare against the resolved base, not the raw mkdtemp path.
+    conduitHome = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'conduit-wt-cleanup-')));
     process.env.CONDUIT_HOME = conduitHome;
 
     base = path.join(conduitHome, 'base');
