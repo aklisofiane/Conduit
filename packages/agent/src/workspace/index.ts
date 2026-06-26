@@ -25,6 +25,7 @@ export {
   clearConduitFolder,
 } from './conduit-folder';
 export { git, GitError } from './git';
+export { ensureBaseClone, fetchWithAuth, defaultBranch } from './git-helpers';
 export { mergeBranchedWorktree, MergeConflictError } from './merge';
 export { deriveSlug, formatBranchName } from './slug';
 export { withPathLock } from './lock';

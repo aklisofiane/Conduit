@@ -28,6 +28,7 @@ export async function clearTenantData(prisma: PrismaClient): Promise<void> {
   await prisma.workflowRun.deleteMany({});
   await prisma.pollSnapshot.deleteMany({});
   await prisma.ticketBranch.deleteMany({});
+  await prisma.repoAnalysis.deleteMany({});
   await prisma.workflow.deleteMany({});
   await prisma.connection.deleteMany({});
   await prisma.credential.deleteMany({});

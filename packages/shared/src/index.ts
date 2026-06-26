@@ -6,6 +6,7 @@ export * from './workspace/index';
 export * from './skill/index';
 export * from './label/index';
 export * from './agent/index';
+export * from './analysis/index';
 export * from './workflow/index';
 export * from './template/index';
 export * from './agent-preset/index';

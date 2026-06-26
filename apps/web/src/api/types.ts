@@ -12,7 +12,8 @@ import type {
   SkillProviderTag,
   WorkflowDefinition,
 } from '@conduit/shared';
-import type { TemplateSummary } from '@conduit/shared/template';
+import type { TemplateFile, TemplateSummary } from '@conduit/shared/template';
+import type { AnalysisPhase, AnalysisStatus } from '@conduit/shared/analysis';
 import type { AgentPreset } from '@conduit/shared/agent-preset';
 
 /** Row shape returned by `GET /workflows`. */
@@ -137,6 +138,28 @@ export interface ConnectionRow {
 }
 
 export type { ConnectionScope, ConnectionScopeKind, TemplateSummary, AgentPreset };
+
+/** A component the analyzer couldn't turn into a review, with the reason. */
+export interface DroppedComponent {
+  component: string;
+  reason: string;
+}
+
+/**
+ * Repo-analysis lifecycle row returned by `GET /connections/:id/analysis`.
+ * `null` (not this shape) when the connection has never been analyzed.
+ * `resultBundle` is populated once `status` reaches READY; `error` once FAILED.
+ */
+export interface ConnectionAnalysis {
+  id: string;
+  status: AnalysisStatus;
+  phase: AnalysisPhase;
+  resultBundle: TemplateFile | null;
+  droppedComponents: DroppedComponent[] | null;
+  error: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export type TemplateBinding =
   | { mode: 'existing'; connectionId: string }

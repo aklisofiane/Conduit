@@ -43,6 +43,10 @@
       "types": "./dist/agent/index.d.ts",
       "default": "./dist/agent/index.js"
     },
+    "./analysis": {
+      "types": "./dist/analysis/index.d.ts",
+      "default": "./dist/analysis/index.js"
+    },
     "./workflow": {
       "types": "./dist/workflow/index.d.ts",
       "default": "./dist/workflow/index.js"

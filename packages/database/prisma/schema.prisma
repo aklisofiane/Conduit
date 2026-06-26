@@ -20,18 +20,31 @@ datasource db {
 // Workflows
 // -----------------------------------------------------------------------------
 
+// STANDARD workflows are user-authored and surface everywhere. A single hidden
+// SYSTEM workflow per org hosts internal analysis runs (see RepoAnalysis) so the
+// `WorkflowRun → Workflow` FK and same-org invariant stay intact; every workflow
+// list/validate path filters SYSTEM out so it never reaches the user.
+enum WorkflowKind {
+  STANDARD
+  SYSTEM
+}
+
 model Workflow {
-  id            String   @id @default(cuid())
+  id            String       @id @default(cuid())
   // Tenant column — every business-data row belongs to exactly one
   // organization. Writers stamp this on create and never let it cross over;
   // readers filter by it. See docs/data-model.md for the same-org invariant.
   orgId         String
+  // Discriminator. STANDARD (default) for user workflows; SYSTEM for the
+  // per-org hidden row backing internal analysis runs. Filtered out of every
+  // user-facing list/validate path.
+  kind          WorkflowKind @default(STANDARD)
   name          String
   description   String?
   // { trigger, nodes: Node[], edges: Edge[], mcpServers: WorkflowMcpServer[], ui: CanvasUI }
   // See @conduit/shared `WorkflowDefinition` for the Zod-validated shape.
   definition    Json
-  isActive      Boolean  @default(true)
+  isActive      Boolean      @default(true)
   // Webhook signing secret for verifying inbound deliveries to this
   // workflow's webhook URL (`POST /api/hooks/:workflowId`). Encrypted at
   // rest (AES-256-GCM). Nullable — polling-only workflows don't need one.
@@ -45,8 +58,8 @@ model Workflow {
   // first assignment — the immutable cuid stays the sole determinism anchor.
   // See .specs/temporal-id-slug.md.
   temporalSlug  String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
   organization Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
   runs         WorkflowRun[]
@@ -54,6 +67,7 @@ model Workflow {
 
   @@index([isActive])
   @@index([orgId, isActive])
+  @@index([orgId, kind])
 }
 
 // -----------------------------------------------------------------------------
@@ -102,11 +116,61 @@ model Connection {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  credential   Credential   @relation(fields: [credentialId], references: [id])
+  organization Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  credential   Credential     @relation(fields: [credentialId], references: [id])
+  analyses     RepoAnalysis[]
 
   @@index([credentialId])
   @@index([orgId, createdAt])
+}
+
+// -----------------------------------------------------------------------------
+// Repo analysis (component-based review-workflow suggestions)
+// -----------------------------------------------------------------------------
+
+// One row per analysis of a repo Connection — owns the user-facing lifecycle on
+// the connection. The analysis orchestrator (`repoAnalysisWorkflow`) runs its
+// agent steps under a hidden internal `WorkflowRun` (`internalRunId`, FK'd to
+// the per-org SYSTEM Workflow), so `status`/`phase` here are workflow-owned and
+// independent of that run's `RunStatus`. The latest row per connection drives
+// the badge + suggestions gallery. See .specs/repo-analyzer.md.
+model RepoAnalysis {
+  id                String             @id @default(cuid())
+  orgId             String
+  connectionId      String
+  status            RepoAnalysisStatus @default(PENDING)
+  phase             RepoAnalysisPhase  @default(DISCOVER)
+  // WorkflowRun.id of the hidden internal run hosting analyzer NodeRuns. Plain
+  // String (not an FK relation) — both rows cascade-delete with the org.
+  internalRunId     String
+  // Validated `TemplateFile` bundle of suggested per-component workflows.
+  resultBundle      Json?
+  // Components that failed Design fan-out, surfaced in the gallery.
+  droppedComponents Json?
+  error             String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  connection   Connection   @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@index([connectionId, createdAt])
+  @@index([orgId, createdAt])
+}
+
+// Workflow-owned analysis lifecycle, independent of the internal RunStatus.
+enum RepoAnalysisStatus {
+  PENDING
+  ANALYZING
+  READY
+  FAILED
+}
+
+// Coarse progress signal for the connection's progress card.
+enum RepoAnalysisPhase {
+  DISCOVER
+  DESIGN
+  ASSEMBLE
 }
 
 // Superset covering every platform Conduit stores credentials for.
@@ -409,6 +473,7 @@ model Organization {
   executionLogs   ExecutionLog[]
   ticketBranches  TicketBranch[]
   providerConfigs ProviderConfig[]
+  repoAnalyses    RepoAnalysis[]
 
   @@unique([slug])
   @@map("organization")

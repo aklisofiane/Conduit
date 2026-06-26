@@ -19,6 +19,7 @@ import {
 import { OrgId } from '../../auth/org-id.decorator';
 import { SessionGuard } from '../../auth/session.guard';
 import { ZodBodyPipe } from '../../common/zod-body.pipe';
+import { ConnectionAnalysisService } from './connection-analysis.service';
 import { ConnectionsService } from './connections.service';
 import {
   type CreateConnectionDto,
@@ -38,7 +39,10 @@ const VALID_SCOPE_KINDS: ReadonlySet<ConnectionScopeKind> = new Set(
 @UseGuards(SessionGuard)
 @Controller('connections')
 export class ConnectionsController {
-  constructor(private readonly svc: ConnectionsService) {}
+  constructor(
+    private readonly svc: ConnectionsService,
+    private readonly analysis: ConnectionAnalysisService,
+  ) {}
 
   @Get()
   list(
@@ -78,6 +82,18 @@ export class ConnectionsController {
   @HttpCode(204)
   async delete(@OrgId() orgId: string, @Param('id') id: string) {
     await this.svc.delete(orgId, id);
+  }
+
+  /** Start a component-based review-workflow analysis of the connection's repo. */
+  @Post(':id/analyze')
+  analyze(@OrgId() orgId: string, @Param('id') id: string) {
+    return this.analysis.analyze(orgId, id);
+  }
+
+  /** Latest analysis status + result bundle for the badge / gallery. */
+  @Get(':id/analysis')
+  getAnalysis(@OrgId() orgId: string, @Param('id') id: string) {
+    return this.analysis.getAnalysis(orgId, id);
   }
 }
 

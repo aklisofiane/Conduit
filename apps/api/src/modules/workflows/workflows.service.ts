@@ -63,7 +63,9 @@ export class WorkflowsService implements OnModuleInit {
 
   async list(orgId: string) {
     return this.prisma.workflow.findMany({
-      where: { orgId },
+      // SYSTEM workflows (hidden per-org host for internal analysis runs) never
+      // surface to the user.
+      where: { orgId, kind: 'STANDARD' },
       orderBy: { updatedAt: 'desc' },
       include: {
         runs: {
@@ -82,7 +84,8 @@ export class WorkflowsService implements OnModuleInit {
   }
 
   async get(orgId: string, id: string) {
-    const wf = await this.prisma.workflow.findFirst({ where: { id, orgId } });
+    // SYSTEM workflows are not user-addressable — 404 a guessed id.
+    const wf = await this.prisma.workflow.findFirst({ where: { id, orgId, kind: 'STANDARD' } });
     return orNotFound(wf, 'Workflow', id);
   }
 

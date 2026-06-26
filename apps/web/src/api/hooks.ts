@@ -13,6 +13,7 @@ import { api } from './client.js';
 import { makeDefaultTrigger } from '../lib/trigger-defaults.js';
 import type {
   AgentPreset,
+  ConnectionAnalysis,
   ConnectionRow,
   ConnectionScope,
   ConnectionScopeKind,
@@ -304,6 +305,41 @@ export function useDeleteConnection() {
   return useMutation({
     mutationFn: (id: string) => api.delete<void>(`/connections/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: CONNECTIONS }),
+  });
+}
+
+const connectionAnalysisKey = (connectionId: string) =>
+  ['connection-analysis', connectionId] as const;
+
+/**
+ * Poll a connection's repo-analysis row. Returns `null` when the connection
+ * has never been analyzed. Refetches every 2.5s while the analysis is in
+ * flight (PENDING/ANALYZING) and stops once it settles (READY/FAILED), mirroring
+ * the conditional-`refetchInterval` pattern in `useRun`.
+ */
+export function useConnectionAnalysis(connectionId: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: connectionId ? connectionAnalysisKey(connectionId) : ['connection-analysis', 'none'],
+    queryFn: () => api.get<ConnectionAnalysis | null>(`/connections/${connectionId!}/analysis`),
+    enabled: enabled && !!connectionId,
+    refetchInterval: (q) => {
+      const data = q.state.data as ConnectionAnalysis | null | undefined;
+      return data && (data.status === 'PENDING' || data.status === 'ANALYZING') ? 2500 : false;
+    },
+  });
+}
+
+/**
+ * Kick off a repo analysis for a connection. Invalidates the analysis query so
+ * polling immediately picks up the freshly-created PENDING row.
+ */
+export function useStartAnalysis() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (connectionId: string) =>
+      api.post<{ analysisId: string }>(`/connections/${connectionId}/analyze`),
+    onSuccess: (_res, connectionId) =>
+      qc.invalidateQueries({ queryKey: connectionAnalysisKey(connectionId) }),
   });
 }
 
