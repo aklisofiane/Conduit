@@ -28,6 +28,10 @@ The flagship workflow: Conduit reviews your codebase on a schedule, files an iss
    └────────────────┬──────────────────┘
                      ▼
               you review the PR
+                     │
+        ┌── changes requested ──┐
+        ▼                       │
+   issue moves back to "Dev" ───┘   (re-runs develop; loops until Review passes)
 ```
 
 Two workflows ship as templates and wire this up end to end:
@@ -38,6 +42,8 @@ Two workflows ship as templates and wire this up end to end:
 These are starting points, not rails — fork them or [build your own](#build-your-own) flow from scratch.
 
 **Why this is the loop that works.** Conduit shines when the spec is already clear — and review findings arrive pre-specified. "This query is N+1, here's the fix" is unambiguous; an agent can act on it without asking a single question. Open-ended feature tickets are the opposite: the agent needs to clarify, which means round-tripping through board comments, re-running, and clarifying again — and a coding agent in your editor closes that loop far faster. The rule of thumb: hand Conduit work that's already well-defined, and let review be the engine that generates it. Keep the exploratory thinking where the feedback is instant.
+
+And because the loop runs on the board rather than inside an agent's context, every pass leaves a trail — commits, PR comments, status moves — so the rework cycle is inspectable and owned by your team instead of buried in a prompt.
 
 ## How it works
 
