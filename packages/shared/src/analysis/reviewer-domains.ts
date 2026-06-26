@@ -87,6 +87,3 @@ const DOMAINS_BY_KEY = new Map(REVIEWER_DOMAINS.map((d) => [d.key, d]));
 export function findReviewerDomain(key: string): ReviewerDomain | undefined {
   return DOMAINS_BY_KEY.get(key);
 }
-
-/** All catalog keys — handy for prompting the Design agent with its options. */
-export const REVIEWER_DOMAIN_KEYS: readonly string[] = REVIEWER_DOMAINS.map((d) => d.key);

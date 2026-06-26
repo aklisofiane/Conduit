@@ -166,11 +166,14 @@ describe('repoAnalysisWorkflow orchestration (TestWorkflowEnvironment)', () => {
   it('runs Discover → Design×N → Assemble and cleans up COMPLETED', async () => {
     await runWorkflow({ manifest: manifest(['API', 'Web']) });
 
-    // One Discover run + one Design run per component.
+    // One Discover run + one Design run per component. Discover is strictly
+    // first; the per-component Design nodes fan out in parallel, so their
+    // recorded execution order isn't guaranteed — compare them as a set.
     const runNodes = callsNamed('runAgentNode').map(
       (c) => (c.input as { node: { name: string } }).node.name,
     );
-    expect(runNodes).toEqual(['Discover', 'Design_0', 'Design_1']);
+    expect(runNodes[0]).toBe('Discover');
+    expect(runNodes.slice(1).sort()).toEqual(['Design_0', 'Design_1']);
 
     // Phase progression: ANALYZING/DISCOVER → DESIGN → ASSEMBLE.
     expect(phases()).toEqual([

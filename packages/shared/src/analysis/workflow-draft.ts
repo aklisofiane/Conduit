@@ -46,5 +46,3 @@ export const droppedComponentSchema = z.object({
   reason: z.string().min(1),
 });
 export type DroppedComponent = z.infer<typeof droppedComponentSchema>;
-
-export const droppedComponentsSchema = z.array(droppedComponentSchema);

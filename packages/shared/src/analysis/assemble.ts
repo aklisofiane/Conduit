@@ -1,4 +1,4 @@
-import type { TriggerSource } from '../platform/index';
+import type { Platform, TriggerSource } from '../platform/index';
 import { findMcpPresetByPlatform } from '../mcp/index';
 import {
   templateFileSchema,
@@ -27,8 +27,6 @@ export interface AssembleResult {
   /** Components whose draft couldn't be turned into a workflow. */
   dropped: DroppedComponent[];
 }
-
-const PLATFORM_FOR_SOURCE = { github: 'GITHUB', gitlab: 'GITLAB', jira: 'JIRA' } as const;
 
 /**
  * Stitch surviving per-component `WorkflowDraft`s into one multi-workflow
@@ -148,7 +146,7 @@ function buildComponentWorkflow(
     },
   };
 
-  const mcpPreset = findMcpPresetByPlatform(PLATFORM_FOR_SOURCE[ctx.platform]);
+  const mcpPreset = findMcpPresetByPlatform(ctx.platform.toUpperCase() as Platform);
   if (!mcpPreset) {
     throw new Error(`No MCP preset for platform ${ctx.platform}`);
   }

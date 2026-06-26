@@ -25,8 +25,8 @@ export const ANALYSIS_DISCOVER_NODE = 'Discover';
 export const ANALYSIS_TRIGGER_EVENT = 'analysis';
 
 /** Synthetic trigger id/name woven into the forged `TriggerConfig`. */
-export const ANALYSIS_TRIGGER_ID = 'analysis-trigger';
-export const ANALYSIS_TRIGGER_NAME = 'AnalysisTrigger';
+const ANALYSIS_TRIGGER_ID = 'analysis-trigger';
+const ANALYSIS_TRIGGER_NAME = 'AnalysisTrigger';
 
 /**
  * Connection placeholder generated bundles carry for the repo binding — same

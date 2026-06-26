@@ -3,7 +3,6 @@ import {
   analysisTriggerConfig,
   errorMessage,
   type Component,
-  type ComponentManifest,
   type DroppedComponent,
   type RepoAnalysisWorkflowInput,
   type TriggerConfig,
@@ -88,35 +87,25 @@ export async function repoAnalysisWorkflow(input: RepoAnalysisWorkflowInput): Pr
     const triggers = analysisTriggerConfig({ connectionId, platform, branch: defaultBranch });
 
     // ---- Discover (bounded retry on a bad/missing manifest) ----
-    let manifest: ComponentManifest | undefined;
-    let discoverWorkspacePath = '';
-    let discoverHead: string | undefined;
-    let lastErr = '';
-    for (let attempt = 1; attempt <= ANALYZER_MAX_ATTEMPTS; attempt++) {
-      try {
-        // Inside the try so a transient agent-activity failure (runAgentNode has
-        // maximumAttempts: 1) is retried by this loop too — not just a bad
-        // manifest. Mirrors designOne's bounded-retry convention.
-        const output = await runAgentNode({
-          ...runCtx,
-          node: discoverNode(defaultBranch),
-          mcpServers: [],
-          triggers,
-          triggerEvent,
-        });
-        manifest = await readComponentManifestActivity({ workspacePath: output.workspacePath });
-        discoverWorkspacePath = output.workspacePath;
-        discoverHead = output.head;
-        break;
-      } catch (err) {
-        lastErr = errorMessage(err);
-      }
-    }
-    if (!manifest) {
+    const discovered = await attemptAnalyzer(async () => {
+      const output = await runAgentNode({
+        ...runCtx,
+        node: discoverNode(defaultBranch),
+        mcpServers: [],
+        triggers,
+        triggerEvent,
+      });
+      const manifest = await readComponentManifestActivity({
+        workspacePath: output.workspacePath,
+      });
+      return { manifest, output };
+    });
+    if (!discovered.ok) {
       throw new Error(
-        `Discover failed to produce a valid ComponentManifest after ${ANALYZER_MAX_ATTEMPTS} attempts: ${lastErr}`,
+        `Discover failed to produce a valid ComponentManifest after ${ANALYZER_MAX_ATTEMPTS} attempts: ${discovered.err}`,
       );
     }
+    const { manifest, output: discover } = discovered.value;
 
     // ---- Design fan-out (≤DESIGN_CONCURRENCY at a time, allSettled-style) ----
     // Each Design node branches a read-only worktree off Discover's still-live
@@ -136,8 +125,8 @@ export async function repoAnalysisWorkflow(input: RepoAnalysisWorkflowInput): Pr
       const settled = await Promise.all(
         batch.map((component, i) =>
           designOne(component, start + i, runCtx, triggers, triggerEvent, {
-            upstreamWorkspacePath: discoverWorkspacePath,
-            upstreamHead: discoverHead,
+            upstreamWorkspacePath: discover.workspacePath,
+            upstreamHead: discover.head,
           }),
         ),
       );
@@ -178,6 +167,27 @@ type DesignOutcome =
   | { ok: false; dropped: DroppedComponent };
 
 /**
+ * Run an analyzer step (agent run + artifact read) up to `ANALYZER_MAX_ATTEMPTS`
+ * times, returning the last error if every attempt fails. `runAgentNode` has
+ * `maximumAttempts: 1`, so a transient agent-activity failure is retried by this
+ * loop too — not just a bad/missing artifact. Neither is fixable by a Temporal
+ * retry, so the workflow re-runs the whole step instead.
+ */
+async function attemptAnalyzer<T>(
+  fn: () => Promise<T>,
+): Promise<{ ok: true; value: T } | { ok: false; err: string }> {
+  let lastErr = '';
+  for (let attempt = 1; attempt <= ANALYZER_MAX_ATTEMPTS; attempt++) {
+    try {
+      return { ok: true, value: await fn() };
+    } catch (err) {
+      lastErr = errorMessage(err);
+    }
+  }
+  return { ok: false, err: lastErr };
+}
+
+/**
  * Design one component: run its agent in a branched worktree off Discover and
  * read back its `WorkflowDraft`, with the same bounded-retry convention as
  * Discover. A component that never produces a valid draft is dropped (recorded
@@ -191,27 +201,20 @@ async function designOne(
   triggerEvent: TriggerEvent,
   upstream: { upstreamWorkspacePath: string; upstreamHead: string | undefined },
 ): Promise<DesignOutcome> {
-  let lastErr = '';
-  for (let attempt = 1; attempt <= ANALYZER_MAX_ATTEMPTS; attempt++) {
-    try {
-      const output = await runAgentNode({
-        ...runCtx,
-        node: designNode(component, index),
-        mcpServers: [],
-        triggers,
-        triggerEvent,
-        upstreamWorkspacePath: upstream.upstreamWorkspacePath,
-        upstreamHead: upstream.upstreamHead,
-        parallelBranch: true,
-      });
-      const draft = await readWorkflowDraftActivity({ workspacePath: output.workspacePath });
-      return { ok: true, draft };
-    } catch (err) {
-      lastErr = errorMessage(err);
-    }
-  }
-  return {
-    ok: false,
-    dropped: { component: component.name, reason: lastErr || 'design failed' },
-  };
+  const result = await attemptAnalyzer(async () => {
+    const output = await runAgentNode({
+      ...runCtx,
+      node: designNode(component, index),
+      mcpServers: [],
+      triggers,
+      triggerEvent,
+      upstreamWorkspacePath: upstream.upstreamWorkspacePath,
+      upstreamHead: upstream.upstreamHead,
+      parallelBranch: true,
+    });
+    return readWorkflowDraftActivity({ workspacePath: output.workspacePath });
+  });
+  return result.ok
+    ? { ok: true, draft: result.value }
+    : { ok: false, dropped: { component: component.name, reason: result.err || 'design failed' } };
 }
