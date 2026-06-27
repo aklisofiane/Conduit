@@ -1,16 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { AgentProviderId } from '@conduit/shared';
-
-/**
- * Provider → conventional skills directory inside the agent workspace. Mirrors
- * `DEST_BY_PROVIDER` in `install.ts`: both Claude and Codex SDKs auto-discover
- * skills from these dirs, so Conduit just places the files there.
- */
-const DEST_BY_PROVIDER: Record<AgentProviderId, string> = {
-  claude: '.claude/skills',
-  codex: '.agents/skills',
-};
+import { DEST_BY_PROVIDER } from './install';
 
 /**
  * The three internal-only skills that guide the repo-analyzer **Design** agent
@@ -27,33 +18,17 @@ const ANALYSIS_SKILL_IDS = ['draft-format', 'scope-authoring', 'reviewer-authori
  *
  * Asset-resolution gotcha: the agent package builds with `tsc --build`, which
  * compiles `.ts` → `.js` but does **not** copy the skills' `.md` files into
- * `dist/`. So we cannot resolve the bundle relative to `__dirname` of the
- * compiled `dist/skill/*.js` module — the `.md` files simply aren't there.
+ * `dist/`. So we cannot read the bundle from `dist/` — the `.md` files simply
+ * aren't there. What *is* always shipped (and present in dev) is the package's
+ * `src` tree (`package.json#files` lists `src`).
  *
- * What *is* always shipped (and present in dev) is the package's `src` tree
- * (`package.json#files` lists `src`). So we resolve the package root by walking
- * up from this module's directory until we find the `package.json`, then point
- * at `<root>/src/analysis/skills`. This works whether the running module lives
- * under `src/` (vitest / tsx) or `dist/` (built worker) — in both cases walking
- * up lands on the same package root, and we always read from `src`.
+ * This module sits at `<root>/{src,dist}/skill/analysis-skills.{ts,js}`, so the
+ * package root is exactly two levels up from `__dirname` in both layouts. We
+ * resolve `<root>/src/analysis/skills` directly — no filesystem probing. The
+ * sibling test pins this same `../..` offset.
  */
-async function resolveAnalysisSkillsDir(): Promise<string> {
-  let dir = __dirname;
-  // Walk up until a package.json is found (the agent package root). Bounded by
-  // the filesystem root.
-  for (;;) {
-    const candidate = path.join(dir, 'package.json');
-    try {
-      await fs.access(candidate);
-      return path.join(dir, 'src', 'analysis', 'skills');
-    } catch {
-      const parent = path.dirname(dir);
-      if (parent === dir) {
-        throw new Error('could not locate @conduit/agent package root for analysis skills');
-      }
-      dir = parent;
-    }
-  }
+function resolveAnalysisSkillsDir(): string {
+  return path.resolve(__dirname, '..', '..', 'src', 'analysis', 'skills');
 }
 
 /**
@@ -71,7 +46,7 @@ export async function installAnalysisSkillsIntoWorkspace(
   workspacePath: string,
   providerId: AgentProviderId,
 ): Promise<void> {
-  const srcDir = await resolveAnalysisSkillsDir();
+  const srcDir = resolveAnalysisSkillsDir();
   const dest = path.join(workspacePath, DEST_BY_PROVIDER[providerId]);
   await Promise.all(
     ANALYSIS_SKILL_IDS.map((id) =>

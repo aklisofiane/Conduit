@@ -17,20 +17,19 @@ import { NODE_NAME_PATTERN } from '../agent/node-name';
  * "letters/digits/spaces/hyphens/underscores" suggestion, which the runtime
  * node-name schema would reject downstream.)
  */
-const REVIEWER_NAME_RE = NODE_NAME_PATTERN;
 
 /** A single agent-authored reviewer block in a draft. */
 export const reviewerDraftSchema = z.object({
   /**
    * Reviewer name — used as the node name (+ edge endpoints), the
    * `.conduit/<name>.md` filename, and the `## <name>` ScopeManifest heading.
-   * Constrained to `NODE_NAME_PATTERN` (see `REVIEWER_NAME_RE`).
+   * Constrained to `NODE_NAME_PATTERN` (see the charset note above).
    */
   name: z
     .string()
     .min(1)
     .regex(
-      REVIEWER_NAME_RE,
+      NODE_NAME_PATTERN,
       'Reviewer name must match /^[A-Za-z_][A-Za-z0-9_]*$/ (letters, digits, underscores; no leading digit)',
     ),
   /** Agent-authored, component-tailored reviewer prompt body. */

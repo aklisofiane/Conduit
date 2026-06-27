@@ -88,10 +88,13 @@ export function assembleSuggestionBundle(
 }
 
 /**
- * Turn a reviewer name into a safe, unique node-id slug (`[a-z0-9-]`). The
- * schema already restricts names to `[A-Za-z0-9 _-]` and rejects duplicates,
- * so the only residual hazards are names that lowercase/strip to the same slug
- * or to nothing — both handled by the dedup in `resolveReviewers`.
+ * Turn a reviewer name into a safe, unique node-id slug (`[a-z0-9-]`) so the
+ * generated ids stay lowercase-kebab like the fixed `agent-scope` /
+ * `agent-publisher` nodes. The schema already restricts names to
+ * `NODE_NAME_PATTERN` (`/^[A-Za-z_][A-Za-z0-9_]*$/`) and rejects duplicate
+ * names, so the slug's lossy lowercase/collapse is the *only* thing that can
+ * reintroduce a collision (`Api_Contract` vs `Api__Contract`) or an empty slug
+ * (`___`) — both handled by the dedup in `resolveReviewers`.
  */
 function slugifyReviewerName(name: string): string {
   return name

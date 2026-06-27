@@ -3,7 +3,12 @@ import path from 'node:path';
 import type { AgentProviderId } from '@conduit/shared';
 import type { DiscoveredSkill } from './discover';
 
-const DEST_BY_PROVIDER: Record<AgentProviderId, string> = {
+/**
+ * Provider → conventional skills directory inside the agent workspace. Both the
+ * Claude and Codex SDKs auto-discover skills from these dirs, so Conduit just
+ * places the files there. Shared with `installAnalysisSkillsIntoWorkspace`.
+ */
+export const DEST_BY_PROVIDER: Record<AgentProviderId, string> = {
   claude: '.claude/skills',
   codex: '.agents/skills',
 };
