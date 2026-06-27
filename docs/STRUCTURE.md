@@ -47,7 +47,8 @@ src/
     provider-configs/                  per-org LLM provider API keys — distinct from Credential;
                                        see docs/data-model.md > ProviderConfig
     trigger/                           POST /trigger/list-projects + /trigger/list-labels
-                                       + /trigger/ensure-labels config-time helpers
+                                       + /trigger/list-branches + /trigger/ensure-labels
+                                       config-time helpers
     webhooks/                          POST /hooks/:workflowId — HMAC-verify, normalize, match,
                                        start run
     mcp/                               POST /mcp/introspect — live tools/list
@@ -229,9 +230,11 @@ src/
               shared HTTP plumbing (`http.ts` — lazy URL/header helpers, web-bundle
               safe), the Projects v2 GraphQL client (`projects.ts`), and the
               labels REST client (`labels.ts` — `listRepoLabels` for the agent
-              panel's issue-writeback picker + idempotent `createRepoLabel`).
-              `gitlab/labels.ts` mirrors it (`listGitlabProjectLabels` +
-              `createGitlabProjectLabel`), returning the same `RepoLabel` shape
+              panel's issue-writeback picker + idempotent `createRepoLabel`), and
+              the branches REST client (`branches.ts` — `listRepoBranches` for the
+              cron panel's branch picker). `gitlab/labels.ts` +
+              `gitlab/branches.ts` mirror them (`listGitlabProjectLabels` /
+              `createGitlabProjectLabel`, `listGitlabProjectBranches`)
   runtime/    AgentEvent → ExecutionLogKind mapping, Redis channel name
   temporal/   task queue name + workflow-type constants + deterministic id helpers
               (`workflowScheduleId` / `pollWorkflowId` / `cronWorkflowId` /
@@ -279,6 +282,8 @@ src/
     fixed-branch.ts                    resolveFixedBranchWorkspace — cron triggers; branch
                                        must exist on remote
     slug.ts                            deriveSlug + formatBranchName — branch naming primitives
+    base-marker.ts                     parseBaseMarker — reads <!-- conduit:base=<branch> -->
+                                       from an issue body (issue-arm base override)
     lock.ts                            withPathLock — in-process base-clone mutex (one worker only)
     push-auth.ts                       installPushCredentials — per-run git credential helper
                                        script wired via credential.helper ! (no token in .git/config)

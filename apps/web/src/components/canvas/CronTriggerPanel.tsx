@@ -43,22 +43,12 @@ type CronTrigger = Extract<TriggerConfig, { type: 'cron' }>;
  * branches are the primary affordance; a non-empty typed value that isn't in
  * the list (a just-pushed branch, or one from a connection whose list failed
  * to load) is surfaced too so free entry stays a graceful fallback rather than
- * a dead end. Order-preserving dedupe; typed-but-unlisted value goes first.
+ * a dead end. The typed-but-unlisted value goes first; remote branch names are
+ * already unique, so no further dedupe is needed.
  */
 export function branchPickerOptions(fetched: string[], current: string): string[] {
-  const seen = new Set<string>();
-  const options: string[] = [];
   const trimmed = current.trim();
-  if (trimmed && !fetched.includes(trimmed)) {
-    options.push(trimmed);
-    seen.add(trimmed);
-  }
-  for (const branch of fetched) {
-    if (seen.has(branch)) continue;
-    seen.add(branch);
-    options.push(branch);
-  }
-  return options;
+  return trimmed && !fetched.includes(trimmed) ? [trimmed, ...fetched] : fetched;
 }
 
 export interface CronTriggerPanelProps {

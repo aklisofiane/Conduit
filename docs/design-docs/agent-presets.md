@@ -100,6 +100,8 @@ Templates reference presets via `presetId` instead of inlining literal prompts. 
 | `issue-publisher.md` | publish | claude / claude-sonnet-4-6 | `nightly-review` (Publisher) |
 | `publish.md` | publish | claude / claude-sonnet-4-6 | `analyze` (Publish), `review` (Publish) |
 
+The `publish` preset (shared by `analyze`/`review`, and inherited by `issue-publisher`) owns the `<!-- conduit:start --> … <!-- conduit:end -->` body block contract. When it operates on a non-default base branch it stamps a `<!-- conduit:base=<branch> -->` marker inside the block, so downstream ticket-branch work bases off the same branch — see [branch-management.md > Base ref selection](./branch-management.md#base-ref-selection).
+
 The review presets are platform-agnostic — they describe what the agent reads, evaluates, and produces without referencing specific platforms. Platform-specific actions (review submission states, ticket column names, issue-body markers) live in template `instructionsAppend`. In `review`, the `code-reviewer` agent classifies the diff (`APPROVE` / `REQUEST_CHANGES_AGENT` / `REQUEST_CHANGES_HUMAN`) into `.conduit/`, and the downstream `publish` agent submits APPROVE or REQUEST_CHANGES and performs the label/state routing — keeping every platform write in one node.
 
 Two prompt directives are load-bearing across the catalog and worth calling out:

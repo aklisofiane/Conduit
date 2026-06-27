@@ -15,7 +15,8 @@ const BASE_MARKER = /<!--\s*conduit:base=([^\s>]+)\s*-->/;
 
 export function parseBaseMarker(body?: string): string | undefined {
   if (!body) return undefined;
-  const match = BASE_MARKER.exec(body);
-  const branch = match?.[1]?.trim();
-  return branch ? branch : undefined;
+  // The capture group is `[^\s>]+`, so a match is always a non-empty,
+  // whitespace-free branch name and the no-value `conduit:base=` case fails to
+  // match outright — no trim/empty-check needed.
+  return BASE_MARKER.exec(body)?.[1];
 }
