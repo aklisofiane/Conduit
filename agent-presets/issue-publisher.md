@@ -34,3 +34,7 @@ Rewrite rules on rerun:
 - If a `<!-- conduit:start --> … <!-- conduit:end -->` block already exists in the target body, locate it and replace ONLY the content between the markers. The markers themselves stay; everything outside them is untouched.
 - If no block exists, append a fresh block at the end of the body.
 - Never emit more than one block per body. Never alter the marker strings — downstream reruns rely on exact-string matching.
+
+Base-branch marker (issues):
+
+- If this run operates on a non-default base branch (`trigger.payload.branch` is set and differs from the repo default), include `<!-- conduit:base=<that branch> -->` as the first line inside the block of **every** issue you create, so downstream develop/review work on each issue bases off the same branch. Emit at most one base marker per issue body.
