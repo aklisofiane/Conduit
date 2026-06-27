@@ -6,7 +6,7 @@ Multi-tenant via per-org partitioning. The auth umbrella moved Conduit from "sha
 
 Primary risks:
 1. **Cross-tenant data leakage** — a member of Org A reading or mutating Org B's workflows, runs, credentials, or connections through any API surface (REST, WS, webhook).
-2. **Credential exfiltration** — stored platform tokens leaked via logs, agent prompts, MCP server env, or compromised workspaces.
+2. **Credential exfiltration** — stored platform tokens leaked via logs, agent prompts, MCP server env, API error responses, or compromised workspaces.
 3. **Webhook forgery** — attacker triggers runs by sending fake GitHub events.
 4. **Agent sandbox escape** — agent tools touching files outside the workspace.
 5. **Prompt injection via trigger payloads** — an attacker opens a GitHub issue with instructions embedded in the title/body, causing the agent to misbehave.
@@ -90,6 +90,10 @@ v1.1+: add a "trust level" flag on triggers; auto-disable write tools on untrust
 - MCP tool call inputs/outputs are logged to `ExecutionLog`, but known-sensitive fields (`authorization`, `token`, `password`) are scrubbed before writing.
 - Agent providers scrub their request/response headers the same way.
 - Credential values are never included in `AgentEvent` payloads that flow through Redis.
+
+## API error response sanitization
+
+Upstream provider error bodies can contain OAuth tokens, internal service URLs, or rate-limit metadata. `TriggerService` catches upstream failures and returns a generic provider-specific message to the caller (e.g. `"Failed to list branches from GitHub"`) while logging the raw upstream body server-side via `logger.warn`. The raw body is never forwarded in the `BadRequestException` payload. Currently applied to: branch listing (`listBranches`) for GitHub and GitLab.
 
 ## API auth & tenant isolation (operator summary)
 
