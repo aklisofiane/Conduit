@@ -211,6 +211,9 @@ async function designOne(
       upstreamWorkspacePath: upstream.upstreamWorkspacePath,
       upstreamHead: upstream.upstreamHead,
       parallelBranch: true,
+      // Design authors Scope + reviewer prose into the draft — give it the
+      // internal authoring skills. Discover (the entry dispatch above) gets none.
+      stageAnalysisSkills: true,
     });
     return readWorkflowDraftActivity({ workspacePath: output.workspacePath });
   });

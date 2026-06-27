@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { componentManifestSchema } from './component-manifest';
 import { workflowDraftSchema } from './workflow-draft';
-import { findReviewerDomain, REVIEWER_DOMAINS } from './reviewer-domains';
 
 describe('componentManifestSchema', () => {
   it('accepts a well-formed manifest', () => {
@@ -37,7 +36,11 @@ describe('workflowDraftSchema', () => {
     workflowName: 'Review: API',
     summary: 'what',
     rationale: 'why',
-    domains: ['security'],
+    scopeInstructions: 'Inspect the API surface and route changes to reviewers.',
+    reviewers: [
+      { name: 'Security', instructions: 'Look for auth bypasses in the API.' },
+      { name: 'Quality', instructions: 'Look for missing error handling.' },
+    ],
     cron: '0 2 * * *',
     paths: ['apps/api/**'],
   };
@@ -46,27 +49,60 @@ describe('workflowDraftSchema', () => {
     expect(workflowDraftSchema.safeParse(valid).success).toBe(true);
   });
 
-  it('rejects an empty domain list', () => {
-    expect(workflowDraftSchema.safeParse({ ...valid, domains: [] }).success).toBe(false);
+  it('rejects an empty scope prompt', () => {
+    expect(workflowDraftSchema.safeParse({ ...valid, scopeInstructions: '' }).success).toBe(false);
+  });
+
+  it('rejects an empty reviewer list', () => {
+    expect(workflowDraftSchema.safeParse({ ...valid, reviewers: [] }).success).toBe(false);
+  });
+
+  it('rejects a reviewer with empty instructions or a blank name', () => {
+    expect(
+      workflowDraftSchema.safeParse({
+        ...valid,
+        reviewers: [{ name: 'Security', instructions: '' }],
+      }).success,
+    ).toBe(false);
+    expect(
+      workflowDraftSchema.safeParse({
+        ...valid,
+        reviewers: [{ name: '', instructions: 'x' }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects a reviewer name with unsafe characters (matches node-name pattern)', () => {
+    for (const name of ['../etc/passwd', 'Sec/urity', 'Api Contract', 'Api-Contract', '2fast']) {
+      expect(
+        workflowDraftSchema.safeParse({ ...valid, reviewers: [{ name, instructions: 'x' }] })
+          .success,
+      ).toBe(false);
+    }
+  });
+
+  it('accepts identifier-style names (letters, digits, underscores; no leading digit)', () => {
+    expect(
+      workflowDraftSchema.safeParse({
+        ...valid,
+        reviewers: [{ name: 'ApiContract_v2', instructions: 'x' }],
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rejects duplicate reviewer names within a draft', () => {
+    expect(
+      workflowDraftSchema.safeParse({
+        ...valid,
+        reviewers: [
+          { name: 'Security', instructions: 'a' },
+          { name: 'Security', instructions: 'b' },
+        ],
+      }).success,
+    ).toBe(false);
   });
 
   it('rejects a malformed cron', () => {
     expect(workflowDraftSchema.safeParse({ ...valid, cron: 'not-a-cron' }).success).toBe(false);
-  });
-});
-
-describe('REVIEWER_DOMAINS catalog', () => {
-  it('every domain maps to the code-analyst preset and has unique keys', () => {
-    const keys = REVIEWER_DOMAINS.map((d) => d.key);
-    expect(new Set(keys).size).toBe(keys.length);
-    for (const d of REVIEWER_DOMAINS) {
-      expect(d.presetId).toBe('code-analyst');
-      expect(d.instructionsAppend.length).toBeGreaterThan(0);
-    }
-  });
-
-  it('findReviewerDomain resolves known keys and rejects unknown', () => {
-    expect(findReviewerDomain('security')?.name).toBe('Security');
-    expect(findReviewerDomain('nope')).toBeUndefined();
   });
 });

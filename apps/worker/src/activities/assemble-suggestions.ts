@@ -22,7 +22,8 @@ export interface AssembleSuggestionsInput {
  * Pure-code Assemble step: stitch surviving `WorkflowDraft`s into one
  * validated multi-workflow `TemplateFile` and persist the terminal analysis
  * state on `RepoAnalysis`. Drops from Design fan-out and from Assemble
- * (drafts with no recognized domains) are merged into `droppedComponents`.
+ * (e.g. every reviewer name collides after sanitization) are merged into
+ * `droppedComponents`.
  * If nothing survives, the analysis is marked FAILED with a clear message.
  */
 export async function assembleSuggestionsActivity(input: AssembleSuggestionsInput): Promise<void> {

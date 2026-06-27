@@ -113,7 +113,11 @@ describe('repoAnalysisWorkflow orchestration (TestWorkflowEnvironment)', () => {
           workflowName: `Review: ${component.name}`,
           summary: 'what',
           rationale: 'why',
-          domains: ['security'],
+          scopeInstructions: `Scope review of ${component.name}: route security-relevant changes to Security and quality issues to Quality.`,
+          reviewers: [
+            { name: 'Security', instructions: 'Review for auth bypasses and input-validation gaps.' },
+            { name: 'Quality', instructions: 'Review for logic errors and missing error handling.' },
+          ],
           cron: '0 2 * * *',
           paths: component.paths,
         };

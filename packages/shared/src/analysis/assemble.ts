@@ -7,9 +7,9 @@ import {
 } from '../template/schema';
 import { ANALYSIS_REPO_PLACEHOLDER } from './adapter';
 import { diffWindowFromCron } from './cadence';
-import { findReviewerDomain, type ReviewerDomain } from './reviewer-domains';
 import {
   type DroppedComponent,
+  type ReviewerDraft,
   type WorkflowDraft,
 } from './workflow-draft';
 import type { AssemblyPresets } from './workflow-input';
@@ -29,16 +29,29 @@ export interface AssembleResult {
   dropped: DroppedComponent[];
 }
 
+/** A reviewer resolved into a safe, unique node identity. */
+interface ResolvedReviewer {
+  /** Unique, safe node id derived from the reviewer name (`agent-<slug>`). */
+  id: string;
+  /** Reviewer name — node name, `.conduit/<name>.md` file, `## <name>` heading. */
+  name: string;
+  /** Agent-authored reviewer prompt body. */
+  instructions: string;
+}
+
 /**
  * Stitch surviving per-component `WorkflowDraft`s into one multi-workflow
- * `TemplateFile`, mapping each selected domain key through `REVIEWER_DOMAINS`
- * to a concrete `code-analyst` node — exactly how `nightly-review` wires its
- * reviewers, but scoped per component. Pure: validation only, no I/O.
+ * `TemplateFile`. Each draft carries **agent-authored** Scope + reviewer prose;
+ * assemble keeps the fixed `Trigger → Scope → N reviewers → Publisher` topology
+ * and appends the deterministic I/O-contract glue onto that prose, exactly the
+ * way `nightly-review` wires its reviewers but scoped per component. Pure:
+ * validation only, no I/O.
  *
- * A draft that maps to zero known domains is dropped (never silently
- * truncated — it lands in `dropped`). The assembled bundle is validated
- * against `templateFileSchema`; a structural failure throws (the whole
- * analysis fails rather than persisting an unimportable bundle).
+ * A draft whose reviewer names all collapse to an empty/duplicate identifier
+ * after sanitization is dropped (never silently truncated — it lands in
+ * `dropped`). The assembled bundle is validated against `templateFileSchema`; a
+ * structural failure throws (the whole analysis fails rather than persisting an
+ * unimportable bundle).
  */
 export function assembleSuggestionBundle(
   drafts: WorkflowDraft[],
@@ -48,15 +61,15 @@ export function assembleSuggestionBundle(
   const workflows: TemplateWorkflow[] = [];
 
   for (const draft of drafts) {
-    const domains = resolveDomains(draft.domains);
-    if (domains.length === 0) {
+    const reviewers = resolveReviewers(draft.reviewers);
+    if (reviewers.length === 0) {
       dropped.push({
         component: draft.component,
-        reason: 'no recognized reviewer domains were selected',
+        reason: 'every reviewer name collapsed to an empty or duplicate identifier after sanitization',
       });
       continue;
     }
-    workflows.push(buildComponentWorkflow(draft, domains, ctx));
+    workflows.push(buildComponentWorkflow(draft, reviewers, ctx));
   }
 
   if (workflows.length === 0) {
@@ -74,32 +87,50 @@ export function assembleSuggestionBundle(
   return { bundle, dropped };
 }
 
-/** Map selected keys to catalog domains, dedup by key, preserve order. */
-function resolveDomains(keys: string[]): ReviewerDomain[] {
+/**
+ * Turn a reviewer name into a safe, unique node-id slug (`[a-z0-9-]`). The
+ * schema already restricts names to `[A-Za-z0-9 _-]` and rejects duplicates,
+ * so the only residual hazards are names that lowercase/strip to the same slug
+ * or to nothing — both handled by the dedup in `resolveReviewers`.
+ */
+function slugifyReviewerName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+/**
+ * Resolve authored reviewers into nodes with safe, unique ids. Reviewers whose
+ * name sanitizes to an empty slug, or whose slug collides with an earlier one,
+ * are dropped; the first occurrence wins. Order preserved.
+ */
+function resolveReviewers(reviewers: ReviewerDraft[]): ResolvedReviewer[] {
   const seen = new Set<string>();
-  const out: ReviewerDomain[] = [];
-  for (const key of keys) {
-    if (seen.has(key)) continue;
-    const domain = findReviewerDomain(key);
-    if (!domain) continue;
-    seen.add(key);
-    out.push(domain);
+  const out: ResolvedReviewer[] = [];
+  for (const reviewer of reviewers) {
+    const slug = slugifyReviewerName(reviewer.name);
+    if (!slug) continue;
+    const id = `agent-${slug}`;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.push({ id, name: reviewer.name, instructions: reviewer.instructions });
   }
   return out;
 }
 
 function buildComponentWorkflow(
   draft: WorkflowDraft,
-  domains: ReviewerDomain[],
+  reviewers: ResolvedReviewer[],
   ctx: AssembleContext,
 ): TemplateWorkflow {
   const { presets } = ctx;
   const pathList = draft.paths.map((p) => `- ${p}`).join('\n');
   const window = diffWindowFromCron(draft.cron);
-  // List the domains explicitly rather than deferring to the runtime-injected
-  // "Parallel downstream" block — that block is suppressed when a node fans out
-  // to a single sibling, which happens for single-domain components.
-  const domainHeadings = domains.map((d) => `- \`## ${d.name}\``).join('\n');
+  // List the reviewer headings explicitly rather than deferring to the
+  // runtime-injected "Parallel downstream" block — that block is suppressed
+  // when a node fans out to a single sibling (single-reviewer components).
+  const reviewerHeadings = reviewers.map((r) => `- \`## ${r.name}\``).join('\n');
 
   const scopeNode = {
     id: 'agent-scope',
@@ -107,27 +138,27 @@ function buildComponentWorkflow(
     provider: presets.scope.provider,
     model: presets.scope.model,
     instructions: appendInstructions(
-      presets.scope.instructions,
-      `This pipeline reviews the **${draft.component}** component. Scope every step to changes under these paths only:\n${pathList}\n\nIdentify what changed under those paths over ${window} using git history, then write one section per review domain to \`.conduit/ScopeManifest.md\` using exactly these headings:\n${domainHeadings}\n\nUnder each heading list the relevant changed files with a one-line focus note (or "Nothing <domain>-relevant" if none apply). If nothing under those paths changed in that window, write "NO_CHANGES" to \`.conduit/ScopeManifest.md\` and stop.`,
+      draft.scopeInstructions,
+      `This pipeline reviews the **${draft.component}** component. Scope every step to changes under these paths only:\n${pathList}\n\nIdentify what changed under those paths over ${window} using git history, then write one section per reviewer to \`.conduit/ScopeManifest.md\` using exactly these headings:\n${reviewerHeadings}\n\nUnder each heading list the relevant changed files with a one-line focus note (or "Nothing relevant" if none apply). If nothing under those paths changed in that window, write "NO_CHANGES" to \`.conduit/ScopeManifest.md\` and stop.`,
     ),
     mcpServers: [],
     skills: [],
     webSearch: false,
   };
 
-  const domainNodes = domains.map((domain) => ({
-    id: `agent-${domain.key}`,
-    name: domain.name,
+  const reviewerNodes = reviewers.map((reviewer) => ({
+    id: reviewer.id,
+    name: reviewer.name,
     provider: presets.codeAnalyst.provider,
     model: presets.codeAnalyst.model,
-    instructions: appendInstructions(presets.codeAnalyst.instructions, domain.instructionsAppend),
+    instructions: appendInstructions(reviewer.instructions, reviewerGlue(reviewer.name)),
     mcpServers: [],
     skills: [],
     webSearch: false,
   }));
 
-  const reviewerNames = domains.map((d) => d.name).join(', ');
-  const summaryReads = domains.map((d) => `\`.conduit/${d.name}.md\``).join(', ');
+  const reviewerNames = reviewers.map((r) => r.name).join(', ');
+  const summaryReads = reviewers.map((r) => `\`.conduit/${r.name}.md\``).join(', ');
   const publisherNode = {
     id: 'agent-publisher',
     name: 'Publisher',
@@ -154,8 +185,8 @@ function buildComponentWorkflow(
 
   const edges = [
     { from: 'Trigger', to: 'Scope' },
-    ...domains.map((d) => ({ from: 'Scope', to: d.name })),
-    ...domains.map((d) => ({ from: d.name, to: 'Publisher' })),
+    ...reviewers.map((r) => ({ from: 'Scope', to: r.name })),
+    ...reviewers.map((r) => ({ from: r.name, to: 'Publisher' })),
   ];
 
   return {
@@ -174,7 +205,7 @@ function buildComponentWorkflow(
           branch: ctx.defaultBranch,
         },
       ],
-      nodes: [scopeNode, ...domainNodes, publisherNode],
+      nodes: [scopeNode, ...reviewerNodes, publisherNode],
       edges,
       mcpServers: [
         {
@@ -185,9 +216,35 @@ function buildComponentWorkflow(
           presetId: mcpPreset.id,
         },
       ],
-      ui: layout(domains.map((d) => d.name)),
+      ui: layout(reviewers.map((r) => r.name)),
     },
   };
+}
+
+/**
+ * Deterministic I/O-contract glue appended to each authored reviewer prompt:
+ * where to read its scoped inputs, where to write findings, and the exact
+ * findings/severity format the Publisher's severity gate parses (mirrors the
+ * old `code-analyst` preset write format so the gate keeps working).
+ */
+function reviewerGlue(name: string): string {
+  return `Read the \`## ${name}\` section of \`.conduit/ScopeManifest.md\` for the files relevant to your review. If that section reports nothing relevant, or the manifest is \`NO_CHANGES\`, write "No findings" to \`.conduit/${name}.md\` and stop.
+
+For each relevant file, read the actual diff and surrounding context, then write your findings to \`.conduit/${name}.md\` using exactly this format:
+
+\`\`\`
+## Findings
+
+### <short title>
+- File: <path>
+- Lines: <range>
+- Severity: critical | high | medium | low
+- Confidence: high | low
+- Description: <1-2 sentences explaining the issue>
+- Suggested fix: <1-2 sentences or "Needs human assessment">
+\`\`\`
+
+Only flag real issues with a concrete file path and line range — do not invent findings or flag stylistic preferences. The \`Severity:\` line is required on every finding; the downstream Publisher drops any finding without a \`medium\`, \`high\`, or \`critical\` severity.`;
 }
 
 function appendInstructions(base: string, append: string): string {
@@ -195,13 +252,13 @@ function appendInstructions(base: string, append: string): string {
 }
 
 /** Deterministic canvas layout: Trigger → Scope → N stacked reviewers → Publisher. */
-function layout(domainNames: string[]) {
+function layout(reviewerNames: string[]) {
   const nodePositions: Record<string, { x: number; y: number }> = {
     Trigger: { x: 60, y: 480 },
     Scope: { x: 360, y: 480 },
     Publisher: { x: 1280, y: 480 },
   };
-  domainNames.forEach((name, i) => {
+  reviewerNames.forEach((name, i) => {
     nodePositions[name] = { x: 820, y: i * 320 };
   });
   return { nodePositions, viewport: { x: 0, y: 0, zoom: 1 } };
