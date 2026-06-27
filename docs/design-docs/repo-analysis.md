@@ -36,7 +36,7 @@ cloneAnalysisWorkspace   prime the base bare clone, probe default branch
         ▼
    Discover  (1 claude agent, fixed-branch on default branch)
         │    writes .conduit/ComponentManifest.json  ─── readComponentManifest (Zod) ──┐
-        │                                                                               │ bad/missing
+        │                                                                               │ bad/missing/exceeds cap
         │◀──────────────────── bounded retry (≤3 agent runs) ───────────────────────────┘
         ▼
    Design fan-out  (N claude agents, ≤12 concurrent, batched)
@@ -53,7 +53,7 @@ cloneAnalysisWorkspace   prime the base bare clone, probe default branch
 
 Phase transitions (`DISCOVER → DESIGN → ASSEMBLE`) are written via `updateAnalysisPhase` so the progress card has a signal without reading hidden `NodeRun` rows.
 
-**Structured agent output.** Both analyzer agents emit a machine-read **JSON artifact** at a fixed workspace path (`ComponentManifest.json` / `WorkflowDraft.json`) — distinct from the markdown `.conduit/<Node>.md` summary the runtime captures. A read activity Zod-validates the file; any failure (missing, bad JSON, schema mismatch) throws so the workflow's own bounded-retry loop re-runs the agent. Freeform markdown can't be reliably parsed by orchestration code. (A structured-output tool replacing this convention is a deferred follow-up.)
+**Structured agent output.** Both analyzer agents emit a machine-read **JSON artifact** at a fixed workspace path (`ComponentManifest.json` / `WorkflowDraft.json`) — distinct from the markdown `.conduit/<Node>.md` summary the runtime captures. A read activity Zod-validates the file; any failure (missing, bad JSON, schema mismatch) throws so the workflow's own bounded-retry loop re-runs the agent. Freeform markdown can't be reliably parsed by orchestration code. (A structured-output tool replacing this convention is a deferred follow-up.) The Discover output is additionally bounded by a `MAX_COMPONENTS = 50` Zod constraint on `componentManifestSchema` — an oversized manifest fails validation the same way a malformed one does, triggering a Discover retry with the cap explicitly stated in the agent prompt.
 
 **Fan-out is `allSettled`-style, never all-or-nothing.** A single component failing after its retries is recorded in `droppedComponents` and surfaced in the gallery — never silently truncated — rather than sinking the whole analysis. Overflow beyond the concurrency cap runs in subsequent batches.
 
