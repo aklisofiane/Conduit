@@ -2,6 +2,7 @@ import path from 'node:path';
 import { type WorkflowBundle, Worker, bundleWorkflowCode } from '@temporalio/worker';
 import type { TestWorkflowEnvironment } from '@temporalio/testing';
 import {
+  MAX_COMPONENTS,
   buildAnalysisTriggerEvent,
   type AssemblyPresets,
   type ComponentManifest,
@@ -218,6 +219,20 @@ describe('repoAnalysisWorkflow orchestration (TestWorkflowEnvironment)', () => {
     expect(dropped[0]!.component).toBe('Web');
 
     // Still a clean run — a single component failing doesn't sink the analysis.
+    const cleanup = callsNamed('cleanupRunActivity')[0]!.input as { status: string };
+    expect(cleanup.status).toBe('COMPLETED');
+  });
+
+  it('retries Discover when manifest exceeds the component cap', async () => {
+    // First readComponentManifestActivity call simulates a cap-exceeded rejection
+    // (manifestFailures: 1 causes the mock to throw on the first attempt).
+    await runWorkflow({ manifest: manifest(['API']), manifestFailures: 1 });
+
+    const discoverRuns = callsNamed('runAgentNode').filter(
+      (c) => (c.input as { node: { name: string } }).node.name === 'Discover',
+    );
+    expect(discoverRuns).toHaveLength(2);
+    expect(callsNamed('assembleSuggestionsActivity')).toHaveLength(1);
     const cleanup = callsNamed('cleanupRunActivity')[0]!.input as { status: string };
     expect(cleanup.status).toBe('COMPLETED');
   });
