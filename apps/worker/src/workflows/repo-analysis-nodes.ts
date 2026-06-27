@@ -3,6 +3,7 @@ import {
   ANALYSIS_DISCOVER_NODE,
   ANALYSIS_DRAFT_PATH,
   ANALYSIS_MANIFEST_PATH,
+  MAX_COMPONENTS,
 } from '@conduit/shared';
 
 /**
@@ -45,6 +46,7 @@ Write a JSON file to \`${ANALYSIS_MANIFEST_PATH}\` (exactly that path) with this
 Rules:
 - \`paths\` are repo-relative globs delimiting the component's source.
 - \`criticality\` is one of \`low\`, \`medium\`, \`high\`. \`churn\` (recent commit count) is optional.
+- Emit no more than ${MAX_COMPONENTS} components — the manifest is rejected if it exceeds this limit.
 - Emit at least one component, and write ONLY valid JSON at that path — it is parsed by orchestration code.
 
 Also write a short human summary to \`.conduit/${ANALYSIS_DISCOVER_NODE}.md\` (the runtime owns that file).`;
