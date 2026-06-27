@@ -12,7 +12,7 @@ It reuses the agent-execution substrate at the **activity** level — `runAgentN
 
 ## The internal run + hidden SYSTEM workflow
 
-`runAgentNode` needs a `WorkflowRun` to write `NodeRun`s against, and a `WorkflowRun` needs a parent `Workflow` (FK, same-org invariant). So each org gets **one hidden `SYSTEM`-kind `Workflow`** (`Workflow.kind`, see [data-model.md](../data-model.md)) that exists only to host analysis runs. It is lazily created once per org, carries a trivially-valid stub `definition`, and is **filtered out of every user-facing workflow list/get/validate path**. The user never sees the internal run — only a coarse `Analyzing… → Suggestions ready` state on the connection.
+`runAgentNode` needs a `WorkflowRun` to write `NodeRun`s against, and a `WorkflowRun` needs a parent `Workflow` (FK, same-org invariant). So each org gets **one hidden `SYSTEM`-kind `Workflow`** (`Workflow.kind`, see [data-model.md](../data-model.md)) that exists only to host analysis runs. It is lazily created once per org, carries a trivially-valid stub `definition`, and is **filtered out of every user-facing workflow list, get, and mutation path** (update, delete, duplicate, setWebhookSecret, clearWebhookSecret). All of these paths scope their Prisma lookups to `kind: 'STANDARD'`, so a caller who somehow obtains the SYSTEM workflow id still cannot mutate or delete it via the service layer. The user never sees the internal run — only a coarse `Analyzing… → Suggestions ready` state on the connection.
 
 The user-facing lifecycle lives on `RepoAnalysis` (`status` + `phase`), **owned by the workflow** and independent of the internal `WorkflowRun.status`. The latest `RepoAnalysis` row per connection drives the badge and the gallery.
 

@@ -54,9 +54,7 @@ export class WorkflowsService implements OnModuleInit {
       },
     });
     const scheduled = workflows.filter((wf) =>
-      isScheduledTrigger(
-        (wf.definition as Partial<WorkflowDefinition> | null)?.triggers?.[0],
-      ),
+      isScheduledTrigger((wf.definition as Partial<WorkflowDefinition> | null)?.triggers?.[0]),
     );
     await Promise.allSettled(scheduled.map((wf) => this.syncWorkflowSchedule(wf)));
   }
@@ -185,9 +183,7 @@ export class WorkflowsService implements OnModuleInit {
     try {
       await this.temporal.deleteWorkflowSchedule(id, existing?.temporalSlug ?? undefined);
     } catch (err) {
-      this.logger.warn(
-        `Deleting schedule for workflow ${id} failed: ${errMessage(err)}`,
-      );
+      this.logger.warn(`Deleting schedule for workflow ${id} failed: ${errMessage(err)}`);
     }
   }
 
@@ -292,9 +288,7 @@ export class WorkflowsService implements OnModuleInit {
         scheduleOptionsForTrigger(trigger, wf.id, wf.isActive, slug),
       );
     } catch (err) {
-      this.logger.warn(
-        `Sync schedule for workflow ${wf.id} failed: ${errMessage(err)}`,
-      );
+      this.logger.warn(`Sync schedule for workflow ${wf.id} failed: ${errMessage(err)}`);
     }
   }
 

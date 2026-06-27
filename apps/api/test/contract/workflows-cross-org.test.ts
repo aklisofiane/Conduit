@@ -65,9 +65,9 @@ describe('WorkflowsService cross-org isolation', () => {
   });
 
   it('duplicate on a sibling-org workflow id throws NotFound', async () => {
-    await expect(
-      svc.duplicate(fixture.orgA.id, fixture.orgB.workflowId),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(svc.duplicate(fixture.orgA.id, fixture.orgB.workflowId)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 
   it('create stamps caller-org orgId on the new row', async () => {
@@ -142,9 +142,9 @@ describe('SYSTEM workflow mutation isolation', () => {
   });
 
   it('duplicate on a same-org SYSTEM workflow throws NotFound', async () => {
-    await expect(
-      svc.duplicate(fixture.orgA.id, systemWorkflowId),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(svc.duplicate(fixture.orgA.id, systemWorkflowId)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 
   it('setWebhookSecret on a same-org SYSTEM workflow throws NotFound', async () => {
@@ -154,9 +154,9 @@ describe('SYSTEM workflow mutation isolation', () => {
   });
 
   it('clearWebhookSecret on a same-org SYSTEM workflow throws NotFound', async () => {
-    await expect(
-      svc.clearWebhookSecret(fixture.orgA.id, systemWorkflowId),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(svc.clearWebhookSecret(fixture.orgA.id, systemWorkflowId)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 });
 
