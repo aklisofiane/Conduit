@@ -196,9 +196,10 @@ src/
   agent/      AgentEvent, provider contract types, `issue-writeback.ts`
               (per-agent allowlist for end-of-run GitHub issue updates)
   analysis/   Repo-analysis contracts (see design-docs/repo-analysis.md):
-              ComponentManifest + WorkflowDraft schemas, the reviewer-domain
-              catalog, the analysis adapter (synthetic `analysis` trigger +
-              fixed artifact paths), and pure `assembleSuggestionBundle`
+              ComponentManifest + WorkflowDraft schemas (agent authors
+              `scopeInstructions` + `reviewers[]`), the analysis adapter
+              (synthetic `analysis` trigger + fixed artifact paths), and pure
+              `assembleSuggestionBundle`
   connection/ ConnectionScope discriminated union (github_repo /
               github_projects_v2 / none) + expectScopeKind helper. Web-bundle safe.
   label/      Canonical registry of Conduit's own `conduit-*` labels
@@ -286,7 +287,12 @@ src/
   mcp/
     resolve.ts                         decrypt credentials + {{credential}} substitution
     introspect.ts                      live `tools/list` via @modelcontextprotocol/sdk (stdio/sse/streamable-http)
-  skill/                               discovery + install into workspace
+  skill/                               discovery + install into workspace;
+                                       analysis-skills.ts stages the internal,
+                                       non-discovered repo-analyzer Design skills
+  analysis/skills/                     three internal SKILL.md bundles (draft-format,
+                                       scope-authoring, reviewer-authoring) — staged
+                                       into the analysis worktree, never in GET /skills
   errors/
 ```
 

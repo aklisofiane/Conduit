@@ -26,7 +26,7 @@ The user-facing lifecycle lives on `RepoAnalysis` (`status` + `phase`), **owned 
 
 If the stubs grow awkward, the planned follow-up is to extract a lower-level `runSingleAgent` core shared by both paths.
 
-The analyzer agents (`Discover`, `Design`) are **not** user-editable canvas presets — their prompts and `AgentConfig`s are inlined in code (`apps/worker/src/workflows/repo-analysis-nodes.ts`), a pure module safe for the V8 sandbox.
+The analyzer agents (`Discover`, `Design`) are **not** user-editable canvas presets — their prompts and `AgentConfig`s are inlined in code (`apps/worker/src/workflows/repo-analysis-nodes.ts`), a pure module safe for the V8 sandbox. The Design dispatch additionally gets three internal skills staged into its worktree to guide the prose it authors (see [Skill-guided prose authoring](#skill-guided-prose-authoring)).
 
 ## Pipeline
 
@@ -41,6 +41,7 @@ cloneAnalysisWorkspace   prime the base bare clone, probe default branch
         ▼
    Design fan-out  (N claude agents, ≤12 concurrent, batched)
         │    each inherits Discover's worktree as a read-only branched worktree
+        │    + 3 internal skills staged in to guide the authored prose
         │    writes .conduit/WorkflowDraft.json   ─── readWorkflowDraft (Zod) ── bounded retry
         │    a component that never produces a valid draft is DROPPED, not fatal
         ▼
@@ -58,20 +59,34 @@ Phase transitions (`DISCOVER → DESIGN → ASSEMBLE`) are written via `updateAn
 
 **Worktree caveat.** Design nodes branch read-only worktrees off Discover's still-live `fixed-branch` worktree. Discover's worktree heartbeat stops when its activity returns, so a *concurrent* analysis on the same repo+default-branch could, on an eviction-recovery path, judge Discover's worktree stale and remove it — failing (and dropping) the remaining Design nodes. Narrow trigger; the proper fix is run-scoped worktree heartbeating, tracked as a follow-up.
 
-## The reviewer-domain catalog
+## Skill-guided prose authoring
 
-A bounded data table (`packages/shared/src/analysis/reviewer-domains.ts`) maps a stable `domain key → { name, presetId: 'code-analyst', instructionsAppend }` — e.g. `security`, `quality`, `refactor`, `performance`, `a11y`, `bundle-size`, `api-contract`, `breaking-change`. The Design agent **selects keys only**; the catalog owns the prose. This keeps generated review prompts deterministic and reviewable rather than agent-authored. Mirrors the static-table pattern of `mcp/presets.ts`.
+The Design agent **authors** each component's review prose — a tailored Scope prompt and a set of named reviewers — rather than picking keys from a fixed catalog. This is what makes a component named `API` and one named `Web` get genuinely different reviews instead of byte-identical prose stamped from a shared table. (The earlier `reviewer-domains.ts` catalog is gone; its lenses live on as *examples* inside the `reviewer-authoring` skill below.)
+
+What the agent authors is bounded by **three internal, non-discovered skills** staged into its worktree (`packages/agent/src/analysis/skills/<id>/SKILL.md`):
+
+| Skill | Guides the agent on |
+|---|---|
+| `draft-format` | the exact `WorkflowDraft` JSON shape, field-by-field, with the reviewer-name charset rule and a worked example |
+| `scope-authoring` | writing a strong, component-tailored Scope prompt and how the ScopeManifest routes change sets to reviewers |
+| `reviewer-authoring` | authoring component-specific reviewers, with a menu of example lenses (security, quality, performance, a11y, api-contract, breaking-change…) to draw from, adapt, or extend |
+
+These skills are **internal**: they are staged directly from the agent package source and are **never** walked by `discoverSkills` (which only scans `~/.claude/skills`, plugin roots, and repo/cwd roots), so they never appear in `GET /skills` or the canvas skill picker. Topology stays fixed and code-owned (see Assemble below) — the agent owns only the prose.
+
+**Staging mechanism.** `installAnalysisSkillsIntoWorkspace` (`packages/agent/src/skill/analysis-skills.ts`) copies the three skill subdirs into the workspace's provider skills dir (`.claude/skills` / `.agents/skills`), the same convention the SDKs auto-discover. The bundle is resolved from the package's `src` tree, not `dist/` — `tsc --build` compiles `.ts` but does not copy the `.md` files, so the resolver walks up to the package root and reads from `src` (works under both `tsx`/vitest and the built worker). Staging is gated by a `stageAnalysisSkills` boolean on `runAgentNode`, set by `repoAnalysisWorkflow` for the **Design dispatch only** (Discover authors no prose). The bundled-dir resolution and copy are filesystem I/O, so they live in the activity, keeping the workflow V8-sandbox-safe.
 
 ## Assemble — generated workflow shape
 
 `assembleSuggestionBundle` (pure, `packages/shared/src/analysis/assemble.ts`) stitches surviving drafts into one multi-workflow `TemplateFile`, wired exactly like `templates/nightly-review.json` but scoped per component:
 
 ```
-Trigger (cron) → Scope → [one code-analyst per selected domain] → Publisher
+Trigger (cron) → Scope → [one reviewer node per authored reviewer] → Publisher
 ```
 
-- **Scope** carries an `instructionsAppend` that scopes the review to the component's path glob(s) **and states the diff window in prose** ("the last 24 hours / 7 days / 30 days") derived from the chosen cadence — there's no typed diff-window field today, so the window rides on prose to stay aligned with cron (a first-class field is a deferred follow-up).
-- Each **domain node** injects the catalog's `instructionsAppend` onto the `code-analyst` preset. A draft mapping to zero known domains is dropped (lands in `droppedComponents`).
+The division of labor is the key invariant: **the agent authors the prose, the code owns the topology and the I/O contract.** Each draft carries authored `scopeInstructions` and a `reviewers[]` list (`{ name, instructions }`, at least one); assemble keeps the fixed shape above and *appends* deterministic glue onto that authored prose. Presets supply only provider/model.
+
+- **Scope** uses the authored `scopeInstructions`, onto which assemble appends the mechanical glue: the component's path glob(s), the **diff window stated in prose** ("the last 24 hours / 7 days / 30 days") derived from the chosen cadence, the `## <ReviewerName>` headings to write into `.conduit/ScopeManifest.md`, and the `NO_CHANGES` short-circuit. (There's no typed diff-window field today, so the window rides on prose to stay aligned with cron — a first-class field is a deferred follow-up.)
+- Each **reviewer node** uses that reviewer's authored `instructions`, onto which assemble appends the contract glue: read your `## <name>` section of the ScopeManifest, and write findings to `.conduit/<name>.md` in the fixed `## Findings` / `Severity:` format the Publisher's gate parses. Reviewer names are sanitized into safe, unique node ids (`agent-<slug>`); a draft whose names all collapse to empty/duplicate slugs is dropped (lands in `droppedComponents`).
 - **Publisher** is label-gated only (publishes issues + `conduit-*` labels, no board status), with a severity gate that skips `low` findings — so generated workflows need only the repo connection.
 
 The bundle carries the `<github-repo>` placeholder (same alias `nightly-review` uses) so it flows through the existing import path. Validation is against `templateFileSchema`; a structural failure throws (the whole analysis fails rather than persisting an unimportable bundle). Generated workflows import **paused-on-create** (`isActive: false`) — they fire only once the user activates them.
