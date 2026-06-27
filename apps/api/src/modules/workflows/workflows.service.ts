@@ -115,7 +115,7 @@ export class WorkflowsService implements OnModuleInit {
     if (dto.isActive === true) {
       const existing = orNotFound(
         await this.prisma.workflow.findFirst({
-          where: { id, orgId },
+          where: { id, orgId, kind: 'STANDARD' },
           select: { definition: true },
         }),
         'Workflow',
@@ -130,7 +130,7 @@ export class WorkflowsService implements OnModuleInit {
     // updateMany returns count rather than throwing on miss — gives us the
     // 404-on-cross-org shape the spec requires (no 403 leak).
     const result = await this.prisma.workflow.updateMany({
-      where: { id, orgId },
+      where: { id, orgId, kind: 'STANDARD' },
       data: {
         name: dto.name,
         description: dto.description,
@@ -170,11 +170,11 @@ export class WorkflowsService implements OnModuleInit {
     // slugged schedule id to remove. Null (never frozen) → undefined →
     // `deleteWorkflowSchedule` targets the legacy slug-less schedule instead.
     const existing = await this.prisma.workflow.findFirst({
-      where: { id, orgId },
+      where: { id, orgId, kind: 'STANDARD' },
       select: { temporalSlug: true },
     });
     const result = await this.prisma.workflow.deleteMany({
-      where: { id, orgId },
+      where: { id, orgId, kind: 'STANDARD' },
     });
     if (result.count === 0) {
       throw new NotFoundException(`Workflow ${id} not found`);
@@ -204,7 +204,7 @@ export class WorkflowsService implements OnModuleInit {
    */
   async duplicate(orgId: string, id: string) {
     const source = orNotFound(
-      await this.prisma.workflow.findFirst({ where: { id, orgId } }),
+      await this.prisma.workflow.findFirst({ where: { id, orgId, kind: 'STANDARD' } }),
       'Workflow',
       id,
     );
@@ -231,7 +231,7 @@ export class WorkflowsService implements OnModuleInit {
    */
   async setWebhookSecret(orgId: string, id: string, plaintext: string) {
     const result = await this.prisma.workflow.updateMany({
-      where: { id, orgId },
+      where: { id, orgId, kind: 'STANDARD' },
       data: { webhookSecret: encrypt(plaintext) },
     });
     if (result.count === 0) {
@@ -246,7 +246,7 @@ export class WorkflowsService implements OnModuleInit {
 
   async clearWebhookSecret(orgId: string, id: string) {
     const result = await this.prisma.workflow.updateMany({
-      where: { id, orgId },
+      where: { id, orgId, kind: 'STANDARD' },
       data: { webhookSecret: null },
     });
     if (result.count === 0) {
