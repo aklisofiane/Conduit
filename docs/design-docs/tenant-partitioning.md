@@ -167,6 +167,7 @@ Empty-DB-only via `db push`. The schema marks `orgId` `NOT NULL` on day one; any
 | Layer | File | What it checks |
 |---|---|---|
 | API contract | `apps/api/test/contract/workflows-cross-org.test.ts` | list/get/update/delete/duplicate cross-org all 404 |
+| API contract | `apps/api/test/contract/workflows-system-guard.test.ts` | SYSTEM workflows return 404 on all write-path mutations (update/delete/duplicate/setWebhookSecret/clearWebhookSecret) regardless of org membership |
 | API contract | `apps/api/test/contract/connections-cross-org.test.ts` | list/get/update/delete + cross-org `credentialId` on create → 404 |
 | API contract | `apps/api/test/contract/credentials-cross-org.test.ts` | list/update/delete cross-org all 404 |
 | API contract | `apps/api/test/contract/runs-cross-org.test.ts` | listForWorkflow returns empty, get/cancel/logs cross-org all 404 |

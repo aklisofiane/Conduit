@@ -12,7 +12,7 @@ It reuses the agent-execution substrate at the **activity** level — `runAgentN
 
 ## The internal run + hidden SYSTEM workflow
 
-`runAgentNode` needs a `WorkflowRun` to write `NodeRun`s against, and a `WorkflowRun` needs a parent `Workflow` (FK, same-org invariant). So each org gets **one hidden `SYSTEM`-kind `Workflow`** (`Workflow.kind`, see [data-model.md](../data-model.md)) that exists only to host analysis runs. It is lazily created once per org, carries a trivially-valid stub `definition`, and is **filtered out of every user-facing workflow list/get/validate path**. The user never sees the internal run — only a coarse `Analyzing… → Suggestions ready` state on the connection.
+`runAgentNode` needs a `WorkflowRun` to write `NodeRun`s against, and a `WorkflowRun` needs a parent `Workflow` (FK, same-org invariant). So each org gets **one hidden `SYSTEM`-kind `Workflow`** (`Workflow.kind`, see [data-model.md](../data-model.md)) that exists only to host analysis runs. It is lazily created once per org, carries a trivially-valid stub `definition`, and is **filtered out of every user-facing workflow API path**: `kind: 'STANDARD'` is enforced on every read *and* write operation — `list`, `get`, `update`, `delete`, `duplicate`, `setWebhookSecret`, `clearWebhookSecret` — so a guessed or leaked SYSTEM workflow id resolves as `404` on any surface. The user never sees the internal run — only a coarse `Analyzing… → Suggestions ready` state on the connection.
 
 The user-facing lifecycle lives on `RepoAnalysis` (`status` + `phase`), **owned by the workflow** and independent of the internal `WorkflowRun.status`. The latest `RepoAnalysis` row per connection drives the badge and the gallery.
 

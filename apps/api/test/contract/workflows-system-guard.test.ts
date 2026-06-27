@@ -76,9 +76,9 @@ describe('WorkflowsService SYSTEM workflow guard', () => {
   });
 
   it('update rejects SYSTEM workflow with NotFound and leaves the row unchanged', async () => {
-    await expect(
-      svc.update(orgId, systemWorkflowId, { name: 'hijack' }),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(svc.update(orgId, systemWorkflowId, { name: 'hijack' })).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
 
     const row = await prisma.workflow.findUnique({ where: { id: systemWorkflowId } });
     expect(row?.name).toBe(SYSTEM_WORKFLOW_NAME);
@@ -92,15 +92,13 @@ describe('WorkflowsService SYSTEM workflow guard', () => {
   });
 
   it('duplicate rejects SYSTEM workflow with NotFound', async () => {
-    await expect(
-      svc.duplicate(orgId, systemWorkflowId),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(svc.duplicate(orgId, systemWorkflowId)).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('setWebhookSecret rejects SYSTEM workflow with NotFound and leaves webhookSecret null', async () => {
-    await expect(
-      svc.setWebhookSecret(orgId, systemWorkflowId, 'secret'),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(svc.setWebhookSecret(orgId, systemWorkflowId, 'secret')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
 
     const row = await prisma.workflow.findUnique({ where: { id: systemWorkflowId } });
     expect(row?.webhookSecret).toBeNull();
