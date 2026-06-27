@@ -131,6 +131,63 @@ describe('ConnectionAnalysisService', () => {
     expect(view?.status).toBe('PENDING');
   });
 
+  it('reconciles a stranded ANALYZING row whose workflow is no longer running', async () => {
+    const { analysisId } = await svc.analyze(fixture.orgA.id, fixture.orgA.connectionId);
+    const before = await prisma.repoAnalysis.findUnique({ where: { id: analysisId } });
+    await prisma.repoAnalysis.update({ where: { id: analysisId }, data: { status: 'ANALYZING' } });
+    // Push it past the grace window — @updatedAt is auto-set, so backdate raw.
+    await prisma.$executeRaw`UPDATE "RepoAnalysis" SET "updatedAt" = now() - interval '60 seconds' WHERE id = ${analysisId}`;
+
+    // describeRunningRepoAnalysis returns null (default fake) → workflow is dead.
+    const view = await svc.getAnalysis(fixture.orgA.id, fixture.orgA.connectionId);
+    expect(view?.status).toBe('FAILED');
+    expect(view?.error).toBeTruthy();
+
+    // The hidden internal run is released, not left RUNNING.
+    const run = await prisma.workflowRun.findUnique({ where: { id: before!.internalRunId } });
+    expect(run?.status).toBe('FAILED');
+    expect(run?.finishedAt).toBeInstanceOf(Date);
+
+    // And a rerun is unblocked now the row is terminal.
+    await expect(
+      svc.analyze(fixture.orgA.id, fixture.orgA.connectionId),
+    ).resolves.toMatchObject({ analysisId: expect.any(String) });
+  });
+
+  it('leaves a freshly-minted non-terminal row alone (start-race grace window)', async () => {
+    const { analysisId } = await svc.analyze(fixture.orgA.id, fixture.orgA.connectionId);
+    // Within the grace window, describe being not-found must NOT fail the row.
+    const view = await svc.getAnalysis(fixture.orgA.id, fixture.orgA.connectionId);
+    expect(view?.id).toBe(analysisId);
+    expect(view?.status).toBe('PENDING');
+  });
+
+  it('does not reconcile a non-terminal row whose workflow is still RUNNING', async () => {
+    const runningTemporal = {
+      ...fakeTemporal,
+      async startRepoAnalysisWorkflow(input: RepoAnalysisWorkflowInput) {
+        started.push(input);
+        return { temporalWorkflowId: `analysis-run-${input.analysisId}`, temporalRunId: 'run-1' };
+      },
+      async describeRunningRepoAnalysis(analysisId: string) {
+        return { temporalWorkflowId: `analysis-run-${analysisId}`, temporalRunId: 'run-1' };
+      },
+    } as unknown as TemporalService;
+    const runningSvc = new ConnectionAnalysisService(
+      prisma as unknown as PrismaService,
+      connections,
+      runningTemporal,
+      presets,
+    );
+
+    const { analysisId } = await runningSvc.analyze(fixture.orgA.id, fixture.orgA.connectionId);
+    await prisma.repoAnalysis.update({ where: { id: analysisId }, data: { status: 'ANALYZING' } });
+    await prisma.$executeRaw`UPDATE "RepoAnalysis" SET "updatedAt" = now() - interval '60 seconds' WHERE id = ${analysisId}`;
+
+    const view = await runningSvc.getAnalysis(fixture.orgA.id, fixture.orgA.connectionId);
+    expect(view?.status).toBe('ANALYZING');
+  });
+
   it('markImported stamps a READY analysis and is reflected by getAnalysis', async () => {
     const { analysisId } = await svc.analyze(fixture.orgA.id, fixture.orgA.connectionId);
     await prisma.repoAnalysis.update({ where: { id: analysisId }, data: { status: 'READY' } });

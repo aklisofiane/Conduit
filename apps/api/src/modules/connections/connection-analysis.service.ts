@@ -22,6 +22,13 @@ import { ConnectionsService } from './connections.service';
 const SYSTEM_WORKFLOW_NAME = 'Conduit System (analysis)';
 
 /**
+ * How long a non-terminal row is left alone before the read path will reconcile
+ * it against Temporal. Covers the gap between minting the PENDING row and the
+ * workflow registering in Temporal, where `describe` is legitimately not-found.
+ */
+const STRANDED_GRACE_MS = 30_000;
+
+/**
  * Trivially-valid stub definition for the per-org hidden SYSTEM workflow.
  * `assertValidWorkflowDefinition` imposes no minimum node count and zero
  * triggers is legal, so this satisfies the schema while the row exists only
@@ -46,6 +53,20 @@ export interface AnalysisView {
   importedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
+}
+
+function toAnalysisView(row: Prisma.RepoAnalysisGetPayload<object>): AnalysisView {
+  return {
+    id: row.id,
+    status: row.status,
+    phase: row.phase,
+    resultBundle: row.resultBundle,
+    droppedComponents: row.droppedComponents,
+    error: row.error,
+    importedAt: row.importedAt,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
 }
 
 /**
@@ -176,17 +197,50 @@ export class ConnectionAnalysisService {
       orderBy: { createdAt: 'desc' },
     });
     if (!row) return null;
-    return {
-      id: row.id,
-      status: row.status,
-      phase: row.phase,
-      resultBundle: row.resultBundle,
-      droppedComponents: row.droppedComponents,
-      error: row.error,
-      importedAt: row.importedAt,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
-    };
+    return toAnalysisView(await this.reconcileIfStranded(row));
+  }
+
+  /**
+   * A workflow that dies without running its catch/finally — Temporal
+   * termination, a worker crash, or the catch's own FAILED write throwing —
+   * strands the row in PENDING/ANALYZING forever. The poller then reads
+   * "in progress" indefinitely and `analyze()`'s guard keeps 409ing reruns. So
+   * when a non-terminal row's workflow is no longer RUNNING in Temporal, flip it
+   * to FAILED here, on the read path that the UI already polls.
+   *
+   * The `updatedAt` grace window skips the gap between minting the PENDING row
+   * and the workflow registering in Temporal: in that window `describe` is
+   * legitimately not-found, and reconciling would race the real start and mark a
+   * live analysis FAILED. The `updateMany` is scoped to the still-non-terminal
+   * status so a concurrent transition to READY/FAILED wins instead of being
+   * clobbered.
+   */
+  private async reconcileIfStranded(
+    row: Prisma.RepoAnalysisGetPayload<object>,
+  ): Promise<Prisma.RepoAnalysisGetPayload<object>> {
+    if (row.status !== 'PENDING' && row.status !== 'ANALYZING') return row;
+    if (Date.now() - row.updatedAt.getTime() < STRANDED_GRACE_MS) return row;
+
+    const live = await this.temporal.describeRunningRepoAnalysis(row.id).catch(() => null);
+    if (live) return row;
+
+    const error = 'Analysis stopped unexpectedly before reaching a result.';
+    const updated = await this.prisma.repoAnalysis.updateMany({
+      where: { id: row.id, status: { in: ['PENDING', 'ANALYZING'] } },
+      data: { status: 'FAILED', error },
+    });
+    if (updated.count === 0) {
+      // Lost the race to a real terminal write — return the authoritative row.
+      return (await this.prisma.repoAnalysis.findUnique({ where: { id: row.id } })) ?? row;
+    }
+    // Best-effort: release the hidden internal run so it isn't stranded RUNNING.
+    await this.prisma.workflowRun
+      .updateMany({
+        where: { id: row.internalRunId, status: 'RUNNING' },
+        data: { status: 'FAILED', error, finishedAt: new Date() },
+      })
+      .catch(() => undefined);
+    return { ...row, status: 'FAILED', error };
   }
 
   /**
