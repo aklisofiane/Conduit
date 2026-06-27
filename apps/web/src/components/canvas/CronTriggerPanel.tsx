@@ -1,7 +1,9 @@
 import { useMemo } from 'react';
 import { CRON_EXPRESSION_RE, type TriggerConfig } from '@conduit/shared';
+import { apiErrorMessage } from '../../api/client.js';
 import { useConnections, useRepoBranches } from '../../api/hooks.js';
 import { repoScopedConnections } from '../../lib/connection.js';
+import { SearchSelect } from '../common/SearchSelect.js';
 import { Select } from '../common/Select.js';
 import { CronScheduleBuilder } from './CronScheduleBuilder.js';
 import {
@@ -39,12 +41,12 @@ const TIMEZONE_OPTIONS = [
 type CronTrigger = Extract<TriggerConfig, { type: 'cron' }>;
 
 /**
- * Suggestion list for the branch picker's `<datalist>`. The fetched remote
- * branches are the primary affordance; a non-empty typed value that isn't in
- * the list (a just-pushed branch, or one from a connection whose list failed
- * to load) is surfaced too so free entry stays a graceful fallback rather than
- * a dead end. The typed-but-unlisted value goes first; remote branch names are
- * already unique, so no further dedupe is needed.
+ * Option list for the branch picker dropdown. The fetched remote branches are
+ * the primary affordance; the current saved branch is surfaced too when it
+ * isn't in the fetched list (a just-pushed branch, or one from a connection
+ * whose list failed to load) so the closed dropdown still shows the active
+ * value rather than appearing empty. The current value goes first; remote
+ * branch names are already unique, so no further dedupe is needed.
  */
 export function branchPickerOptions(fetched: string[], current: string): string[] {
   const trimmed = current.trim();
@@ -93,9 +95,18 @@ export function CronTriggerPanel({
 
   const branchesQuery = useRepoBranches(trigger.connectionId);
   const branchOptions = useMemo(
-    () => branchPickerOptions(branchesQuery.data ?? [], trigger.branch),
+    () =>
+      branchPickerOptions(branchesQuery.data ?? [], trigger.branch).map((b) => ({
+        value: b,
+        label: b,
+      })),
     [branchesQuery.data, trigger.branch],
   );
+  const branchPlaceholder = !trigger.connectionId
+    ? 'select a repo first'
+    : branchesQuery.isLoading
+      ? 'loading branches…'
+      : 'main';
 
   return (
     <>
@@ -117,19 +128,19 @@ export function CronTriggerPanel({
           </Field>
 
           <Field label="Branch" hint="cron runs anchor on this branch">
-            <input
-              className="field-input"
-              type="text"
-              list="cron-branch-options"
-              placeholder="main"
+            <SearchSelect
+              ariaLabel="Branch"
               value={trigger.branch}
-              onChange={(e) => onChange({ branch: e.target.value })}
+              onValueChange={(branch) => onChange({ branch })}
+              options={branchOptions}
+              placeholder={branchPlaceholder}
+              disabled={!trigger.connectionId || branchesQuery.isLoading}
             />
-            <datalist id="cron-branch-options">
-              {branchOptions.map((b) => (
-                <option key={b} value={b} />
-              ))}
-            </datalist>
+            {branchesQuery.isError && (
+              <p className="mt-1 font-mono text-[11px] text-[var(--color-danger,#dc322f)]">
+                {apiErrorMessage(branchesQuery.error)}
+              </p>
+            )}
           </Field>
 
           <CronScheduleBuilder
