@@ -104,4 +104,73 @@ describe('TriggerService.listBranches', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(fakeFetch).not.toHaveBeenCalled();
   });
+
+  it('does not leak raw GitHub upstream error body to the client', async () => {
+    await prisma.credential.update({
+      where: { id: fixture.orgA.credentialId },
+      data: { secret: encrypt('gh-token') },
+    });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        new Response(
+          'rate limit exceeded — token: ghp_secret123, internal: https://api.internal.github.net',
+          { status: 403 },
+        ),
+      ),
+    );
+
+    let error: BadRequestException | undefined;
+    try {
+      await svc.listBranches(fixture.orgA.id, { connectionId: fixture.orgA.connectionId });
+    } catch (e) {
+      error = e as BadRequestException;
+    }
+
+    expect(error).toBeInstanceOf(BadRequestException);
+    const resp = error!.getResponse() as { message: string };
+    expect(resp.message).toBe('Failed to list branches from GitHub');
+    expect(resp.message).not.toContain('ghp_secret');
+    expect(resp.message).not.toContain('internal.github');
+  });
+
+  it('does not leak raw GitLab upstream error body to the client', async () => {
+    const glCred = await prisma.credential.create({
+      data: {
+        orgId: fixture.orgA.id,
+        platform: 'GITLAB',
+        name: 'A gitlab creds',
+        secret: encrypt('glpat-token'),
+      },
+    });
+    const glConn = await prisma.connection.create({
+      data: {
+        orgId: fixture.orgA.id,
+        credentialId: glCred.id,
+        name: 'A gitlab project',
+        scope: { kind: 'gitlab_project', projectPath: 'group/project' },
+      },
+    });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        new Response('oauth token invalid — token: glpat-secret456', { status: 401 }),
+      ),
+    );
+
+    let error: BadRequestException | undefined;
+    try {
+      await svc.listBranches(fixture.orgA.id, { connectionId: glConn.id });
+    } catch (e) {
+      error = e as BadRequestException;
+    }
+
+    expect(error).toBeInstanceOf(BadRequestException);
+    const resp = error!.getResponse() as { message: string };
+    expect(resp.message).toBe('Failed to list branches from GitLab');
+    expect(resp.message).not.toContain('glpat-secret');
+    expect(resp.message).not.toContain('oauth token');
+  });
 });
