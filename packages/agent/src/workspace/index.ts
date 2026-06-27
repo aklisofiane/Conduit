@@ -28,6 +28,7 @@ export { git, GitError } from './git';
 export { ensureBaseClone, fetchWithAuth, defaultBranch } from './git-helpers';
 export { mergeBranchedWorktree, MergeConflictError } from './merge';
 export { deriveSlug, formatBranchName } from './slug';
+export { parseBaseMarker } from './base-marker';
 export { withPathLock } from './lock';
 export { installPushCredentials } from './push-auth';
 export {

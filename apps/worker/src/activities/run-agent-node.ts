@@ -524,7 +524,11 @@ async function resolveEntryWorkspaceInputs(
   return {
     connection,
     ticket: triggerEvent.issue
-      ? { id: triggerEvent.issue.key, title: triggerEvent.issue.title }
+      ? {
+          id: triggerEvent.issue.key,
+          title: triggerEvent.issue.title,
+          body: triggerEvent.issue.body,
+        }
       : undefined,
     store: makeTicketBranchStore(),
     pr: triggerEvent.pr ? { ...triggerEvent.pr } : undefined,

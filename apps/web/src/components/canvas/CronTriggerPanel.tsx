@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { CRON_EXPRESSION_RE, type TriggerConfig } from '@conduit/shared';
-import { useConnections } from '../../api/hooks.js';
+import { useConnections, useRepoBranches } from '../../api/hooks.js';
 import { repoScopedConnections } from '../../lib/connection.js';
 import { Select } from '../common/Select.js';
 import { CronScheduleBuilder } from './CronScheduleBuilder.js';
@@ -37,6 +37,29 @@ const TIMEZONE_OPTIONS = [
 ];
 
 type CronTrigger = Extract<TriggerConfig, { type: 'cron' }>;
+
+/**
+ * Suggestion list for the branch picker's `<datalist>`. The fetched remote
+ * branches are the primary affordance; a non-empty typed value that isn't in
+ * the list (a just-pushed branch, or one from a connection whose list failed
+ * to load) is surfaced too so free entry stays a graceful fallback rather than
+ * a dead end. Order-preserving dedupe; typed-but-unlisted value goes first.
+ */
+export function branchPickerOptions(fetched: string[], current: string): string[] {
+  const seen = new Set<string>();
+  const options: string[] = [];
+  const trimmed = current.trim();
+  if (trimmed && !fetched.includes(trimmed)) {
+    options.push(trimmed);
+    seen.add(trimmed);
+  }
+  for (const branch of fetched) {
+    if (seen.has(branch)) continue;
+    seen.add(branch);
+    options.push(branch);
+  }
+  return options;
+}
 
 export interface CronTriggerPanelProps {
   trigger: CronTrigger;
@@ -78,6 +101,12 @@ export function CronTriggerPanel({
     [allConnections],
   );
 
+  const branchesQuery = useRepoBranches(trigger.connectionId);
+  const branchOptions = useMemo(
+    () => branchPickerOptions(branchesQuery.data ?? [], trigger.branch),
+    [branchesQuery.data, trigger.branch],
+  );
+
   return (
     <>
       <PanelHeader trigger={trigger} isActive={isActive} title="schedule" onClose={onClose} />
@@ -97,14 +126,20 @@ export function CronTriggerPanel({
             />
           </Field>
 
-          <Field label="Branch" hint="cron runs anchor on this branch — v1 is free-text">
+          <Field label="Branch" hint="cron runs anchor on this branch">
             <input
               className="field-input"
               type="text"
+              list="cron-branch-options"
               placeholder="main"
               value={trigger.branch}
               onChange={(e) => onChange({ branch: e.target.value })}
             />
+            <datalist id="cron-branch-options">
+              {branchOptions.map((b) => (
+                <option key={b} value={b} />
+              ))}
+            </datalist>
           </Field>
 
           <CronScheduleBuilder

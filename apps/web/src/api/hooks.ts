@@ -452,6 +452,23 @@ export function useListLabels(args: { connectionId: string; enabled: boolean }) 
 }
 
 /**
+ * List the remote branch names on a connection's repo/project, for the cron
+ * trigger's branch picker. Mirrors `useListLabels`: gated on a non-empty
+ * `connectionId`, no retry (config-time, surface failures inline). Free-text
+ * entry stays the graceful fallback when this query is empty or errors.
+ */
+export function useRepoBranches(connectionId: string) {
+  return useQuery({
+    queryKey: ['branches', connectionId] as const,
+    queryFn: () =>
+      api.post<string[]>('/trigger/list-branches', { connectionId }),
+    enabled: !!connectionId,
+    staleTime: 30_000,
+    retry: false,
+  });
+}
+
+/**
  * Idempotently ensure labels exist on a connection's repo/project. Used by
  * both the trigger-panel inline "create label" action (one name) and the
  * connection-time prompt (the selected set). Invalidates the labels query on

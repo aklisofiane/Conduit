@@ -97,6 +97,8 @@ export interface TicketContext {
   id: string;
   /** Ticket title — seeds the slug on *first* creation only. */
   title: string;
+  /** Platform issue body at trigger-fire time; source for the `conduit:base` marker. */
+  body?: string;
 }
 
 /** PR identity passed into `ticket-branch` resolution for PR-anchored runs. */
