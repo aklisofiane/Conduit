@@ -168,6 +168,40 @@ describe('assembleSuggestionBundle', () => {
     expect(reviewerNodes[0]!.instructions.startsWith('first')).toBe(true);
   });
 
+  it('drops reviewers whose name reuses a structural node name, keeping the rest', () => {
+    // `Scope`/`Publisher`/`Trigger` are schema-valid names but collide with the
+    // fixed nodes; the colliding reviewer is dropped, valid siblings survive.
+    const { bundle, dropped } = assembleSuggestionBundle(
+      [
+        draft({
+          reviewers: [
+            { name: 'Scope', instructions: 'collides with the scope node' },
+            { name: 'Security', instructions: SECURITY_PROSE },
+          ],
+        }),
+      ],
+      ctx,
+    );
+    expect(dropped).toEqual([]);
+    const def = bundle!.workflows[0]!.definition;
+    // Exactly one Scope node (the structural one) and the surviving reviewer.
+    expect(def.nodes.filter((n) => n.name === 'Scope')).toHaveLength(1);
+    const reviewerNodes = def.nodes.filter((n) => n.name !== 'Scope' && n.name !== 'Publisher');
+    expect(reviewerNodes.map((n) => n.name)).toEqual(['Security']);
+    // The bundle stays structurally valid (no duplicate ids/names).
+    expect(() => templateFileSchema.parse(bundle)).not.toThrow();
+  });
+
+  it('drops a component whose every reviewer reuses a structural node name, surfacing it', () => {
+    const { bundle, dropped } = assembleSuggestionBundle(
+      [draft({ reviewers: [{ name: 'Trigger', instructions: 'x' }] })],
+      ctx,
+    );
+    expect(bundle).toBeNull();
+    expect(dropped).toHaveLength(1);
+    expect(dropped[0]!.component).toBe('API');
+  });
+
   it('derives a weekly window for a weekly cron', () => {
     const { bundle } = assembleSuggestionBundle([draft({ cron: '0 2 * * 1' })], ctx);
     const scope = bundle!.workflows[0]!.definition.nodes.find((n) => n.name === 'Scope')!;

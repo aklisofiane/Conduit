@@ -104,14 +104,29 @@ function slugifyReviewerName(name: string): string {
 }
 
 /**
+ * Names of the fixed structural nodes a reviewer may not reuse. The schema's
+ * charset rule permits these (`Scope`, `Publisher`, `Trigger` all match
+ * `NODE_NAME_PATTERN`), but reusing one collides with a code-owned node: a
+ * `Scope`/`Publisher` reviewer duplicates that node's id *and* name (silent
+ * graph corruption, since name dedup hides it), and a `Trigger` reviewer trips
+ * the trigger-vs-agent name check and throws out the whole bundle. Compared
+ * case-insensitively because the slug lowercases anyway.
+ */
+const RESERVED_NODE_NAMES = new Set(['scope', 'publisher', 'trigger']);
+
+/**
  * Resolve authored reviewers into nodes with safe, unique ids. Reviewers whose
- * name sanitizes to an empty slug, or whose slug collides with an earlier one,
- * are dropped; the first occurrence wins. Order preserved.
+ * name sanitizes to an empty slug, collides with an earlier reviewer's slug, or
+ * reuses a reserved structural node name (`Scope`/`Publisher`/`Trigger`) are
+ * dropped; the first occurrence wins. Order preserved. If every reviewer is
+ * dropped the caller surfaces the component in `dropped` rather than emitting a
+ * reviewer-less workflow.
  */
 function resolveReviewers(reviewers: ReviewerDraft[]): ResolvedReviewer[] {
   const seen = new Set<string>();
   const out: ResolvedReviewer[] = [];
   for (const reviewer of reviewers) {
+    if (RESERVED_NODE_NAMES.has(reviewer.name.toLowerCase())) continue;
     const slug = slugifyReviewerName(reviewer.name);
     if (!slug) continue;
     const id = `agent-${slug}`;

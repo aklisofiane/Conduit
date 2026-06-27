@@ -204,4 +204,20 @@ describe('workflowDefinitionSchema', () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it('rejects two nodes with the same id', () => {
+    const dup = { ...agentNode('B'), id: agentNode('A').id };
+    const result = workflowDefinitionSchema.safeParse({
+      ...baseDefinition({ nodes: [agentNode('A'), dup] }),
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects two nodes with the same name', () => {
+    const dup = { ...agentNode('A'), id: 'agent-a2' };
+    const result = workflowDefinitionSchema.safeParse({
+      ...baseDefinition({ nodes: [agentNode('A'), dup] }),
+    });
+    expect(result.success).toBe(false);
+  });
 });
