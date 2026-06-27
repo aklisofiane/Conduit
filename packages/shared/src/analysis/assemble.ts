@@ -184,7 +184,7 @@ function buildComponentWorkflow(
     model: presets.issuePublisher.model,
     instructions: appendInstructions(
       presets.issuePublisher.instructions,
-      `The upstream reviewers for the **${draft.component}** component are: ${reviewerNames}. Read ${summaryReads}.\n\n**Severity gate:** only publish findings with a severity of \`medium\`, \`high\`, or \`critical\`. Skip any finding marked \`low\` (or with no severity) entirely. If every finding is \`low\` (or there are none), stop and create nothing.`,
+      `The upstream reviewers for the **${draft.component}** component are: ${reviewerNames}. Read ${summaryReads}.\n\n**Severity gate:** only publish findings that are \`medium\`, \`high\`, or \`critical\`. If a finding declares its severity, use it. If a finding has no explicit severity, do not default it to \`low\` — assess the severity yourself from its description and impact, then apply the same threshold. Skip only findings that are declared or assessed as \`low\`. If every finding is \`low\` (or there are none), stop and create nothing.`,
     ),
     mcpServers: [{ serverId: 'github-mcp' }],
     skills: [],
@@ -242,8 +242,11 @@ function buildComponentWorkflow(
 /**
  * Deterministic I/O-contract glue appended to each authored reviewer prompt:
  * where to read its scoped inputs, where to write findings, and the exact
- * findings/severity format the Publisher's severity gate parses (mirrors the
- * old `code-analyst` preset write format so the gate keeps working).
+ * findings/severity format the Publisher's severity gate reads (mirrors the
+ * old `code-analyst` preset write format so the gate keeps working). The
+ * `Severity:` line is mandatory: a reviewer that drops to a prose summary
+ * leaves the Publisher inferring severity, so the format is stated as
+ * non-substitutable here.
  */
 function reviewerGlue(name: string): string {
   return `Read the \`## ${name}\` section of \`.conduit/ScopeManifest.md\` for the files relevant to your review. If that section reports nothing relevant, or the manifest is \`NO_CHANGES\`, write "No findings" to \`.conduit/${name}.md\` and stop.
@@ -262,7 +265,7 @@ For each relevant file, read the actual diff and surrounding context, then write
 - Suggested fix: <1-2 sentences or "Needs human assessment">
 \`\`\`
 
-Only flag real issues with a concrete file path and line range — do not invent findings or flag stylistic preferences. The \`Severity:\` line is required on every finding; the downstream Publisher drops any finding without a \`medium\`, \`high\`, or \`critical\` severity.`;
+Only flag real issues with a concrete file path and line range — do not invent findings or flag stylistic preferences. Write every finding as the exact block above — a narrative or prose summary is **not** a substitute. The \`Severity:\` line is required on every finding; if you omit it the downstream Publisher has to infer the severity itself, which it may get wrong.`;
 }
 
 function appendInstructions(base: string, append: string): string {

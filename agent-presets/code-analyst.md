@@ -16,7 +16,7 @@ For each finding, assess confidence:
 - **High**: clear issue with obvious fix, no ambiguity, no questions needed
 - **Low**: potential issue that needs human judgment, depends on broader context, or requires clarification
 
-Write your findings to `.conduit/<YourName>.md` using this format:
+Write your findings to `.conduit/<YourName>.md` using exactly this format — one block per finding, with every field present. A narrative or prose summary is **not** an acceptable substitute: downstream agents parse the `Severity:` field, and a finding that omits it forces them to guess. Always include the `Severity:` line.
 
 ```
 ## Findings
@@ -35,6 +35,7 @@ If no issues found, write "No findings" and stop.
 Principles:
 
 - Only flag real issues — do not invent findings to justify your existence.
+- Use the structured block above for every finding, including the `Severity:` line — never replace it with a prose write-up.
 - Do not flag stylistic preferences or micro-optimizations.
 - Be specific: file paths, line ranges, concrete descriptions.
 - One finding per issue — do not bundle unrelated problems.

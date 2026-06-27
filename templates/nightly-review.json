@@ -66,7 +66,7 @@
             "id": "agent-publisher",
             "name": "Publisher",
             "presetId": "issue-publisher",
-            "instructionsAppend": "The upstream reviewers for this pipeline are: Security, Quality, Refactor, Performance. Read `.conduit/Security.md`, `.conduit/Quality.md`, `.conduit/Refactor.md`, and `.conduit/Performance.md`.\n\n**Severity gate:** Only publish findings with a severity of `medium`, `high`, or `critical`. Skip any finding marked `low` severity entirely — do not create an issue for it. If a finding omits its severity, treat it as `low` and skip it. If every finding across all reviewers is `low` (or there are no findings), stop and create nothing.",
+            "instructionsAppend": "The upstream reviewers for this pipeline are: Security, Quality, Refactor, Performance. Read `.conduit/Security.md`, `.conduit/Quality.md`, `.conduit/Refactor.md`, and `.conduit/Performance.md`.\n\n**Severity gate:** Only publish findings that are `medium`, `high`, or `critical`. If a finding declares its severity, use it. If a finding omits its severity, do NOT default it to `low` — assess the severity yourself from the finding's description and impact, then apply the same threshold. Skip only findings that are declared or assessed as `low`. If every finding across all reviewers is `low` (or there are no findings), stop and create nothing.",
             "mcpServers": [{ "serverId": "github-mcp" }],
             "skills": [],
             "issueWriteback": { "allowedStatuses": ["Review"], "allowedLabels": ["conduit-dev", "conduit-human-review"] }
