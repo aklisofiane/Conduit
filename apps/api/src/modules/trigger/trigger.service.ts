@@ -220,7 +220,9 @@ export class TriggerService {
         this.logger.warn(
           `List GitLab branches failed (${glScope.projectPath}): ${message}`,
         );
-        throw new BadRequestException({ message });
+        throw new BadRequestException({
+          message: 'Failed to list branches from GitLab',
+        });
       }
     }
 
@@ -242,7 +244,9 @@ export class TriggerService {
       this.logger.warn(
         `List branches failed (${repoScope.owner}/${repoScope.repo}): ${message}`,
       );
-      throw new BadRequestException({ message });
+      throw new BadRequestException({
+        message: 'Failed to list branches from GitHub',
+      });
     }
   }
 
