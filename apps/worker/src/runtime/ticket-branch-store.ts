@@ -47,6 +47,22 @@ export function makeTicketBranchStore(): TicketBranchStore {
       });
       return toRow(row);
     },
+    async find(key) {
+      const platform = key.platform === 'github' ? 'GITHUB' : 'GITLAB';
+      const row = await prisma().ticketBranch.findUnique({
+        where: {
+          orgId_platform_hostUrl_owner_repo_ticketId: {
+            orgId: key.orgId,
+            platform,
+            hostUrl: key.hostUrl,
+            owner: key.owner,
+            repo: key.repo,
+            ticketId: key.ticketId,
+          },
+        },
+      });
+      return row ? toRow(row) : null;
+    },
     async markRunStart(id) {
       await prisma().ticketBranch.update({
         where: { id },

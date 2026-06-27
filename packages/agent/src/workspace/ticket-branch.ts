@@ -90,20 +90,32 @@ export async function resolveTicketBranchWorkspace(
       // Issue-anchored — derive `conduit/<id>-<slug>`, upsert the row,
       // create-or-track the branch off the resolved base. The base defaults to
       // the repo default, but a `<!-- conduit:base=<branch> -->` marker on the
-      // issue body overrides it (read-once, at branch birth — `baseRef` is
-      // first-create-wins on the row, so a changed marker is inert once the
-      // branch exists). A marker pointing at a branch that isn't on the remote
-      // hard-fails the run rather than silently basing off the default.
+      // issue body overrides it — read-once, only at branch birth (when no row
+      // exists yet), so a changed or since-broken marker is inert once the
+      // branch exists (`baseRef` is first-create-wins on the row). A marker
+      // pointing at a branch that isn't on the remote hard-fails the run rather
+      // than silently basing off the default; gating on branch birth keeps that
+      // hard-fail from killing an established branch whose base it never uses.
       const repoDefault = await defaultBranch(bare);
-      const marked = parseBaseMarker(ticket!.body);
-      let baseRef = repoDefault;
-      if (marked && marked !== repoDefault) {
-        if (!(await remoteBranchExists(bare, marked))) {
-          throw new WorkspaceError(
-            `ticket-branch on node "${nodeName}" requested base "${marked}" via a conduit:base marker, but that branch does not exist on the remote`,
-          );
+      const existing = await store!.find({
+        orgId: orgId!,
+        platform: connection.platform,
+        hostUrl: connection.host,
+        owner: connection.owner,
+        repo: connection.repo,
+        ticketId: ticket!.id,
+      });
+      let baseRef = existing?.baseRef ?? repoDefault;
+      if (!existing) {
+        const marked = parseBaseMarker(ticket!.body);
+        if (marked && marked !== repoDefault) {
+          if (!(await remoteBranchExists(bare, marked))) {
+            throw new WorkspaceError(
+              `ticket-branch on node "${nodeName}" requested base "${marked}" via a conduit:base marker, but that branch does not exist on the remote`,
+            );
+          }
+          baseRef = marked;
         }
-        baseRef = marked;
       }
       const row = await store!.upsert({
         orgId: orgId!,

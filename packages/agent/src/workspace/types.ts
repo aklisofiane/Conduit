@@ -152,5 +152,19 @@ export interface TicketBranchStore {
     ticketTitle: string;
     baseRef: string;
   }): Promise<TicketBranchRow>;
+  /**
+   * Read back an existing row by its tenant-scoped identity, or `null` if none
+   * exists yet. Lets the resolver tell branch birth (no row) from a later run,
+   * so a `conduit:base` marker is only consulted — and its hard-fail only
+   * fires — when the branch is actually being created.
+   */
+  find(key: {
+    orgId: string;
+    platform: ConnectionContext['platform'];
+    hostUrl: string;
+    owner: string;
+    repo: string;
+    ticketId: string;
+  }): Promise<TicketBranchRow | null>;
   markRunStart(id: string): Promise<void>;
 }

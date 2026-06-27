@@ -317,6 +317,47 @@ describe('resolveTicketBranchWorkspace', () => {
     expect(store._rows()[0]?.baseRef).toBe('branch-2');
   });
 
+  it('does not hard-fail an existing branch when the marker base is gone from the remote', async () => {
+    // First run bases off branch-2 and pushes the ticket branch to the remote.
+    await git(['checkout', '-q', '-b', 'branch-2'], { cwd: remote });
+    await fs.writeFile(path.join(remote, 'b2.ts'), 'export const b2 = 1;\n');
+    await git(['add', '-A'], { cwd: remote });
+    await git(['commit', '-q', '-m', 'branch-2 work'], { cwd: remote });
+    await git(['checkout', '-q', 'main'], { cwd: remote });
+
+    const store = makeFakeStore();
+    const first = await resolveTicketBranchWorkspace({
+      runId: 'run_first',
+      nodeName: 'Worker',
+      orgId: ORG_A,
+      connection,
+      ticket: { id: '74', title: 'Gone base', body: '<!-- conduit:base=branch-2 -->' },
+      store,
+    });
+    await git(['config', 'user.email', 'agent@conduit.test'], { cwd: first.path });
+    await git(['config', 'user.name', 'Agent'], { cwd: first.path });
+    await git(['push', 'origin', first.branchName!], { cwd: first.path });
+
+    // branch-2 is merged away and deleted on the remote before the next run.
+    await git(['branch', '-D', 'branch-2'], { cwd: remote });
+
+    // The same issue still carries the now-broken marker, but the ticket branch
+    // already exists — its base was settled at birth, so the marker must not be
+    // re-validated and the run must not hard-fail.
+    const second = await resolveTicketBranchWorkspace({
+      runId: 'run_second',
+      nodeName: 'Worker',
+      orgId: ORG_A,
+      connection,
+      ticket: { id: '74', title: 'Gone base', body: '<!-- conduit:base=branch-2 -->' },
+      store,
+    });
+
+    expect(second.remoteBranchExisted).toBe(true);
+    expect(second.branchName).toBe(first.branchName);
+    expect(store._rows()[0]?.baseRef).toBe('branch-2');
+  });
+
   it('lands on pr.headRef with no store/ticket needed (external PR)', async () => {
     await git(['checkout', '-q', '-b', 'patch-1'], { cwd: remote });
     await fs.writeFile(path.join(remote, 'patch.ts'), 'export const x = 2;\n');
@@ -362,6 +403,9 @@ function makeFakeStore(): TicketBranchStore & { _rows(): TicketBranchRow[] } {
       };
       rows.set(k, row);
       return row;
+    },
+    async find(q) {
+      return rows.get(key(q.orgId, q.platform, q.owner, q.repo, q.ticketId)) ?? null;
     },
     async markRunStart() {
       /* no-op */

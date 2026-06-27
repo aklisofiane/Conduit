@@ -140,6 +140,9 @@ function makeFakeStore(): TicketBranchStore & { _rows(): TicketBranchRow[] } {
       rows.set(k, row);
       return row;
     },
+    async find(q) {
+      return rows.get(key(q.orgId, q.platform, q.owner, q.repo, q.ticketId)) ?? null;
+    },
     async markRunStart() {
       /* no-op */
     },
