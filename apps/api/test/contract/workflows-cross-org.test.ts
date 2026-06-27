@@ -76,6 +76,90 @@ describe('WorkflowsService cross-org isolation', () => {
   });
 });
 
+describe('SYSTEM workflow mutation isolation', () => {
+  let prisma: PrismaClient;
+  let svc: WorkflowsService;
+  let fixture: TwoOrgFixture;
+  let systemWorkflowId: string;
+
+  beforeEach(async () => {
+    prisma = makePrisma();
+    await clearTenantData(prisma);
+    fixture = await seedTwoOrgs(prisma);
+    svc = new WorkflowsService(
+      prisma as unknown as PrismaService,
+      fakeTemporal() as unknown as TemporalService,
+    );
+    const systemWorkflow = await prisma.workflow.create({
+      data: {
+        orgId: fixture.orgA.id,
+        kind: 'SYSTEM',
+        name: 'Conduit System (analysis)',
+        isActive: false,
+        definition: {
+          triggers: [],
+          nodes: [],
+          edges: [],
+          mcpServers: [],
+          ui: { nodePositions: {}, viewport: { x: 0, y: 0, zoom: 1 } },
+        },
+      },
+    });
+    systemWorkflowId = systemWorkflow.id;
+  });
+
+  afterEach(async () => {
+    await clearTenantData(prisma);
+    await prisma.$disconnect();
+  });
+
+  it('list excludes SYSTEM workflows from same-org results', async () => {
+    const rows = await svc.list(fixture.orgA.id);
+    expect(rows.map((r) => r.id)).not.toContain(systemWorkflowId);
+  });
+
+  it('get on a same-org SYSTEM workflow throws NotFound', async () => {
+    await expect(svc.get(fixture.orgA.id, systemWorkflowId)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
+  it('update on a same-org SYSTEM workflow throws NotFound and writes nothing', async () => {
+    await expect(
+      svc.update(fixture.orgA.id, systemWorkflowId, { name: 'hijack' }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    const row = await prisma.workflow.findUnique({ where: { id: systemWorkflowId } });
+    expect(row?.name).toBe('Conduit System (analysis)');
+  });
+
+  it('delete on a same-org SYSTEM workflow throws NotFound and leaves the row', async () => {
+    await expect(svc.delete(fixture.orgA.id, systemWorkflowId)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    const row = await prisma.workflow.findUnique({ where: { id: systemWorkflowId } });
+    expect(row).not.toBeNull();
+  });
+
+  it('duplicate on a same-org SYSTEM workflow throws NotFound', async () => {
+    await expect(
+      svc.duplicate(fixture.orgA.id, systemWorkflowId),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('setWebhookSecret on a same-org SYSTEM workflow throws NotFound', async () => {
+    await expect(
+      svc.setWebhookSecret(fixture.orgA.id, systemWorkflowId, 'secret'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('clearWebhookSecret on a same-org SYSTEM workflow throws NotFound', async () => {
+    await expect(
+      svc.clearWebhookSecret(fixture.orgA.id, systemWorkflowId),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
 function fakeTemporal() {
   return {
     upsertWorkflowSchedule: async () => undefined,
