@@ -3,7 +3,7 @@ import { CRON_EXPRESSION_RE, type TriggerConfig } from '@conduit/shared';
 import { apiErrorMessage } from '../../api/client.js';
 import { useConnections, useRepoBranches } from '../../api/hooks.js';
 import { repoScopedConnections } from '../../lib/connection.js';
-import { SearchSelect } from '../common/SearchSelect.js';
+import { SearchSelect } from '../ui/search-select.js';
 import { Select } from '../ui/select.js';
 import { CronScheduleBuilder } from './CronScheduleBuilder.js';
 import {

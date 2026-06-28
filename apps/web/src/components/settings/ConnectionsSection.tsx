@@ -19,7 +19,7 @@ import {
   scopeSummary,
   type EnsureLabelTarget,
 } from '../../lib/connection.js';
-import { InfoPopover } from '../common/InfoPopover.js';
+import { InfoPopover } from '../ui/info-popover.js';
 import { SettingsSection } from '../common/SettingsSection.js';
 import { Badge, BadgeDot } from '../ui/badge.js';
 import { Button } from '../ui/button.js';

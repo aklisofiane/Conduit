@@ -9,3 +9,23 @@ export {
   type SelectGroup,
   type SelectItem,
 } from './select.js';
+export { SearchSelect } from './search-select.js';
+export { CheckboxListPopover, type CheckboxListGroup } from './checkbox-list-popover.js';
+export {
+  Dialog,
+  DialogTrigger,
+  DialogClose,
+  DialogOverlay,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+} from './dialog.js';
+export {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from './dropdown-menu.js';
+export { InfoPopover } from './info-popover.js';

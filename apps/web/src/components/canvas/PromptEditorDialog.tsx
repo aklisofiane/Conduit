@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { cn } from '../../lib/cn.js';
-import { Dialog, DialogContent, DialogTitle } from '../common/Dialog.js';
+import { Dialog, DialogContent, DialogTitle } from '../ui/dialog.js';
 import { Button } from '../ui/button.js';
 import { Textarea } from '../ui/input.js';
 

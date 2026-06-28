@@ -8,7 +8,7 @@ import {
   useListViewerOrgs,
 } from '../../api/hooks.js';
 import type { CredentialRow } from '../../api/types.js';
-import { SearchSelect } from '../common/SearchSelect.js';
+import { SearchSelect } from '../ui/search-select.js';
 import { Select } from '../ui/select.js';
 import { Button } from '../ui/button.js';
 import { Input } from '../ui/input.js';

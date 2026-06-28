@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { CircleDot, Clock, GitPullRequest } from 'lucide-react';
 import { useConnections } from '../../api/hooks.js';
 import { scopeSummary } from '../../lib/connection.js';
-import { Dialog, DialogContent, DialogTitle } from '../common/Dialog.js';
+import { Dialog, DialogContent, DialogTitle } from '../ui/dialog.js';
 import { Select } from '../ui/select.js';
 import { Button } from '../ui/button.js';
 import { Input } from '../ui/input.js';

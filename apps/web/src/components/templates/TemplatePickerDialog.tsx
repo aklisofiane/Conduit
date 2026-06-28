@@ -25,8 +25,8 @@ import type {
   TemplateSummary,
 } from '../../api/types.js';
 import { connectionLabel, repoScopedConnections } from '../../lib/connection.js';
-import { Dialog, DialogContent, DialogTitle } from '../common/Dialog.js';
-import { SearchSelect } from '../common/SearchSelect.js';
+import { Dialog, DialogContent, DialogTitle } from '../ui/dialog.js';
+import { SearchSelect } from '../ui/search-select.js';
 import { Select, type SelectOption } from '../ui/select.js';
 import { Button } from '../ui/button.js';
 import { Input } from '../ui/input.js';

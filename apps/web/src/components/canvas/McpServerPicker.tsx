@@ -13,7 +13,7 @@ import { useConnections, useIntrospectMcp } from '../../api/hooks.js';
 import { useWorkflowEditor } from '../../state/workflow-editor.js';
 import { cn } from '../../lib/cn.js';
 import { connectionLabel } from '../../lib/connection.js';
-import { CheckboxListPopover } from '../common/CheckboxListPopover.js';
+import { CheckboxListPopover } from '../ui/checkbox-list-popover.js';
 import { Select } from '../ui/select.js';
 import { Button } from '../ui/button.js';
 import { Input } from '../ui/input.js';

@@ -5,7 +5,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '../common/DropdownMenu.js';
+} from '../ui/dropdown-menu.js';
 import { Copy, Download, Pencil, Trash2 } from 'lucide-react';
 
 interface RowActionsMenuProps {

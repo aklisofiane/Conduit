@@ -23,7 +23,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '../common/DropdownMenu.js';
+} from '../ui/dropdown-menu.js';
 import { Button } from '../ui/button.js';
 
 const FILTER_THRESHOLD = 5;

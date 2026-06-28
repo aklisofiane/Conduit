@@ -5,7 +5,7 @@ import { apiErrorMessage } from '../../api/client.js';
 import { useImportTemplate, useMarkAnalysisImported } from '../../api/hooks.js';
 import type { DroppedComponent, TemplateBinding } from '../../api/types.js';
 import { formatCadence } from '../../lib/cron.js';
-import { Dialog, DialogContent, DialogTitle } from '../common/Dialog.js';
+import { Dialog, DialogContent, DialogTitle } from '../ui/dialog.js';
 import { Button } from '../ui/button.js';
 
 // The analyzer's bundle binds exactly one connection placeholder — the repo it
