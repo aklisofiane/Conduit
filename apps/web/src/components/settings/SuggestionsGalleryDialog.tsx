@@ -6,6 +6,7 @@ import { useImportTemplate, useMarkAnalysisImported } from '../../api/hooks.js';
 import type { DroppedComponent, TemplateBinding } from '../../api/types.js';
 import { formatCadence } from '../../lib/cron.js';
 import { Dialog, DialogContent, DialogTitle } from '../common/Dialog.js';
+import { Button } from '../ui/button.js';
 
 // The analyzer's bundle binds exactly one connection placeholder — the repo it
 // analyzed — under this alias (the `<github-repo>` placeholder without its
@@ -118,9 +119,9 @@ export function SuggestionsGalleryDialog({
                 : `${bundle.workflows.length} review${bundle.workflows.length === 1 ? '' : 's'} suggested for this repository.`}
             </p>
           </div>
-          <button className="btn" onClick={onClose} aria-label="Close">
+          <Button onClick={onClose} aria-label="Close">
             ✕
-          </button>
+          </Button>
         </header>
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
@@ -177,19 +178,19 @@ export function SuggestionsGalleryDialog({
             </div>
           )}
           {imported ? (
-            <button className="btn primary" onClick={onClose}>
+            <Button variant="primary" onClick={onClose}>
               Done
-            </button>
+            </Button>
           ) : (
-            <button
-              className="btn primary"
+            <Button
+              variant="primary"
               onClick={importSelected}
               disabled={selectedCount === 0 || importTemplate.isPending}
             >
               {importTemplate.isPending
                 ? 'Importing…'
                 : `Import ${selectedCount === 1 ? 'review' : `${selectedCount} reviews`}`}
-            </button>
+            </Button>
           )}
         </footer>
       </DialogContent>

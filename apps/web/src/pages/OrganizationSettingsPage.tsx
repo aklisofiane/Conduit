@@ -7,6 +7,7 @@ import { useSession } from '../lib/auth-client.js';
 import { relativeFromNow } from '../lib/time.js';
 import { InlineRename } from '../components/common/InlineRename.js';
 import { Select } from '../components/common/Select.js';
+import { Button } from '../components/ui/button.js';
 import {
   buildInviteUrl,
   ORG_ROLES,
@@ -199,15 +200,14 @@ function OrganizationHeader({
             </span>
           )}
           {canRename && !renaming && (
-            <button
-              className="btn"
+            <Button
               onClick={() => {
                 setError(null);
                 setRenaming(true);
               }}
             >
               Rename
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -327,14 +327,13 @@ function MemberRow({
           <span className="font-mono text-[11px] text-[var(--color-text-2)]">{member.role}</span>
         )}
         {canManage && (
-          <button
-            className="btn"
+          <Button
             onClick={handleRemove}
             disabled={remove.isPending}
             aria-label={`Remove ${display}`}
           >
             Remove
-          </button>
+          </Button>
         )}
       </div>
     </li>
@@ -425,13 +424,13 @@ function InvitationRow({
         )}
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        <button className="btn" onClick={handleCopy} aria-label="Copy invite URL">
+        <Button onClick={handleCopy} aria-label="Copy invite URL">
           {copied ? 'Copied' : 'Copy invite URL'}
-        </button>
+        </Button>
         {canManage && (
-          <button className="btn" onClick={handleRevoke} disabled={cancel.isPending}>
+          <Button onClick={handleRevoke} disabled={cancel.isPending}>
             Revoke
-          </button>
+          </Button>
         )}
       </div>
     </li>
@@ -510,13 +509,13 @@ function InviteMemberSection() {
               )}
             />
           </label>
-          <button
+          <Button
             type="submit"
-            className="btn primary"
+            variant="primary"
             disabled={form.formState.isSubmitting}
           >
             {form.formState.isSubmitting ? 'Sending…' : 'Send'}
-          </button>
+          </Button>
         </div>
 
         {rootError && (
@@ -537,9 +536,8 @@ function InviteMemberSection() {
               <code className="min-w-0 flex-1 truncate text-[10.5px] text-[var(--color-text)]">
                 {inviteUrl}
               </code>
-              <button
+              <Button
                 type="button"
-                className="btn"
                 onClick={async () => {
                   try {
                     await navigator.clipboard.writeText(inviteUrl);
@@ -549,7 +547,7 @@ function InviteMemberSection() {
                 }}
               >
                 Copy
-              </button>
+              </Button>
             </div>
           </div>
         )}
@@ -619,9 +617,9 @@ function DangerZoneSection({
             <div className="font-mono text-[11.5px] text-[var(--color-text-2)]">
               Leave this organization. Your access is removed; the org keeps running.
             </div>
-            <button className="btn" onClick={handleLeave} disabled={leave.isPending}>
+            <Button onClick={handleLeave} disabled={leave.isPending}>
               {leave.isPending ? 'Leaving…' : 'Leave organization'}
-            </button>
+            </Button>
           </div>
         )}
         {leaveError && (
@@ -635,9 +633,9 @@ function DangerZoneSection({
                 Permanently delete this organization and everything inside it.
               </div>
               {!confirmingDelete && (
-                <button className="btn" onClick={() => setConfirmingDelete(true)}>
+                <Button onClick={() => setConfirmingDelete(true)}>
                   Delete organization
-                </button>
+                </Button>
               )}
             </div>
             {confirmingDelete && (
@@ -655,8 +653,7 @@ function DangerZoneSection({
                   <div className="font-mono text-[10.5px] text-[var(--color-error)]">{deleteError}</div>
                 )}
                 <div className="flex justify-end gap-2">
-                  <button
-                    className="btn"
+                  <Button
                     onClick={() => {
                       setConfirmingDelete(false);
                       setConfirmName('');
@@ -664,14 +661,14 @@ function DangerZoneSection({
                     }}
                   >
                     Cancel
-                  </button>
-                  <button
-                    className="btn primary"
+                  </Button>
+                  <Button
+                    variant="primary"
                     disabled={confirmName !== organizationName || remove.isPending}
                     onClick={handleDelete}
                   >
                     {remove.isPending ? 'Deleting…' : 'Permanently delete'}
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}

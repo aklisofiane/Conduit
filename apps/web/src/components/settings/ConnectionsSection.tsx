@@ -21,6 +21,7 @@ import {
 } from '../../lib/connection.js';
 import { InfoPopover } from '../common/InfoPopover.js';
 import { SettingsSection } from '../common/SettingsSection.js';
+import { Button } from '../ui/button.js';
 import { CreateConnectionForm } from './ConnectionForm.js';
 import { SuggestionsGalleryDialog } from './SuggestionsGalleryDialog.js';
 
@@ -192,16 +193,15 @@ function LabelPrompt({
 
         <div className="flex justify-end gap-2">
           {done ? (
-            <button className="btn" onClick={onDismiss}>
+            <Button onClick={onDismiss}>
               Done
-            </button>
+            </Button>
           ) : (
             <>
-              <button className="btn" onClick={onDismiss}>
+              <Button onClick={onDismiss}>
                 Skip
-              </button>
-              <button
-                className="btn"
+              </Button>
+              <Button
                 disabled={ensure.isPending || selected.size === 0}
                 onClick={add}
               >
@@ -210,7 +210,7 @@ function LabelPrompt({
                   : hasFailures
                     ? 'Retry'
                     : 'Add labels'}
-              </button>
+              </Button>
             </>
           )}
         </div>
@@ -276,13 +276,12 @@ function ConnectionRowView({ conn, onDelete }: { conn: ConnectionRow; onDelete: 
           {isRepoScoped &&
             (() => {
               const analyzeButton = (
-                <button
-                  className="btn"
+                <Button
                   disabled={running || startAnalysis.isPending}
                   onClick={onAnalyze}
                 >
                   {running ? 'Analyzing…' : ready ? 'Re-analyze' : 'Analyze repo'}
-                </button>
+                </Button>
               );
               // Explain the action on first run, when its purpose is opaque.
               // Once it's running (progress card) or ready (suggestions pill),
@@ -295,9 +294,9 @@ function ConnectionRowView({ conn, onDelete }: { conn: ConnectionRow; onDelete: 
                 analyzeButton
               );
             })()}
-          <button className="btn" onClick={onDelete}>
+          <Button onClick={onDelete}>
             Delete
-          </button>
+          </Button>
         </div>
       </div>
 

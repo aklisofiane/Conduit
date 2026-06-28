@@ -6,6 +6,7 @@ import {
   useInvitation,
   useRejectInvitation,
 } from '../api/organization.js';
+import { Button } from '../components/ui/button.js';
 
 interface AcceptDeps {
   acceptInvitation: (id: string) => Promise<unknown>;
@@ -97,12 +98,11 @@ export function AcceptInvitationPage() {
               {describeInvitationError(error)}
             </p>
             <div>
-              <button
-                className="btn"
+              <Button
                 onClick={() => navigate('/account/invitations', { replace: true })}
               >
                 Back to invitations
-              </button>
+              </Button>
             </div>
           </div>
         )}
@@ -150,20 +150,19 @@ export function AcceptInvitationPage() {
             </p>
 
             <div className="flex justify-end gap-2">
-              <button
-                className="btn"
+              <Button
                 onClick={handleReject}
                 disabled={accept.isPending || reject.isPending}
               >
                 {reject.isPending ? 'Rejecting…' : 'Reject'}
-              </button>
-              <button
-                className="btn primary"
+              </Button>
+              <Button
+                variant="primary"
                 onClick={handleAccept}
                 disabled={accept.isPending || reject.isPending}
               >
                 {accept.isPending ? 'Accepting…' : 'Accept invitation'}
-              </button>
+              </Button>
             </div>
           </div>
         )}

@@ -4,6 +4,7 @@ import { useForm, type UseFormSetError } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { resetPassword } from '../lib/auth-client.js';
+import { Button } from '../components/ui/button.js';
 
 const schema = z.object({
   password: z.string().min(8, 'At least 8 characters'),
@@ -120,13 +121,14 @@ export function ResetPasswordPage() {
             </div>
           )}
 
-          <button
+          <Button
             type="submit"
-            className="btn primary justify-center"
+            variant="primary"
+            className="justify-center"
             disabled={form.formState.isSubmitting}
           >
             {form.formState.isSubmitting ? 'Updating…' : 'Update password'}
-          </button>
+          </Button>
         </form>
       )}
     </div>

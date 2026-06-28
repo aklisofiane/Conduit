@@ -17,6 +17,7 @@ import type { AgentPreset } from '../../api/types.js';
 import { cn } from '../../lib/cn.js';
 import { providerStyle } from '../../styles/theme.js';
 import { Select, type SelectItem } from '../common/Select.js';
+import { Button } from '../ui/button.js';
 import { Maximize2, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { McpServerPicker } from './McpServerPicker.js';
@@ -292,12 +293,12 @@ export function AgentConfigPanel({
       </div>
 
       <div className="flex gap-2 border-t border-[var(--color-divider)] bg-[var(--color-bg-panel)] px-5 py-4">
-        <button className="btn flex-1" onClick={onDiscard} disabled={!dirty}>
+        <Button className="flex-1" onClick={onDiscard} disabled={!dirty}>
           Discard
-        </button>
-        <button className="btn primary flex-1" onClick={onSave} disabled={!dirty || saving}>
+        </Button>
+        <Button variant="primary" className="flex-1" onClick={onSave} disabled={!dirty || saving}>
           {saving ? 'Saving…' : 'Save changes'}
-        </button>
+        </Button>
       </div>
 
       <PromptEditorDialog

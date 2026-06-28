@@ -15,6 +15,7 @@ import { cn } from '../../lib/cn.js';
 import { connectionLabel } from '../../lib/connection.js';
 import { CheckboxListPopover } from '../common/CheckboxListPopover.js';
 import { Select } from '../common/Select.js';
+import { Button } from '../ui/button.js';
 
 interface Props {
   agent: AgentConfig;
@@ -107,9 +108,9 @@ export function McpServerPicker({ agent, workflowId, onChange }: Props) {
           }}
         />
       ) : (
-        <button className="btn" onClick={() => setShowAdd(true)}>
+        <Button onClick={() => setShowAdd(true)}>
           + Add MCP server
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -175,13 +176,12 @@ function ServerCard({
             {transportSummary(server.transport)}
           </div>
         </div>
-        <button
-          className="btn"
+        <Button
           onClick={onRemoveFromWorkflow}
           title="Remove from workflow"
         >
           ✕
-        </button>
+        </Button>
       </div>
 
       <div className="mt-3 grid grid-cols-[1fr_auto] items-end gap-2">
@@ -204,14 +204,13 @@ function ServerCard({
             }))}
           />
         </label>
-        <button
-          className="btn"
+        <Button
           onClick={handleIntrospect}
           disabled={introspect.isPending}
           title="Run tools/list on this server"
         >
           {introspect.isPending ? '…' : server.discoveredTools ? 'Refresh tools' : 'Load tools'}
-        </button>
+        </Button>
       </div>
 
       {attached && server.discoveredTools && (
@@ -309,22 +308,22 @@ function AddServerForm({
   return (
     <div className="rounded-md border border-[var(--color-line)] bg-[var(--color-bg-2)] p-3">
       <div className="flex items-center gap-2">
-        <button
-          className={cn('btn', mode === 'preset' && 'primary')}
+        <Button
+          variant={mode === 'preset' ? 'primary' : 'secondary'}
           onClick={() => setMode('preset')}
         >
           Preset
-        </button>
-        <button
-          className={cn('btn', mode === 'custom' && 'primary')}
+        </Button>
+        <Button
+          variant={mode === 'custom' ? 'primary' : 'secondary'}
           onClick={() => setMode('custom')}
         >
           Custom
-        </button>
+        </Button>
         <div className="flex-1" />
-        <button className="btn" onClick={onCancel}>
+        <Button onClick={onCancel}>
           Cancel
-        </button>
+        </Button>
       </div>
 
       {mode === 'preset' && <PresetPicker connections={connections} onAdd={onAdd} />}
@@ -408,9 +407,9 @@ function PresetPicker({
               </span>
             )}
           </label>
-          <button className="btn primary" onClick={handleAdd}>
+          <Button variant="primary" onClick={handleAdd}>
             Add {selected.name}
-          </button>
+          </Button>
         </>
       )}
     </div>
@@ -453,17 +452,17 @@ function KeyValueEditor({
             value={v}
             onChange={(e) => update(i, 1, e.target.value)}
           />
-          <button className="btn" onClick={() => remove(i)} title="Remove">
+          <Button onClick={() => remove(i)} title="Remove">
             ✕
-          </button>
+          </Button>
         </div>
       ))}
-      <button
-        className="btn self-start"
+      <Button
+        className="self-start"
         onClick={() => onChange([...entries, ['', '']])}
       >
         + Add
-      </button>
+      </Button>
     </div>
   );
 }
@@ -620,9 +619,9 @@ function CustomServerForm({
         />
       </label>
 
-      <button className="btn primary" disabled={!canSave} onClick={handleAdd}>
+      <Button variant="primary" disabled={!canSave} onClick={handleAdd}>
         Add server
-      </button>
+      </Button>
     </div>
   );
 }

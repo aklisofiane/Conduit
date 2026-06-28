@@ -7,6 +7,7 @@ import { signIn } from '../lib/auth-client.js';
 import { FormField } from '../components/common/FormField.js';
 import { OAuthButton } from '../components/common/OAuthButton.js';
 import { useClearFormError } from '../hooks/use-clear-form-error.js';
+import { Button } from '../components/ui/button.js';
 
 const schema = z.object({
   email: z.string().email('Enter a valid email'),
@@ -115,13 +116,14 @@ export function SignInPage() {
           </div>
         )}
 
-        <button
+        <Button
           type="submit"
-          className="btn primary justify-center"
+          variant="primary"
+          className="justify-center"
           disabled={form.formState.isSubmitting}
         >
           {form.formState.isSubmitting ? 'Signing in…' : 'Sign in'}
-        </button>
+        </Button>
 
         <div className="flex items-center justify-between font-mono text-[11px]">
           <Link to="/forgot-password" className="text-[var(--color-text-2)] hover:text-[var(--color-text)]">

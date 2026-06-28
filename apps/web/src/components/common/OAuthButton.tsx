@@ -1,4 +1,5 @@
 import { signIn } from '../../lib/auth-client.js';
+import { Button } from '../ui/button.js';
 
 /**
  * Social-login button shared by the sign-in and sign-up pages. Relative
@@ -24,8 +25,8 @@ export function OAuthButton({
     });
   };
   return (
-    <button type="button" className="btn justify-center" onClick={handleClick}>
+    <Button type="button" className="justify-center" onClick={handleClick}>
       {label}
-    </button>
+    </Button>
   );
 }

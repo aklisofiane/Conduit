@@ -10,6 +10,7 @@ import { useRunUpdates } from '../hooks/use-run-updates.js';
 import { duration, relativeFromNow } from '../lib/time.js';
 import { cn } from '../lib/cn.js';
 import { statusClass } from '../lib/status.js';
+import { Button } from '../components/ui/button.js';
 
 type NodeTab = 'timeline' | 'summary' | 'files' | 'error';
 
@@ -148,19 +149,21 @@ export function RunDetailPage() {
           <div className="flex flex-col items-end gap-1">
             <div className="flex gap-2">
               {run.trigger.issue && (
-                <a className="btn" href={run.trigger.issue.url} target="_blank" rel="noreferrer">
-                  Open issue ↗
-                </a>
+                <Button asChild>
+                  <a href={run.trigger.issue.url} target="_blank" rel="noreferrer">
+                    Open issue ↗
+                  </a>
+                </Button>
               )}
               {streaming && (
-                <button className="btn danger" onClick={() => cancelRun.mutate(runId)} disabled={cancelRun.isPending}>
+                <Button variant="danger" onClick={() => cancelRun.mutate(runId)} disabled={cancelRun.isPending}>
                   {cancelRun.isPending ? 'Cancelling…' : 'Cancel run'}
-                </button>
+                </Button>
               )}
               {status === 'FAILED' && (
-                <button className="btn" onClick={handleRerun} disabled={rerunRun.isPending}>
+                <Button onClick={handleRerun} disabled={rerunRun.isPending}>
                   {rerunRun.isPending ? 'Rerunning…' : 'Rerun'}
-                </button>
+                </Button>
               )}
             </div>
             {rerunNote && (

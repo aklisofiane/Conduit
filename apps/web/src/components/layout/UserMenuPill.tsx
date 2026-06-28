@@ -24,6 +24,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '../common/DropdownMenu.js';
+import { Button } from '../ui/button.js';
 
 const FILTER_THRESHOLD = 5;
 
@@ -317,13 +318,13 @@ function OrganizationSection({
             aria-label="New organization name"
             className="min-w-0 flex-1 rounded-[var(--radius-sm)] border border-[var(--color-divider)] bg-[var(--color-bg)] px-2 py-1 font-mono text-[11px] text-[var(--color-text)] outline-none focus:border-[var(--color-text-muted)]"
           />
-          <button
+          <Button
             type="submit"
+            variant="primary"
             disabled={!newName.trim() || create.isPending || setActive.isPending}
-            className="btn primary"
           >
             {create.isPending || setActive.isPending ? '…' : 'Create'}
-          </button>
+          </Button>
         </form>
       ) : (
         <button

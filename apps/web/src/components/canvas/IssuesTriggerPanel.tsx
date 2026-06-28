@@ -16,6 +16,7 @@ import {
   PanelHeader,
 } from './trigger-panel-common.js';
 import { ensureLabelTarget, repoScopedConnections } from '../../lib/connection.js';
+import { Button } from '../ui/button.js';
 
 type IssuesTrigger = Extract<TriggerConfig, { type: 'issues' }>;
 
@@ -122,31 +123,31 @@ export function IssuesTriggerPanel({
                       emptyHint="No Projects v2 connections yet — create one on the Connections page."
                     />
                   </div>
-                  <button
+                  <Button
                     type="button"
-                    className="btn shrink-0"
+                    className="shrink-0"
                     onClick={() => onChange({ boardConnectionId: undefined })}
                     aria-label="Detach board"
                     title="Detach board"
                   >
                     ×
-                  </button>
+                  </Button>
                 </div>
               ) : boardConnections.length === 0 ? (
                 <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
                   No Projects v2 connections yet — create one on the Connections page.
                 </div>
               ) : (
-                <button
+                <Button
                   type="button"
-                  className="btn w-full"
+                  className="w-full"
                   onClick={() => {
                     const first = boardConnections[0];
                     if (first) onChange({ boardConnectionId: first.id });
                   }}
                 >
                   + Attach a board
-                </button>
+                </Button>
               )}
               {hasBoard && selectedBoardSummary && (
                 <div className="mt-2">

@@ -12,6 +12,7 @@ import { ApiError } from '../../api/client.js';
 import { relativeFromNow } from '../../lib/time.js';
 import { Select } from '../common/Select.js';
 import { SettingsSection } from '../common/SettingsSection.js';
+import { Button } from '../ui/button.js';
 
 const PLATFORMS = ['GITHUB', 'GITLAB', 'JIRA', 'SLACK', 'DISCORD'] as const;
 
@@ -137,8 +138,8 @@ export function CredentialsSection() {
                 onChange={(e) => setForm((f) => ({ ...f, secret: e.target.value }))}
               />
             </label>
-            <button
-              className="btn primary"
+            <Button
+              variant="primary"
               disabled={
                 !form.name ||
                 !form.secret ||
@@ -148,7 +149,7 @@ export function CredentialsSection() {
               onClick={handleCreate}
             >
               {create.isPending ? 'Saving…' : 'Save'}
-            </button>
+            </Button>
             {error && (
               <div className="col-span-4 font-mono text-[11px] text-[var(--color-danger)]">
                 {error}
@@ -289,32 +290,30 @@ function CredentialRowView({ cred, onDelete }: { cred: CredentialRow; onDelete: 
               onChange={(e) => setNewSecret(e.target.value)}
               autoFocus
             />
-            <button
-              className="btn primary"
+            <Button
+              variant="primary"
               onClick={handleRotate}
               disabled={!newSecret || update.isPending}
             >
               {update.isPending ? 'Rotating…' : 'Rotate'}
-            </button>
-            <button
-              className="btn"
+            </Button>
+            <Button
               onClick={() => {
                 setRotating(false);
                 setNewSecret('');
               }}
             >
               Cancel
-            </button>
+            </Button>
           </div>
         )}
       </div>
       {!rotating && (
-        <button className="btn" onClick={() => setRotating(true)}>
+        <Button onClick={() => setRotating(true)}>
           Rotate
-        </button>
+        </Button>
       )}
-      <button
-        className="btn"
+      <Button
         onClick={onDelete}
         disabled={cred.connectionCount > 0}
         title={
@@ -324,7 +323,7 @@ function CredentialRowView({ cred, onDelete }: { cred: CredentialRow; onDelete: 
         }
       >
         Delete
-      </button>
+      </Button>
     </div>
   );
 }

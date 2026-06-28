@@ -11,6 +11,7 @@ import { ApiError } from '../../api/client.js';
 import { relativeFromNow } from '../../lib/time.js';
 import { Select } from '../common/Select.js';
 import { SettingsSection } from '../common/SettingsSection.js';
+import { Button } from '../ui/button.js';
 
 const PROVIDER_OPTIONS = agentProviderIdSchema.options.map((p) => ({ value: p, label: p }));
 
@@ -106,13 +107,13 @@ export function ApiKeysSection() {
               onChange={(e) => setForm((f) => ({ ...f, baseUrl: e.target.value }))}
             />
           </label>
-          <button
-            className="btn primary"
+          <Button
+            variant="primary"
             disabled={!form.apiKey || create.isPending}
             onClick={handleCreate}
           >
             {create.isPending ? 'Saving…' : 'Save'}
-          </button>
+          </Button>
           {error && (
             <div className="col-span-4 font-mono text-[11px] text-[var(--color-danger)]">
               {error}
@@ -203,22 +204,21 @@ function ProviderConfigRowView({
               onChange={(e) => setNewSecret(e.target.value)}
               autoFocus
             />
-            <button
-              className="btn primary"
+            <Button
+              variant="primary"
               onClick={handleRotate}
               disabled={!newSecret || update.isPending}
             >
               {update.isPending ? 'Rotating…' : 'Rotate'}
-            </button>
-            <button
-              className="btn"
+            </Button>
+            <Button
               onClick={() => {
                 setRotating(false);
                 setNewSecret('');
               }}
             >
               Cancel
-            </button>
+            </Button>
           </div>
         )}
         {editingBaseUrl && (
@@ -230,44 +230,42 @@ function ProviderConfigRowView({
               onChange={(e) => setNewBaseUrl(e.target.value)}
               autoFocus
             />
-            <button
-              className="btn primary"
+            <Button
+              variant="primary"
               onClick={handleSaveBaseUrl}
               disabled={update.isPending}
             >
               {update.isPending ? 'Saving…' : 'Save'}
-            </button>
-            <button
-              className="btn"
+            </Button>
+            <Button
               onClick={() => {
                 setEditingBaseUrl(false);
                 setNewBaseUrl('');
               }}
             >
               Cancel
-            </button>
+            </Button>
           </div>
         )}
       </div>
       {!rotating && !editingBaseUrl && (
         <>
-          <button className="btn" onClick={() => setRotating(true)}>
+          <Button onClick={() => setRotating(true)}>
             Rotate
-          </button>
-          <button
-            className="btn"
+          </Button>
+          <Button
             onClick={() => {
               setNewBaseUrl(cfg.baseUrl ?? '');
               setEditingBaseUrl(true);
             }}
           >
             Edit base URL
-          </button>
+          </Button>
         </>
       )}
-      <button className="btn" onClick={onDelete} title="Delete">
+      <Button onClick={onDelete} title="Delete">
         Delete
-      </button>
+      </Button>
     </div>
   );
 }

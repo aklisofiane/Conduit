@@ -4,6 +4,7 @@ import { useConnections } from '../../api/hooks.js';
 import { scopeSummary } from '../../lib/connection.js';
 import { Dialog, DialogContent, DialogTitle } from '../common/Dialog.js';
 import { Select } from '../common/Select.js';
+import { Button } from '../ui/button.js';
 import type { PaletteTriggerType } from '../canvas/NodePalette.js';
 
 interface CreateWorkflowDialogProps {
@@ -85,9 +86,9 @@ export function CreateWorkflowDialog({
               Name it and pick a trigger to get started.
             </p>
           </div>
-          <button className="btn" onClick={onClose} aria-label="Close" disabled={isPending}>
+          <Button onClick={onClose} aria-label="Close" disabled={isPending}>
             ✕
-          </button>
+          </Button>
         </header>
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
@@ -183,16 +184,16 @@ export function CreateWorkflowDialog({
 
         <footer className="flex items-center justify-end border-t border-[var(--color-line)] px-5 py-3">
           <div className="flex items-center gap-2">
-            <button className="btn" onClick={onClose} disabled={isPending}>
+            <Button onClick={onClose} disabled={isPending}>
               Cancel
-            </button>
-            <button
-              className="btn primary"
+            </Button>
+            <Button
+              variant="primary"
               onClick={handleCreate}
               disabled={!canCreate || isPending}
             >
               {isPending ? 'Creating…' : 'Create'}
-            </button>
+            </Button>
           </div>
         </footer>
       </DialogContent>

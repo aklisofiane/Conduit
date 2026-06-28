@@ -4,6 +4,7 @@ import { useForm, type UseFormSetError } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { requestPasswordReset } from '../lib/auth-client.js';
+import { Button } from '../components/ui/button.js';
 
 const schema = z.object({
   email: z.string().email('Enter a valid email'),
@@ -107,13 +108,14 @@ export function ForgotPasswordPage() {
             </div>
           )}
 
-          <button
+          <Button
             type="submit"
-            className="btn primary justify-center"
+            variant="primary"
+            className="justify-center"
             disabled={form.formState.isSubmitting}
           >
             {form.formState.isSubmitting ? 'Sending…' : 'Send reset link'}
-          </button>
+          </Button>
 
           <div className="flex justify-start font-mono text-[11px]">
             <Link to="/sign-in" className="text-[var(--color-text-2)] hover:text-[var(--color-text)]">

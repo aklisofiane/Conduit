@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { useUserInvitations } from '../api/organization.js';
 import { authClient, signOut, useSession } from '../lib/auth-client.js';
 import { FormField } from '../components/common/FormField.js';
+import { Button } from '../components/ui/button.js';
 
 const passwordSchema = z
   .object({
@@ -195,13 +196,13 @@ function ChangePasswordSection() {
         )}
 
         <div className="flex">
-          <button
+          <Button
             type="submit"
-            className="btn primary"
+            variant="primary"
             disabled={form.formState.isSubmitting}
           >
             {form.formState.isSubmitting ? 'Updating…' : 'Update password'}
-          </button>
+          </Button>
         </div>
       </form>
     </section>
@@ -232,9 +233,9 @@ function SignOutSection() {
         <p className="font-mono text-[11.5px] text-[var(--color-text-2)]">
           End this browser session.
         </p>
-        <button className="btn" onClick={handleSignOut} disabled={busy}>
+        <Button onClick={handleSignOut} disabled={busy}>
           {busy ? 'Signing out…' : 'Sign out'}
-        </button>
+        </Button>
       </div>
     </section>
   );

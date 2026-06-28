@@ -8,6 +8,7 @@ import {
   useUserInvitations,
   type UserInvitation,
 } from '../api/organization.js';
+import { Button } from '../components/ui/button.js';
 
 export function filterPendingInvitations(
   invitations: ReadonlyArray<UserInvitation>,
@@ -100,16 +101,16 @@ function InvitationRow({ invitation }: { invitation: UserInvitation }) {
         )}
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        <button className="btn" onClick={handleReject} disabled={reject.isPending || accept.isPending}>
+        <Button onClick={handleReject} disabled={reject.isPending || accept.isPending}>
           {reject.isPending ? 'Rejecting…' : 'Reject'}
-        </button>
-        <button
-          className="btn primary"
+        </Button>
+        <Button
+          variant="primary"
           onClick={handleAccept}
           disabled={reject.isPending || accept.isPending}
         >
           {accept.isPending ? 'Accepting…' : 'Accept'}
-        </button>
+        </Button>
       </div>
     </li>
   );

@@ -59,6 +59,7 @@ import { downloadWorkflowExport } from '../lib/export-workflow.js';
 import { useWorkflowEditor } from '../state/workflow-editor.js';
 import { useTopbarSlots } from '../state/topbar-slots.js';
 import { relativeFromNow } from '../lib/time.js';
+import { Button } from '../components/ui/button.js';
 
 const NODE_TYPES: NodeTypes = { agent: AgentNode, ...TRIGGER_NODE_TYPES };
 const EDGE_TYPES = { workflow: WorkflowEdge } as const;
@@ -545,9 +546,9 @@ function TriggerPanelByType({ trigger, onChange, ...rest }: TriggerPanelByTypePr
         No editor yet — delete this trigger and re-add an Issues, Pull requests, or Schedule
         trigger from the palette.
       </div>
-      <button className="btn mt-2" onClick={rest.onClose}>
+      <Button className="mt-2" onClick={rest.onClose}>
         Close
-      </button>
+      </Button>
     </div>
   );
 }

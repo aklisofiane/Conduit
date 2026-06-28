@@ -28,6 +28,7 @@ import { connectionLabel, repoScopedConnections } from '../../lib/connection.js'
 import { Dialog, DialogContent, DialogTitle } from '../common/Dialog.js';
 import { SearchSelect } from '../common/SearchSelect.js';
 import { Select, type SelectOption } from '../common/Select.js';
+import { Button } from '../ui/button.js';
 
 function credentialPlatform(
   credentialId: string,
@@ -284,9 +285,9 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
                 : 'Pre-built workflow blueprints you can copy and edit.'}
             </p>
           </div>
-          <button className="btn" onClick={onClose} aria-label="Close">
+          <Button onClick={onClose} aria-label="Close">
             ✕
-          </button>
+          </Button>
         </header>
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
@@ -295,14 +296,13 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
               <div className="font-mono text-[11.5px] text-[var(--color-text-2)]">
                 Have a workflow export? Import a <code>.json</code> bundle.
               </div>
-              <button
+              <Button
                 type="button"
-                className="btn"
                 onClick={() => fileInputRef.current?.click()}
               >
                 <Upload size={12} strokeWidth={1.5} />
                 Import from file
-              </button>
+              </Button>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -380,12 +380,12 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
           )}
           <div className="flex items-center gap-2">
             {selected && (
-              <button className="btn" onClick={handleBack} disabled={pending}>
+              <Button onClick={handleBack} disabled={pending}>
                 ← Back
-              </button>
+              </Button>
             )}
-            <button
-              className="btn primary"
+            <Button
+              variant="primary"
               onClick={handleCreate}
               disabled={!selected || !canCreate || pending}
             >
@@ -394,7 +394,7 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
                 : selected
                   ? `Create ${selected.workflowCount === 1 ? 'workflow' : `${selected.workflowCount} workflows`}`
                   : 'Pick a template'}
-            </button>
+            </Button>
           </div>
         </footer>
       </DialogContent>

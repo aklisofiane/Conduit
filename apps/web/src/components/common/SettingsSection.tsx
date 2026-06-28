@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Button } from '../ui/button.js';
 
 /**
  * Shared shell for the settings sections (API keys, credentials, connections):
@@ -27,9 +28,9 @@ export function SettingsSection({
           <h2 className="font-mono text-[13px] font-semibold">{title}</h2>
           <p className="font-mono text-[11px] text-[var(--color-text-3)]">{description}</p>
         </div>
-        <button className="btn shrink-0 whitespace-nowrap" onClick={onToggleCreate}>
+        <Button className="shrink-0 whitespace-nowrap" onClick={onToggleCreate}>
           {creating ? 'Cancel' : '+ New'}
-        </button>
+        </Button>
       </header>
 
       {children}

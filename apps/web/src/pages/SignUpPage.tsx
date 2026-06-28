@@ -7,6 +7,7 @@ import { signUp } from '../lib/auth-client.js';
 import { FormField } from '../components/common/FormField.js';
 import { OAuthButton } from '../components/common/OAuthButton.js';
 import { useClearFormError } from '../hooks/use-clear-form-error.js';
+import { Button } from '../components/ui/button.js';
 
 const schema = z.object({
   name: z.string().min(1, 'Name required').max(120),
@@ -117,13 +118,14 @@ export function SignUpPage() {
           </div>
         )}
 
-        <button
+        <Button
           type="submit"
-          className="btn primary justify-center"
+          variant="primary"
+          className="justify-center"
           disabled={form.formState.isSubmitting}
         >
           {form.formState.isSubmitting ? 'Creating account…' : 'Create account'}
-        </button>
+        </Button>
 
         <div className="flex justify-end font-mono text-[11px]">
           <Link

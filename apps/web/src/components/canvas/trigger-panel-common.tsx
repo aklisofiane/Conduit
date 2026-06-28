@@ -13,6 +13,7 @@ import type { useListProjectBoards } from '../../api/hooks.js';
 import { cn } from '../../lib/cn.js';
 import { scopeSummary, type EnsureLabelTarget } from '../../lib/connection.js';
 import { Select } from '../common/Select.js';
+import { Button } from '../ui/button.js';
 
 /**
  * Pieces shared across the three typed trigger panels (`IssuesTriggerPanel`,
@@ -70,12 +71,12 @@ export interface PanelFooterProps {
 export function PanelFooter({ saving, dirty, valid = true, onSave, onDiscard }: PanelFooterProps) {
   return (
     <div className="flex gap-2 border-t border-[var(--color-divider)] bg-[var(--color-bg-panel)] px-5 py-4">
-      <button className="btn flex-1" onClick={onDiscard} disabled={!dirty}>
+      <Button className="flex-1" onClick={onDiscard} disabled={!dirty}>
         Discard
-      </button>
-      <button className="btn primary flex-1" onClick={onSave} disabled={!dirty || saving || !valid}>
+      </Button>
+      <Button variant="primary" className="flex-1" onClick={onSave} disabled={!dirty || saving || !valid}>
         {saving ? 'Saving…' : 'Save changes'}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -236,9 +237,9 @@ export function FilterEditor({
           onRemove={() => removeAt(i)}
         />
       ))}
-      <button className="btn w-full" onClick={add}>
+      <Button className="w-full" onClick={add}>
         + Add filter
-      </button>
+      </Button>
     </div>
   );
 }
@@ -314,14 +315,13 @@ function FilterRow({
           ]}
         />
       )}
-      <button
-        className="btn"
+      <Button
         onClick={onRemove}
         aria-label="Remove filter"
         title="Remove filter"
       >
         ×
-      </button>
+      </Button>
     </div>
   );
 }
@@ -401,9 +401,9 @@ function CreateLabelAction({
         <code className="text-[var(--color-text)]">{name}</code> isn't on{' '}
         <code className="text-[var(--color-text)]">{target.scopeLabel}</code> yet.
       </div>
-      <button
+      <Button
         type="button"
-        className="btn mt-1.5"
+        className="mt-1.5"
         disabled={ensure.isPending}
         onClick={() =>
           ensure.mutate({ connectionId: target.connectionId, names: [name] })
@@ -412,7 +412,7 @@ function CreateLabelAction({
         {ensure.isPending
           ? 'Creating…'
           : `+ Create "${name}" on ${target.scopeLabel}`}
-      </button>
+      </Button>
       {errorText && (
         <div className="mt-1 font-mono text-[11px] text-[var(--color-danger,#dc322f)]">
           {errorText}

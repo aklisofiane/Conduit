@@ -1,4 +1,5 @@
 import { Download } from 'lucide-react';
+import { Button } from '../ui/button.js';
 
 interface WorkflowActionsProps {
   isActive: boolean;
@@ -31,23 +32,21 @@ export function WorkflowActions({
           {isActive ? 'active' : 'paused'}
         </span>
       </span>
-      <button
+      <Button
         type="button"
-        className="btn"
         onClick={onExport}
         title="Export this workflow as a shareable template JSON"
       >
         <Download size={12} strokeWidth={1.5} />
         Export
-      </button>
-      <button
+      </Button>
+      <Button
         type="button"
-        className="btn"
         onClick={onSave}
         disabled={!dirty || saving}
       >
         {saving ? 'Saving…' : dirty ? 'Save' : 'Saved'}
-      </button>
+      </Button>
     </div>
   );
 }

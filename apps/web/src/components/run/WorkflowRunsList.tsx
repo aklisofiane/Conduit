@@ -5,6 +5,8 @@ import type { RunTrigger, WorkflowRunListItem } from '../../api/types.js';
 import { cn } from '../../lib/cn.js';
 import { statusClass } from '../../lib/status.js';
 import { duration, relativeFromNow } from '../../lib/time.js';
+import { Button } from '../ui/button.js';
+import { Card } from '../ui/card.js';
 
 interface WorkflowRunsListProps {
   workflowId: string;
@@ -20,7 +22,7 @@ export function WorkflowRunsList({ workflowId }: WorkflowRunsListProps) {
         <span className="text-[var(--color-text-4)]">{runs.length}</span>
       </h2>
 
-      <div className="overflow-hidden rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-1)]">
+      <Card padded={false}>
         {isLoading && <EmptyRow text="Loading runs…" />}
         {!isLoading && runs.length === 0 && (
           <EmptyRow text="No runs yet — they'll appear once the trigger fires." />
@@ -28,7 +30,7 @@ export function WorkflowRunsList({ workflowId }: WorkflowRunsListProps) {
         {runs.map((run) => (
           <RunRow key={run.id} run={run} />
         ))}
-      </div>
+      </Card>
     </div>
   );
 }
@@ -104,14 +106,14 @@ function RunRow({ run }: { run: WorkflowRunListItem }) {
           (note ? (
             <span className="text-[var(--color-text-3)]">{note}</span>
           ) : (
-            <button
+            <Button
               type="button"
-              className="btn opacity-0 transition-opacity group-hover:opacity-100"
+              className="opacity-0 transition-opacity group-hover:opacity-100"
               onClick={handleRerun}
               disabled={rerun.isPending}
             >
               {rerun.isPending ? '…' : 'Rerun'}
-            </button>
+            </Button>
           ))}
         <span>{dur}</span>
       </div>

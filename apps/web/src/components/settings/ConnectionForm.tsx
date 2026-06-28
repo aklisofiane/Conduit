@@ -10,6 +10,7 @@ import {
 import type { CredentialRow } from '../../api/types.js';
 import { SearchSelect } from '../common/SearchSelect.js';
 import { Select } from '../common/Select.js';
+import { Button } from '../ui/button.js';
 
 export type CreateBody = {
   credentialId: string;
@@ -187,17 +188,17 @@ export function CreateConnectionForm({
       )}
 
       <div className="flex justify-end gap-2">
-        <button className="btn" onClick={onCancel}>
+        <Button onClick={onCancel}>
           Cancel
-        </button>
-        <button
-          className="btn primary"
+        </Button>
+        <Button
+          variant="primary"
           disabled={!canSave || pending}
           onClick={handleSave}
           title={saveBlocker}
         >
           {pending ? 'Saving…' : 'Save'}
-        </button>
+        </Button>
       </div>
     </div>
   );
