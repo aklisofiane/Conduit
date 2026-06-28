@@ -9,6 +9,8 @@ import { useConnections, useCreateWorkflow, useWorkflows } from '../api/hooks.js
 import type { ConnectionRow, WorkflowRow } from '../api/types.js';
 import { repoGroupRef, type RepoGroupRef } from '../lib/connection.js';
 import { cn } from '../lib/cn.js';
+import { Button } from '../components/ui/button.js';
+import { Card } from '../components/ui/card.js';
 
 const NO_REPO_KEY = '__no_repo__';
 
@@ -146,17 +148,15 @@ export function HomePage() {
             <span className="text-[var(--color-text-4)]">{workflows.length}</span>
           </h2>
           <div className="flex items-center gap-2">
-            <button className="btn" onClick={() => setShowTemplatePicker(true)}>
-              From template
-            </button>
-            <button className="btn primary" onClick={() => setShowCreateDialog(true)}>
+            <Button onClick={() => setShowTemplatePicker(true)}>From template</Button>
+            <Button variant="primary" onClick={() => setShowCreateDialog(true)}>
               <Plus size={12} strokeWidth={2.5} />
               New workflow
-            </button>
+            </Button>
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-1)]">
+        <Card padded={false}>
           {isLoading && <EmptyRow text="Loading workflows…" />}
           {!isLoading && workflows.length === 0 && (
             <EmptyRow text="No workflows yet — click “New workflow” to get started." />
@@ -229,7 +229,7 @@ export function HomePage() {
                 )),
               ];
             })}
-        </div>
+        </Card>
       </section>
 
       {showTemplatePicker && (
@@ -248,7 +248,7 @@ export function HomePage() {
 
 function StatCard({ label, value, hint }: { label: string; value: string; hint: string }) {
   return (
-    <div className="rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-1)] p-4">
+    <Card>
       <div className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-3)]">
         {label}
       </div>
@@ -259,7 +259,7 @@ function StatCard({ label, value, hint }: { label: string; value: string; hint: 
         {value}
       </div>
       <div className="mt-1 font-mono text-[11px] text-[var(--color-text-3)]">{hint}</div>
-    </div>
+    </Card>
   );
 }
 
