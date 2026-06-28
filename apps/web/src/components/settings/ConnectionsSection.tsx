@@ -21,6 +21,7 @@ import {
 } from '../../lib/connection.js';
 import { InfoPopover } from '../common/InfoPopover.js';
 import { SettingsSection } from '../common/SettingsSection.js';
+import { Badge, BadgeDot } from '../ui/badge.js';
 import { Button } from '../ui/button.js';
 import { CreateConnectionForm } from './ConnectionForm.js';
 import { SuggestionsGalleryDialog } from './SuggestionsGalleryDialog.js';
@@ -268,10 +269,12 @@ function ConnectionRowView({ conn, onDelete }: { conn: ConnectionRow; onDelete: 
         </div>
         <div className="flex items-center gap-2">
           {isRepoScoped && ready && (
-            <button type="button" className="pill" onClick={() => setGalleryOpen(true)}>
-              <span className="dot" />
-              {imported ? 'Suggestions imported' : 'Suggestions ready'}
-            </button>
+            <Badge asChild>
+              <button type="button" onClick={() => setGalleryOpen(true)}>
+                <BadgeDot />
+                {imported ? 'Suggestions imported' : 'Suggestions ready'}
+              </button>
+            </Badge>
           )}
           {isRepoScoped &&
             (() => {

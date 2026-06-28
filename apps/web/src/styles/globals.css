@@ -99,40 +99,10 @@ body {
    in components/ui/button.tsx — its variants are now the single source of
    truth for button styling. See .specs/ui-primitive-layer.md. */
 
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 2px 8px;
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  color: var(--color-text-2);
-  background: var(--color-pill-bg);
-  border: 1px solid var(--color-pill-border);
-  border-radius: 999px;
-}
-.chip .dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 999px;
-  background: var(--color-text-muted);
-}
-.chip.claude {
-  color: var(--color-claude-tag-text);
-  background: var(--color-claude-tag-bg);
-  border-color: var(--color-claude-border);
-}
-.chip.claude .dot {
-  background: var(--color-claude-mark);
-}
-.chip.codex {
-  color: var(--color-codex-tag-text);
-  background: var(--color-codex-tag-bg);
-  border-color: var(--color-codex-border);
-}
-.chip.codex .dot {
-  background: var(--color-codex-mark);
-}
+/* `.chip` / `.pill` / `.prov-glyph` were removed once every consumer migrated
+   to the <Badge>/<BadgeDot> primitive in components/ui/badge.tsx — its pill /
+   chip / glyph variants are now the single source of truth for the labeled-pill
+   family. See .specs/ui-primitive-layer.md (wave 3). */
 
 /* `.field-label` and `.field-input` were removed once every consumer migrated
    to the <Label>/<Hint>/<Input>/<Textarea> primitives in components/ui/ —
@@ -513,28 +483,6 @@ body {
   border: 1px solid var(--color-divider);
 }
 
-.pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 10px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--color-text-2);
-  background: var(--color-bg-panel);
-  border: 1px solid var(--color-divider);
-  border-radius: 999px;
-}
-.pill .dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: var(--color-success);
-}
-.pill.error .dot {
-  background: var(--color-error);
-}
-
 .status-dot {
   width: 8px;
   height: 8px;
@@ -568,27 +516,6 @@ body {
   50% {
     opacity: 0.4;
   }
-}
-
-/* Provider glyph tile (the "C" / "X" badges used outside the canvas) */
-.prov-glyph {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  border-radius: var(--radius-sm);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 700;
-}
-.prov-glyph.claude {
-  background: var(--color-claude-mark);
-  color: #ffffff;
-}
-.prov-glyph.codex {
-  background: var(--color-codex-mark);
-  color: #ffffff;
 }
 
 .cursor {

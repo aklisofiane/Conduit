@@ -1,4 +1,5 @@
 import { Download } from 'lucide-react';
+import { Badge, BadgeDot } from '../ui/badge.js';
 import { Button } from '../ui/button.js';
 
 interface WorkflowActionsProps {
@@ -18,20 +19,13 @@ export function WorkflowActions({
 }: WorkflowActionsProps) {
   return (
     <div className="flex items-center gap-3">
-      <span className="pill">
-        <span
-          className="dot"
-          style={{
-            background: isActive
-              ? 'var(--color-success)'
-              : 'var(--color-text-muted)',
-          }}
-        />
+      <Badge>
+        <BadgeDot tone={isActive ? 'success' : 'muted'} />
         <span className="text-[var(--color-text-muted)]">workflow</span>
         <span className="text-[var(--color-text)]">
           {isActive ? 'active' : 'paused'}
         </span>
-      </span>
+      </Badge>
       <Button
         type="button"
         onClick={onExport}
