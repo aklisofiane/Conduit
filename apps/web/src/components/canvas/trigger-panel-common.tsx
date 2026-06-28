@@ -50,14 +50,16 @@ export function PanelHeader({ trigger, isActive, title, onClose }: PanelHeaderPr
           <span className="text-[var(--color-text-muted)]"> · config</span>
         </h3>
       </div>
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="icon"
         onClick={onClose}
         aria-label="Close inspector"
-        className="ml-2 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-[var(--radius-sm)] text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-pill-bg)] hover:text-[var(--color-text)]"
+        className="ml-2 shrink-0 rounded-[var(--radius-sm)] text-[var(--color-text-muted)] hover:bg-[var(--color-pill-bg)] hover:text-[var(--color-text)]"
       >
         <X size={14} strokeWidth={1.5} />
-      </button>
+      </Button>
     </div>
   );
 }

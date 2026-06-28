@@ -1,73 +1,71 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import type { AgentConfig } from '@conduit/shared';
-import {
-  nodeSize,
-  providerStyle,
-  tokens,
-  type ProviderId,
-} from '../../styles/theme.js';
+import { nodeSize, type ProviderId } from '../../styles/theme.js';
 import { ProviderGlyph } from '../common/BrandGlyph.js';
+import { NodeShell, NodeIconTile, NodeTag, NodePill } from '../ui/node.js';
+import { cn } from '../../lib/cn.js';
 
 export interface AgentNodeData extends Record<string, unknown> {
   agent: AgentConfig;
 }
 
+/**
+ * Provider-tinted surfaces that don't have their own primitive (the prompt
+ * sheet and footer). The `var(--color-<p>-*)` values are the verbatim
+ * `providerStyle()` tokens the old inline `style={}` used; literal class
+ * strings keep them visible to the Tailwind scanner.
+ */
+const promptTint: Record<ProviderId, string> = {
+  claude: 'bg-[var(--color-claude-prompt)] border-[var(--color-claude-prompt-border)] font-sans',
+  codex: 'bg-[var(--color-codex-prompt)] border-[var(--color-codex-prompt-border)] font-mono',
+};
+const footerTint: Record<ProviderId, string> = {
+  claude: 'bg-[var(--color-claude-footer)] border-[var(--color-claude-prompt-border)]',
+  codex: 'bg-[var(--color-codex-footer)] border-[var(--color-codex-prompt-border)]',
+};
+
 export function AgentNode({ data, selected }: NodeProps) {
   const { agent } = data as AgentNodeData;
   const provider = agent.provider;
-  const ps = providerStyle(provider);
 
   return (
-    <div
-      className="overflow-hidden rounded-[var(--radius)] transition-all"
-      style={{
-        width: nodeSize.agent.width,
-        minHeight: nodeSize.agent.minHeight,
-        background: ps.card,
-        border: `1px solid ${selected ? ps.mark : ps.border}`,
-        boxShadow: selected
-          ? `${tokens.shadow.focus}, ${tokens.shadow.node}`
-          : tokens.shadow.node,
-        fontFamily: tokens.font.sans,
-        color: tokens.color.text,
-      }}
+    <NodeShell
+      tone={provider}
+      selected={selected}
+      style={{ width: nodeSize.agent.width, minHeight: nodeSize.agent.minHeight }}
     >
       <Handle type="target" position={Position.Left} className="!h-2 !w-2" />
 
       {/* Header */}
       <div className="flex items-center gap-2 px-3 pb-2 pt-[10px]">
-        <span
-          className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-[var(--radius)]"
-          style={{ background: ps.mark }}
-        >
+        <NodeIconTile tone={provider} size="md">
           <ProviderGlyph provider={provider} size={12} color="#FFFFFF" />
-        </span>
+        </NodeIconTile>
         <span
-          className="min-w-0 flex-1 truncate text-[13px] font-semibold leading-none"
-          style={{ fontFamily: ps.font }}
+          className={cn(
+            'min-w-0 flex-1 truncate text-[13px] font-semibold leading-none',
+            provider === 'codex' ? 'font-mono' : 'font-sans',
+          )}
         >
           {agent.name}
         </span>
-        <ProviderTag provider={provider} />
+        <NodeTag tone={provider}>{provider}</NodeTag>
       </div>
 
       {/* Prompt sheet */}
       <div className="px-[10px] pb-2">
         <div
-          className="rounded-[var(--radius)] px-[10px] py-2 text-[11.5px] leading-[1.45]"
-          style={{
-            background: ps.prompt,
-            border: `1px solid ${ps.promptBorder}`,
-            color: tokens.color.text2,
-            fontFamily: ps.font,
-          }}
+          className={cn(
+            'rounded-[var(--radius)] border px-[10px] py-2 text-[11.5px] leading-[1.45] text-[var(--color-text-2)]',
+            promptTint[provider],
+          )}
         >
           {agent.instructions ? (
             <span className="line-clamp-3 whitespace-pre-wrap">
               {agent.instructions}
             </span>
           ) : (
-            <span style={{ color: tokens.color.textMuted }}>
+            <span className="text-[var(--color-text-muted)]">
               No instructions yet — click to configure.
             </span>
           )}
@@ -75,19 +73,17 @@ export function AgentNode({ data, selected }: NodeProps) {
       </div>
 
       <div className="flex flex-wrap gap-[6px] px-[10px] pb-2">
-        <NodePill borderColor={ps.promptBorder} bg={ps.prompt}>
-          <span style={{ color: tokens.color.text2 }}>{agent.model}</span>
+        <NodePill tone={provider}>
+          <span className="text-[var(--color-text-2)]">{agent.model}</span>
         </NodePill>
       </div>
 
       {/* Footer */}
       <div
-        className="flex items-center justify-between gap-2 px-3 py-[6px] font-mono text-[10px]"
-        style={{
-          background: ps.footer,
-          borderTop: `1px solid ${ps.promptBorder}`,
-          color: tokens.color.textMuted,
-        }}
+        className={cn(
+          'flex items-center justify-between gap-2 border-t px-3 py-[6px] font-mono text-[10px] text-[var(--color-text-muted)]',
+          footerTint[provider],
+        )}
       >
         <div className="flex min-w-0 gap-2">
           {agent.mcpServers.length === 0 ? (
@@ -113,38 +109,6 @@ export function AgentNode({ data, selected }: NodeProps) {
       </div>
 
       <Handle type="source" position={Position.Right} className="!h-2 !w-2" />
-    </div>
+    </NodeShell>
   );
 }
-
-function ProviderTag({ provider }: { provider: ProviderId }) {
-  const ps = providerStyle(provider);
-  return (
-    <span
-      className="ml-auto rounded-[var(--radius-sm)] px-[6px] py-[2px] font-mono text-[9px] font-semibold uppercase tracking-[0.06em]"
-      style={{ background: ps.tagBg, color: ps.tagText }}
-    >
-      {provider}
-    </span>
-  );
-}
-
-function NodePill({
-  children,
-  bg,
-  borderColor,
-}: {
-  children: React.ReactNode;
-  bg: string;
-  borderColor: string;
-}) {
-  return (
-    <span
-      className="inline-flex items-center gap-[6px] rounded-[var(--radius-sm)] px-[6px] py-[2px] font-mono text-[10px]"
-      style={{ background: bg, border: `1px solid ${borderColor}` }}
-    >
-      {children}
-    </span>
-  );
-}
-

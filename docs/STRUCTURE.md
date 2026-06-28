@@ -170,9 +170,11 @@ src/
                                        (Conduit `Logo` + `ProviderGlyph`)
     ui/                                the `cva`-based primitive layer (single source of truth for
                                        shared UI; see docs/DESIGN.md) — `Button`, `Card`, `Badge`,
-                                       `Input`/`Textarea`, `Field`/`Label`, `Select`, plus the
-                                       folded Radix wrappers `Dialog`, `DropdownMenu`,
-                                       `SearchSelect`, `CheckboxListPopover`, `InfoPopover`
+                                       `Input`/`Textarea`, `Field`/`Label`, `Select`, the canvas
+                                       node chrome (`NodeShell`/`NodeIconTile`/`NodeTag`/`NodePill`
+                                       in `node.tsx`), plus the folded Radix wrappers `Dialog`,
+                                       `DropdownMenu`, `SearchSelect`, `CheckboxListPopover`,
+                                       `InfoPopover`
   api/
     client.ts, hooks.ts, types.ts      HTTP client (cookie-based, `credentials: 'include'`),
                                        TanStack Query hooks, response types

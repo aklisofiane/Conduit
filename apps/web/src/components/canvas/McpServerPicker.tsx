@@ -17,6 +17,7 @@ import { CheckboxListPopover } from '../ui/checkbox-list-popover.js';
 import { Select } from '../ui/select.js';
 import { Button } from '../ui/button.js';
 import { Input } from '../ui/input.js';
+import { Card } from '../ui/card.js';
 
 interface Props {
   agent: AgentConfig;
@@ -152,9 +153,9 @@ function ServerCard({
   };
 
   return (
-    <div
+    <Card
       className={cn(
-        'rounded-md border bg-[var(--color-bg-2)] p-3',
+        'rounded-md bg-[var(--color-bg-2)] p-3',
         attached ? 'border-[var(--color-line-2)]' : 'border-[var(--color-line)]',
       )}
     >
@@ -221,7 +222,7 @@ function ServerCard({
           onChange={onSetAllowedTools}
         />
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -307,7 +308,7 @@ function AddServerForm({
   const [mode, setMode] = useState<'preset' | 'custom'>('preset');
 
   return (
-    <div className="rounded-md border border-[var(--color-line)] bg-[var(--color-bg-2)] p-3">
+    <Card className="rounded-md bg-[var(--color-bg-2)] p-3">
       <div className="flex items-center gap-2">
         <Button
           variant={mode === 'preset' ? 'primary' : 'secondary'}
@@ -329,7 +330,7 @@ function AddServerForm({
 
       {mode === 'preset' && <PresetPicker connections={connections} onAdd={onAdd} />}
       {mode === 'custom' && <CustomServerForm connections={connections} onAdd={onAdd} />}
-    </div>
+    </Card>
   );
 }
 
