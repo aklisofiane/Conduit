@@ -5,6 +5,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { requestPasswordReset } from '../lib/auth-client.js';
 import { Button } from '../components/ui/button.js';
+import { Input } from '../components/ui/input.js';
+import { Label } from '../components/ui/field.js';
 
 const schema = z.object({
   email: z.string().email('Enter a valid email'),
@@ -87,9 +89,8 @@ export function ForgotPasswordPage() {
       ) : (
         <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
           <label className="flex flex-col">
-            <span className="field-label">Email</span>
-            <input
-              className="field-input"
+            <Label asChild><span>Email</span></Label>
+            <Input
               type="email"
               autoComplete="email"
               autoFocus

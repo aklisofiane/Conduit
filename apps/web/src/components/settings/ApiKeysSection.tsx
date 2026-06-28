@@ -9,9 +9,10 @@ import {
 } from '../../api/hooks.js';
 import { ApiError } from '../../api/client.js';
 import { relativeFromNow } from '../../lib/time.js';
-import { Select } from '../common/Select.js';
+import { Select } from '../ui/select.js';
 import { SettingsSection } from '../common/SettingsSection.js';
 import { Button } from '../ui/button.js';
+import { Input } from '../ui/input.js';
 
 const PROVIDER_OPTIONS = agentProviderIdSchema.options.map((p) => ({ value: p, label: p }));
 
@@ -88,8 +89,7 @@ export function ApiKeysSection() {
             <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
               API key
             </span>
-            <input
-              className="field-input"
+            <Input
               type="password"
               autoComplete="new-password"
               value={form.apiKey}
@@ -100,8 +100,7 @@ export function ApiKeysSection() {
             <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
               Base URL (optional)
             </span>
-            <input
-              className="field-input"
+            <Input
               placeholder={BASE_URL_PLACEHOLDER[form.providerId]}
               value={form.baseUrl}
               onChange={(e) => setForm((f) => ({ ...f, baseUrl: e.target.value }))}
@@ -196,8 +195,7 @@ function ProviderConfigRowView({
         </div>
         {rotating && (
           <div className="mt-2 flex items-center gap-2">
-            <input
-              className="field-input"
+            <Input
               type="password"
               placeholder="New API key"
               value={newSecret}
@@ -223,8 +221,7 @@ function ProviderConfigRowView({
         )}
         {editingBaseUrl && (
           <div className="mt-2 flex items-center gap-2">
-            <input
-              className="field-input"
+            <Input
               placeholder={`${BASE_URL_PLACEHOLDER[cfg.providerId]} (leave empty to clear)`}
               value={newBaseUrl}
               onChange={(e) => setNewBaseUrl(e.target.value)}

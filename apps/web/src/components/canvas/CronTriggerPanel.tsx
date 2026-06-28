@@ -4,7 +4,7 @@ import { apiErrorMessage } from '../../api/client.js';
 import { useConnections, useRepoBranches } from '../../api/hooks.js';
 import { repoScopedConnections } from '../../lib/connection.js';
 import { SearchSelect } from '../common/SearchSelect.js';
-import { Select } from '../common/Select.js';
+import { Select } from '../ui/select.js';
 import { CronScheduleBuilder } from './CronScheduleBuilder.js';
 import {
   ActiveToggleField,

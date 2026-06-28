@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm';
 import { cn } from '../../lib/cn.js';
 import { Dialog, DialogContent, DialogTitle } from '../common/Dialog.js';
 import { Button } from '../ui/button.js';
+import { Textarea } from '../ui/input.js';
 
 /** Char + line counts for the prompt editors. Empty text reads as zero lines. */
 export function promptCounts(value: string): { chars: number; lines: number } {
@@ -105,9 +106,8 @@ export function PromptEditorDialog({
 
         <div className="px-5 pb-4 pt-2">
           {mode === 'write' ? (
-            <textarea
+            <Textarea
               ref={textareaRef}
-              className="field-input"
               style={{ height: '50vh', resize: 'none' }}
               value={buffer}
               onChange={(e) => setBuffer(e.target.value)}

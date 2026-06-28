@@ -10,9 +10,10 @@ import {
 } from '../../api/hooks.js';
 import { ApiError } from '../../api/client.js';
 import { relativeFromNow } from '../../lib/time.js';
-import { Select } from '../common/Select.js';
+import { Select } from '../ui/select.js';
 import { SettingsSection } from '../common/SettingsSection.js';
 import { Button } from '../ui/button.js';
+import { Input } from '../ui/input.js';
 
 const PLATFORMS = ['GITHUB', 'GITLAB', 'JIRA', 'SLACK', 'DISCORD'] as const;
 
@@ -119,8 +120,7 @@ export function CredentialsSection() {
               <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
                 Name
               </span>
-              <input
-                className="field-input"
+              <Input
                 placeholder="e.g. acme-github-pat"
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
@@ -130,8 +130,7 @@ export function CredentialsSection() {
               <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
                 Secret
               </span>
-              <input
-                className="field-input"
+              <Input
                 type="password"
                 autoComplete="new-password"
                 value={form.secret}
@@ -188,8 +187,7 @@ export function CredentialsSection() {
               </div>
               {form.selfHosted && (
                 <div className="flex flex-col gap-1">
-                  <input
-                    className="field-input"
+                  <Input
                     placeholder="ghe.example.com"
                     value={form.hostUrl}
                     onChange={(e) => {
@@ -282,8 +280,7 @@ function CredentialRowView({ cred, onDelete }: { cred: CredentialRow; onDelete: 
         </div>
         {rotating && (
           <div className="mt-2 flex items-center gap-2">
-            <input
-              className="field-input"
+            <Input
               type="password"
               placeholder="New secret"
               value={newSecret}

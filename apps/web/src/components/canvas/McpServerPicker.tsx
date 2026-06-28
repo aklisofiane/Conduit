@@ -14,8 +14,9 @@ import { useWorkflowEditor } from '../../state/workflow-editor.js';
 import { cn } from '../../lib/cn.js';
 import { connectionLabel } from '../../lib/connection.js';
 import { CheckboxListPopover } from '../common/CheckboxListPopover.js';
-import { Select } from '../common/Select.js';
+import { Select } from '../ui/select.js';
 import { Button } from '../ui/button.js';
+import { Input } from '../ui/input.js';
 
 interface Props {
   agent: AgentConfig;
@@ -440,14 +441,14 @@ function KeyValueEditor({
     <div className="flex flex-col gap-1.5">
       {entries.map(([k, v], i) => (
         <div key={i} className="flex items-center gap-1.5">
-          <input
-            className="field-input flex-1 font-mono text-[11px]"
+          <Input
+            className="flex-1 font-mono text-[11px]"
             placeholder={keyPlaceholder}
             value={k}
             onChange={(e) => update(i, 0, e.target.value)}
           />
-          <input
-            className="field-input flex-[2] font-mono text-[11px]"
+          <Input
+            className="flex-[2] font-mono text-[11px]"
             placeholder={valuePlaceholder}
             value={v}
             onChange={(e) => update(i, 1, e.target.value)}
@@ -521,8 +522,7 @@ function CustomServerForm({
         <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
           Name
         </span>
-        <input
-          className="field-input"
+        <Input
           placeholder="e.g. Internal API"
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -546,8 +546,7 @@ function CustomServerForm({
             <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
               Command
             </span>
-            <input
-              className="field-input"
+            <Input
               placeholder="npx"
               value={command}
               onChange={(e) => setCommand(e.target.value)}
@@ -557,8 +556,7 @@ function CustomServerForm({
             <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
               Args (space-separated)
             </span>
-            <input
-              className="field-input"
+            <Input
               placeholder="-y @my-org/mcp-something"
               value={args}
               onChange={(e) => setArgs(e.target.value)}
@@ -582,8 +580,7 @@ function CustomServerForm({
             <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
               URL
             </span>
-            <input
-              className="field-input"
+            <Input
               placeholder="https://tools.example.com/mcp"
               value={url}
               onChange={(e) => setUrl(e.target.value)}

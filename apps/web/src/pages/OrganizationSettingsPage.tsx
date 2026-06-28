@@ -6,8 +6,10 @@ import { z } from 'zod';
 import { useSession } from '../lib/auth-client.js';
 import { relativeFromNow } from '../lib/time.js';
 import { InlineRename } from '../components/common/InlineRename.js';
-import { Select } from '../components/common/Select.js';
+import { Select } from '../components/ui/select.js';
 import { Button } from '../components/ui/button.js';
+import { Input } from '../components/ui/input.js';
+import { Label } from '../components/ui/field.js';
 import {
   buildInviteUrl,
   ORG_ROLES,
@@ -481,9 +483,8 @@ function InviteMemberSection() {
       <form onSubmit={onSubmit} className="flex flex-col gap-3 px-4 py-4" noValidate>
         <div className="grid grid-cols-[1fr_140px_auto] items-end gap-3">
           <label className="flex flex-col">
-            <span className="field-label">Email</span>
-            <input
-              className="field-input"
+            <Label asChild><span>Email</span></Label>
+            <Input
               type="email"
               autoComplete="email"
               {...form.register('email')}
@@ -495,7 +496,7 @@ function InviteMemberSection() {
             )}
           </label>
           <label className="flex flex-col">
-            <span className="field-label">Role</span>
+            <Label asChild><span>Role</span></Label>
             <Controller
               name="role"
               control={form.control}
@@ -643,8 +644,7 @@ function DangerZoneSection({
                 <div className="font-mono text-[11px] text-[var(--color-text)]">
                   Type <code className="text-[var(--color-claude)]">{organizationName}</code> to confirm.
                 </div>
-                <input
-                  className="field-input"
+                <Input
                   value={confirmName}
                   onChange={(e) => setConfirmName(e.target.value)}
                   autoFocus

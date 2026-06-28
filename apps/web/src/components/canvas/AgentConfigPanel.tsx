@@ -16,8 +16,10 @@ import {
 import type { AgentPreset } from '../../api/types.js';
 import { cn } from '../../lib/cn.js';
 import { providerStyle } from '../../styles/theme.js';
-import { Select, type SelectItem } from '../common/Select.js';
+import { Select, type SelectItem } from '../ui/select.js';
 import { Button } from '../ui/button.js';
+import { Input, Textarea } from '../ui/input.js';
+import { Label, Hint } from '../ui/field.js';
 import { Maximize2, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { McpServerPicker } from './McpServerPicker.js';
@@ -134,8 +136,7 @@ export function AgentConfigPanel({
       <div className="flex-1 overflow-y-auto px-5 py-4">
         <div className="space-y-5">
           <Field label="Name">
-            <input
-              className="field-input"
+            <Input
               value={agent.name}
               onChange={(e) => onChange({ name: e.target.value })}
             />
@@ -212,20 +213,21 @@ export function AgentConfigPanel({
           </Field>
 
           <div>
-            <div className="field-label">
-              Instructions
-              <span className="hint">system prompt</span>
-              <button
-                type="button"
-                onClick={() => setPromptEditorOpen(true)}
-                className="ml-auto inline-flex items-center gap-1 rounded-[var(--radius-sm)] px-1.5 py-0.5 font-mono text-[10px] tracking-normal text-[var(--color-accent)] normal-case transition-colors hover:bg-[var(--color-pill-bg)]"
-              >
-                <Maximize2 size={11} strokeWidth={1.75} />
-                Expand
-              </button>
-            </div>
-            <textarea
-              className="field-input"
+            <Label asChild>
+              <div>
+                Instructions
+                <Hint>system prompt</Hint>
+                <button
+                  type="button"
+                  onClick={() => setPromptEditorOpen(true)}
+                  className="ml-auto inline-flex items-center gap-1 rounded-[var(--radius-sm)] px-1.5 py-0.5 font-mono text-[10px] tracking-normal text-[var(--color-accent)] normal-case transition-colors hover:bg-[var(--color-pill-bg)]"
+                >
+                  <Maximize2 size={11} strokeWidth={1.75} />
+                  Expand
+                </button>
+              </div>
+            </Label>
+            <Textarea
               rows={8}
               value={agent.instructions}
               onChange={(e) => onChange({ instructions: e.target.value })}
@@ -324,10 +326,12 @@ function Field({
 }) {
   return (
     <div>
-      <div className="field-label">
-        {label}
-        {hint && <span className="hint">{hint}</span>}
-      </div>
+      <Label asChild>
+        <div>
+          {label}
+          {hint && <Hint>{hint}</Hint>}
+        </div>
+      </Label>
       {children}
     </div>
   );

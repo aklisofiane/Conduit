@@ -12,8 +12,10 @@ import { useEnsureRepoLabels } from '../../api/hooks.js';
 import type { useListProjectBoards } from '../../api/hooks.js';
 import { cn } from '../../lib/cn.js';
 import { scopeSummary, type EnsureLabelTarget } from '../../lib/connection.js';
-import { Select } from '../common/Select.js';
+import { Select } from '../ui/select.js';
 import { Button } from '../ui/button.js';
+import { Input } from '../ui/input.js';
+import { Label, Hint as FieldHint } from '../ui/field.js';
 
 /**
  * Pieces shared across the three typed trigger panels (`IssuesTriggerPanel`,
@@ -92,10 +94,12 @@ export function Field({
 }) {
   return (
     <div>
-      <div className="field-label">
-        {label}
-        {hint && <span className="hint">{hint}</span>}
-      </div>
+      <Label asChild>
+        <div>
+          {label}
+          {hint && <FieldHint>{hint}</FieldHint>}
+        </div>
+      </Label>
       {children}
     </div>
   );
@@ -341,8 +345,7 @@ function OptionsValueInput({
 }) {
   if (options.length === 0) {
     return (
-      <input
-        className="field-input"
+      <Input
         placeholder={emptyHint}
         value={value}
         onChange={(e) => onChange(e.target.value)}

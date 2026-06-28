@@ -5,6 +5,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { resetPassword } from '../lib/auth-client.js';
 import { Button } from '../components/ui/button.js';
+import { Input } from '../components/ui/input.js';
+import { Label } from '../components/ui/field.js';
 
 const schema = z.object({
   password: z.string().min(8, 'At least 8 characters'),
@@ -100,9 +102,8 @@ export function ResetPasswordPage() {
       ) : (
         <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
           <label className="flex flex-col">
-            <span className="field-label">New password</span>
-            <input
-              className="field-input"
+            <Label asChild><span>New password</span></Label>
+            <Input
               type="password"
               autoComplete="new-password"
               autoFocus

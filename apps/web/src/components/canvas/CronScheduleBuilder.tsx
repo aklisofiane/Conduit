@@ -2,7 +2,9 @@ import { useCallback, useMemo, useState } from 'react';
 import cronstrue from 'cronstrue';
 import { ChevronDown } from 'lucide-react';
 import { CRON_EXPRESSION_RE } from '@conduit/shared';
-import { Select } from '../common/Select.js';
+import { Select } from '../ui/select.js';
+import { Input } from '../ui/input.js';
+import { Label, Hint as FieldHint } from '../ui/field.js';
 import { cn } from '../../lib/cn.js';
 import { Hint } from './trigger-panel-common.js';
 
@@ -197,7 +199,9 @@ export function CronScheduleBuilder({ value, onChange }: CronScheduleBuilderProp
   return (
     <div className="space-y-4">
       <div>
-        <div className="field-label">Repeat</div>
+        <Label asChild>
+          <div>Repeat</div>
+        </Label>
         <Select
           ariaLabel="Schedule frequency"
           value={isCustom ? 'custom' : schedule.frequency}
@@ -210,7 +214,9 @@ export function CronScheduleBuilder({ value, onChange }: CronScheduleBuilderProp
         <>
           {schedule.frequency === 'weekly' && (
             <div>
-              <div className="field-label">On</div>
+              <Label asChild>
+                <div>On</div>
+              </Label>
               <div className="flex gap-1">
                 {DAYS.map((label, i) => (
                   <button
@@ -233,7 +239,9 @@ export function CronScheduleBuilder({ value, onChange }: CronScheduleBuilderProp
 
           {schedule.frequency === 'monthly' && (
             <div>
-              <div className="field-label">Day of month</div>
+              <Label asChild>
+                <div>Day of month</div>
+              </Label>
               <Select
                 ariaLabel="Day of month"
                 value={String(schedule.dayOfMonth)}
@@ -244,9 +252,9 @@ export function CronScheduleBuilder({ value, onChange }: CronScheduleBuilderProp
           )}
 
           <div>
-            <div className="field-label">
-              {schedule.frequency === 'hourly' ? 'At minute' : 'At'}
-            </div>
+            <Label asChild>
+              <div>{schedule.frequency === 'hourly' ? 'At minute' : 'At'}</div>
+            </Label>
               <div className="flex items-center gap-1.5">
                 {schedule.frequency !== 'hourly' && (
                   <>
@@ -276,12 +284,13 @@ export function CronScheduleBuilder({ value, onChange }: CronScheduleBuilderProp
 
       {isCustom && (
         <div>
-          <div className="field-label">
-            Cron expression
-            <span className="hint">5-field POSIX (min hour dom month dow)</span>
-          </div>
-          <input
-            className="field-input"
+          <Label asChild>
+            <div>
+              Cron expression
+              <FieldHint>5-field POSIX (min hour dom month dow)</FieldHint>
+            </div>
+          </Label>
+          <Input
             type="text"
             placeholder="0 9 * * *"
             value={value}
@@ -319,8 +328,8 @@ export function CronScheduleBuilder({ value, onChange }: CronScheduleBuilderProp
             {showAdvanced ? 'Hide' : 'Show'} cron expression
           </button>
           {showAdvanced && (
-            <input
-              className="field-input mt-2"
+            <Input
+              className="mt-2"
               type="text"
               value={value}
               readOnly

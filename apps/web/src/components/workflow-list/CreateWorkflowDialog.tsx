@@ -3,8 +3,9 @@ import { CircleDot, Clock, GitPullRequest } from 'lucide-react';
 import { useConnections } from '../../api/hooks.js';
 import { scopeSummary } from '../../lib/connection.js';
 import { Dialog, DialogContent, DialogTitle } from '../common/Dialog.js';
-import { Select } from '../common/Select.js';
+import { Select } from '../ui/select.js';
 import { Button } from '../ui/button.js';
+import { Input } from '../ui/input.js';
 import type { PaletteTriggerType } from '../canvas/NodePalette.js';
 
 interface CreateWorkflowDialogProps {
@@ -96,8 +97,7 @@ export function CreateWorkflowDialog({
             <span className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-3)]">
               Name
             </span>
-            <input
-              className="field-input"
+            <Input
               value={name}
               placeholder="My workflow"
               autoFocus

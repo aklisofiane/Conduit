@@ -2,7 +2,7 @@ import * as Popover from '@radix-ui/react-popover';
 import { useRef, useState } from 'react';
 import { Check, ChevronDown, Search } from 'lucide-react';
 import { cn } from '../../lib/cn.js';
-import type { SelectOption } from './Select.js';
+import type { SelectOption } from '../ui/select.js';
 
 interface SearchSelectProps {
   value: string;

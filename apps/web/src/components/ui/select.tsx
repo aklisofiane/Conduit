@@ -3,6 +3,13 @@ import type { ReactNode } from 'react';
 import { Check, ChevronDown } from 'lucide-react';
 import { cn } from '../../lib/cn.js';
 
+/**
+ * Select — Radix-backed select folded into the `ui/` primitive layer alongside
+ * the form controls. The trigger keeps the shared `.select-trigger` styling for
+ * now (still used by the wave-4 wrappers `SearchSelect` / `CheckboxListPopover`),
+ * so this is a pure relocation: behaviour and markup are unchanged from the old
+ * `common/Select`.
+ */
 export type SelectOption = {
   value: string;
   label: ReactNode;

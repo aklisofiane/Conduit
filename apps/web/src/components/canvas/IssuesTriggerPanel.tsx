@@ -17,6 +17,7 @@ import {
 } from './trigger-panel-common.js';
 import { ensureLabelTarget, repoScopedConnections } from '../../lib/connection.js';
 import { Button } from '../ui/button.js';
+import { Input } from '../ui/input.js';
 
 type IssuesTrigger = Extract<TriggerConfig, { type: 'issues' }>;
 
@@ -159,8 +160,7 @@ export function IssuesTriggerPanel({
 
           <Field label="Poll every" hint="seconds between poll cycles">
             <div className="flex items-center gap-2">
-              <input
-                className="field-input"
+              <Input
                 type="number"
                 min={10}
                 step={10}

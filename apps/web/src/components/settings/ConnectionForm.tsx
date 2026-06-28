@@ -9,8 +9,9 @@ import {
 } from '../../api/hooks.js';
 import type { CredentialRow } from '../../api/types.js';
 import { SearchSelect } from '../common/SearchSelect.js';
-import { Select } from '../common/Select.js';
+import { Select } from '../ui/select.js';
 import { Button } from '../ui/button.js';
+import { Input } from '../ui/input.js';
 
 export type CreateBody = {
   credentialId: string;
@@ -118,8 +119,7 @@ export function CreateConnectionForm({
           <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
             Name
           </span>
-          <input
-            className="field-input"
+          <Input
             placeholder="e.g. acme/shop repo"
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -267,8 +267,7 @@ function RepoScopeRow({
             options={options}
           />
         ) : (
-          <input
-            className="field-input"
+          <Input
             placeholder="owner/repo"
             value={manualValue}
             onChange={(e) => {
@@ -335,8 +334,7 @@ function GitlabProjectScopeRow({
             }))}
           />
         ) : (
-          <input
-            className="field-input"
+          <Input
             placeholder="group/project"
             value={projectPath}
             onChange={(e) => onSelect(e.target.value.trim())}
@@ -420,8 +418,7 @@ function BoardOwnerField({
         <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
           Owner
         </span>
-        <input
-          className="field-input"
+        <Input
           placeholder="acme"
           value={owner}
           onChange={(e) => onOwner(e.target.value)}
@@ -513,8 +510,7 @@ function BoardScopeRow({
               }))}
             />
           ) : (
-            <input
-              className="field-input"
+            <Input
               type="number"
               min={1}
               placeholder="5"

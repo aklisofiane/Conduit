@@ -27,8 +27,9 @@ import type {
 import { connectionLabel, repoScopedConnections } from '../../lib/connection.js';
 import { Dialog, DialogContent, DialogTitle } from '../common/Dialog.js';
 import { SearchSelect } from '../common/SearchSelect.js';
-import { Select, type SelectOption } from '../common/Select.js';
+import { Select, type SelectOption } from '../ui/select.js';
 import { Button } from '../ui/button.js';
+import { Input } from '../ui/input.js';
 
 function credentialPlatform(
   credentialId: string,
@@ -838,8 +839,7 @@ function LabeledInput({
       <span className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-3)]">
         {label}
       </span>
-      <input
-        className="field-input"
+      <Input
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
