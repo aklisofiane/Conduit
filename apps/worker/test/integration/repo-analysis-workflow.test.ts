@@ -222,6 +222,20 @@ describe('repoAnalysisWorkflow orchestration (TestWorkflowEnvironment)', () => {
     expect(cleanup.status).toBe('COMPLETED');
   });
 
+  it('retries Discover when manifest exceeds the component cap', async () => {
+    // First readComponentManifestActivity call simulates a cap-exceeded rejection
+    // (manifestFailures: 1 causes the mock to throw on the first attempt).
+    await runWorkflow({ manifest: manifest(['API']), manifestFailures: 1 });
+
+    const discoverRuns = callsNamed('runAgentNode').filter(
+      (c) => (c.input as { node: { name: string } }).node.name === 'Discover',
+    );
+    expect(discoverRuns).toHaveLength(2);
+    expect(callsNamed('assembleSuggestionsActivity')).toHaveLength(1);
+    const cleanup = callsNamed('cleanupRunActivity')[0]!.input as { status: string };
+    expect(cleanup.status).toBe('COMPLETED');
+  });
+
   it('fails the analysis (FAILED phase + cleanup) when Discover never parses', async () => {
     await runWorkflow({ manifest: manifest(['API']), manifestFailures: 3 });
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { componentManifestSchema } from './component-manifest';
+import { MAX_COMPONENTS, componentManifestSchema } from './component-manifest';
 import { workflowDraftSchema } from './workflow-draft';
 
 describe('componentManifestSchema', () => {
@@ -14,6 +14,26 @@ describe('componentManifestSchema', () => {
 
   it('rejects a manifest with no components', () => {
     expect(componentManifestSchema.safeParse({ components: [] }).success).toBe(false);
+  });
+
+  it('accepts a manifest at the max-components cap', () => {
+    const components = Array.from({ length: MAX_COMPONENTS }, (_, i) => ({
+      name: `Component${i}`,
+      paths: [`apps/component${i}/**`],
+      rationale: 'r',
+      criticality: 'medium' as const,
+    }));
+    expect(componentManifestSchema.safeParse({ components }).success).toBe(true);
+  });
+
+  it('rejects a manifest exceeding the max-components cap', () => {
+    const components = Array.from({ length: MAX_COMPONENTS + 1 }, (_, i) => ({
+      name: `Component${i}`,
+      paths: [`apps/component${i}/**`],
+      rationale: 'r',
+      criticality: 'medium' as const,
+    }));
+    expect(componentManifestSchema.safeParse({ components }).success).toBe(false);
   });
 
   it('rejects a component with no paths or a bad criticality', () => {

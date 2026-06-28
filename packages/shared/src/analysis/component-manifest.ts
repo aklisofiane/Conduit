@@ -30,6 +30,8 @@ export const componentSchema = z.object({
 });
 export type Component = z.infer<typeof componentSchema>;
 
+export const MAX_COMPONENTS = 50;
+
 /**
  * Structured Discover output. Written by the Discover agent as JSON to a
  * fixed workspace path (see `ANALYSIS_MANIFEST_PATH`) — a machine-read
@@ -38,6 +40,6 @@ export type Component = z.infer<typeof componentSchema>;
  * so the workflow can fan out over a typed list.
  */
 export const componentManifestSchema = z.object({
-  components: z.array(componentSchema).min(1),
+  components: z.array(componentSchema).min(1).max(MAX_COMPONENTS),
 });
 export type ComponentManifest = z.infer<typeof componentManifestSchema>;
