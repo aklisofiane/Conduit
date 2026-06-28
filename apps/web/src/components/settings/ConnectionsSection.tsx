@@ -19,6 +19,7 @@ import {
   scopeSummary,
   type EnsureLabelTarget,
 } from '../../lib/connection.js';
+import { InfoPopover } from '../common/InfoPopover.js';
 import { SettingsSection } from '../common/SettingsSection.js';
 import { CreateConnectionForm } from './ConnectionForm.js';
 import { SuggestionsGalleryDialog } from './SuggestionsGalleryDialog.js';
@@ -272,15 +273,28 @@ function ConnectionRowView({ conn, onDelete }: { conn: ConnectionRow; onDelete: 
               {imported ? 'Suggestions imported' : 'Suggestions ready'}
             </button>
           )}
-          {isRepoScoped && (
-            <button
-              className="btn"
-              disabled={running || startAnalysis.isPending}
-              onClick={onAnalyze}
-            >
-              {running ? 'Analyzing…' : ready ? 'Re-analyze' : 'Analyze repo'}
-            </button>
-          )}
+          {isRepoScoped &&
+            (() => {
+              const analyzeButton = (
+                <button
+                  className="btn"
+                  disabled={running || startAnalysis.isPending}
+                  onClick={onAnalyze}
+                >
+                  {running ? 'Analyzing…' : ready ? 'Re-analyze' : 'Analyze repo'}
+                </button>
+              );
+              // Explain the action on first run, when its purpose is opaque.
+              // Once it's running (progress card) or ready (suggestions pill),
+              // the meaning is already clear, so render the bare button.
+              return !ready && !running ? (
+                <InfoPopover label="What “Analyze repo” does" trigger={analyzeButton}>
+                  <AnalyzeRepoInfo />
+                </InfoPopover>
+              ) : (
+                analyzeButton
+              );
+            })()}
           <button className="btn" onClick={onDelete}>
             Delete
           </button>
@@ -302,6 +316,47 @@ function ConnectionRowView({ conn, onDelete }: { conn: ConnectionRow; onDelete: 
         />
       )}
     </div>
+  );
+}
+
+/**
+ * Body of the `ⓘ` popover next to "Analyze repo" — explains the otherwise
+ * opaque action: what it produces, the three coarse steps, and that it's a
+ * read-only multi-minute run nothing imports without consent. Mirrors the
+ * phase labels in {@link ANALYSIS_PHASE_LABEL} in plain language.
+ */
+function AnalyzeRepoInfo() {
+  return (
+    <>
+      <div className="info-popover-title">
+        <span className="spark">✦</span> What “Analyze repo” does
+      </div>
+      <p className="info-popover-lede">
+        Conduit reads the repo and proposes <b>ready-to-import review workflows</b> — one per
+        component it finds.
+      </p>
+      <ul className="info-popover-steps">
+        <li>
+          <span className="n">1</span>
+          <span>
+            <b>Maps the components</b> in the codebase
+          </span>
+        </li>
+        <li>
+          <span className="n">2</span>
+          <span>
+            <b>Designs a scheduled review</b> for each — reviewer focus and a cadence
+          </span>
+        </li>
+        <li>
+          <span className="n">3</span>
+          <span>
+            You <b>pick which to import</b>; nothing runs until you do
+          </span>
+        </li>
+      </ul>
+      <div className="info-popover-foot">~ a few minutes · read-only</div>
+    </>
   );
 }
 
