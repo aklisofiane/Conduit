@@ -2,7 +2,6 @@ import path from 'node:path';
 import { type WorkflowBundle, Worker, bundleWorkflowCode } from '@temporalio/worker';
 import type { TestWorkflowEnvironment } from '@temporalio/testing';
 import {
-  MAX_COMPONENTS,
   buildAnalysisTriggerEvent,
   type AssemblyPresets,
   type ComponentManifest,
