@@ -99,7 +99,7 @@ Read by `AgentNode` / `TriggerNode` for the outer wrapper; React Flow uses these
 | `AgentConfigPanel` (`canvas/AgentConfigPanel.tsx`) | `providerStyle()` for the heading dot + `ps.label` text; arbitrary-`var` Tailwind for the rest |
 | Typed trigger nodes (`IssuesTriggerNode`, `PrTriggerNode`, `CronTriggerNode`, `WebhookTriggerPlaceholderNode` via `trigger-node-common.tsx` / `TriggerNodeShell`) + panels (`IssuesTriggerPanel`, `PrTriggerPanel`, `CronTriggerPanel` via `trigger-panel-common.tsx`), all in `canvas/` | `tokens.color.trigger*` only (trigger is not provider-specific) |
 | `TopChrome` (`layout/TopChrome.tsx`) | Arbitrary-`var` Tailwind only — divider, panel bg, accent for the logo, pill bg for nav-icon hover |
-| Component primitives in `globals.css` | `.btn`, `.chip`, `.pill`, `.field-input`, `.kbd`, `.status-dot`, `.prov-glyph` — read CSS vars directly |
+| Component primitives in `globals.css` | `.kbd`, `.status-dot` — read CSS vars directly. The `.btn` / `.chip` / `.pill` / `.field-input` / `.prov-glyph` families were folded into the `cva` primitives in `components/ui/` (`Button`, `Badge`, `Input`/`Field`) |
 
 ## `cn()` helper
 

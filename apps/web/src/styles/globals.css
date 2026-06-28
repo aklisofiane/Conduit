@@ -44,10 +44,6 @@ body {
   background: var(--color-text-muted);
 }
 
-.mono {
-  font-family: var(--font-mono);
-}
-
 /* ---------- React Flow overrides ---------- */
 .react-flow {
   background: var(--color-bg-canvas);

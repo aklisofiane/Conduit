@@ -165,9 +165,14 @@ src/
                                        docs/design-docs/web-auth-ui.md
     workflow-list/                     WorkflowRowItem + RowActionsMenu — rows on the
                                        workflow list (rename / duplicate / delete)
-    common/                            shared UI primitives — `Dialog`, `DropdownMenu`, `Select`
-                                       (thin Radix wrappers), `InlineRename`, `BrandGlyph.tsx`
+    common/                            shared non-primitive UI — `InlineRename`, `OAuthButton`,
+                                       `FormField`, `SettingsSection`, `BrandGlyph.tsx`
                                        (Conduit `Logo` + `ProviderGlyph`)
+    ui/                                the `cva`-based primitive layer (single source of truth for
+                                       shared UI; see docs/DESIGN.md) — `Button`, `Card`, `Badge`,
+                                       `Input`/`Textarea`, `Field`/`Label`, `Select`, plus the
+                                       folded Radix wrappers `Dialog`, `DropdownMenu`,
+                                       `SearchSelect`, `CheckboxListPopover`, `InfoPopover`
   api/
     client.ts, hooks.ts, types.ts      HTTP client (cookie-based, `credentials: 'include'`),
                                        TanStack Query hooks, response types
