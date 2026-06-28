@@ -93,7 +93,7 @@ v1.1+: add a "trust level" flag on triggers; auto-disable write tools on untrust
 
 ## API error response sanitization
 
-Upstream provider error bodies can contain OAuth tokens, internal service URLs, or rate-limit metadata. `TriggerService` catches upstream failures and returns a generic provider-specific message to the caller (e.g. `"Failed to list branches from GitHub"`) while logging the raw upstream body server-side via `logger.warn`. The raw body is never forwarded in the `BadRequestException` payload. Currently applied to: branch listing (`listBranches`) for GitHub and GitLab.
+Upstream provider error bodies can contain OAuth tokens, internal service URLs, or rate-limit metadata. The branch-listing helpers (`github/branches.ts`, `gitlab/branches.ts`) throw errors that contain only the HTTP status code and the repo/project identifier — the upstream response body is never read for error construction. `TriggerService.listBranches` catches those errors with an unbound `catch {}`, discarding whatever the helper threw, and returns a hardcoded provider-specific message (`"Failed to list branches from GitHub"` / `"Failed to list branches from GitLab"`) to the caller. The `logger.warn` call emits only a static `"upstream returned an error"` phrase. The upstream body is discarded before it can reach logs, `BadRequestException` payloads, or any persistence path. Currently applied to: branch listing (`listBranches`) for GitHub and GitLab.
 
 ## API auth & tenant isolation (operator summary)
 
