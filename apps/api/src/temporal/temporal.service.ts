@@ -7,18 +7,22 @@ import {
   ScheduleNotFoundError,
   ScheduleOverlapPolicy,
   WorkflowExecutionAlreadyStartedError,
+  WorkflowNotFoundError,
   isGrpcServiceError,
 } from '@temporalio/client';
 import {
   AGENT_WORKFLOW_TYPE,
   CRON_WORKFLOW_TYPE,
   POLL_WORKFLOW_TYPE,
+  REPO_ANALYSIS_WORKFLOW_TYPE,
   agentWorkflowId,
   cronWorkflowId,
   pollWorkflowId,
+  repoAnalysisWorkflowId,
   workflowScheduleId,
   type CronWorkflowInput,
   type PollWorkflowInput,
+  type RepoAnalysisWorkflowInput,
   type ScheduledTrigger,
   type TicketLock,
   type TriggerEvent,
@@ -177,6 +181,57 @@ export class TemporalService implements OnModuleInit, OnModuleDestroy {
         throw new DuplicateRunError(temporalWorkflowId, err);
       }
       throw err;
+    }
+  }
+
+  /**
+   * Start the dedicated `repoAnalysisWorkflow` for a connection analysis. The
+   * Temporal workflow id keys on the `RepoAnalysis.id`; the API already
+   * rejects a second analysis while one is running for the connection, so a
+   * start collision shouldn't happen and isn't translated specially.
+   */
+  async startRepoAnalysisWorkflow(input: RepoAnalysisWorkflowInput): Promise<{
+    temporalWorkflowId: string;
+    temporalRunId: string;
+  }> {
+    if (!this.client) {
+      throw new Error('Temporal client not initialized — check TEMPORAL_ADDRESS');
+    }
+    const temporalWorkflowId = repoAnalysisWorkflowId(input.analysisId);
+    const handle = await this.client.workflow.start(REPO_ANALYSIS_WORKFLOW_TYPE, {
+      args: [input],
+      taskQueue: config.temporal.taskQueue,
+      workflowId: temporalWorkflowId,
+    });
+    return { temporalWorkflowId, temporalRunId: handle.firstExecutionRunId };
+  }
+
+  /**
+   * Describe the dedicated `repoAnalysisWorkflow` for an analysis id, returning
+   * the live execution's ids when it exists and is still `RUNNING`, else null.
+   *
+   * Disambiguates a *lost* `StartWorkflowExecution` response from a genuine
+   * start failure: if the start RPC committed server-side but the client never
+   * saw the reply (network blip / retry exhaustion), the workflow is actually
+   * running and the caller's teardown must NOT mark the analysis FAILED. A
+   * not-found execution — or an unreachable server (same cause as the original
+   * start failure) — yields null so the caller tears down as normal.
+   */
+  async describeRunningRepoAnalysis(analysisId: string): Promise<{
+    temporalWorkflowId: string;
+    temporalRunId: string;
+  } | null> {
+    if (!this.client) return null;
+    const temporalWorkflowId = repoAnalysisWorkflowId(analysisId);
+    try {
+      const desc = await this.client.workflow.getHandle(temporalWorkflowId).describe();
+      if (desc.status.name !== 'RUNNING') return null;
+      return { temporalWorkflowId, temporalRunId: desc.runId };
+    } catch (err) {
+      if (err instanceof WorkflowNotFoundError) return null;
+      // Can't confirm (e.g. Temporal still unreachable) — treat as not running
+      // so the analysis is failed rather than left dangling.
+      return null;
     }
   }
 

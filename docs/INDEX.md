@@ -16,20 +16,21 @@ Agent-first workflow automation for dev teams. Board-driven orchestration, atomi
 10. [design-docs/connections.md](./design-docs/connections.md) — Credential + Connection model, typed scope union, workflow webhook secret
 11. [design-docs/templates.md](./design-docs/templates.md) — workflow templates shipped as starting points
 12. [design-docs/agent-presets.md](./design-docs/agent-presets.md) — reusable agent prompts referenced by templates and the canvas
-13. [design-docs/authentication.md](./design-docs/authentication.md) — **auth umbrella overview**: deployment modes, signup → org-creation flow, the three auth planes, trust contract, RBAC stance, links to all per-feature docs
-14. [design-docs/auth-integration.md](./design-docs/auth-integration.md) — Better Auth mount, `SessionGuard`, `/api/auth-config`, harness signup
-15. [design-docs/tenant-partitioning.md](./design-docs/tenant-partitioning.md) — `orgId` on every business row, `@OrgId()`, signup-shim, cross-org → 404 convention
-16. [design-docs/authorization-enforcement.md](./design-docs/authorization-enforcement.md) — `activeOrganizationId` trust contract, Socket.IO auth on `RunsGateway`, webhook → run org chain, v1 flat-RBAC, membership-staleness window
-17. [data-model.md](./data-model.md) — Prisma schema spec
-18. [FRONTEND.md](./FRONTEND.md) — canvas (design), run history, run detail page
-19. [design-docs/web-auth-ui.md](./design-docs/web-auth-ui.md) — auth route shell, `RequireAuth` boundary, `UserMenuPill`, Better Auth client API surface
-20. [design-docs/org-switching.md](./design-docs/org-switching.md) — org switching UI, members + invitations management, copyable invite-URL fallback
-21. [design-docs/operational-hardening.md](./design-docs/operational-hardening.md) — Better Auth rate limits, AuditLog model, failed-login spike signal
-22. [DESIGN.md](./DESIGN.md) — design tokens, palette, provider styling, the @theme bridge
-23. [SECURITY.md](./SECURITY.md) — auth, credentials, sandboxing
-24. [RELIABILITY.md](./RELIABILITY.md) — retries, crash recovery, cancellation
-25. [VALIDATION.md](./VALIDATION.md) — testing strategy, E2E harness, `StubProvider`
-26. [PLANS.md](./PLANS.md) — phased rollout
+13. [design-docs/repo-analysis.md](./design-docs/repo-analysis.md) — point Conduit at a repo → per-component review workflows, suggested and ready to import (dedicated Temporal workflow, hidden SYSTEM run host)
+14. [design-docs/authentication.md](./design-docs/authentication.md) — **auth umbrella overview**: deployment modes, signup → org-creation flow, the three auth planes, trust contract, RBAC stance, links to all per-feature docs
+15. [design-docs/auth-integration.md](./design-docs/auth-integration.md) — Better Auth mount, `SessionGuard`, `/api/auth-config`, harness signup
+16. [design-docs/tenant-partitioning.md](./design-docs/tenant-partitioning.md) — `orgId` on every business row, `@OrgId()`, signup-shim, cross-org → 404 convention
+17. [design-docs/authorization-enforcement.md](./design-docs/authorization-enforcement.md) — `activeOrganizationId` trust contract, Socket.IO auth on `RunsGateway`, webhook → run org chain, v1 flat-RBAC, membership-staleness window
+18. [data-model.md](./data-model.md) — Prisma schema spec
+19. [FRONTEND.md](./FRONTEND.md) — canvas (design), run history, run detail page
+20. [design-docs/web-auth-ui.md](./design-docs/web-auth-ui.md) — auth route shell, `RequireAuth` boundary, `UserMenuPill`, Better Auth client API surface
+21. [design-docs/org-switching.md](./design-docs/org-switching.md) — org switching UI, members + invitations management, copyable invite-URL fallback
+22. [design-docs/operational-hardening.md](./design-docs/operational-hardening.md) — Better Auth rate limits, AuditLog model, failed-login spike signal
+23. [DESIGN.md](./DESIGN.md) — design tokens, palette, provider styling, the @theme bridge
+24. [SECURITY.md](./SECURITY.md) — auth, credentials, sandboxing
+25. [RELIABILITY.md](./RELIABILITY.md) — retries, crash recovery, cancellation
+26. [VALIDATION.md](./VALIDATION.md) — testing strategy, E2E harness, `StubProvider`
+27. [PLANS.md](./PLANS.md) — phased rollout
 
 ## Setup recipes
 

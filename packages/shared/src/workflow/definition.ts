@@ -34,6 +34,30 @@ export const workflowDefinitionSchema = z
     const triggerNames = new Set(def.triggers.map((t) => t.name));
     const agentNames = new Set(def.nodes.map((n) => n.name));
 
+    // Node ids and names must each be unique. Edges and the runtime key off
+    // both, so a duplicate silently corrupts the graph (ambiguous edge
+    // endpoints, a node keyed by a colliding id) rather than failing loudly.
+    const seenIds = new Set<string>();
+    const seenNames = new Set<string>();
+    for (const node of def.nodes) {
+      if (seenIds.has(node.id)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['nodes'],
+          message: `Duplicate node id "${node.id}"`,
+        });
+      }
+      seenIds.add(node.id);
+      if (seenNames.has(node.name)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['nodes'],
+          message: `Duplicate node name "${node.name}"`,
+        });
+      }
+      seenNames.add(node.name);
+    }
+
     for (const name of triggerNames) {
       if (agentNames.has(name)) {
         ctx.addIssue({

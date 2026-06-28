@@ -8,6 +8,7 @@ import {
   finalSummaryPrompt,
   formatParallelDownstreamBlock,
   formatUpstreamContextBlock,
+  installAnalysisSkillsIntoWorkspace,
   installPushCredentials,
   installSkillsIntoWorkspace,
   issueWritebackPrompt,
@@ -94,6 +95,15 @@ export interface RunAgentNodeInput {
    * Empty/undefined for entry nodes.
    */
   directUpstream?: string[];
+  /**
+   * When true, stage the internal repo-analyzer Design skills
+   * (`draft-format`, `scope-authoring`, `reviewer-authoring`) into the
+   * workspace alongside any user-selected skills. Set by `repoAnalysisWorkflow`
+   * for the Design dispatch only — Discover authors no prose and gets none. The
+   * bundled-dir resolution happens here in the activity (filesystem I/O), so the
+   * workflow stays V8-sandbox-safe and only passes the boolean.
+   */
+  stageAnalysisSkills?: boolean;
 }
 
 /**
@@ -118,6 +128,7 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
     parallelBranch,
     parallelDownstream,
     directUpstream,
+    stageAnalysisSkills,
   } = input;
   const ctx = Context.current();
   const workspaceManager = new WorkspaceManager();
@@ -199,6 +210,12 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
     const selected = skills.filter((s) => node.skills.some((r) => r.skillId === s.id));
     if (selected.length) {
       await installSkillsIntoWorkspace(workspace.path, selected, node.provider);
+    }
+    // Internal-only repo-analyzer Design skills. Staged directly from the agent
+    // package source (never via discoverSkills), so they guide the Design agent
+    // without ever surfacing in GET /skills or the canvas picker.
+    if (stageAnalysisSkills) {
+      await installAnalysisSkillsIntoWorkspace(workspace.path, node.provider);
     }
 
     // Skip auto-attach if the firing platform's MCP is already referenced —
@@ -507,7 +524,11 @@ async function resolveEntryWorkspaceInputs(
   return {
     connection,
     ticket: triggerEvent.issue
-      ? { id: triggerEvent.issue.key, title: triggerEvent.issue.title }
+      ? {
+          id: triggerEvent.issue.key,
+          title: triggerEvent.issue.title,
+          body: triggerEvent.issue.body,
+        }
       : undefined,
     store: makeTicketBranchStore(),
     pr: triggerEvent.pr ? { ...triggerEvent.pr } : undefined,

@@ -13,6 +13,7 @@ export const DEFAULT_TEMPORAL_TASK_QUEUE = 'conduit-workflows';
 export const AGENT_WORKFLOW_TYPE = 'agentWorkflow';
 export const POLL_WORKFLOW_TYPE = 'pollWorkflow';
 export const CRON_WORKFLOW_TYPE = 'cronWorkflow';
+export const REPO_ANALYSIS_WORKFLOW_TYPE = 'repoAnalysisWorkflow';
 
 /**
  * Build the frozen, human-readable slug woven into every Temporal id as a
@@ -117,6 +118,15 @@ export function agentWorkflowId(
     return `run-${withSlug(ticketLock.workflowId, slug)}-${ticketLock.ticketKey}`;
   }
   return `run-${withSlug(runId, slug)}`;
+}
+
+/**
+ * Deterministic Temporal workflow id for a `repoAnalysisWorkflow` start.
+ * Scoped by the `RepoAnalysis.id` — one in-flight analysis per row; the API
+ * already rejects a second analysis while one is running for the connection.
+ */
+export function repoAnalysisWorkflowId(analysisId: string): string {
+  return `analysis-run-${analysisId}`;
 }
 
 /** Dedup key for `ticket-branch` workflow starts. See `agentWorkflowId`. */

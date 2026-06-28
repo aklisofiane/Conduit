@@ -4,20 +4,25 @@ import { isCloudHost } from '@conduit/shared/platform';
 import type { Platform } from '@conduit/shared/platform';
 import { ApiError, apiErrorMessage } from '../../api/client.js';
 import {
+  useConnectionAnalysis,
   useConnections,
   useCreateConnection,
   useCredentials,
   useDeleteConnection,
   useEnsureRepoLabels,
+  useStartAnalysis,
 } from '../../api/hooks.js';
-import type { ConnectionRow } from '../../api/types.js';
+import type { AnalysisPhase } from '@conduit/shared/analysis';
+import type { ConnectionAnalysis, ConnectionRow } from '../../api/types.js';
 import {
   ensureLabelTarget,
   scopeSummary,
   type EnsureLabelTarget,
 } from '../../lib/connection.js';
+import { InfoPopover } from '../common/InfoPopover.js';
 import { SettingsSection } from '../common/SettingsSection.js';
 import { CreateConnectionForm } from './ConnectionForm.js';
+import { SuggestionsGalleryDialog } from './SuggestionsGalleryDialog.js';
 
 /**
  * Connections are global, not per-workflow: a workflow's trigger and MCP slots
@@ -214,26 +219,173 @@ function LabelPrompt({
   );
 }
 
+/** Coarse phase → progress-card label. No raw logs ever reach the UI. */
+const ANALYSIS_PHASE_LABEL: Record<AnalysisPhase, string> = {
+  DISCOVER: 'Mapping components',
+  DESIGN: 'Designing reviews',
+  ASSEMBLE: 'Finalizing',
+};
+
 function ConnectionRowView({ conn, onDelete }: { conn: ConnectionRow; onDelete: () => void }) {
   const summary = scopeSummary(conn.scope);
+  // Only repo/project-scoped connections can be analyzed — board and unscoped
+  // connections have no repo to map components from.
+  const isRepoScoped =
+    conn.scope.kind === 'github_repo' || conn.scope.kind === 'gitlab_project';
+
+  const { data: analysis } = useConnectionAnalysis(conn.id, isRepoScoped);
+  const startAnalysis = useStartAnalysis();
+  const [galleryOpen, setGalleryOpen] = useState(false);
+
+  const status = analysis?.status;
+  const running = status === 'PENDING' || status === 'ANALYZING';
+  const ready = status === 'READY';
+  const imported = ready && !!analysis?.importedAt;
+
+  const onAnalyze = async () => {
+    try {
+      await startAnalysis.mutateAsync(conn.id);
+    } catch (e) {
+      alert(apiErrorMessage(e));
+    }
+  };
+
   return (
-    <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4 border-b border-[var(--color-line)] px-4 py-3 last:border-b-0">
-      <span className="flex h-7 w-7 items-center justify-center rounded-md border border-[var(--color-line)] bg-[var(--color-bg-2)] font-mono text-[10.5px]">
-        {conn.credential.platform.slice(0, 2)}
-      </span>
-      <div>
-        <div className="font-mono text-[13px] font-medium">{conn.name}</div>
-        <div className="font-mono text-[11px] text-[var(--color-text-3)]">
-          {conn.credential.name} · {conn.credential.platform.toLowerCase()}
-          {conn.credential.hostUrl &&
-            !isCloudHost(conn.credential.platform as Platform, conn.credential.hostUrl) &&
-            ` · ${conn.credential.hostUrl}`}
-          {summary && ` · ${summary}`}
+    <div className="border-b border-[var(--color-line)] last:border-b-0">
+      <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4 px-4 py-3">
+        <span className="flex h-7 w-7 items-center justify-center rounded-md border border-[var(--color-line)] bg-[var(--color-bg-2)] font-mono text-[10.5px]">
+          {conn.credential.platform.slice(0, 2)}
+        </span>
+        <div>
+          <div className="font-mono text-[13px] font-medium">{conn.name}</div>
+          <div className="font-mono text-[11px] text-[var(--color-text-3)]">
+            {conn.credential.name} · {conn.credential.platform.toLowerCase()}
+            {conn.credential.hostUrl &&
+              !isCloudHost(conn.credential.platform as Platform, conn.credential.hostUrl) &&
+              ` · ${conn.credential.hostUrl}`}
+            {summary && ` · ${summary}`}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {isRepoScoped && ready && (
+            <button type="button" className="pill" onClick={() => setGalleryOpen(true)}>
+              <span className="dot" />
+              {imported ? 'Suggestions imported' : 'Suggestions ready'}
+            </button>
+          )}
+          {isRepoScoped &&
+            (() => {
+              const analyzeButton = (
+                <button
+                  className="btn"
+                  disabled={running || startAnalysis.isPending}
+                  onClick={onAnalyze}
+                >
+                  {running ? 'Analyzing…' : ready ? 'Re-analyze' : 'Analyze repo'}
+                </button>
+              );
+              // Explain the action on first run, when its purpose is opaque.
+              // Once it's running (progress card) or ready (suggestions pill),
+              // the meaning is already clear, so render the bare button.
+              return !ready && !running ? (
+                <InfoPopover label="What “Analyze repo” does" trigger={analyzeButton}>
+                  <AnalyzeRepoInfo />
+                </InfoPopover>
+              ) : (
+                analyzeButton
+              );
+            })()}
+          <button className="btn" onClick={onDelete}>
+            Delete
+          </button>
         </div>
       </div>
-      <button className="btn" onClick={onDelete}>
-        Delete
-      </button>
+
+      {isRepoScoped && analysis && (running || status === 'FAILED') && (
+        <AnalysisProgressCard analysis={analysis} />
+      )}
+
+      {galleryOpen && analysis?.resultBundle && (
+        <SuggestionsGalleryDialog
+          connectionId={conn.id}
+          analysisId={analysis.id}
+          bundle={analysis.resultBundle}
+          droppedComponents={analysis.droppedComponents ?? []}
+          alreadyImported={imported}
+          onClose={() => setGalleryOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Body of the `ⓘ` popover next to "Analyze repo" — explains the otherwise
+ * opaque action: what it produces, the three coarse steps, and that it's a
+ * read-only multi-minute run nothing imports without consent. Mirrors the
+ * phase labels in {@link ANALYSIS_PHASE_LABEL} in plain language.
+ */
+function AnalyzeRepoInfo() {
+  return (
+    <>
+      <div className="info-popover-title">
+        <span className="spark">✦</span> What “Analyze repo” does
+      </div>
+      <p className="info-popover-lede">
+        Conduit reads the repo and proposes <b>ready-to-import review workflows</b> — one per
+        component it finds.
+      </p>
+      <ul className="info-popover-steps">
+        <li>
+          <span className="n">1</span>
+          <span>
+            <b>Maps the components</b> in the codebase
+          </span>
+        </li>
+        <li>
+          <span className="n">2</span>
+          <span>
+            <b>Designs a scheduled review</b> for each — reviewer focus and a cadence
+          </span>
+        </li>
+        <li>
+          <span className="n">3</span>
+          <span>
+            You <b>pick which to import</b>; nothing runs until you do
+          </span>
+        </li>
+      </ul>
+      <div className="info-popover-foot">~ a few minutes · read-only</div>
+    </>
+  );
+}
+
+/**
+ * Inline progress/result panel for an in-flight or failed analysis, in the same
+ * bordered-card shape as `LabelPrompt`. Shows a coarse phase label and a pulsing
+ * status dot while running; the server error when failed. Never shows raw logs.
+ */
+function AnalysisProgressCard({ analysis }: { analysis: ConnectionAnalysis }) {
+  const failed = analysis.status === 'FAILED';
+  return (
+    <div className="px-4 pb-4">
+      <div className="flex flex-col gap-2 rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-2,var(--color-bg-1))] p-3">
+        <div className="flex items-center gap-2 font-mono text-[12px]">
+          <span className={`status-dot ${failed ? 'error' : 'running'}`} />
+          {failed ? 'Analysis failed' : ANALYSIS_PHASE_LABEL[analysis.phase]}
+        </div>
+        {failed ? (
+          analysis.error && (
+            <div className="font-mono text-[11px] text-[var(--color-danger,#dc322f)]">
+              {analysis.error}
+            </div>
+          )
+        ) : (
+          <div className="font-mono text-[11px] text-[var(--color-text-3)]">
+            Analyzing your repository — this can take a few minutes.
+          </div>
+        )}
+      </div>
     </div>
   );
 }

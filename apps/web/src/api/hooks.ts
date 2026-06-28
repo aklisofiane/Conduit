@@ -13,6 +13,7 @@ import { api } from './client.js';
 import { makeDefaultTrigger } from '../lib/trigger-defaults.js';
 import type {
   AgentPreset,
+  ConnectionAnalysis,
   ConnectionRow,
   ConnectionScope,
   ConnectionScopeKind,
@@ -307,6 +308,56 @@ export function useDeleteConnection() {
   });
 }
 
+const connectionAnalysisKey = (connectionId: string) =>
+  ['connection-analysis', connectionId] as const;
+
+/**
+ * Poll a connection's repo-analysis row. Returns `null` when the connection
+ * has never been analyzed. Refetches every 2.5s while the analysis is in
+ * flight (PENDING/ANALYZING) and stops once it settles (READY/FAILED), mirroring
+ * the conditional-`refetchInterval` pattern in `useRun`.
+ */
+export function useConnectionAnalysis(connectionId: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: connectionId ? connectionAnalysisKey(connectionId) : ['connection-analysis', 'none'],
+    queryFn: () => api.get<ConnectionAnalysis | null>(`/connections/${connectionId!}/analysis`),
+    enabled: enabled && !!connectionId,
+    refetchInterval: (q) => {
+      const data = q.state.data as ConnectionAnalysis | null | undefined;
+      return data && (data.status === 'PENDING' || data.status === 'ANALYZING') ? 2500 : false;
+    },
+  });
+}
+
+/**
+ * Kick off a repo analysis for a connection. Invalidates the analysis query so
+ * polling immediately picks up the freshly-created PENDING row.
+ */
+export function useStartAnalysis() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (connectionId: string) =>
+      api.post<{ analysisId: string }>(`/connections/${connectionId}/analyze`),
+    onSuccess: (_res, connectionId) =>
+      qc.invalidateQueries({ queryKey: connectionAnalysisKey(connectionId) }),
+  });
+}
+
+/**
+ * Mark an analysis's suggestions as imported. Invalidates the analysis query so
+ * the gallery / pill reflect the imported state across reloads, preventing a
+ * re-opened gallery from silently re-importing the same workflows.
+ */
+export function useMarkAnalysisImported(connectionId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (analysisId: string) =>
+      api.post<void>(`/connections/${connectionId}/analysis/${analysisId}/imported`),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: connectionAnalysisKey(connectionId) }),
+  });
+}
+
 export function useSetWebhookSecret(workflowId: string) {
   const qc = useQueryClient();
   return useMutation({
@@ -395,6 +446,23 @@ export function useListLabels(args: { connectionId: string; enabled: boolean }) 
     queryFn: () =>
       api.post<RepoLabel[]>('/trigger/list-labels', { connectionId }),
     enabled: enabled && !!connectionId,
+    staleTime: 30_000,
+    retry: false,
+  });
+}
+
+/**
+ * List the remote branch names on a connection's repo/project, for the cron
+ * trigger's branch picker. Mirrors `useListLabels`: gated on a non-empty
+ * `connectionId`, no retry (config-time, surface failures inline). Free-text
+ * entry stays the graceful fallback when this query is empty or errors.
+ */
+export function useRepoBranches(connectionId: string) {
+  return useQuery({
+    queryKey: ['branches', connectionId] as const,
+    queryFn: () =>
+      api.post<string[]>('/trigger/list-branches', { connectionId }),
+    enabled: !!connectionId,
     staleTime: 30_000,
     retry: false,
   });

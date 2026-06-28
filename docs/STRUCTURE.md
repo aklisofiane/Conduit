@@ -41,11 +41,14 @@ src/
     credentials/                       Credential CRUD + AES-256-GCM (crypto.ts) +
                                        getConnectionBinding (Connection→Credential join)
     connections/                       global Connection CRUD over the typed scope union;
-                                       refuses delete when a workflow definition references the row
+                                       refuses delete when a workflow definition references the row.
+                                       `connection-analysis.service.ts` owns the analyze action
+                                       (POST/GET :id/analyze|analysis) — see design-docs/repo-analysis.md
     provider-configs/                  per-org LLM provider API keys — distinct from Credential;
                                        see docs/data-model.md > ProviderConfig
     trigger/                           POST /trigger/list-projects + /trigger/list-labels
-                                       + /trigger/ensure-labels config-time helpers
+                                       + /trigger/list-branches + /trigger/ensure-labels
+                                       config-time helpers
     webhooks/                          POST /hooks/:workflowId — HMAC-verify, normalize, match,
                                        start run
     mcp/                               POST /mcp/introspect — live tools/list
@@ -69,6 +72,11 @@ src/
                                        by the API via Temporal Schedule
     cron-workflow.ts                   sandboxed shell for cron triggers — one tick per
                                        Temporal Schedule fire
+    repo-analysis-workflow.ts          sandboxed — dynamic fan-out over discovered
+                                       components (clone → Discover → Design ≤12 → Assemble →
+                                       cleanup); see design-docs/repo-analysis.md
+    repo-analysis-nodes.ts             pure module — inlined Discover/Design analyzer prompts
+                                       + node builders (no agent-presets/*.md for the analyzer)
     topo-sort.ts                       pure graph ordering
   activities/
     run-agent-node.ts                  invokes provider, streams events via heartbeat + Redis
@@ -81,6 +89,12 @@ src/
     copy-conduit-files.ts              copies .conduit/<Node>.md across parallel siblings
     poll-board.ts                      one poll cycle: fetch, filter, set-diff against
                                        PollSnapshot, start agentWorkflow per new match
+    clone-analysis-workspace.ts        prime the base bare clone + probe default branch
+    read-analysis-artifacts.ts         read + Zod-validate the analyzer's JSON artifacts
+                                       (ComponentManifest / WorkflowDraft)
+    update-analysis-phase.ts           write RepoAnalysis status/phase from the workflow
+    assemble-suggestions.ts            stitch drafts → validated TemplateFile, persist on
+                                       RepoAnalysis (see design-docs/repo-analysis.md)
   runtime/                             activity-side helpers — Prisma, Redis event bus, log writer,
                                        connection/credential lookup, `temporal-client.ts` (singleton
                                        that starts agentWorkflows from inside pollBoardActivity),
@@ -141,7 +155,9 @@ src/
     settings/                          CredentialsSection + ConnectionsSection (→ IntegrationsPage),
                                        ApiKeysSection (→ ApiKeysPage), settings-nav.ts (sidebar
                                        config — add an entry + a child route in router.tsx to
-                                       slot in new sections)
+                                       slot in new sections). ConnectionsSection hosts the repo
+                                       Analyze action + progress card; SuggestionsGalleryDialog
+                                       imports the result (see design-docs/repo-analysis.md)
     layout/                            TopChrome (topbar shell, reads slot store), AppLayout,
                                        AuthLayout, SettingsLayout (sidebar + outlet at /settings),
                                        RequireAuth + RedirectIfAuthed (session gates), UserMenuPill
@@ -180,6 +196,11 @@ Zod schemas + cross-process contracts. Domain directories line up with subpath e
 src/
   agent/      AgentEvent, provider contract types, `issue-writeback.ts`
               (per-agent allowlist for end-of-run GitHub issue updates)
+  analysis/   Repo-analysis contracts (see design-docs/repo-analysis.md):
+              ComponentManifest + WorkflowDraft schemas (agent authors
+              `scopeInstructions` + `reviewers[]`), the analysis adapter
+              (synthetic `analysis` trigger + fixed artifact paths), and pure
+              `assembleSuggestionBundle`
   connection/ ConnectionScope discriminated union (github_repo /
               github_projects_v2 / none) + expectScopeKind helper. Web-bundle safe.
   label/      Canonical registry of Conduit's own `conduit-*` labels
@@ -209,9 +230,11 @@ src/
               shared HTTP plumbing (`http.ts` — lazy URL/header helpers, web-bundle
               safe), the Projects v2 GraphQL client (`projects.ts`), and the
               labels REST client (`labels.ts` — `listRepoLabels` for the agent
-              panel's issue-writeback picker + idempotent `createRepoLabel`).
-              `gitlab/labels.ts` mirrors it (`listGitlabProjectLabels` +
-              `createGitlabProjectLabel`), returning the same `RepoLabel` shape
+              panel's issue-writeback picker + idempotent `createRepoLabel`), and
+              the branches REST client (`branches.ts` — `listRepoBranches` for the
+              cron panel's branch picker). `gitlab/labels.ts` +
+              `gitlab/branches.ts` mirror them (`listGitlabProjectLabels` /
+              `createGitlabProjectLabel`, `listGitlabProjectBranches`)
   runtime/    AgentEvent → ExecutionLogKind mapping, Redis channel name
   temporal/   task queue name + workflow-type constants + deterministic id helpers
               (`workflowScheduleId` / `pollWorkflowId` / `cronWorkflowId` /
@@ -259,6 +282,8 @@ src/
     fixed-branch.ts                    resolveFixedBranchWorkspace — cron triggers; branch
                                        must exist on remote
     slug.ts                            deriveSlug + formatBranchName — branch naming primitives
+    base-marker.ts                     parseBaseMarker — reads <!-- conduit:base=<branch> -->
+                                       from an issue body (issue-arm base override)
     lock.ts                            withPathLock — in-process base-clone mutex (one worker only)
     push-auth.ts                       installPushCredentials — per-run git credential helper
                                        script wired via credential.helper ! (no token in .git/config)
@@ -267,7 +292,12 @@ src/
   mcp/
     resolve.ts                         decrypt credentials + {{credential}} substitution
     introspect.ts                      live `tools/list` via @modelcontextprotocol/sdk (stdio/sse/streamable-http)
-  skill/                               discovery + install into workspace
+  skill/                               discovery + install into workspace;
+                                       analysis-skills.ts stages the internal,
+                                       non-discovered repo-analyzer Design skills
+  analysis/skills/                     three internal SKILL.md bundles (draft-format,
+                                       scope-authoring, reviewer-authoring) — staged
+                                       into the analysis worktree, never in GET /skills
   errors/
 ```
 

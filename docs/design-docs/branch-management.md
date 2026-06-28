@@ -19,12 +19,30 @@ The trigger event determines which arm runs:
 - **Issue trigger** (`issues.opened` webhook, polling on board status):
   1. Derive the branch name (`conduit/<ticket-id>-<slug>`).
   2. Upsert the `TicketBranch` row — first call writes the slug + base ref; later calls return the row verbatim so name and base stay stable across workflows.
-  3. Check the remote — add a worktree from the branch if it exists, or create it with `-b <baseRef>` if it doesn't. The base ref is resolved from the base clone's `HEAD` symbolic ref (typically `main`).
+  3. Check the remote — add a worktree from the branch if it exists, or create it with `-b <baseRef>` if it doesn't. The base ref defaults to the repo default (the base clone's `HEAD` symbolic ref, typically `main`), but can be overridden per-ticket by a `conduit:base` body marker — see [Base ref selection](#base-ref-selection).
 - **PR trigger** (`pull_request.opened` webhook): no row, no slug. Add a worktree directly at `pr.headRef` after fetching. For Conduit-internal flows where a Worker pushed and opened a PR, this lands the Reviewer on the same `conduit/<id>-<slug>` branch the Worker built; for external/human-opened PRs, on whatever ref the contributor opened from.
 
 In both arms, the runtime injects a platform token into the agent process env and configures a git credential helper so the agent can `git push`. The connection comes from the workflow's single trigger configuration — agents and the workspace itself no longer carry a `connectionId`.
 
 **First-create-wins for `baseRef`** (issue arm only): the `TicketBranch` row is shared across workflows targeting the same ticket. The first workflow to create the branch writes its `baseRef`; subsequent workflows resolve to the existing branch. The branch, once created, is the source of truth.
+
+## Base ref selection
+
+By default the issue arm bases the branch off the repo default. A ticket can override this by carrying a **base marker** on its issue body, so work spawned from a non-default branch (e.g. a `cron` trigger running on `branch-2`) lands on top of that branch instead of `main`. The PR arm already has this property natively — it bases off `pr.baseRef` — but issues have no native base-ref field, so Conduit manufactures one inside the Conduit-owned body block.
+
+**Marker contract.** A single optional line inside the `<!-- conduit:start --> … <!-- conduit:end -->` block (see [agent-presets.md](./agent-presets.md)):
+
+```
+<!-- conduit:base=branch-2 -->
+```
+
+It's free text in an HTML comment — no label namespace, no per-branch label proliferation, and branch names containing `/` or `.` (`release/2.0`) work verbatim.
+
+- **Read path.** The resolver parses the marker from `TriggerEvent.issue.body` (already propagated on webhook and polling paths) and uses it as the base. If the marker names a branch that **doesn't exist on the remote**, the run hard-fails with a clear `WorkspaceError` rather than silently substituting a base — a typo'd or stale base surfaces loudly. Absent marker → repo default, unchanged.
+- **Read-once.** The marker is consulted only at **branch birth**. Once the branch exists, the resolver tracks it and `baseRef` is fixed by first-create-wins — a changed marker on an existing branch is inert. Same stability guarantee the slug has.
+- **Write path.** Conduit can't inject the marker mechanically — issues are created by the agent through the GitHub MCP `create_issue` tool, opaque to the orchestrator. So the marker is **preset-driven**: the `publish` preset stamps it when operating on a non-default base branch.
+
+Deferred: per-phase base branches (contradicts the one-branch-per-ticket loop), re-reading the marker after birth, and validating the marked branch is a "safe" base (only remote existence is gated).
 
 Validation at save time: every trigger must surface an issue or PR identifier (rejected webhook events: `push`, `release`, `workflow_run`, `board.column.changed`); polling triggers always pull issue identity from the GraphQL response and pass unconditionally.
 

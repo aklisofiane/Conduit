@@ -4,6 +4,7 @@ import { WorkspaceError } from '../errors/index';
 import { cloneConduitFolder } from './conduit-folder';
 import { resolveFixedBranchWorkspace } from './fixed-branch';
 import { git } from './git';
+import { withPathLock } from './lock';
 import { nodeWorkspacePath, runDir } from './paths';
 import { resolveTicketBranchWorkspace } from './ticket-branch';
 import type { ResolvedWorkspace, WorkspaceResolveInput } from './types';
@@ -122,12 +123,23 @@ export class WorkspaceManager {
     const target = nodeWorkspacePath(runId, nodeName);
     await fs.mkdir(path.dirname(target), { recursive: true });
 
-    // Idempotency under Temporal retries: a previous attempt may have left
-    // a worktree registration and/or a stranded directory at `target`.
-    await dropConflictingWorktrees(upstreamPath, target);
-
-    const ref = upstreamHead ?? (await git(['rev-parse', 'HEAD'], { cwd: upstreamPath })).trim();
-    await git(['worktree', 'add', '--detach', target, ref], { cwd: upstreamPath });
+    // Several siblings fanning out from the same upstream register worktrees
+    // against one shared git common dir concurrently. `git worktree add` and
+    // the `prune` inside `dropConflictingWorktrees` are not safe to interleave
+    // on the same common dir — a sibling's prune can collect another's
+    // mid-creation entry. Serialize the registration on the owning base clone
+    // (same lock the branch-resolution path takes), keyed so unrelated repos
+    // don't contend. The agent session itself runs outside the lock.
+    const lockKey = (await bareCloneOf(upstreamPath)) ?? upstreamPath;
+    const ref = await withPathLock(lockKey, async () => {
+      // Idempotency under Temporal retries: a previous attempt may have left
+      // a worktree registration and/or a stranded directory at `target`.
+      await dropConflictingWorktrees(upstreamPath, target);
+      const head =
+        upstreamHead ?? (await git(['rev-parse', 'HEAD'], { cwd: upstreamPath })).trim();
+      await git(['worktree', 'add', '--detach', target, head], { cwd: upstreamPath });
+      return head;
+    });
     // `.conduit/` is gitignored, so `worktree add` doesn't carry the upstream's
     // handoff summary into the sibling. Copy it explicitly so this node's
     // agent starts with the same context downstream nodes will see post-merge.

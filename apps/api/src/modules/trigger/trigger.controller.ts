@@ -4,11 +4,13 @@ import { SessionGuard } from '../../auth/session.guard';
 import { ZodBodyPipe } from '../../common/zod-body.pipe';
 import {
   type EnsureLabelsDto,
+  type ListBranchesDto,
   type ListLabelsDto,
   type ListProjectsDto,
   type ListViewerReposDto,
   type ListViewerOrgsDto,
   ensureLabelsDtoSchema,
+  listBranchesDtoSchema,
   listLabelsDtoSchema,
   listProjectsDtoSchema,
   listViewerReposDtoSchema,
@@ -56,6 +58,14 @@ export class TriggerController {
     @Body(new ZodBodyPipe(listLabelsDtoSchema)) dto: ListLabelsDto,
   ) {
     return this.svc.listLabels(orgId, dto);
+  }
+
+  @Post('list-branches')
+  listBranches(
+    @OrgId() orgId: string,
+    @Body(new ZodBodyPipe(listBranchesDtoSchema)) dto: ListBranchesDto,
+  ) {
+    return this.svc.listBranches(orgId, dto);
   }
 
   @Post('ensure-labels')

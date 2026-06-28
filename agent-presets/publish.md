@@ -25,3 +25,7 @@ Rewrite rules on rerun:
 - If no block exists, append a fresh block at the end of the body.
 - Never emit more than one block per body. Never alter the marker strings — downstream reruns rely on exact-string matching.
 - Block contents are entirely yours to structure; the marker contract owns only the wrapper.
+
+Base-branch marker (issues):
+
+- If this run operates on a non-default base branch (`trigger.payload.branch` is set and differs from the repo default), include `<!-- conduit:base=<that branch> -->` as the first line inside the block, so downstream develop/review work bases off the same branch. Emit at most one base marker.

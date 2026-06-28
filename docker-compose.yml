@@ -50,6 +50,8 @@ services:
       - POSTGRES_USER=temporal
       - POSTGRES_PWD=temporal
       - POSTGRES_SEEDS=temporal-postgres
+      - DEFAULT_NAMESPACE=default
+      - DEFAULT_NAMESPACE_RETENTION=72h
     ports:
       - '${TEMPORAL_PORT:-7233}:7233'
 

@@ -404,6 +404,99 @@ textarea.field-input {
   font-weight: 600;
 }
 
+/* ---------- InfoPopover primitive (Radix-based) ---------- */
+.info-popover {
+  z-index: 80;
+  width: 312px;
+  background: var(--color-bg-panel);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius);
+  box-shadow:
+    0 4px 16px rgba(11, 16, 32, 0.06),
+    0 1px 2px rgba(11, 16, 32, 0.04);
+  padding: 14px;
+  font-family: var(--font-sans);
+  animation: info-popover-in 140ms ease;
+}
+.info-popover-arrow {
+  fill: var(--color-bg-panel);
+  /* Radix draws the arrow as a triangle below the border; nudge it to overlap
+     the 1px frame so the seam reads as a continuous edge. */
+}
+@keyframes info-popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.info-popover-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 8px;
+}
+.info-popover-title .spark {
+  color: var(--color-accent);
+}
+.info-popover-lede {
+  margin: 0 0 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-text-2);
+}
+.info-popover-lede b {
+  color: var(--color-text);
+  font-weight: 600;
+}
+.info-popover-steps {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: grid;
+  gap: 7px;
+}
+.info-popover-steps li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 9px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--color-text-2);
+}
+.info-popover-steps .n {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  margin-top: 1px;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+}
+.info-popover-steps b {
+  color: var(--color-text);
+  font-weight: 600;
+}
+.info-popover-foot {
+  border-top: 1px solid var(--color-divider);
+  padding-top: 10px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--color-text-muted);
+}
+
 /* ---------- DropdownMenu primitive (Radix-based) ---------- */
 .dropdown-content {
   z-index: 60;

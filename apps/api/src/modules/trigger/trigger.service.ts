@@ -9,6 +9,8 @@ import {
   createRepoLabel,
   listGitlabProjectLabels,
   createGitlabProjectLabel,
+  listRepoBranches,
+  listGitlabProjectBranches,
   listAccessibleGitlabProjects,
   type ProjectBoardSummary,
   type RepositorySummary,
@@ -22,6 +24,7 @@ import { ConnectionsService } from '../connections/connections.service';
 import { CredentialsService } from '../credentials/credentials.service';
 import type {
   EnsureLabelsDto,
+  ListBranchesDto,
   ListLabelsDto,
   ListProjectsDto,
   ListViewerReposDto,
@@ -184,6 +187,64 @@ export class TriggerService {
         `List labels failed (${repoScope.owner}/${repoScope.repo}): ${message}`,
       );
       throw new BadRequestException({ message });
+    }
+  }
+
+  /**
+   * List the remote branch names on a connection's repo/project. Resolves the
+   * binding/scope exactly like `listLabels` and branches GitHub vs GitLab on
+   * `binding.platform`; a scope that isn't a repo/project is a
+   * `BadRequestException`. Powers the cron trigger's branch picker.
+   */
+  async listBranches(orgId: string, dto: ListBranchesDto): Promise<string[]> {
+    const [, binding] = await Promise.all([
+      this.connections.assertInOrg(orgId, dto.connectionId),
+      this.credentials.getConnectionBinding(dto.connectionId),
+    ]);
+
+    if (binding.platform === 'GITLAB') {
+      const glScope = this.expectScopeOr400(
+        binding.scope,
+        'gitlab_project',
+        dto.connectionId,
+        'GitLab project',
+      );
+      try {
+        return await listGitlabProjectBranches({
+          hostUrl: binding.hostUrl ?? 'gitlab.com',
+          projectPath: glScope.projectPath,
+          token: binding.token,
+        });
+      } catch {
+        this.logger.warn(
+          `List GitLab branches failed (${glScope.projectPath}): upstream returned an error`,
+        );
+        throw new BadRequestException({
+          message: 'Failed to list branches from GitLab',
+        });
+      }
+    }
+
+    // Default: GitHub (existing behavior).
+    const repoScope = this.expectScopeOr400(
+      binding.scope,
+      'github_repo',
+      dto.connectionId,
+      'GitHub repo',
+    );
+    try {
+      return await listRepoBranches({
+        owner: repoScope.owner,
+        repo: repoScope.repo,
+        token: binding.token,
+      });
+    } catch {
+      this.logger.warn(
+        `List branches failed (${repoScope.owner}/${repoScope.repo}): upstream returned an error`,
+      );
+      throw new BadRequestException({
+        message: 'Failed to list branches from GitHub',
+      });
     }
   }
 

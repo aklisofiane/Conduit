@@ -209,6 +209,155 @@ describe('resolveTicketBranchWorkspace', () => {
     expect(worker.ticketBranchId).toBe(critic.ticketBranchId);
   });
 
+  it('bases the ticket branch off a conduit:base marker when the branch exists', async () => {
+    // Seed branch-2 with a file main doesn't have, so the chosen base is
+    // observable from the resulting worktree's contents.
+    await git(['checkout', '-q', '-b', 'branch-2'], { cwd: remote });
+    await fs.writeFile(path.join(remote, 'b2.ts'), 'export const b2 = 1;\n');
+    await git(['add', '-A'], { cwd: remote });
+    await git(['commit', '-q', '-m', 'branch-2 work'], { cwd: remote });
+    await git(['checkout', '-q', 'main'], { cwd: remote });
+
+    const store = makeFakeStore();
+    const resolved = await resolveTicketBranchWorkspace({
+      runId: 'run_marker',
+      nodeName: 'Worker',
+      orgId: ORG_A,
+      connection,
+      ticket: { id: '70', title: 'Cron spawned issue', body: '<!-- conduit:base=branch-2 -->' },
+      store,
+    });
+
+    expect(resolved.branchName).toBe('conduit/70-cron-spawned-issue');
+    expect(resolved.remoteBranchExisted).toBe(false);
+    // Branched off branch-2 → its file is present (would be absent off main).
+    const onDisk = await fs.readFile(path.join(resolved.path, 'b2.ts'), 'utf8');
+    expect(onDisk).toBe('export const b2 = 1;\n');
+    // The row records branch-2 as the base.
+    expect(store._rows()[0]?.baseRef).toBe('branch-2');
+  });
+
+  it('hard-fails when the conduit:base marker names a branch not on the remote', async () => {
+    const store = makeFakeStore();
+    await expect(
+      resolveTicketBranchWorkspace({
+        runId: 'run_bad_marker',
+        nodeName: 'Worker',
+        orgId: ORG_A,
+        connection,
+        ticket: { id: '71', title: 'Bad base', body: '<!-- conduit:base=does-not-exist -->' },
+        store,
+      }),
+    ).rejects.toThrow(/conduit:base marker.*does not exist on the remote/s);
+    // The run stops before any row is written.
+    expect(store._rows()).toHaveLength(0);
+  });
+
+  it('uses the repo default when the marker names the default branch', async () => {
+    const store = makeFakeStore();
+    const resolved = await resolveTicketBranchWorkspace({
+      runId: 'run_default_marker',
+      nodeName: 'Worker',
+      orgId: ORG_A,
+      connection,
+      ticket: { id: '72', title: 'Default base', body: '<!-- conduit:base=main -->' },
+      store,
+    });
+
+    // marker == default → treated as default; row records the default base.
+    expect(resolved.branchName).toBe('conduit/72-default-base');
+    expect(store._rows()[0]?.baseRef).toBe('main');
+  });
+
+  it('ignores a changed marker once the branch exists (first-create-wins base)', async () => {
+    // Seed two non-default branches with distinct files.
+    await git(['checkout', '-q', '-b', 'branch-2'], { cwd: remote });
+    await fs.writeFile(path.join(remote, 'b2.ts'), 'export const b2 = 1;\n');
+    await git(['add', '-A'], { cwd: remote });
+    await git(['commit', '-q', '-m', 'branch-2 work'], { cwd: remote });
+    await git(['checkout', '-q', 'main'], { cwd: remote });
+    await git(['checkout', '-q', '-b', 'branch-3'], { cwd: remote });
+    await fs.writeFile(path.join(remote, 'b3.ts'), 'export const b3 = 1;\n');
+    await git(['add', '-A'], { cwd: remote });
+    await git(['commit', '-q', '-m', 'branch-3 work'], { cwd: remote });
+    await git(['checkout', '-q', 'main'], { cwd: remote });
+
+    const store = makeFakeStore();
+    // First run bases off branch-2 and pushes the branch to the remote.
+    const first = await resolveTicketBranchWorkspace({
+      runId: 'run_first',
+      nodeName: 'Worker',
+      orgId: ORG_A,
+      connection,
+      ticket: { id: '73', title: 'Stable base', body: '<!-- conduit:base=branch-2 -->' },
+      store,
+    });
+    await git(['config', 'user.email', 'agent@conduit.test'], { cwd: first.path });
+    await git(['config', 'user.name', 'Agent'], { cwd: first.path });
+    await git(['push', 'origin', first.branchName!], { cwd: first.path });
+
+    // Second run carries a *changed* marker (branch-3, which also exists so the
+    // existence gate passes) — but the branch is already on the remote, so the
+    // base is never consulted and the worktree still reflects branch-2.
+    const second = await resolveTicketBranchWorkspace({
+      runId: 'run_second',
+      nodeName: 'Worker',
+      orgId: ORG_A,
+      connection,
+      ticket: { id: '73', title: 'Stable base', body: '<!-- conduit:base=branch-3 -->' },
+      store,
+    });
+
+    expect(second.remoteBranchExisted).toBe(true);
+    expect(second.branchName).toBe(first.branchName);
+    // Cached base (branch-2) wins: b2.ts present, branch-3's b3.ts absent.
+    const b2 = await fs.readFile(path.join(second.path, 'b2.ts'), 'utf8');
+    expect(b2).toBe('export const b2 = 1;\n');
+    await expect(fs.access(path.join(second.path, 'b3.ts'))).rejects.toThrow();
+    expect(store._rows()[0]?.baseRef).toBe('branch-2');
+  });
+
+  it('does not hard-fail an existing branch when the marker base is gone from the remote', async () => {
+    // First run bases off branch-2 and pushes the ticket branch to the remote.
+    await git(['checkout', '-q', '-b', 'branch-2'], { cwd: remote });
+    await fs.writeFile(path.join(remote, 'b2.ts'), 'export const b2 = 1;\n');
+    await git(['add', '-A'], { cwd: remote });
+    await git(['commit', '-q', '-m', 'branch-2 work'], { cwd: remote });
+    await git(['checkout', '-q', 'main'], { cwd: remote });
+
+    const store = makeFakeStore();
+    const first = await resolveTicketBranchWorkspace({
+      runId: 'run_first',
+      nodeName: 'Worker',
+      orgId: ORG_A,
+      connection,
+      ticket: { id: '74', title: 'Gone base', body: '<!-- conduit:base=branch-2 -->' },
+      store,
+    });
+    await git(['config', 'user.email', 'agent@conduit.test'], { cwd: first.path });
+    await git(['config', 'user.name', 'Agent'], { cwd: first.path });
+    await git(['push', 'origin', first.branchName!], { cwd: first.path });
+
+    // branch-2 is merged away and deleted on the remote before the next run.
+    await git(['branch', '-D', 'branch-2'], { cwd: remote });
+
+    // The same issue still carries the now-broken marker, but the ticket branch
+    // already exists — its base was settled at birth, so the marker must not be
+    // re-validated and the run must not hard-fail.
+    const second = await resolveTicketBranchWorkspace({
+      runId: 'run_second',
+      nodeName: 'Worker',
+      orgId: ORG_A,
+      connection,
+      ticket: { id: '74', title: 'Gone base', body: '<!-- conduit:base=branch-2 -->' },
+      store,
+    });
+
+    expect(second.remoteBranchExisted).toBe(true);
+    expect(second.branchName).toBe(first.branchName);
+    expect(store._rows()[0]?.baseRef).toBe('branch-2');
+  });
+
   it('lands on pr.headRef with no store/ticket needed (external PR)', async () => {
     await git(['checkout', '-q', '-b', 'patch-1'], { cwd: remote });
     await fs.writeFile(path.join(remote, 'patch.ts'), 'export const x = 2;\n');
@@ -254,6 +403,9 @@ function makeFakeStore(): TicketBranchStore & { _rows(): TicketBranchRow[] } {
       };
       rows.set(k, row);
       return row;
+    },
+    async find(q) {
+      return rows.get(key(q.orgId, q.platform, q.owner, q.repo, q.ticketId)) ?? null;
     },
     async markRunStart() {
       /* no-op */
