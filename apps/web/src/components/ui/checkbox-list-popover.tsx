@@ -2,6 +2,18 @@ import { useMemo, useRef, useState, type ReactNode } from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import { ChevronDown, Search } from 'lucide-react';
 import { cn } from '../../lib/cn.js';
+import { selectChevronClass, selectItemClass, selectTriggerClass } from './select.js';
+import {
+  searchSelectContentClass,
+  searchSelectEmptyClass,
+  searchSelectIconClass,
+  searchSelectInputClass,
+  searchSelectInputRowClass,
+  searchSelectItemSelectedClass,
+  searchSelectListClass,
+  searchSelectOpenClass,
+  searchSelectValueClass,
+} from './search-select.js';
 
 /**
  * Searchable multi-select popover with a checkbox list — the shared shell behind
@@ -110,10 +122,10 @@ export function CheckboxListPopover<T>({
       }}
     >
       <Popover.Trigger
-        className={cn('select-trigger', triggerClassName, open && 'search-select-open')}
+        className={cn(selectTriggerClass, triggerClassName, open && searchSelectOpenClass)}
       >
-        <span className="search-select-value font-mono text-[11px]">{triggerLabel}</span>
-        <span className={cn('select-trigger-chevron', open && 'search-select-chevron-open')}>
+        <span className={cn(searchSelectValueClass, 'font-mono text-[11px]')}>{triggerLabel}</span>
+        <span className={cn(selectChevronClass, open && 'rotate-180')}>
           <ChevronDown size={12} strokeWidth={1.5} />
         </span>
       </Popover.Trigger>
@@ -122,18 +134,18 @@ export function CheckboxListPopover<T>({
         <Popover.Content
           sideOffset={4}
           align="start"
-          className="search-select-content"
+          className={searchSelectContentClass}
           style={{ maxHeight }}
           onOpenAutoFocus={(e) => {
             e.preventDefault();
             inputRef.current?.focus();
           }}
         >
-          <div className="search-select-input-row">
-            <Search size={12} strokeWidth={1.5} className="search-select-icon" />
+          <div className={searchSelectInputRowClass}>
+            <Search size={12} strokeWidth={1.5} className={searchSelectIconClass} />
             <input
               ref={inputRef}
-              className="search-select-input"
+              className={searchSelectInputClass}
               placeholder={placeholder}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -149,9 +161,9 @@ export function CheckboxListPopover<T>({
             </div>
           )}
 
-          <div className="search-select-list">
+          <div className={searchSelectListClass}>
             {(groups ? groups.length === 0 : filtered.length === 0) && (
-              <div className="search-select-empty">{emptyLabel}</div>
+              <div className={searchSelectEmptyClass}>{emptyLabel}</div>
             )}
             {groups
               ? groups.map((group) => {
@@ -199,8 +211,9 @@ function CheckboxRow({
   return (
     <label
       className={cn(
-        'select-item flex items-start gap-2',
-        checked && 'search-select-item-selected',
+        selectItemClass,
+        'flex items-start gap-2',
+        checked && searchSelectItemSelectedClass,
       )}
     >
       <input

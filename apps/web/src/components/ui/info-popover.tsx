@@ -3,6 +3,18 @@ import * as Popover from '@radix-ui/react-popover';
 import { cn } from '../../lib/cn.js';
 
 /**
+ * Card surface for the hover popover. Self-contained Tailwind (no `.info-popover`
+ * global); the `info-popover-in` keyframes still live in `globals.css` alongside
+ * the other animation primitives. See .specs/ui-primitive-layer.md (wave 7).
+ */
+const infoPopoverClass = cn(
+  'z-[80] w-[312px] p-3.5 font-sans',
+  'bg-[var(--color-bg-panel)] border border-[var(--color-divider)] rounded-[var(--radius)]',
+  'shadow-[0_4px_16px_rgba(11,16,32,0.06),0_1px_2px_rgba(11,16,32,0.04)]',
+  'animate-[info-popover-in_140ms_ease]',
+);
+
+/**
  * Wraps an action (typically a button) so that hovering or focusing it reveals
  * an explanatory popover card — the shared "what does this control do?"
  * affordance next to a dense, otherwise-opaque action (e.g. "Analyze repo").
@@ -69,14 +81,14 @@ export function InfoPopover({
           sideOffset={6}
           align={align}
           collisionPadding={12}
-          className={cn('info-popover', className)}
+          className={cn(infoPopoverClass, className)}
           onPointerEnter={cancelClose}
           onPointerLeave={scheduleClose}
           // Hover/focus-opened — don't steal focus from the page.
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
           {children}
-          <Popover.Arrow className="info-popover-arrow" width={11} height={6} />
+          <Popover.Arrow className="fill-[var(--color-bg-panel)]" width={11} height={6} />
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>

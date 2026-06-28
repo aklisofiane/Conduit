@@ -327,37 +327,43 @@ function ConnectionRowView({ conn, onDelete }: { conn: ConnectionRow; onDelete: 
  * read-only multi-minute run nothing imports without consent. Mirrors the
  * phase labels in {@link ANALYSIS_PHASE_LABEL} in plain language.
  */
+/** The small numbered badge ahead of each step in {@link AnalyzeRepoInfo}. */
+const stepNumClass =
+  'mt-px flex h-[17px] w-[17px] items-center justify-center rounded-[var(--radius-sm)] bg-[var(--color-accent-soft)] font-mono text-[10px] font-semibold text-[var(--color-accent)]';
+
 function AnalyzeRepoInfo() {
   return (
     <>
-      <div className="info-popover-title">
-        <span className="spark">✦</span> What “Analyze repo” does
+      <div className="mb-2 flex items-center gap-[7px] font-mono text-[12px] font-semibold text-[var(--color-text)]">
+        <span className="text-[var(--color-accent)]">✦</span> What “Analyze repo” does
       </div>
-      <p className="info-popover-lede">
+      <p className="m-0 mb-2.5 text-[12px] leading-[1.5] text-[var(--color-text-2)] [&_b]:font-semibold [&_b]:text-[var(--color-text)]">
         Conduit reads the repo and proposes <b>ready-to-import review workflows</b> — one per
         component it finds.
       </p>
-      <ul className="info-popover-steps">
+      <ul className="m-0 mb-2.5 grid list-none gap-[7px] p-0 [&>li]:grid [&>li]:grid-cols-[auto_1fr] [&>li]:gap-[9px] [&>li]:text-[11.5px] [&>li]:leading-[1.45] [&>li]:text-[var(--color-text-2)] [&_b]:font-semibold [&_b]:text-[var(--color-text)]">
         <li>
-          <span className="n">1</span>
+          <span className={stepNumClass}>1</span>
           <span>
             <b>Maps the components</b> in the codebase
           </span>
         </li>
         <li>
-          <span className="n">2</span>
+          <span className={stepNumClass}>2</span>
           <span>
             <b>Designs a scheduled review</b> for each — reviewer focus and a cadence
           </span>
         </li>
         <li>
-          <span className="n">3</span>
+          <span className={stepNumClass}>3</span>
           <span>
             You <b>pick which to import</b>; nothing runs until you do
           </span>
         </li>
       </ul>
-      <div className="info-popover-foot">~ a few minutes · read-only</div>
+      <div className="border-t border-[var(--color-divider)] pt-2.5 font-mono text-[10.5px] text-[var(--color-text-muted)]">
+        ~ a few minutes · read-only
+      </div>
     </>
   );
 }
