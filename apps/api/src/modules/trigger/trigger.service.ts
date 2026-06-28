@@ -215,12 +215,13 @@ export class TriggerService {
           projectPath: glScope.projectPath,
           token: binding.token,
         });
-      } catch (e: unknown) {
-        const message = errMessage(e);
+      } catch {
         this.logger.warn(
-          `List GitLab branches failed (${glScope.projectPath}): ${message}`,
+          `List GitLab branches failed (${glScope.projectPath}): upstream returned an error`,
         );
-        throw new BadRequestException({ message });
+        throw new BadRequestException({
+          message: 'Failed to list branches from GitLab',
+        });
       }
     }
 
@@ -237,12 +238,13 @@ export class TriggerService {
         repo: repoScope.repo,
         token: binding.token,
       });
-    } catch (e: unknown) {
-      const message = errMessage(e);
+    } catch {
       this.logger.warn(
-        `List branches failed (${repoScope.owner}/${repoScope.repo}): ${message}`,
+        `List branches failed (${repoScope.owner}/${repoScope.repo}): upstream returned an error`,
       );
-      throw new BadRequestException({ message });
+      throw new BadRequestException({
+        message: 'Failed to list branches from GitHub',
+      });
     }
   }
 

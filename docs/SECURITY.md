@@ -6,7 +6,7 @@ Multi-tenant via per-org partitioning. The auth umbrella moved Conduit from "sha
 
 Primary risks:
 1. **Cross-tenant data leakage** — a member of Org A reading or mutating Org B's workflows, runs, credentials, or connections through any API surface (REST, WS, webhook).
-2. **Credential exfiltration** — stored platform tokens leaked via logs, agent prompts, MCP server env, or compromised workspaces.
+2. **Credential exfiltration** — stored platform tokens leaked via logs, agent prompts, MCP server env, API error responses, or compromised workspaces.
 3. **Webhook forgery** — attacker triggers runs by sending fake GitHub events.
 4. **Agent sandbox escape** — agent tools touching files outside the workspace.
 5. **Prompt injection via trigger payloads** — an attacker opens a GitHub issue with instructions embedded in the title/body, causing the agent to misbehave.
@@ -90,6 +90,10 @@ v1.1+: add a "trust level" flag on triggers; auto-disable write tools on untrust
 - MCP tool call inputs/outputs are logged to `ExecutionLog`, but known-sensitive fields (`authorization`, `token`, `password`) are scrubbed before writing.
 - Agent providers scrub their request/response headers the same way.
 - Credential values are never included in `AgentEvent` payloads that flow through Redis.
+
+## API error response sanitization
+
+Upstream provider error bodies can contain OAuth tokens, internal service URLs, or rate-limit metadata. The branch-listing helpers (`github/branches.ts`, `gitlab/branches.ts`) throw errors that contain only the HTTP status code and the repo/project identifier — the upstream response body is never read for error construction. `TriggerService.listBranches` catches those errors with an unbound `catch {}`, discarding whatever the helper threw, and returns a hardcoded provider-specific message (`"Failed to list branches from GitHub"` / `"Failed to list branches from GitLab"`) to the caller. The `logger.warn` call emits only a static `"upstream returned an error"` phrase. The upstream body is discarded before it can reach logs, `BadRequestException` payloads, or any persistence path. Currently applied to: branch listing (`listBranches`) for GitHub and GitLab.
 
 ## API auth & tenant isolation (operator summary)
 

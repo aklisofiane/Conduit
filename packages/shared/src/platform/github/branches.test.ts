@@ -55,6 +55,19 @@ describe('listRepoBranches', () => {
     ).rejects.toThrow(/GitHub REST HTTP 403 listing branches for acme\/api/);
   });
 
+  it('does not include upstream response body in the thrown error message', async () => {
+    const fakeFetch: typeof fetch = (async () =>
+      new Response('Forbidden', { status: 403 })) as typeof fetch;
+
+    const err = await listRepoBranches(
+      { owner: 'acme', repo: 'api', token: 't' },
+      fakeFetch,
+    ).catch((e: Error) => e);
+
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).not.toContain('Forbidden');
+  });
+
   it('returns an empty array when the repo has no branches', async () => {
     const fakeFetch = makeFetch([[]]);
     const branches = await listRepoBranches(

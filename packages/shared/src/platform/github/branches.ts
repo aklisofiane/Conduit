@@ -39,7 +39,7 @@ export async function listRepoBranches(
     });
     if (!resp.ok) {
       throw new Error(
-        `GitHub REST HTTP ${resp.status} listing branches for ${q.owner}/${q.repo}: ${await resp.text().catch(() => '')}`,
+        `GitHub REST HTTP ${resp.status} listing branches for ${q.owner}/${q.repo}`,
       );
     }
     const batch = (await resp.json()) as RawBranch[];

@@ -36,7 +36,7 @@ export async function listGitlabProjectBranches(
     });
     if (!resp.ok) {
       throw new Error(
-        `GitLab REST HTTP ${resp.status} listing branches for ${q.projectPath}: ${await resp.text().catch(() => '')}`,
+        `GitLab REST HTTP ${resp.status} listing branches for ${q.projectPath}`,
       );
     }
     const batch = (await resp.json()) as RawGitlabBranch[];
