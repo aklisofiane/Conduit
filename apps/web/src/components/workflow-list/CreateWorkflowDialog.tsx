@@ -6,11 +6,17 @@ import { Dialog, DialogContent, DialogTitle } from '../ui/dialog.js';
 import { Select } from '../ui/select.js';
 import { Button } from '../ui/button.js';
 import { Input } from '../ui/input.js';
+import { SelectableCard } from '../ui/selectable-card.js';
 import type { PaletteTriggerType } from '../canvas/NodePalette.js';
 
 interface CreateWorkflowDialogProps {
   onClose: () => void;
-  onCreate: (name: string, triggerType: PaletteTriggerType, connectionId?: string, platform?: 'github' | 'gitlab') => void;
+  onCreate: (
+    name: string,
+    triggerType: PaletteTriggerType,
+    connectionId?: string,
+    platform?: 'github' | 'gitlab',
+  ) => void;
   isPending: boolean;
 }
 
@@ -40,15 +46,9 @@ const TRIGGER_OPTIONS: Array<{
   },
 ];
 
-export function CreateWorkflowDialog({
-  onClose,
-  onCreate,
-  isPending,
-}: CreateWorkflowDialogProps) {
+export function CreateWorkflowDialog({ onClose, onCreate, isPending }: CreateWorkflowDialogProps) {
   const [name, setName] = useState('');
-  const [triggerType, setTriggerType] = useState<PaletteTriggerType | null>(
-    null,
-  );
+  const [triggerType, setTriggerType] = useState<PaletteTriggerType | null>(null);
   const [connectionId, setConnectionId] = useState('');
   const { data: connections = [] } = useConnections();
 
@@ -61,8 +61,14 @@ export function CreateWorkflowDialog({
   const handleCreate = () => {
     if (!canCreate || !triggerType) return;
     const conn = repoConnections.find((c) => c.id === connectionId);
-    const platform = conn?.credential.platform === 'GITLAB' ? 'gitlab' as const : 'github' as const;
-    onCreate(name.trim(), triggerType, connectionId || undefined, connectionId ? platform : undefined);
+    const platform =
+      conn?.credential.platform === 'GITLAB' ? ('gitlab' as const) : ('github' as const);
+    onCreate(
+      name.trim(),
+      triggerType,
+      connectionId || undefined,
+      connectionId ? platform : undefined,
+    );
   };
 
   return (
@@ -72,9 +78,7 @@ export function CreateWorkflowDialog({
         if (!o && !isPending) onClose();
       }}
     >
-      <DialogContent
-        className="flex max-h-[85vh] w-[480px] max-w-[94vw] flex-col overflow-hidden rounded-xl border border-[var(--color-line)] bg-[var(--color-bg-1)] p-0 shadow-none"
-      >
+      <DialogContent className="flex max-h-[85vh] w-[480px] max-w-[94vw] flex-col overflow-hidden rounded-xl border border-[var(--color-line)] bg-[var(--color-bg-1)] p-0 shadow-none">
         <header className="flex items-center justify-between border-b border-[var(--color-line)] px-5 py-4">
           <div>
             <DialogTitle
@@ -114,33 +118,18 @@ export function CreateWorkflowDialog({
             </span>
             <div className="mt-1.5 flex flex-col gap-[6px]">
               {TRIGGER_OPTIONS.map((opt) => (
-                <button
+                <SelectableCard
                   key={opt.type}
-                  type="button"
+                  tone="accent"
+                  selected={triggerType === opt.type}
                   onClick={() => setTriggerType(opt.type)}
-                  className="flex w-full items-center gap-3 rounded-[var(--radius)] border px-3 py-2.5 text-left transition-colors"
-                  style={{
-                    borderColor:
-                      triggerType === opt.type
-                        ? 'var(--color-primary)'
-                        : 'var(--color-divider)',
-                    background:
-                      triggerType === opt.type
-                        ? 'var(--color-primary-soft, oklch(0.95 0.03 250))'
-                        : 'var(--color-bg)',
-                    boxShadow:
-                      triggerType === opt.type
-                        ? '0 0 0 1px var(--color-primary)'
-                        : 'none',
-                  }}
+                  className="flex items-center gap-3 rounded-[var(--radius)] px-3 py-2.5"
                 >
                   <span
                     className="grid h-[24px] w-[24px] shrink-0 place-items-center rounded-[5px]"
                     style={{
                       background:
-                        triggerType === opt.type
-                          ? 'var(--color-primary)'
-                          : 'var(--color-text-3)',
+                        triggerType === opt.type ? 'var(--color-primary)' : 'var(--color-text-3)',
                     }}
                   >
                     {opt.icon}
@@ -153,7 +142,7 @@ export function CreateWorkflowDialog({
                       {opt.description}
                     </span>
                   </span>
-                </button>
+                </SelectableCard>
               ))}
             </div>
           </div>
@@ -187,11 +176,7 @@ export function CreateWorkflowDialog({
             <Button onClick={onClose} disabled={isPending}>
               Cancel
             </Button>
-            <Button
-              variant="primary"
-              onClick={handleCreate}
-              disabled={!canCreate || isPending}
-            >
+            <Button variant="primary" onClick={handleCreate} disabled={!canCreate || isPending}>
               {isPending ? 'Creating…' : 'Create'}
             </Button>
           </div>

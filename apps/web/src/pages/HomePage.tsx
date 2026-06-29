@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronRight, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { TemplatePickerDialog } from '../components/templates/TemplatePickerDialog.js';
 import { CreateWorkflowDialog } from '../components/workflow-list/CreateWorkflowDialog.js';
 import type { PaletteTriggerType } from '../components/canvas/NodePalette.js';
@@ -8,9 +8,9 @@ import { WorkflowRowItem } from '../components/workflow-list/WorkflowRowItem.js'
 import { useConnections, useCreateWorkflow, useWorkflows } from '../api/hooks.js';
 import type { ConnectionRow, WorkflowRow } from '../api/types.js';
 import { repoGroupRef, type RepoGroupRef } from '../lib/connection.js';
-import { cn } from '../lib/cn.js';
 import { Button } from '../components/ui/button.js';
 import { Card } from '../components/ui/card.js';
+import { DisclosureButton } from '../components/ui/disclosure.js';
 
 const NO_REPO_KEY = '__no_repo__';
 
@@ -104,7 +104,12 @@ export function HomePage() {
     });
   };
 
-  const handleCreate = async (name: string, triggerType: PaletteTriggerType, connectionId?: string, platform?: 'github' | 'gitlab') => {
+  const handleCreate = async (
+    name: string,
+    triggerType: PaletteTriggerType,
+    connectionId?: string,
+    platform?: 'github' | 'gitlab',
+  ) => {
     const created = await createWorkflow.mutateAsync({ name, triggerType, connectionId, platform });
     setShowCreateDialog(false);
     navigate(`/workflows/${created.id}`);
@@ -161,7 +166,9 @@ export function HomePage() {
           {!isLoading && workflows.length === 0 && (
             <EmptyRow text="No workflows yet — click “New workflow” to get started." />
           )}
-          {!isLoading && workflows.length > 0 && groups === null &&
+          {!isLoading &&
+            workflows.length > 0 &&
+            groups === null &&
             workflows.map((wf) => (
               <WorkflowRowItem
                 key={wf.id}
@@ -171,25 +178,17 @@ export function HomePage() {
                 onEndRename={() => setRenamingId((curr) => (curr === wf.id ? null : curr))}
               />
             ))}
-          {!isLoading && groups !== null &&
+          {!isLoading &&
+            groups !== null &&
             groups.flatMap((group) => {
               const collapsed = collapsedGroups.has(group.key);
               const header = (
-                <button
+                <DisclosureButton
                   key={`${group.key}:header`}
-                  type="button"
+                  open={!collapsed}
                   onClick={() => toggleGroup(group.key)}
-                  aria-expanded={!collapsed}
-                  className="flex w-full items-center gap-3 border-b border-[var(--color-line)] px-4 py-2.5 text-left transition-colors last:border-b-0 hover:bg-[var(--color-bg-2)]"
+                  className="border-b border-[var(--color-line)] last:border-b-0"
                 >
-                  <ChevronRight
-                    size={12}
-                    strokeWidth={2}
-                    className={cn(
-                      'text-[var(--color-text-3)] transition-transform',
-                      !collapsed && 'rotate-90',
-                    )}
-                  />
                   <div className="flex items-baseline gap-2 font-mono text-[12px]">
                     {group.ref ? (
                       <>
@@ -211,7 +210,7 @@ export function HomePage() {
                   <span className="ml-auto font-mono text-[11px] text-[var(--color-text-3)]">
                     {group.rows.length} workflow{group.rows.length === 1 ? '' : 's'}
                   </span>
-                </button>
+                </DisclosureButton>
               );
               if (collapsed) return [header];
               return [
@@ -222,9 +221,7 @@ export function HomePage() {
                     wf={wf}
                     renaming={renamingId === wf.id}
                     onStartRename={() => setRenamingId(wf.id)}
-                    onEndRename={() =>
-                      setRenamingId((curr) => (curr === wf.id ? null : curr))
-                    }
+                    onEndRename={() => setRenamingId((curr) => (curr === wf.id ? null : curr))}
                   />
                 )),
               ];
@@ -232,9 +229,7 @@ export function HomePage() {
         </Card>
       </section>
 
-      {showTemplatePicker && (
-        <TemplatePickerDialog onClose={() => setShowTemplatePicker(false)} />
-      )}
+      {showTemplatePicker && <TemplatePickerDialog onClose={() => setShowTemplatePicker(false)} />}
       {showCreateDialog && (
         <CreateWorkflowDialog
           onClose={() => setShowCreateDialog(false)}

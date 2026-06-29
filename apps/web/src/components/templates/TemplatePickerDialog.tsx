@@ -1,11 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { ConnectionScope } from '@conduit/shared';
-import {
-  summarizeTemplate,
-  templateFileSchema,
-  type TemplateFile,
-} from '@conduit/shared/template';
+import { summarizeTemplate, templateFileSchema, type TemplateFile } from '@conduit/shared/template';
 import { Upload } from 'lucide-react';
 import { ApiError } from '../../api/client.js';
 import {
@@ -30,6 +26,7 @@ import { SearchSelect } from '../ui/search-select.js';
 import { Select, type SelectOption } from '../ui/select.js';
 import { Button } from '../ui/button.js';
 import { Input } from '../ui/input.js';
+import { SelectableCard } from '../ui/selectable-card.js';
 import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group.js';
 
 function credentialPlatform(
@@ -109,9 +106,7 @@ function defaultBindingForBoard(
   credentials: CredentialRow[],
   connections: ConnectionRow[],
 ): TemplateBinding {
-  const eligible = connections.filter(
-    (c) => c.scope.kind === 'github_projects_v2',
-  );
+  const eligible = connections.filter((c) => c.scope.kind === 'github_projects_v2');
   const only = eligible.length === 1 ? eligible[0] : undefined;
   if (eligible.length > 0) {
     return { mode: 'existing', connectionId: only?.id ?? '' };
@@ -137,10 +132,7 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
 
   const pending = createFromTemplate.isPending || importTemplate.isPending;
 
-  const boardAliasSet = useMemo(
-    () => new Set(selected?.boardAliases ?? []),
-    [selected],
-  );
+  const boardAliasSet = useMemo(() => new Set(selected?.boardAliases ?? []), [selected]);
   const repoAliases = useMemo(
     () => (selected?.placeholders ?? []).filter((p) => !boardAliasSet.has(p)),
     [selected, boardAliasSet],
@@ -192,10 +184,9 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
       Object.fromEntries(
         t.placeholders
           .filter((alias) => !boards.has(alias))
-          .map<[string, TemplateBinding]>((alias) => [
-            alias,
-            defaultBindingForRepo(alias, credentials, connections),
-          ]),
+          .map<
+            [string, TemplateBinding]
+          >((alias) => [alias, defaultBindingForRepo(alias, credentials, connections)]),
       ),
     );
     setError(null);
@@ -270,9 +261,7 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
         if (!o) onClose();
       }}
     >
-      <DialogContent
-        className="flex max-h-[85vh] w-[680px] max-w-[94vw] flex-col overflow-hidden rounded-xl border border-[var(--color-line)] bg-[var(--color-bg-1)] p-0 shadow-none"
-      >
+      <DialogContent className="flex max-h-[85vh] w-[680px] max-w-[94vw] flex-col overflow-hidden rounded-xl border border-[var(--color-line)] bg-[var(--color-bg-1)] p-0 shadow-none">
         <header className="flex items-center justify-between border-b border-[var(--color-line)] px-5 py-4">
           <div>
             <DialogTitle
@@ -298,10 +287,7 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
               <div className="font-mono text-[11.5px] text-[var(--color-text-2)]">
                 Have a workflow export? Import a <code>.json</code> bundle.
               </div>
-              <Button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-              >
+              <Button type="button" onClick={() => fileInputRef.current?.click()}>
                 <Upload size={12} strokeWidth={1.5} />
                 Import from file
               </Button>
@@ -319,7 +305,11 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
             </div>
           )}
 
-          {isLoading && <div className="font-mono text-[12px] text-[var(--color-text-3)]">Loading templates…</div>}
+          {isLoading && (
+            <div className="font-mono text-[12px] text-[var(--color-text-3)]">
+              Loading templates…
+            </div>
+          )}
 
           {!selected && !isLoading && templates.length === 0 && (
             <div className="font-mono text-[12px] text-[var(--color-text-3)]">
@@ -361,9 +351,7 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
                       binding={bindings[alias]}
                       credentials={credentials}
                       connections={connections}
-                      onChange={(b) =>
-                        setBindings((prev) => ({ ...prev, [alias]: b }))
-                      }
+                      onChange={(b) => setBindings((prev) => ({ ...prev, [alias]: b }))}
                     />
                   ))}
                 </div>
@@ -404,18 +392,11 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
-function TemplateCard({
-  t,
-  onPick,
-}: {
-  t: TemplateSummary;
-  onPick: (t: TemplateSummary) => void;
-}) {
+function TemplateCard({ t, onPick }: { t: TemplateSummary; onPick: (t: TemplateSummary) => void }) {
   return (
-    <button
-      type="button"
+    <SelectableCard
       onClick={() => onPick(t)}
-      className="flex flex-col items-start gap-1 rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-2)] px-4 py-3 text-left transition-colors hover:border-[var(--color-claude)]"
+      className="flex flex-col items-start gap-1 rounded-lg bg-[var(--color-bg-2)] px-4 py-3 hover:border-[var(--color-claude)]"
     >
       <div className="flex w-full items-center justify-between">
         <span className="font-mono text-[13px] font-semibold text-[var(--color-text)]">
@@ -428,7 +409,7 @@ function TemplateCard({
       <span className="line-clamp-2 font-mono text-[11.5px] leading-relaxed text-[var(--color-text-2)]">
         {t.description.split('\n\n')[0]}
       </span>
-    </button>
+    </SelectableCard>
   );
 }
 
@@ -454,9 +435,7 @@ function BindingRow({
 
   const handleNewClick = () => {
     const credId =
-      (binding?.mode === 'new' ? binding.credentialId : '') ||
-      credentials[0]?.id ||
-      '';
+      (binding?.mode === 'new' ? binding.credentialId : '') || credentials[0]?.id || '';
     if (isBoard) {
       onChange(newBindingForBoard(alias, credId));
     } else {
@@ -482,8 +461,7 @@ function BindingRow({
             else if (v === 'existing')
               onChange({
                 mode: 'existing',
-                connectionId:
-                  binding?.mode === 'existing' ? binding.connectionId : '',
+                connectionId: binding?.mode === 'existing' ? binding.connectionId : '',
               });
           }}
           variant="subtle"
@@ -649,7 +627,8 @@ function GithubRepoScopeFields({
             value={selected}
             onValueChange={(v) => {
               const slash = v.indexOf('/');
-              if (slash > 0) setScope({ ...scope, owner: v.slice(0, slash), repo: v.slice(slash + 1) });
+              if (slash > 0)
+                setScope({ ...scope, owner: v.slice(0, slash), repo: v.slice(slash + 1) });
             }}
             placeholder={reposQuery.isFetching ? 'Loading…' : '— pick a repo —'}
             options={options}
@@ -769,9 +748,7 @@ function BoardScopeFields({
           <LabeledSelect
             label="Owner type"
             value={scope.ownerType}
-            onChange={(v) =>
-              setScope({ ...scope, ownerType: v as 'user' | 'org' })
-            }
+            onChange={(v) => setScope({ ...scope, ownerType: v as 'user' | 'org' })}
             options={[
               { value: 'org', label: 'Org' },
               { value: 'user', label: 'User' },
@@ -827,11 +804,7 @@ function LabeledInput({
       <span className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-3)]">
         {label}
       </span>
-      <Input
-        value={value}
-        placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value)}
-      />
+      <Input value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />
     </label>
   );
 }

@@ -11,6 +11,7 @@ import { duration, relativeFromNow } from '../lib/time.js';
 import { cn } from '../lib/cn.js';
 import { statusClass } from '../lib/status.js';
 import { Button } from '../components/ui/button.js';
+import { SelectableCard } from '../components/ui/selectable-card.js';
 import { ToggleGroup, ToggleGroupItem } from '../components/ui/toggle-group.js';
 
 type NodeTab = 'timeline' | 'summary' | 'files' | 'error';
@@ -134,7 +135,9 @@ export function RunDetailPage() {
             </div>
             <div className="mt-1 flex flex-wrap items-center gap-3 font-mono text-[11px] text-[var(--color-text-3)]">
               <StatusBadge status={status} />
-              <span>trigger: {run.trigger.source} · {run.trigger.event}</span>
+              <span>
+                trigger: {run.trigger.source} · {run.trigger.event}
+              </span>
               <span>started {relativeFromNow(run.startedAt)}</span>
               <span>elapsed {duration(run.startedAt, run.finishedAt)}</span>
               <span>
@@ -157,7 +160,11 @@ export function RunDetailPage() {
                 </Button>
               )}
               {streaming && (
-                <Button variant="danger" onClick={() => cancelRun.mutate(runId)} disabled={cancelRun.isPending}>
+                <Button
+                  variant="danger"
+                  onClick={() => cancelRun.mutate(runId)}
+                  disabled={cancelRun.isPending}
+                >
                   {cancelRun.isPending ? 'Cancelling…' : 'Cancel run'}
                 </Button>
               )}
@@ -203,9 +210,7 @@ export function RunDetailPage() {
 
         <section className="flex min-w-0 flex-1 flex-col">
           <div className="flex h-10 items-center gap-4 border-b border-[var(--color-line)] bg-[var(--color-bg-1)] px-4">
-            <div className="font-mono text-[12px] font-semibold">
-              {selectedNode ?? '—'}
-            </div>
+            <div className="font-mono text-[12px] font-semibold">{selectedNode ?? '—'}</div>
             <ToggleGroup
               type="single"
               value={activeTab}
@@ -224,7 +229,10 @@ export function RunDetailPage() {
               <div className="flex items-center gap-1.5 font-mono text-[11px] text-[var(--color-running)]">
                 <span
                   className="h-1.5 w-1.5 animate-pulse rounded-full"
-                  style={{ background: 'var(--color-running)', boxShadow: '0 0 6px var(--color-running)' }}
+                  style={{
+                    background: 'var(--color-running)',
+                    boxShadow: '0 0 6px var(--color-running)',
+                  }}
                 />
                 streaming
               </div>
@@ -237,7 +245,12 @@ export function RunDetailPage() {
           </div>
           <div className="min-h-0 flex-1">
             {selected ? (
-              <NodeTabBody tab={activeTab} node={selected} events={orderedEvents} streaming={streaming} />
+              <NodeTabBody
+                tab={activeTab}
+                node={selected}
+                events={orderedEvents}
+                streaming={streaming}
+              />
             ) : (
               <div className="flex h-full items-center justify-center font-mono text-[12px] text-[var(--color-text-4)]">
                 Select a node to inspect.
@@ -283,14 +296,11 @@ function NodeRailItem({
   onClick: () => void;
 }) {
   return (
-    <button
+    <SelectableCard
+      tone="fill"
+      selected={selected}
       onClick={onClick}
-      className={cn(
-        'flex w-full items-start gap-2.5 rounded-md border px-2 py-2 text-left transition-colors',
-        selected
-          ? 'border-[var(--color-line-2)] bg-[var(--color-bg-2)]'
-          : 'border-transparent hover:bg-[var(--color-bg-2)]',
-      )}
+      className="flex items-start gap-2.5 px-2 py-2"
     >
       <span className={cn('status-dot mt-1', statusClass(node.status))} />
       <div className="min-w-0 flex-1">
@@ -308,7 +318,7 @@ function NodeRailItem({
           {labelForStatus(node.status)}
         </div>
       </div>
-    </button>
+    </SelectableCard>
   );
 }
 

@@ -19,6 +19,7 @@ import { Button } from '../ui/button.js';
 import { Checkbox } from '../ui/checkbox.js';
 import { Input } from '../ui/input.js';
 import { Card } from '../ui/card.js';
+import { SelectableCard } from '../ui/selectable-card.js';
 
 interface Props {
   agent: AgentConfig;
@@ -38,11 +39,7 @@ interface Props {
  * (`discoveredTools`), so reopening the panel doesn't re-hit the MCP binary.
  * "Refresh tools" re-runs introspection on demand.
  */
-const TRANSPORT_KINDS: ReadonlyArray<McpTransport['kind']> = [
-  'stdio',
-  'sse',
-  'streamable-http',
-];
+const TRANSPORT_KINDS: ReadonlyArray<McpTransport['kind']> = ['stdio', 'sse', 'streamable-http'];
 
 export function McpServerPicker({ agent, workflowId, onChange }: Props) {
   const addMcpServer = useWorkflowEditor((s) => s.addMcpServer);
@@ -111,9 +108,7 @@ export function McpServerPicker({ agent, workflowId, onChange }: Props) {
           }}
         />
       ) : (
-        <Button onClick={() => setShowAdd(true)}>
-          + Add MCP server
-        </Button>
+        <Button onClick={() => setShowAdd(true)}>+ Add MCP server</Button>
       )}
     </div>
   );
@@ -178,10 +173,7 @@ function ServerCard({
             {transportSummary(server.transport)}
           </div>
         </div>
-        <Button
-          onClick={onRemoveFromWorkflow}
-          title="Remove from workflow"
-        >
+        <Button onClick={onRemoveFromWorkflow} title="Remove from workflow">
           ✕
         </Button>
       </div>
@@ -286,9 +278,7 @@ function ToolAllowList({
         placeholder="Filter tools…"
         emptyLabel="No matching tools"
         triggerLabel={
-          allAllowed
-            ? `All tools (${tools.length})`
-            : `${selected.size} of ${tools.length} tools`
+          allAllowed ? `All tools (${tools.length})` : `${selected.size} of ${tools.length} tools`
         }
         selectAll={{ checked: allAllowed, onToggle: toggleAll, label: 'Select all' }}
       />
@@ -323,9 +313,7 @@ function AddServerForm({
           Custom
         </Button>
         <div className="flex-1" />
-        <Button onClick={onCancel}>
-          Cancel
-        </Button>
+        <Button onClick={onCancel}>Cancel</Button>
       </div>
 
       {mode === 'preset' && <PresetPicker connections={connections} onAdd={onAdd} />}
@@ -369,15 +357,11 @@ function PresetPicker({
     <div className="mt-3 flex flex-col gap-3">
       <div className="grid grid-cols-1 gap-2">
         {MCP_PRESETS.map((preset) => (
-          <button
+          <SelectableCard
             key={preset.id}
-            className={cn(
-              'rounded-md border bg-[var(--color-bg-1)] p-3 text-left transition-colors',
-              selected?.id === preset.id
-                ? 'border-[var(--color-line-2)]'
-                : 'border-[var(--color-line)] hover:border-[var(--color-line-2)]',
-            )}
+            selected={selected?.id === preset.id}
             onClick={() => setSelected(preset)}
+            className="bg-[var(--color-bg-1)] p-3"
           >
             <div className="font-mono text-[12px] font-medium">{preset.name}</div>
             <div className="mt-1 font-mono text-[10.5px] text-[var(--color-text-3)]">
@@ -386,7 +370,7 @@ function PresetPicker({
             <div className="mt-1 font-mono text-[10.5px] text-[var(--color-text-4)]">
               Requires {preset.platform.toLowerCase()} credential · {preset.credentialHint}
             </div>
-          </button>
+          </SelectableCard>
         ))}
       </div>
 
@@ -405,7 +389,8 @@ function PresetPicker({
             />
             {eligible.length === 0 && (
               <span className="font-mono text-[10.5px] text-[var(--color-text-4)]">
-                No {selected.platform.toLowerCase()} connection yet — add one from the Connections page.
+                No {selected.platform.toLowerCase()} connection yet — add one from the Connections
+                page.
               </span>
             )}
           </label>
@@ -431,7 +416,9 @@ function KeyValueEditor({
 }) {
   const update = (i: number, col: 0 | 1, value: string) => {
     const next = entries.map((row, j) =>
-      j === i ? ([col === 0 ? value : row[0], col === 1 ? value : row[1]] as [string, string]) : row,
+      j === i
+        ? ([col === 0 ? value : row[0], col === 1 ? value : row[1]] as [string, string])
+        : row,
     );
     onChange(next);
   };
@@ -459,10 +446,7 @@ function KeyValueEditor({
           </Button>
         </div>
       ))}
-      <Button
-        className="self-start"
-        onClick={() => onChange([...entries, ['', '']])}
-      >
+      <Button className="self-start" onClick={() => onChange([...entries, ['', '']])}>
         + Add
       </Button>
     </div>
@@ -547,11 +531,7 @@ function CustomServerForm({
             <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
               Command
             </span>
-            <Input
-              placeholder="npx"
-              value={command}
-              onChange={(e) => setCommand(e.target.value)}
-            />
+            <Input placeholder="npx" value={command} onChange={(e) => setCommand(e.target.value)} />
           </label>
           <label className="flex flex-col gap-1">
             <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">

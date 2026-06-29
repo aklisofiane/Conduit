@@ -1,11 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AgentEvent, ExecutionLogRow } from '../../api/types.js';
 import { cn } from '../../lib/cn.js';
-import {
-  prettyToolName,
-  summarizeToolCall,
-  type ToolStatus,
-} from './tool-summary.js';
+import { DisclosureButton } from '../ui/disclosure.js';
+import { prettyToolName, summarizeToolCall, type ToolStatus } from './tool-summary.js';
 
 interface RunTimelineProps {
   events: ExecutionLogRow[];
@@ -340,14 +337,13 @@ function ToolGroupRow({
 }) {
   return (
     <div className="overflow-hidden rounded-md border border-[var(--color-line)] bg-[var(--color-bg-1)]">
-      <button
-        type="button"
+      <DisclosureButton
+        size="sm"
+        open={groupOpen}
         onClick={() => onToggle(item.id)}
-        aria-expanded={groupOpen}
         aria-label={`${groupOpen ? 'Collapse' : 'Expand'} ${item.tools.length} ${prettyToolName(item.toolName)} calls`}
-        className="group flex w-full cursor-pointer items-center gap-3 px-3 py-2 text-left font-mono text-[11px] text-[var(--color-text-3)] transition-colors hover:bg-[var(--color-bg-2)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-claude)] focus-visible:ring-inset"
+        className="font-mono text-[11px] text-[var(--color-text-3)]"
       >
-        <Chevron open={groupOpen} />
         <span className="w-12 shrink-0 text-[var(--color-text-4)]">
           +{secondsSince(item.tsMs, startMs)}s
         </span>
@@ -358,7 +354,7 @@ function ToolGroupRow({
         <span className="flex-1" />
         <StatusPill status={item.status} label={item.statusLabel} />
         {cursor && !groupOpen && <span className="cursor" />}
-      </button>
+      </DisclosureButton>
       {groupOpen && (
         <div>
           {item.tools.map((tool, idx) => (
@@ -395,16 +391,12 @@ function CollapsedToolHeader({
   nested: boolean;
 }) {
   return (
-    <button
-      type="button"
+    <DisclosureButton
+      size="sm"
+      open={open}
       onClick={onToggle}
-      aria-expanded={open}
-      className={cn(
-        'group flex w-full cursor-pointer items-center gap-3 px-3 py-2 text-left font-mono text-[11.5px] transition-colors hover:bg-[var(--color-bg-2)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-claude)] focus-visible:ring-inset',
-        nested && 'pl-8',
-      )}
+      className={cn('font-mono text-[11.5px]', nested && 'pl-8')}
     >
-      <Chevron open={open} />
       <span className="w-12 shrink-0 text-[var(--color-text-4)]">+{offset}s</span>
       {!nested && (
         <span className="shrink-0 text-[var(--color-claude)]">
@@ -416,21 +408,7 @@ function CollapsedToolHeader({
       </span>
       <StatusPill status={tool.status} />
       {cursor && <span className="cursor" />}
-    </button>
-  );
-}
-
-function Chevron({ open }: { open: boolean }) {
-  return (
-    <span
-      aria-hidden
-      className={cn(
-        'inline-block w-3 shrink-0 text-[var(--color-text-3)] transition-transform duration-150 group-hover:text-[var(--color-text)]',
-        open && 'rotate-90',
-      )}
-    >
-      ▸
-    </span>
+    </DisclosureButton>
   );
 }
 
@@ -456,9 +434,7 @@ function ExpandedToolBody({ tool }: { tool: ToolItem }) {
             error ? 'text-[var(--color-error)]' : 'text-[var(--color-text-2)]',
           )}
         >
-          {tool.result === undefined
-            ? '(streaming…)'
-            : (error ?? formatValue(tool.result.output))}
+          {tool.result === undefined ? '(streaming…)' : (error ?? formatValue(tool.result.output))}
         </pre>
       </div>
     </div>
@@ -523,7 +499,10 @@ function formatStructured(v: unknown, indent: number): string {
 
   if (typeof v === 'string') {
     if (!v.includes('\n')) return v;
-    const body = v.split('\n').map((l) => pad + l).join('\n');
+    const body = v
+      .split('\n')
+      .map((l) => pad + l)
+      .join('\n');
     return '|\n' + body;
   }
 
