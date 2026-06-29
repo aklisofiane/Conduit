@@ -44,3 +44,10 @@ export {
   DropdownMenuLabel,
 } from './dropdown-menu.js';
 export { InfoPopover } from './info-popover.js';
+export {
+  ToggleGroup,
+  ToggleGroupItem,
+  toggleGroupItemVariants,
+  type ToggleGroupProps,
+  type ToggleGroupItemProps,
+} from './toggle-group.js';

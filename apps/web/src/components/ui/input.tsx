@@ -1,5 +1,5 @@
 import { forwardRef } from 'react';
-import { cva } from 'class-variance-authority';
+import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '../../lib/cn.js';
 
 /**
@@ -24,18 +24,30 @@ const inputVariants = cva(
         input: 'h-[30px] px-[10px] font-sans text-[12px]',
         textarea: 'h-auto py-2 px-[10px] resize-y font-sans text-[12px]',
       },
+      // `compact` is the dense pill-field look used in popovers/menus (filter
+      // boxes, inline create-org): auto height, tighter radius/padding, mono,
+      // and a muted focus border with no focus shadow. Collapses the per-site
+      // "re-declare the base then cancel the defaults" className soup.
+      variant: {
+        default: '',
+        compact:
+          'h-auto rounded-[var(--radius-sm)] px-2 py-1 font-mono text-[11px] focus:border-[var(--color-text-muted)] focus:shadow-none',
+      },
     },
     defaultVariants: {
       as: 'input',
+      variant: 'default',
     },
   },
 );
 
-export type InputProps = React.InputHTMLAttributes<HTMLInputElement>;
+export interface InputProps
+  extends React.InputHTMLAttributes<HTMLInputElement>,
+    Pick<VariantProps<typeof inputVariants>, 'variant'> {}
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ className, ...props }, ref) => (
-    <input ref={ref} className={cn(inputVariants({ as: 'input' }), className)} {...props} />
+  ({ className, variant, ...props }, ref) => (
+    <input ref={ref} className={cn(inputVariants({ as: 'input', variant }), className)} {...props} />
   ),
 );
 Input.displayName = 'Input';

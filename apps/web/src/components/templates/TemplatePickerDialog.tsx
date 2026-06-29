@@ -30,6 +30,7 @@ import { SearchSelect } from '../ui/search-select.js';
 import { Select, type SelectOption } from '../ui/select.js';
 import { Button } from '../ui/button.js';
 import { Input } from '../ui/input.js';
+import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group.js';
 
 function credentialPlatform(
   credentialId: string,
@@ -473,23 +474,35 @@ function BindingRow({
             connection{isBoard ? ' · optional' : ''}
           </span>
         </div>
-        <div className="flex gap-1 rounded-md border border-[var(--color-line)] p-0.5">
-          <ModeButton active={mode === 'new'} onClick={handleNewClick}>
-            New
-          </ModeButton>
-          <ModeButton
-            active={mode === 'existing'}
-            onClick={() =>
+        <ToggleGroup
+          type="single"
+          value={mode}
+          onValueChange={(v) => {
+            if (v === 'new') handleNewClick();
+            else if (v === 'existing')
               onChange({
                 mode: 'existing',
                 connectionId:
                   binding?.mode === 'existing' ? binding.connectionId : '',
-              })
-            }
+              });
+          }}
+          variant="subtle"
+          size="sm"
+          className="rounded-md border border-[var(--color-line)] p-0.5"
+        >
+          <ToggleGroupItem
+            value="new"
+            className="uppercase tracking-wider data-[state=on]:bg-[var(--color-claude)] data-[state=on]:text-black"
+          >
+            New
+          </ToggleGroupItem>
+          <ToggleGroupItem
+            value="existing"
+            className="uppercase tracking-wider data-[state=on]:bg-[var(--color-claude)] data-[state=on]:text-black"
           >
             Existing
-          </ModeButton>
-        </div>
+          </ToggleGroupItem>
+        </ToggleGroup>
       </div>
 
       {binding?.mode === 'new' && (
@@ -795,31 +808,6 @@ function BoardScopeFields({
         />
       )}
     </>
-  );
-}
-
-function ModeButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={
-        'rounded px-2 py-0.5 font-mono text-[10.5px] uppercase tracking-wider transition-colors ' +
-        (active
-          ? 'bg-[var(--color-claude)] text-black'
-          : 'text-[var(--color-text-2)] hover:text-[var(--color-text)]')
-      }
-    >
-      {children}
-    </button>
   );
 }
 

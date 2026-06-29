@@ -28,11 +28,13 @@ const buttonVariants = cva(
           'border-[color-mix(in_oklch,var(--color-error)_30%,transparent)] bg-[var(--color-bg)] text-[var(--color-error)] hover:bg-[var(--color-pill-bg)]',
         ghost:
           'border-transparent bg-transparent text-[var(--color-text-3)] hover:bg-[var(--color-bg-2)] hover:text-[var(--color-text)]',
+        link: 'border-transparent bg-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text)]',
       },
       size: {
         md: 'h-7 px-3 text-[11.5px]',
         sm: 'h-6 px-2 text-[11px]',
         icon: 'h-6 w-6 p-0',
+        inline: 'h-auto p-0 text-[11px]',
       },
     },
     defaultVariants: {

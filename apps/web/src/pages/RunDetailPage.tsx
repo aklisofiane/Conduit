@@ -11,6 +11,7 @@ import { duration, relativeFromNow } from '../lib/time.js';
 import { cn } from '../lib/cn.js';
 import { statusClass } from '../lib/status.js';
 import { Button } from '../components/ui/button.js';
+import { ToggleGroup, ToggleGroupItem } from '../components/ui/toggle-group.js';
 
 type NodeTab = 'timeline' | 'summary' | 'files' | 'error';
 
@@ -205,22 +206,20 @@ export function RunDetailPage() {
             <div className="font-mono text-[12px] font-semibold">
               {selectedNode ?? '—'}
             </div>
-            <nav className="flex items-center gap-0.5">
+            <ToggleGroup
+              type="single"
+              value={activeTab}
+              onValueChange={(v) => v && setActiveTab(v as NodeTab)}
+              variant="subtle"
+              className="gap-0.5"
+              aria-label="Node detail tab"
+            >
               {NODE_TABS.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={cn(
-                    'rounded-md px-2.5 py-1 font-mono text-[11px] transition-colors',
-                    activeTab === tab.id
-                      ? 'bg-[var(--color-bg-2)] text-[var(--color-text)]'
-                      : 'text-[var(--color-text-3)] hover:text-[var(--color-text)]',
-                  )}
-                >
+                <ToggleGroupItem key={tab.id} value={tab.id} className="rounded-md">
                   {tab.label}
-                </button>
+                </ToggleGroupItem>
               ))}
-            </nav>
+            </ToggleGroup>
             {streaming && activeTab === 'timeline' && (
               <div className="flex items-center gap-1.5 font-mono text-[11px] text-[var(--color-running)]">
                 <span

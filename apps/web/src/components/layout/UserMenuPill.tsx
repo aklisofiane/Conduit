@@ -25,6 +25,7 @@ import {
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu.js';
 import { Button } from '../ui/button.js';
+import { Input } from '../ui/input.js';
 
 const FILTER_THRESHOLD = 5;
 
@@ -301,7 +302,7 @@ function OrganizationSection({
 
       {creating ? (
         <form onSubmit={handleCreate} className="mt-1 flex items-center gap-1">
-          <input
+          <Input
             value={newName}
             autoFocus
             placeholder="Organization name"
@@ -316,7 +317,8 @@ function OrganizationSection({
               }
             }}
             aria-label="New organization name"
-            className="min-w-0 flex-1 rounded-[var(--radius-sm)] border border-[var(--color-divider)] bg-[var(--color-bg)] px-2 py-1 font-mono text-[11px] text-[var(--color-text)] outline-none focus:border-[var(--color-text-muted)]"
+            variant="compact"
+            className="min-w-0 w-auto flex-1"
           />
           <Button
             type="submit"
@@ -327,13 +329,13 @@ function OrganizationSection({
           </Button>
         </form>
       ) : (
-        <button
-          type="button"
+        <Button
+          variant="ghost"
           onClick={() => setCreating(true)}
-          className="mt-1 flex w-full items-center gap-1 px-1 py-1 text-left font-mono text-[11px] text-[var(--color-text-2)] transition-colors hover:text-[var(--color-text)]"
+          className="mt-1 w-full justify-start gap-1 h-auto rounded-none border-0 px-1 py-1 text-left font-mono text-[11px] text-[var(--color-text-2)] hover:bg-transparent hover:text-[var(--color-text)]"
         >
           <Plus size={11} strokeWidth={1.5} /> Create organization
-        </button>
+        </Button>
       )}
 
       {error && (
@@ -372,13 +374,14 @@ function SwitchOrgList({
   return (
     <div className="mt-1 flex flex-col gap-1">
       {showFilter && (
-        <input
+        <Input
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           onKeyDown={stopFilterKey}
           placeholder="Filter orgs…"
           aria-label="Filter organizations"
-          className="w-full rounded-[var(--radius-sm)] border border-[var(--color-divider)] bg-[var(--color-bg)] px-2 py-1 font-mono text-[10.5px] text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-text-muted)]"
+          variant="compact"
+          className="text-[10.5px]"
         />
       )}
       <div className="max-h-[140px] overflow-y-auto" role="listbox" aria-label="Switch organization">
@@ -388,17 +391,17 @@ function SwitchOrgList({
           </div>
         ) : (
           others.map((o) => (
-            <button
+            <Button
               key={o.id}
-              type="button"
+              variant="ghost"
               role="option"
               onClick={() => void onSwitch(o.id)}
               disabled={isSwitching}
-              className="flex w-full items-center gap-2 rounded-[var(--radius-sm)] px-2 py-1 text-left font-mono text-[11px] text-[var(--color-text-2)] transition-colors hover:bg-[var(--color-pill-bg)] hover:text-[var(--color-text)] disabled:opacity-60"
               title={o.name}
+              className="w-full justify-start gap-2 h-auto rounded-[var(--radius-sm)] px-2 py-1 text-left font-mono text-[11px] text-[var(--color-text-2)] hover:bg-[var(--color-pill-bg)] hover:text-[var(--color-text)] disabled:opacity-60"
             >
               <span className="min-w-0 flex-1 truncate">{o.name}</span>
-            </button>
+            </Button>
           ))
         )}
       </div>

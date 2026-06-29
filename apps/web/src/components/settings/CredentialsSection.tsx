@@ -14,6 +14,7 @@ import { Select } from '../ui/select.js';
 import { SettingsSection } from '../common/SettingsSection.js';
 import { Button } from '../ui/button.js';
 import { Input } from '../ui/input.js';
+import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group.js';
 
 const PLATFORMS = ['GITHUB', 'GITLAB', 'JIRA', 'SLACK', 'DISCORD'] as const;
 
@@ -161,30 +162,19 @@ export function CredentialsSection() {
               <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
                 Instance
               </span>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  className={`rounded-full px-3 py-1 font-mono text-[11px] transition-colors ${
-                    !form.selfHosted
-                      ? 'bg-[var(--color-accent)] text-white'
-                      : 'bg-[var(--color-bg-2)] text-[var(--color-text-3)] hover:text-[var(--color-text-2)]'
-                  }`}
-                  onClick={() => handleSelfHostedChange(false)}
-                >
-                  Cloud
-                </button>
-                <button
-                  type="button"
-                  className={`rounded-full px-3 py-1 font-mono text-[11px] transition-colors ${
-                    form.selfHosted
-                      ? 'bg-[var(--color-accent)] text-white'
-                      : 'bg-[var(--color-bg-2)] text-[var(--color-text-3)] hover:text-[var(--color-text-2)]'
-                  }`}
-                  onClick={() => handleSelfHostedChange(true)}
-                >
-                  Self-hosted
-                </button>
-              </div>
+              <ToggleGroup
+                type="single"
+                value={form.selfHosted ? 'self' : 'cloud'}
+                onValueChange={(v) => {
+                  if (v) handleSelfHostedChange(v === 'self');
+                }}
+                variant="solid"
+                size="pill"
+                aria-label="Instance type"
+              >
+                <ToggleGroupItem value="cloud">Cloud</ToggleGroupItem>
+                <ToggleGroupItem value="self">Self-hosted</ToggleGroupItem>
+              </ToggleGroup>
               {form.selfHosted && (
                 <div className="flex flex-col gap-1">
                   <Input

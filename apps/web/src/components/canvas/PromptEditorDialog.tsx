@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { cn } from '../../lib/cn.js';
 import { Dialog, DialogContent, DialogTitle } from '../ui/dialog.js';
 import { Button } from '../ui/button.js';
 import { Textarea } from '../ui/input.js';
+import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group.js';
 
 /** Char + line counts for the prompt editors. Empty text reads as zero lines. */
 export function promptCounts(value: string): { chars: number; lines: number } {
@@ -86,23 +86,21 @@ export function PromptEditorDialog({
           </span>
         </div>
 
-        <div className="flex gap-1 px-5 pt-3">
-          {(['write', 'preview'] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => setMode(m)}
-              className={cn(
-                'rounded-[var(--radius-sm)] px-2.5 py-1 font-mono text-[11px] capitalize transition-colors',
-                mode === m
-                  ? 'bg-[var(--color-pill-bg)] text-[var(--color-text)]'
-                  : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]',
-              )}
-            >
-              {m}
-            </button>
-          ))}
-        </div>
+        <ToggleGroup
+          type="single"
+          value={mode}
+          onValueChange={(v) => v && setMode(v as 'write' | 'preview')}
+          variant="subtle"
+          className="px-5 pt-3"
+          aria-label="Editor mode"
+        >
+          <ToggleGroupItem value="write" className="capitalize">
+            write
+          </ToggleGroupItem>
+          <ToggleGroupItem value="preview" className="capitalize">
+            preview
+          </ToggleGroupItem>
+        </ToggleGroup>
 
         <div className="px-5 pb-4 pt-2">
           {mode === 'write' ? (

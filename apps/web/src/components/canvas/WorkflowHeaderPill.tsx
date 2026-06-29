@@ -21,6 +21,8 @@ import { cn } from '../../lib/cn.js';
 import { relativeFromNow } from '../../lib/time.js';
 import { InlineRename } from '../common/InlineRename.js';
 import { CreateWorkflowDialog } from '../workflow-list/CreateWorkflowDialog.js';
+import { Button } from '../ui/button.js';
+import { Input } from '../ui/input.js';
 import type { PaletteTriggerType } from './NodePalette.js';
 import { ChevronDown, Plus } from 'lucide-react';
 
@@ -231,7 +233,7 @@ function SwitcherPopover({ anchorEl, currentId, onClose }: SwitcherPopoverProps)
       onWheel={stop}
     >
       <div className="border-b border-[var(--color-divider)] p-2">
-        <input
+        <Input
           ref={filterRef}
           value={query}
           onChange={(e) => {
@@ -239,7 +241,7 @@ function SwitcherPopover({ anchorEl, currentId, onClose }: SwitcherPopoverProps)
             setCursor(0);
           }}
           placeholder="Filter workflows…"
-          className="w-full rounded-[var(--radius-sm)] border border-[var(--color-divider)] bg-[var(--color-bg)] px-2 py-1 font-mono text-[11px] text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-text-muted)]"
+          variant="compact"
         />
       </div>
 
@@ -262,14 +264,14 @@ function SwitcherPopover({ anchorEl, currentId, onClose }: SwitcherPopoverProps)
       </div>
 
       <div className="border-t border-[var(--color-divider)]">
-        <button
-          type="button"
+        <Button
+          variant="ghost"
           onClick={() => setShowCreateDialog(true)}
-          className="flex w-full items-center gap-2 px-3 py-2 font-mono text-[11px] text-[var(--color-text-2)] transition-colors hover:bg-[var(--color-pill-bg)] hover:text-[var(--color-text)]"
+          className="w-full justify-start gap-2 h-auto rounded-none px-3 py-2 font-mono text-[11px] text-[var(--color-text-2)] hover:bg-[var(--color-pill-bg)] hover:text-[var(--color-text)]"
         >
           <Plus size={12} strokeWidth={1.5} />
           New workflow
-        </button>
+        </Button>
       </div>
       {showCreateDialog && (
         <CreateWorkflowDialog
@@ -295,15 +297,15 @@ function SwitcherRow({
   onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
       onMouseEnter={onMouseEnter}
       onClick={onClick}
       className={cn(
-        'flex w-full items-center justify-between gap-3 px-3 py-1.5 text-left font-mono text-[11px] transition-colors',
+        'w-full justify-between gap-3 h-auto rounded-none px-3 py-1.5 text-left font-mono text-[11px]',
         highlighted
           ? 'bg-[var(--color-pill-bg)] text-[var(--color-text)]'
-          : 'text-[var(--color-text-2)] hover:text-[var(--color-text)]',
+          : 'text-[var(--color-text-2)] hover:bg-transparent hover:text-[var(--color-text)]',
       )}
     >
       <span className="min-w-0 flex-1 truncate" title={row.name}>
@@ -312,7 +314,7 @@ function SwitcherRow({
       <span className="shrink-0 text-[var(--color-text-muted)]">
         {relativeFromNow(row.updatedAt)}
       </span>
-    </button>
+    </Button>
   );
 }
 
