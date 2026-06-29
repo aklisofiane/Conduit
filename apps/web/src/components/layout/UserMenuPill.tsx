@@ -210,7 +210,7 @@ function UserMenuBody({ name, email, onClose }: UserMenuBodyProps) {
             {pendingInvitationCount > 0 && (
               <span
                 aria-label={`${pendingInvitationCount} pending`}
-                className="rounded-full bg-[var(--color-claude)] px-1.5 py-[1px] font-mono text-[10px] text-[var(--color-bg-panel)]"
+                className="rounded-full bg-[var(--color-claude-mark)] px-1.5 py-[1px] font-mono text-[10px] text-[var(--color-bg-panel)]"
               >
                 {pendingInvitationCount}
               </span>

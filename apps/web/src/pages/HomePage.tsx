@@ -130,7 +130,7 @@ export function HomePage() {
           {failingCount > 0 ? (
             <span className="text-[var(--color-error)]">{failingCount} needs attention</span>
           ) : (
-            <span className="text-[var(--color-text-3)]">all good</span>
+            <span className="text-[var(--color-text-muted)]">all good</span>
           )}
         </div>
       </section>
@@ -150,7 +150,7 @@ export function HomePage() {
         <div className="flex items-end justify-between">
           <h2 className="flex items-baseline gap-2 font-mono text-[12px] uppercase tracking-wider text-[var(--color-text-2)]">
             Your workflows
-            <span className="text-[var(--color-text-4)]">{workflows.length}</span>
+            <span className="text-[var(--color-text-muted)]">{workflows.length}</span>
           </h2>
           <div className="flex items-center gap-2">
             <Button onClick={() => setShowTemplatePicker(true)}>From template</Button>
@@ -187,7 +187,7 @@ export function HomePage() {
                   key={`${group.key}:header`}
                   open={!collapsed}
                   onClick={() => toggleGroup(group.key)}
-                  className="border-b border-[var(--color-line)] last:border-b-0"
+                  className="border-b border-[var(--color-divider)] last:border-b-0"
                 >
                   <div className="flex items-baseline gap-2 font-mono text-[12px]">
                     {group.ref ? (
@@ -195,7 +195,7 @@ export function HomePage() {
                         <span className="font-semibold text-[var(--color-text)]">
                           {group.ref.label}
                         </span>
-                        <span className="text-[var(--color-text-3)]">
+                        <span className="text-[var(--color-text-muted)]">
                           · {group.ref.platform}
                           {group.ref.hostUrl ? ` · ${group.ref.hostUrl}` : ''}
                         </span>
@@ -203,11 +203,11 @@ export function HomePage() {
                     ) : (
                       <>
                         <span className="font-semibold text-[var(--color-text)]">No repo</span>
-                        <span className="text-[var(--color-text-3)]">· cron or unconfigured</span>
+                        <span className="text-[var(--color-text-muted)]">· cron or unconfigured</span>
                       </>
                     )}
                   </div>
-                  <span className="ml-auto font-mono text-[11px] text-[var(--color-text-3)]">
+                  <span className="ml-auto font-mono text-[11px] text-[var(--color-text-muted)]">
                     {group.rows.length} workflow{group.rows.length === 1 ? '' : 's'}
                   </span>
                 </DisclosureButton>
@@ -244,7 +244,7 @@ export function HomePage() {
 function StatCard({ label, value, hint }: { label: string; value: string; hint: string }) {
   return (
     <Card>
-      <div className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-3)]">
+      <div className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-muted)]">
         {label}
       </div>
       <div
@@ -253,14 +253,14 @@ function StatCard({ label, value, hint }: { label: string; value: string; hint: 
       >
         {value}
       </div>
-      <div className="mt-1 font-mono text-[11px] text-[var(--color-text-3)]">{hint}</div>
+      <div className="mt-1 font-mono text-[11px] text-[var(--color-text-muted)]">{hint}</div>
     </Card>
   );
 }
 
 function EmptyRow({ text }: { text: string }) {
   return (
-    <div className="flex h-16 items-center justify-center font-mono text-[12px] text-[var(--color-text-3)]">
+    <div className="flex h-16 items-center justify-center font-mono text-[12px] text-[var(--color-text-muted)]">
       {text}
     </div>
   );

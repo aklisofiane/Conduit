@@ -27,7 +27,7 @@ const buttonVariants = cva(
         danger:
           'border-[color-mix(in_oklch,var(--color-error)_30%,transparent)] bg-[var(--color-bg)] text-[var(--color-error)] hover:bg-[var(--color-pill-bg)]',
         ghost:
-          'border-transparent bg-transparent text-[var(--color-text-3)] hover:bg-[var(--color-bg-2)] hover:text-[var(--color-text)]',
+          'border-transparent bg-transparent text-[var(--color-text-muted)] hover:bg-[var(--color-pill-bg)] hover:text-[var(--color-text)]',
         link: 'border-transparent bg-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text)]',
       },
       size: {

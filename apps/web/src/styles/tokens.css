@@ -54,18 +54,6 @@
   --color-codex-tag-bg: oklch(0.94 0.06 155);
   --color-codex-tag-text: oklch(0.4 0.12 155);
 
-  /* Legacy aliases — older pages (Home, Credentials, Connections, Runs,
-     TemplatePicker) still reference these names. Drop once consumers migrate. */
-  --color-claude: var(--color-claude-mark);
-  --color-codex: var(--color-codex-mark);
-  --color-bg-1: var(--color-bg-panel);
-  --color-bg-2: var(--color-pill-bg);
-  --color-bg-3: var(--color-pill-bg);
-  --color-line: var(--color-divider);
-  --color-line-2: var(--color-divider);
-  --color-text-3: var(--color-text-muted);
-  --color-text-4: var(--color-text-muted);
-
   --radius-sm: 4px;
   --radius: 6px;
   --radius-md: 7px;

@@ -81,10 +81,10 @@ export function AcceptInvitationPage() {
         className="text-[28px] font-semibold leading-none tracking-tight text-[var(--color-text)]"
         style={{ fontFamily: 'var(--font-serif)' }}
       >
-        Invitation<em className="text-[var(--color-claude)] not-italic">.</em>
+        Invitation<em className="text-[var(--color-claude-mark)] not-italic">.</em>
       </h1>
 
-      <section className="rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-1)] p-5">
+      <section className="rounded-lg border border-[var(--color-divider)] bg-[var(--color-bg-panel)] p-5">
         {isLoading && (
           <p className="font-mono text-[12px] text-[var(--color-text-muted)]">Loading invitation…</p>
         )}
@@ -110,7 +110,7 @@ export function AcceptInvitationPage() {
         {data && !error && (
           <div className="flex flex-col gap-4">
             <dl className="grid grid-cols-[140px_1fr] items-baseline gap-y-2">
-              <dt className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+              <dt className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-muted)]">
                 Organization
               </dt>
               <dd className="font-mono text-[13px] text-[var(--color-text)]">
@@ -118,7 +118,7 @@ export function AcceptInvitationPage() {
               </dd>
               {data.inviterEmail && (
                 <>
-                  <dt className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+                  <dt className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-muted)]">
                     Invited by
                   </dt>
                   <dd className="font-mono text-[12.5px] text-[var(--color-text)]">
@@ -126,13 +126,13 @@ export function AcceptInvitationPage() {
                   </dd>
                 </>
               )}
-              <dt className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+              <dt className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-muted)]">
                 Role
               </dt>
               <dd className="font-mono text-[12.5px] text-[var(--color-text)]">
                 {data.invitation.role}
               </dd>
-              <dt className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+              <dt className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-muted)]">
                 Email
               </dt>
               <dd className="font-mono text-[12.5px] text-[var(--color-text)]">

@@ -110,7 +110,7 @@ export function WorkflowRowItem({
             {wf.name}
           </div>
         )}
-        <div className="mt-0.5 flex items-center gap-2 font-mono text-[11px] text-[var(--color-text-3)]">
+        <div className="mt-0.5 flex items-center gap-2 font-mono text-[11px] text-[var(--color-text-muted)]">
           {providers.has('claude') && (
             <Badge variant="glyph" provider="claude">
               C
@@ -135,7 +135,7 @@ export function WorkflowRowItem({
             · {triggerSummary(trigger)}
           </>
         ) : (
-          <span className="text-[var(--color-text-4)]">— trigger not configured</span>
+          <span className="text-[var(--color-text-muted)]">— trigger not configured</span>
         )}
       </div>
       <div className="font-mono text-[11px] text-[var(--color-text-2)]">
@@ -150,14 +150,14 @@ export function WorkflowRowItem({
                 : duration(lastRun.startedAt, lastRun.finishedAt)}
           </>
         ) : (
-          <span className="text-[var(--color-text-4)]">never run</span>
+          <span className="text-[var(--color-text-muted)]">never run</span>
         )}
       </div>
       <div className="flex justify-end">
         <Badge
           asChild
           className={cn(
-            'cursor-pointer transition-opacity hover:opacity-100 hover:ring-1 hover:ring-[var(--color-line)] disabled:cursor-default disabled:opacity-60',
+            'cursor-pointer transition-opacity hover:opacity-100 hover:ring-1 hover:ring-[var(--color-divider)] disabled:cursor-default disabled:opacity-60',
             wf.isActive ? '' : 'opacity-40',
           )}
         >
@@ -169,7 +169,7 @@ export function WorkflowRowItem({
             disabled={update.isPending}
           >
             <BadgeDot
-              className={wf.isActive ? 'bg-[var(--color-success)]' : 'bg-[var(--color-text-4)]'}
+              className={wf.isActive ? 'bg-[var(--color-success)]' : 'bg-[var(--color-text-muted)]'}
             />
             {wf.isActive ? 'on' : 'off'}
           </button>
@@ -192,7 +192,7 @@ export function WorkflowRowItem({
                 e.preventDefault();
                 e.stopPropagation();
               }}
-              className="flex h-6 w-6 items-center justify-center rounded text-[var(--color-text-3)] transition-colors hover:bg-[var(--color-bg-2)] hover:text-[var(--color-text)] data-[state=open]:bg-[var(--color-bg-2)] data-[state=open]:text-[var(--color-text)]"
+              className="flex h-6 w-6 items-center justify-center rounded text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-pill-bg)] hover:text-[var(--color-text)] data-[state=open]:bg-[var(--color-pill-bg)] data-[state=open]:text-[var(--color-text)]"
             >
               <MoreVertical size={14} strokeWidth={1.5} />
             </button>
@@ -209,7 +209,7 @@ export function WorkflowRowItem({
   return (
     <Link
       to={`/workflows/${wf.id}`}
-      className={cn(rowClassName, 'transition-colors hover:bg-[var(--color-bg-2)]')}
+      className={cn(rowClassName, 'transition-colors hover:bg-[var(--color-pill-bg)]')}
     >
       {inner}
     </Link>
@@ -217,4 +217,4 @@ export function WorkflowRowItem({
 }
 
 const rowClassName =
-  'grid grid-cols-[20px_minmax(0,1fr)_minmax(0,1fr)_140px_60px_28px] items-center gap-4 border-b border-[var(--color-line)] px-4 py-3 last:border-b-0';
+  'grid grid-cols-[20px_minmax(0,1fr)_minmax(0,1fr)_140px_60px_28px] items-center gap-4 border-b border-[var(--color-divider)] px-4 py-3 last:border-b-0';

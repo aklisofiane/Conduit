@@ -11,7 +11,7 @@ export function SettingsLayout() {
     <div className="flex flex-1">
       <aside className="w-[220px] shrink-0 border-r border-[var(--color-divider)] bg-[var(--color-bg-panel)] py-6">
         <div className="mb-3 px-5">
-          <h2 className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+          <h2 className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-muted)]">
             Settings
           </h2>
         </div>

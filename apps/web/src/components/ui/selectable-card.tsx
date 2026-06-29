@@ -41,18 +41,18 @@ const selectableCardVariants = cva(
       {
         tone: 'neutral',
         selected: false,
-        class: 'border-[var(--color-line)] hover:border-[var(--color-line-2)]',
+        class: 'border-[var(--color-divider)] hover:border-[var(--color-divider)]',
       },
-      { tone: 'neutral', selected: true, class: 'border-[var(--color-line-2)]' },
+      { tone: 'neutral', selected: true, class: 'border-[var(--color-divider)]' },
       {
         tone: 'fill',
         selected: false,
-        class: 'border-transparent hover:bg-[var(--color-bg-2)]',
+        class: 'border-transparent hover:bg-[var(--color-pill-bg)]',
       },
       {
         tone: 'fill',
         selected: true,
-        class: 'border-[var(--color-line-2)] bg-[var(--color-bg-2)]',
+        class: 'border-[var(--color-divider)] bg-[var(--color-pill-bg)]',
       },
       {
         tone: 'accent',

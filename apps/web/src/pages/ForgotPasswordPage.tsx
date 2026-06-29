@@ -67,7 +67,7 @@ export function ForgotPasswordPage() {
           className="text-[26px] font-semibold leading-none tracking-tight text-[var(--color-text)]"
           style={{ fontFamily: 'var(--font-serif)' }}
         >
-          Reset password<em className="text-[var(--color-claude)] not-italic">.</em>
+          Reset password<em className="text-[var(--color-claude-mark)] not-italic">.</em>
         </h1>
         <p className="font-mono text-[11.5px] text-[var(--color-text-2)]">
           Enter your email and we'll send you a reset link.

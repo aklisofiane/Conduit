@@ -7,7 +7,7 @@ import type { NodeRunRow } from '../../api/types.js';
 export function NodeError({ node }: { node: NodeRunRow }) {
   if (!node.error) {
     return (
-      <div className="flex h-full items-center justify-center font-mono text-[12px] text-[var(--color-text-4)]">
+      <div className="flex h-full items-center justify-center font-mono text-[12px] text-[var(--color-text-muted)]">
         No error recorded for this node.
       </div>
     );

@@ -105,8 +105,8 @@ export function SuggestionsGalleryDialog({
         if (!o) onClose();
       }}
     >
-      <DialogContent className="flex max-h-[85vh] w-[680px] max-w-[94vw] flex-col overflow-hidden rounded-xl border border-[var(--color-line)] bg-[var(--color-bg-1)] p-0 shadow-none">
-        <header className="flex items-center justify-between border-b border-[var(--color-line)] px-5 py-4">
+      <DialogContent className="flex max-h-[85vh] w-[680px] max-w-[94vw] flex-col overflow-hidden rounded-xl border border-[var(--color-divider)] bg-[var(--color-bg-panel)] p-0 shadow-none">
+        <header className="flex items-center justify-between border-b border-[var(--color-divider)] px-5 py-4">
           <div>
             <DialogTitle
               className="text-[22px] font-semibold tracking-tight text-[var(--color-text)]"
@@ -114,7 +114,7 @@ export function SuggestionsGalleryDialog({
             >
               Suggested reviews
             </DialogTitle>
-            <p className="mt-0.5 font-mono text-[11px] text-[var(--color-text-3)]">
+            <p className="mt-0.5 font-mono text-[11px] text-[var(--color-text-muted)]">
               {imported
                 ? 'Imported — new workflows are created paused.'
                 : `${bundle.workflows.length} review${bundle.workflows.length === 1 ? '' : 's'} suggested for this repository.`}
@@ -127,7 +127,7 @@ export function SuggestionsGalleryDialog({
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {imported ? (
-            <div className="rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-2)] px-4 py-3 font-mono text-[12px] text-[var(--color-text-2)]">
+            <div className="rounded-lg border border-[var(--color-divider)] bg-[var(--color-pill-bg)] px-4 py-3 font-mono text-[12px] text-[var(--color-text-2)]">
               {importTemplate.isSuccess ? (
                 <>
                   Imported {selectedCount} review{selectedCount === 1 ? '' : 's'}. Find them in
@@ -153,8 +153,8 @@ export function SuggestionsGalleryDialog({
               ))}
 
               {droppedComponents.length > 0 && (
-                <div className="mt-1 flex flex-col gap-1.5 rounded-lg border border-dashed border-[var(--color-line)] bg-[var(--color-bg-2)] px-4 py-3">
-                  <div className="font-mono text-[11px] uppercase tracking-wider text-[var(--color-text-3)]">
+                <div className="mt-1 flex flex-col gap-1.5 rounded-lg border border-dashed border-[var(--color-divider)] bg-[var(--color-pill-bg)] px-4 py-3">
+                  <div className="font-mono text-[11px] uppercase tracking-wider text-[var(--color-text-muted)]">
                     Couldn't analyze
                   </div>
                   {droppedComponents.map((d, i) => (
@@ -168,11 +168,11 @@ export function SuggestionsGalleryDialog({
           )}
         </div>
 
-        <footer className="flex items-center justify-between border-t border-[var(--color-line)] px-5 py-3">
+        <footer className="flex items-center justify-between border-t border-[var(--color-divider)] px-5 py-3">
           {error ? (
             <div className="font-mono text-[11px] text-[var(--color-danger)]">{error}</div>
           ) : (
-            <div className="font-mono text-[11px] text-[var(--color-text-3)]">
+            <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
               {imported
                 ? 'Workflows are created paused — review + activate on the canvas.'
                 : `${selectedCount} of ${bundle.workflows.length} selected`}
@@ -212,7 +212,7 @@ function SuggestionCard({
   const cadence = cadenceOf(workflow);
 
   return (
-    <label className="flex cursor-pointer gap-3 rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-2)] px-4 py-3">
+    <label className="flex cursor-pointer gap-3 rounded-lg border border-[var(--color-divider)] bg-[var(--color-pill-bg)] px-4 py-3">
       <Checkbox
         checked={selected}
         onCheckedChange={onToggle}
@@ -224,7 +224,7 @@ function SuggestionCard({
             {workflow.name}
           </span>
           {cadence && (
-            <span className="flex shrink-0 items-center gap-1 font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-3)]">
+            <span className="flex shrink-0 items-center gap-1 font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-muted)]">
               <CalendarClock size={12} strokeWidth={1.5} />
               {cadence}
             </span>
@@ -236,7 +236,7 @@ function SuggestionCard({
           </span>
         )}
         {why && (
-          <span className="font-mono text-[11px] leading-relaxed text-[var(--color-text-3)]">
+          <span className="font-mono text-[11px] leading-relaxed text-[var(--color-text-muted)]">
             <span className="text-[var(--color-text-2)]">Why:</span> {why}
           </span>
         )}

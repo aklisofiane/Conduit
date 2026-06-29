@@ -61,24 +61,24 @@ export function AccountSettingsPage() {
         className="text-[34px] font-semibold leading-none tracking-tight text-[var(--color-text)]"
         style={{ fontFamily: 'var(--font-serif)' }}
       >
-        Account<em className="text-[var(--color-claude)] not-italic">.</em>
+        Account<em className="text-[var(--color-claude-mark)] not-italic">.</em>
       </h1>
       <p className="font-mono text-[12px] text-[var(--color-text-2)]">
         Your profile and password. Organization-level settings live elsewhere.
       </p>
 
-      <section className="rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-1)]">
-        <header className="border-b border-[var(--color-line)] px-4 py-3">
+      <section className="rounded-lg border border-[var(--color-divider)] bg-[var(--color-bg-panel)]">
+        <header className="border-b border-[var(--color-divider)] px-4 py-3">
           <h2 className="font-mono text-[13px] font-semibold">Profile</h2>
         </header>
         <dl className="grid grid-cols-[140px_1fr] items-center gap-y-3 px-4 py-4">
-          <dt className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+          <dt className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-muted)]">
             Name
           </dt>
           <dd className="font-mono text-[12.5px] text-[var(--color-text)]">
             {user?.name?.trim() || '—'}
           </dd>
-          <dt className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+          <dt className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-muted)]">
             Email
           </dt>
           <dd className="font-mono text-[12.5px] text-[var(--color-text)]">{user?.email ?? '—'}</dd>
@@ -102,7 +102,7 @@ function OrganizationLinks() {
     <section className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <Link
         to="/account/organization"
-        className="flex flex-col gap-1 rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-1)] px-4 py-3 transition-colors hover:border-[var(--color-divider)] hover:bg-[var(--color-pill-bg)]"
+        className="flex flex-col gap-1 rounded-lg border border-[var(--color-divider)] bg-[var(--color-bg-panel)] px-4 py-3 transition-colors hover:border-[var(--color-divider)] hover:bg-[var(--color-pill-bg)]"
       >
         <span className="font-mono text-[12.5px] font-semibold text-[var(--color-text)]">
           Organization
@@ -114,7 +114,7 @@ function OrganizationLinks() {
       {pendingCount > 0 && (
         <Link
           to="/account/invitations"
-          className="flex flex-col gap-1 rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-1)] px-4 py-3 transition-colors hover:border-[var(--color-divider)] hover:bg-[var(--color-pill-bg)]"
+          className="flex flex-col gap-1 rounded-lg border border-[var(--color-divider)] bg-[var(--color-bg-panel)] px-4 py-3 transition-colors hover:border-[var(--color-divider)] hover:bg-[var(--color-pill-bg)]"
         >
           <span className="font-mono text-[12.5px] font-semibold text-[var(--color-text)]">
             Pending invitations ({pendingCount})
@@ -151,8 +151,8 @@ function ChangePasswordSection() {
   const rootError = form.formState.errors.root?.message;
 
   return (
-    <section className="rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-1)]">
-      <header className="border-b border-[var(--color-line)] px-4 py-3">
+    <section className="rounded-lg border border-[var(--color-divider)] bg-[var(--color-bg-panel)]">
+      <header className="border-b border-[var(--color-divider)] px-4 py-3">
         <h2 className="font-mono text-[13px] font-semibold">Change password</h2>
       </header>
       <form onSubmit={onSubmit} className="flex flex-col gap-3 px-4 py-4" noValidate>
@@ -225,8 +225,8 @@ function SignOutSection() {
   };
 
   return (
-    <section className="rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-1)]">
-      <header className="border-b border-[var(--color-line)] px-4 py-3">
+    <section className="rounded-lg border border-[var(--color-divider)] bg-[var(--color-bg-panel)]">
+      <header className="border-b border-[var(--color-divider)] px-4 py-3">
         <h2 className="font-mono text-[13px] font-semibold">Sign out</h2>
       </header>
       <div className="flex items-center justify-between gap-4 px-4 py-4">

@@ -91,7 +91,7 @@ export function RunDetailPage() {
   if (!runId) return null;
   if (!run) {
     return (
-      <div className="flex flex-1 items-center justify-center font-mono text-[12px] text-[var(--color-text-3)]">
+      <div className="flex flex-1 items-center justify-center font-mono text-[12px] text-[var(--color-text-muted)]">
         Loading run…
       </div>
     );
@@ -101,8 +101,8 @@ export function RunDetailPage() {
 
   return (
     <div className="flex flex-1 flex-col">
-      <div className="border-b border-[var(--color-line)] bg-[var(--color-bg-1)] px-6 py-5">
-        <div className="font-mono text-[11px] text-[var(--color-text-3)]">
+      <div className="border-b border-[var(--color-divider)] bg-[var(--color-bg-panel)] px-6 py-5">
+        <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
           <Link to="/" className="hover:text-[var(--color-text)]">
             workflows
           </Link>{' '}
@@ -127,13 +127,13 @@ export function RunDetailPage() {
             >
               {run.workflow.name}
               {run.trigger.issue && (
-                <span className="text-[var(--color-text-3)]">
+                <span className="text-[var(--color-text-muted)]">
                   {' · '}
                   {run.trigger.issue.title}
                 </span>
               )}
             </div>
-            <div className="mt-1 flex flex-wrap items-center gap-3 font-mono text-[11px] text-[var(--color-text-3)]">
+            <div className="mt-1 flex flex-wrap items-center gap-3 font-mono text-[11px] text-[var(--color-text-muted)]">
               <StatusBadge status={status} />
               <span>
                 trigger: {run.trigger.source} · {run.trigger.event}
@@ -175,15 +175,15 @@ export function RunDetailPage() {
               )}
             </div>
             {rerunNote && (
-              <span className="font-mono text-[11px] text-[var(--color-text-3)]">{rerunNote}</span>
+              <span className="font-mono text-[11px] text-[var(--color-text-muted)]">{rerunNote}</span>
             )}
           </div>
         </div>
       </div>
 
       <div className="flex min-h-0 flex-1">
-        <aside className="w-[260px] shrink-0 border-r border-[var(--color-line)] bg-[var(--color-bg-1)] p-3">
-          <h4 className="mb-2 px-1 font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-3)]">
+        <aside className="w-[260px] shrink-0 border-r border-[var(--color-divider)] bg-[var(--color-bg-panel)] p-3">
+          <h4 className="mb-2 px-1 font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-muted)]">
             Execution · {run.nodes.length} node{run.nodes.length === 1 ? '' : 's'}
           </h4>
           <div className="space-y-1">
@@ -201,7 +201,7 @@ export function RunDetailPage() {
               />
             ))}
             {run.nodes.length === 0 && (
-              <div className="px-2 font-mono text-[11px] text-[var(--color-text-4)]">
+              <div className="px-2 font-mono text-[11px] text-[var(--color-text-muted)]">
                 No nodes have started yet.
               </div>
             )}
@@ -209,7 +209,7 @@ export function RunDetailPage() {
         </aside>
 
         <section className="flex min-w-0 flex-1 flex-col">
-          <div className="flex h-10 items-center gap-4 border-b border-[var(--color-line)] bg-[var(--color-bg-1)] px-4">
+          <div className="flex h-10 items-center gap-4 border-b border-[var(--color-divider)] bg-[var(--color-bg-panel)] px-4">
             <div className="font-mono text-[12px] font-semibold">{selectedNode ?? '—'}</div>
             <ToggleGroup
               type="single"
@@ -238,7 +238,7 @@ export function RunDetailPage() {
               </div>
             )}
             {latestFrame && activeTab === 'timeline' && (
-              <div className="font-mono text-[11px] text-[var(--color-text-3)]">
+              <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
                 last: {latestFrame.event.type}
               </div>
             )}
@@ -252,7 +252,7 @@ export function RunDetailPage() {
                 streaming={streaming}
               />
             ) : (
-              <div className="flex h-full items-center justify-center font-mono text-[12px] text-[var(--color-text-4)]">
+              <div className="flex h-full items-center justify-center font-mono text-[12px] text-[var(--color-text-muted)]">
                 Select a node to inspect.
               </div>
             )}
@@ -306,7 +306,7 @@ function NodeRailItem({
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between font-mono text-[12px] font-medium">
           <span className="truncate">{node.nodeName}</span>
-          <span className="ml-2 font-mono text-[10.5px] text-[var(--color-text-3)]">
+          <span className="ml-2 font-mono text-[10.5px] text-[var(--color-text-muted)]">
             {node.finishedAt
               ? duration(node.startedAt, node.finishedAt)
               : node.startedAt
@@ -314,7 +314,7 @@ function NodeRailItem({
                 : '—'}
           </span>
         </div>
-        <div className="font-mono text-[10.5px] text-[var(--color-text-3)]">
+        <div className="font-mono text-[10.5px] text-[var(--color-text-muted)]">
           {labelForStatus(node.status)}
         </div>
       </div>
@@ -375,9 +375,9 @@ function statusBadgeClass(status: string): string {
     case 'FAILED':
       return 'border-[rgba(239,68,68,0.3)] bg-[rgba(239,68,68,0.08)] text-[var(--color-error)]';
     case 'CANCELLED':
-      return 'border-[var(--color-line)] bg-[var(--color-bg-2)] text-[var(--color-text-3)]';
+      return 'border-[var(--color-divider)] bg-[var(--color-pill-bg)] text-[var(--color-text-muted)]';
     default:
-      return 'border-[var(--color-line)] bg-[var(--color-bg-2)] text-[var(--color-text-3)]';
+      return 'border-[var(--color-divider)] bg-[var(--color-pill-bg)] text-[var(--color-text-muted)]';
   }
 }
 

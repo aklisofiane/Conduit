@@ -4,11 +4,11 @@ import { cn } from '../../lib/cn.js';
 
 /**
  * Card — the bordered panel repeated by hand across pages as
- * `rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-1)]`.
+ * `rounded-lg border border-[var(--color-divider)] bg-[var(--color-bg-panel)]`.
  * `padded` toggles the standard inner padding off for surfaces that own their
  * own layout (e.g. a list whose rows draw their own dividers).
  */
-const cardVariants = cva('rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-1)]', {
+const cardVariants = cva('rounded-lg border border-[var(--color-divider)] bg-[var(--color-bg-panel)]', {
   variants: {
     padded: {
       true: 'p-4',

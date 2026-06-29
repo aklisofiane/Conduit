@@ -19,7 +19,7 @@ export function WorkflowRunsList({ workflowId }: WorkflowRunsListProps) {
     <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-3 px-6 pb-16 pt-8">
       <h2 className="flex items-baseline gap-2 font-mono text-[12px] uppercase tracking-wider text-[var(--color-text-2)]">
         Runs
-        <span className="text-[var(--color-text-4)]">{runs.length}</span>
+        <span className="text-[var(--color-text-muted)]">{runs.length}</span>
       </h2>
 
       <Card padded={false}>
@@ -67,7 +67,7 @@ function RunRow({ run }: { run: WorkflowRunListItem }) {
   return (
     <Link
       to={`/runs/${run.id}`}
-      className="group grid grid-cols-[20px_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_140px] items-center gap-4 border-b border-[var(--color-line)] px-4 py-3 transition-colors last:border-b-0 hover:bg-[var(--color-bg-2)]"
+      className="group grid grid-cols-[20px_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_140px] items-center gap-4 border-b border-[var(--color-divider)] px-4 py-3 transition-colors last:border-b-0 hover:bg-[var(--color-pill-bg)]"
     >
       <span className={cn('status-dot', statusClass(run.status))} />
       <div className="min-w-0">
@@ -78,7 +78,7 @@ function RunRow({ run }: { run: WorkflowRunListItem }) {
           <div
             className={cn(
               'mt-0.5 truncate font-mono text-[11px]',
-              isError ? 'text-[var(--color-error)]' : 'text-[var(--color-text-3)]',
+              isError ? 'text-[var(--color-error)]' : 'text-[var(--color-text-muted)]',
             )}
           >
             {subtitle}
@@ -89,13 +89,13 @@ function RunRow({ run }: { run: WorkflowRunListItem }) {
         {total > 0 ? (
           <>
             <b className="text-[var(--color-text)]">{done}</b>
-            <span className="text-[var(--color-text-3)]">/{total}</span>{' '}
-            <span className="text-[var(--color-text-3)]">
+            <span className="text-[var(--color-text-muted)]">/{total}</span>{' '}
+            <span className="text-[var(--color-text-muted)]">
               node{total === 1 ? '' : 's'}
             </span>
           </>
         ) : (
-          <span className="text-[var(--color-text-4)]">—</span>
+          <span className="text-[var(--color-text-muted)]">—</span>
         )}
       </div>
       <div className="font-mono text-[11px] text-[var(--color-text-2)]">
@@ -104,7 +104,7 @@ function RunRow({ run }: { run: WorkflowRunListItem }) {
       <div className="flex items-center justify-end gap-2 text-right font-mono text-[11px] text-[var(--color-text-2)]">
         {run.status === 'FAILED' &&
           (note ? (
-            <span className="text-[var(--color-text-3)]">{note}</span>
+            <span className="text-[var(--color-text-muted)]">{note}</span>
           ) : (
             <Button
               type="button"
@@ -123,7 +123,7 @@ function RunRow({ run }: { run: WorkflowRunListItem }) {
 
 function EmptyRow({ text }: { text: string }) {
   return (
-    <div className="flex h-16 items-center justify-center font-mono text-[12px] text-[var(--color-text-3)]">
+    <div className="flex h-16 items-center justify-center font-mono text-[12px] text-[var(--color-text-muted)]">
       {text}
     </div>
   );

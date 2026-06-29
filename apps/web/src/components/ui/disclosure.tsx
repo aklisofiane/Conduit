@@ -16,7 +16,7 @@ import { cn } from '../../lib/cn.js';
 const disclosureButtonVariants = cva(
   cn(
     'group flex w-full cursor-pointer items-center gap-3 text-left transition-colors',
-    'hover:bg-[var(--color-bg-2)]',
+    'hover:bg-[var(--color-pill-bg)]',
     'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-accent)] focus-visible:ring-inset',
     'disabled:cursor-not-allowed disabled:opacity-60',
   ),
@@ -55,7 +55,7 @@ export const DisclosureButton = forwardRef<HTMLButtonElement, DisclosureButtonPr
         strokeWidth={2}
         aria-hidden
         className={cn(
-          'shrink-0 text-[var(--color-text-3)] transition-transform duration-150 group-hover:text-[var(--color-text)]',
+          'shrink-0 text-[var(--color-text-muted)] transition-transform duration-150 group-hover:text-[var(--color-text)]',
           open && 'rotate-90',
         )}
       />

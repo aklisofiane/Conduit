@@ -113,10 +113,10 @@ export function CreateConnectionForm({
   };
 
   return (
-    <div className="flex flex-col gap-3 border-b border-[var(--color-line)] px-4 py-4">
+    <div className="flex flex-col gap-3 border-b border-[var(--color-divider)] px-4 py-4">
       <div className="grid grid-cols-2 gap-3">
         <label className="flex flex-col gap-1">
-          <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+          <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-muted)]">
             Name
           </span>
           <Input
@@ -126,7 +126,7 @@ export function CreateConnectionForm({
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+          <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-muted)]">
             Credential
           </span>
           <Select
@@ -145,7 +145,7 @@ export function CreateConnectionForm({
       </div>
 
       <label className="flex flex-col gap-1">
-        <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+        <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-muted)]">
           Scope kind
         </span>
         <Select
@@ -251,7 +251,7 @@ function RepoScopeRow({
   return (
     <div className="flex flex-col gap-2">
       <label className="flex flex-col gap-1">
-        <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+        <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-muted)]">
           Repository
         </span>
         {showDropdown ? (
@@ -319,7 +319,7 @@ function GitlabProjectScopeRow({
   return (
     <div className="flex flex-col gap-2">
       <label className="flex flex-col gap-1">
-        <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+        <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-muted)]">
           Project
         </span>
         {showDropdown ? (
@@ -378,7 +378,7 @@ function BoardOwnerField({
   if (showOwnerDropdown) {
     return (
       <label className="flex min-w-0 flex-col gap-1">
-        <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+        <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-muted)]">
           Owner
         </span>
         <Select
@@ -401,7 +401,7 @@ function BoardOwnerField({
   return (
     <>
       <label className="flex min-w-0 flex-col gap-1">
-        <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+        <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-muted)]">
           Owner type
         </span>
         <Select
@@ -415,7 +415,7 @@ function BoardOwnerField({
         />
       </label>
       <label className="flex min-w-0 flex-col gap-1">
-        <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+        <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-muted)]">
           Owner
         </span>
         <Input
@@ -495,7 +495,7 @@ function BoardScopeRow({
           onOwnerSelect={onOwnerSelect}
         />
         <label className="flex min-w-0 flex-col gap-1">
-          <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+          <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-muted)]">
             Project
           </span>
           {showBoardDropdown ? (
@@ -547,7 +547,7 @@ function AutoLoadHint({
   if (!credentialId) return null;
   if (isLoading) {
     return (
-      <span className="font-mono text-[11px] text-[var(--color-text-3)]">
+      <span className="font-mono text-[11px] text-[var(--color-text-muted)]">
         Loading {itemLabel}…
       </span>
     );
@@ -561,7 +561,7 @@ function AutoLoadHint({
   }
   if (itemCount === 0) {
     return (
-      <span className="font-mono text-[11px] text-[var(--color-text-3)]">
+      <span className="font-mono text-[11px] text-[var(--color-text-muted)]">
         No {itemLabel} found. You can type manually.
       </span>
     );

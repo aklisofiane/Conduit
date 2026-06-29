@@ -74,7 +74,7 @@ export function McpServerPicker({ agent, workflowId, onChange }: Props) {
   return (
     <div className="flex flex-col gap-3">
       {servers.length === 0 && !showAdd && (
-        <div className="font-mono text-[11px] text-[var(--color-text-4)]">
+        <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
           No MCP servers yet. Add one to expose GitHub, Slack, or a custom service to this agent.
         </div>
       )}
@@ -151,8 +151,8 @@ function ServerCard({
   return (
     <Card
       className={cn(
-        'rounded-md bg-[var(--color-bg-2)] p-3',
-        attached ? 'border-[var(--color-line-2)]' : 'border-[var(--color-line)]',
+        'rounded-md bg-[var(--color-pill-bg)] p-3',
+        attached ? 'border-[var(--color-divider)]' : 'border-[var(--color-divider)]',
       )}
     >
       <div className="flex items-start gap-3">
@@ -165,11 +165,11 @@ function ServerCard({
         <div className="flex-1">
           <div className="flex items-center gap-2 font-mono text-[12px] font-medium">
             {server.name}
-            <span className="font-mono text-[10.5px] text-[var(--color-text-3)]">
+            <span className="font-mono text-[10.5px] text-[var(--color-text-muted)]">
               · {server.transport.kind}
             </span>
           </div>
-          <div className="mt-0.5 font-mono text-[10.5px] text-[var(--color-text-3)]">
+          <div className="mt-0.5 font-mono text-[10.5px] text-[var(--color-text-muted)]">
             {transportSummary(server.transport)}
           </div>
         </div>
@@ -180,7 +180,7 @@ function ServerCard({
 
       <div className="mt-3 grid grid-cols-[1fr_auto] items-end gap-2">
         <label className="flex flex-col gap-1">
-          <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+          <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-muted)]">
             Connection
           </span>
           <Select
@@ -257,7 +257,7 @@ function ToolAllowList({
   };
 
   return (
-    <div className="mt-3 flex items-center gap-2 border-t border-[var(--color-line)] pt-3">
+    <div className="mt-3 flex items-center gap-2 border-t border-[var(--color-divider)] pt-3">
       <CheckboxListPopover
         items={tools}
         getId={toolName}
@@ -298,7 +298,7 @@ function AddServerForm({
   const [mode, setMode] = useState<'preset' | 'custom'>('preset');
 
   return (
-    <Card className="rounded-md bg-[var(--color-bg-2)] p-3">
+    <Card className="rounded-md bg-[var(--color-pill-bg)] p-3">
       <div className="flex items-center gap-2">
         <Button
           variant={mode === 'preset' ? 'primary' : 'secondary'}
@@ -361,13 +361,13 @@ function PresetPicker({
             key={preset.id}
             selected={selected?.id === preset.id}
             onClick={() => setSelected(preset)}
-            className="bg-[var(--color-bg-1)] p-3"
+            className="bg-[var(--color-bg-panel)] p-3"
           >
             <div className="font-mono text-[12px] font-medium">{preset.name}</div>
-            <div className="mt-1 font-mono text-[10.5px] text-[var(--color-text-3)]">
+            <div className="mt-1 font-mono text-[10.5px] text-[var(--color-text-muted)]">
               {preset.description}
             </div>
-            <div className="mt-1 font-mono text-[10.5px] text-[var(--color-text-4)]">
+            <div className="mt-1 font-mono text-[10.5px] text-[var(--color-text-muted)]">
               Requires {preset.platform.toLowerCase()} credential · {preset.credentialHint}
             </div>
           </SelectableCard>
@@ -377,7 +377,7 @@ function PresetPicker({
       {selected && (
         <>
           <label className="flex flex-col gap-1">
-            <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+            <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-muted)]">
               Connection (optional — can set later)
             </span>
             <Select
@@ -388,7 +388,7 @@ function PresetPicker({
               options={eligible.map((c) => ({ value: c.id, label: c.name }))}
             />
             {eligible.length === 0 && (
-              <span className="font-mono text-[10.5px] text-[var(--color-text-4)]">
+              <span className="font-mono text-[10.5px] text-[var(--color-text-muted)]">
                 No {selected.platform.toLowerCase()} connection yet — add one from the Connections
                 page.
               </span>
@@ -504,7 +504,7 @@ function CustomServerForm({
   return (
     <div className="mt-3 flex flex-col gap-3">
       <label className="flex flex-col gap-1">
-        <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+        <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-muted)]">
           Name
         </span>
         <Input
@@ -514,7 +514,7 @@ function CustomServerForm({
         />
       </label>
       <label className="flex flex-col gap-1">
-        <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+        <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-muted)]">
           Transport
         </span>
         <Select
@@ -528,13 +528,13 @@ function CustomServerForm({
       {kind === 'stdio' ? (
         <>
           <label className="flex flex-col gap-1">
-            <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+            <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-muted)]">
               Command
             </span>
             <Input placeholder="npx" value={command} onChange={(e) => setCommand(e.target.value)} />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+            <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-muted)]">
               Args (space-separated)
             </span>
             <Input
@@ -544,7 +544,7 @@ function CustomServerForm({
             />
           </label>
           <div className="flex flex-col gap-1">
-            <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+            <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-muted)]">
               Environment variables
             </span>
             <KeyValueEditor
@@ -558,7 +558,7 @@ function CustomServerForm({
       ) : (
         <>
           <label className="flex flex-col gap-1">
-            <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+            <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-muted)]">
               URL
             </span>
             <Input
@@ -568,7 +568,7 @@ function CustomServerForm({
             />
           </label>
           <div className="flex flex-col gap-1">
-            <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+            <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-muted)]">
               Headers
             </span>
             <KeyValueEditor
@@ -582,7 +582,7 @@ function CustomServerForm({
       )}
 
       <label className="flex flex-col gap-1">
-        <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+        <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-muted)]">
           Connection (optional)
         </span>
         <Select

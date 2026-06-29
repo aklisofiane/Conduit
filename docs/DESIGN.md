@@ -45,9 +45,13 @@ Two warm/cool families, namespaced by provider key:
 
 Hue: Claude ≈ `oklch(... 50)` (amber), Codex ≈ `oklch(... 155)` (green-teal).
 
-### Legacy aliases
+### One canonical token set
 
-`tokens.css:57-67` defines `--color-claude`, `--color-codex`, `--color-bg-1..3`, `--color-line`, `--color-line-2`, `--color-text-3`, `--color-text-4`. These exist only for older pages (Home, Credentials, Connections, Runs, TemplatePicker) that haven't migrated to the canvas palette. Drop once those pages are restyled. Don't add new consumers.
+There are no numbered/alias token names. The old `--color-bg-1..3`, `--color-line`, `--color-line-2`, `--color-text-3`, `--color-text-4`, bare `--color-claude`/`--color-codex` aliases were removed once every consumer converged onto the semantic names that `theme.ts` exposes (`--color-bg-panel`, `--color-pill-bg`, `--color-divider`, `--color-text-muted`, `--color-claude-mark`, `--color-codex-mark`). Use those; don't reintroduce numbered scales.
+
+## Theming (light / dark)
+
+`tokens.css` `:root` is the light theme (`color-scheme: light`). `[data-theme='dark']` overrides the same token names with a warm-dark palette (`color-scheme: dark`) — because every primitive and page reads `var(--color-*)`, dark mode is purely a token override, no component changes. The active theme is set as `data-theme` on `<html>`: an inline no-flash script in `index.html` resolves the stored preference (`localStorage['conduit-theme']` = `system | light | dark`) against `matchMedia('(prefers-color-scheme: dark)')` before first paint; `lib/theme.ts` + `useTheme()` own the runtime read/write and live-follow the OS when the preference is `system`. The Appearance control lives on the Account Settings page.
 
 ## Radii, shadows, grid
 

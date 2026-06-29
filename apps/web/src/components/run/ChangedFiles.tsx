@@ -10,7 +10,7 @@ export function ChangedFiles({ node }: { node: NodeRunRow }) {
   const files = node.output?.files ?? [];
   if (!files.length) {
     return (
-      <div className="flex h-full items-center justify-center font-mono text-[12px] text-[var(--color-text-4)]">
+      <div className="flex h-full items-center justify-center font-mono text-[12px] text-[var(--color-text-muted)]">
         {node.status === 'COMPLETED' ? 'No files changed in this workspace.' : 'File list appears after the node completes.'}
       </div>
     );
@@ -20,7 +20,7 @@ export function ChangedFiles({ node }: { node: NodeRunRow }) {
       <ul className="space-y-1 font-mono text-[12px] text-[var(--color-text)]">
         {files.map((file) => (
           <li key={file} className="flex items-center gap-2">
-            <span className="text-[var(--color-text-3)]">·</span>
+            <span className="text-[var(--color-text-muted)]">·</span>
             <span className="truncate">{file}</span>
           </li>
         ))}

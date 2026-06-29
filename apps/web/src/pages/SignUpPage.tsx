@@ -75,7 +75,7 @@ export function SignUpPage() {
           className="text-[26px] font-semibold leading-none tracking-tight text-[var(--color-text)]"
           style={{ fontFamily: 'var(--font-serif)' }}
         >
-          Create account<em className="text-[var(--color-claude)] not-italic">.</em>
+          Create account<em className="text-[var(--color-claude-mark)] not-italic">.</em>
         </h1>
         <p className="font-mono text-[11.5px] text-[var(--color-text-2)]">
           {inviteOnly ? 'Registration is by invitation only.' : 'Spin up workflows in minutes.'}

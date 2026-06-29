@@ -261,8 +261,8 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
         if (!o) onClose();
       }}
     >
-      <DialogContent className="flex max-h-[85vh] w-[680px] max-w-[94vw] flex-col overflow-hidden rounded-xl border border-[var(--color-line)] bg-[var(--color-bg-1)] p-0 shadow-none">
-        <header className="flex items-center justify-between border-b border-[var(--color-line)] px-5 py-4">
+      <DialogContent className="flex max-h-[85vh] w-[680px] max-w-[94vw] flex-col overflow-hidden rounded-xl border border-[var(--color-divider)] bg-[var(--color-bg-panel)] p-0 shadow-none">
+        <header className="flex items-center justify-between border-b border-[var(--color-divider)] px-5 py-4">
           <div>
             <DialogTitle
               className="text-[22px] font-semibold tracking-tight text-[var(--color-text)]"
@@ -270,7 +270,7 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
             >
               {selected ? `Configure ${selected.name}` : 'Start from a template'}
             </DialogTitle>
-            <p className="mt-0.5 font-mono text-[11px] text-[var(--color-text-3)]">
+            <p className="mt-0.5 font-mono text-[11px] text-[var(--color-text-muted)]">
               {selected
                 ? `${selected.workflowCount} workflow${selected.workflowCount === 1 ? '' : 's'} · ${orderedAliases.length} connection${orderedAliases.length === 1 ? '' : 's'} to bind`
                 : 'Pre-built workflow blueprints you can copy and edit.'}
@@ -283,7 +283,7 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {!selected && (
-            <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-dashed border-[var(--color-line)] bg-[var(--color-bg-2)] px-4 py-3">
+            <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-dashed border-[var(--color-divider)] bg-[var(--color-pill-bg)] px-4 py-3">
               <div className="font-mono text-[11.5px] text-[var(--color-text-2)]">
                 Have a workflow export? Import a <code>.json</code> bundle.
               </div>
@@ -306,13 +306,13 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
           )}
 
           {isLoading && (
-            <div className="font-mono text-[12px] text-[var(--color-text-3)]">
+            <div className="font-mono text-[12px] text-[var(--color-text-muted)]">
               Loading templates…
             </div>
           )}
 
           {!selected && !isLoading && templates.length === 0 && (
-            <div className="font-mono text-[12px] text-[var(--color-text-3)]">
+            <div className="font-mono text-[12px] text-[var(--color-text-muted)]">
               No templates found — check that <code>/templates</code> exists at the repo root.
             </div>
           )}
@@ -338,7 +338,7 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
                 ))}
               </div>
               {orderedAliases.length === 0 ? (
-                <div className="rounded-md border border-[var(--color-line)] bg-[var(--color-bg-2)] px-3 py-2 font-mono text-[12px] text-[var(--color-text-2)]">
+                <div className="rounded-md border border-[var(--color-divider)] bg-[var(--color-pill-bg)] px-3 py-2 font-mono text-[12px] text-[var(--color-text-2)]">
                   No connection bindings needed.
                 </div>
               ) : (
@@ -360,11 +360,11 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
           )}
         </div>
 
-        <footer className="flex items-center justify-between border-t border-[var(--color-line)] px-5 py-3">
+        <footer className="flex items-center justify-between border-t border-[var(--color-divider)] px-5 py-3">
           {error ? (
             <div className="font-mono text-[11px] text-[var(--color-danger)]">{error}</div>
           ) : (
-            <div className="font-mono text-[11px] text-[var(--color-text-3)]">
+            <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
               Workflows are created paused — review + activate on the canvas.
             </div>
           )}
@@ -396,13 +396,13 @@ function TemplateCard({ t, onPick }: { t: TemplateSummary; onPick: (t: TemplateS
   return (
     <SelectableCard
       onClick={() => onPick(t)}
-      className="flex flex-col items-start gap-1 rounded-lg bg-[var(--color-bg-2)] px-4 py-3 hover:border-[var(--color-claude)]"
+      className="flex flex-col items-start gap-1 rounded-lg bg-[var(--color-pill-bg)] px-4 py-3 hover:border-[var(--color-claude-mark)]"
     >
       <div className="flex w-full items-center justify-between">
         <span className="font-mono text-[13px] font-semibold text-[var(--color-text)]">
           {t.name}
         </span>
-        <span className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-3)]">
+        <span className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-muted)]">
           {t.category} · {t.workflowCount} wf
         </span>
       </div>
@@ -445,11 +445,11 @@ function BindingRow({
   };
 
   return (
-    <div className="rounded-md border border-[var(--color-line)] bg-[var(--color-bg-2)] p-3">
+    <div className="rounded-md border border-[var(--color-divider)] bg-[var(--color-pill-bg)] p-3">
       <div className="flex items-center justify-between">
         <div className="font-mono text-[12px] text-[var(--color-text)]">
-          <span className="text-[var(--color-claude)]">&lt;{alias}&gt;</span>{' '}
-          <span className="text-[var(--color-text-3)]">
+          <span className="text-[var(--color-claude-mark)]">&lt;{alias}&gt;</span>{' '}
+          <span className="text-[var(--color-text-muted)]">
             connection{isBoard ? ' · optional' : ''}
           </span>
         </div>
@@ -466,17 +466,17 @@ function BindingRow({
           }}
           variant="subtle"
           size="sm"
-          className="rounded-md border border-[var(--color-line)] p-0.5"
+          className="rounded-md border border-[var(--color-divider)] p-0.5"
         >
           <ToggleGroupItem
             value="new"
-            className="uppercase tracking-wider data-[state=on]:bg-[var(--color-claude)] data-[state=on]:text-black"
+            className="uppercase tracking-wider data-[state=on]:bg-[var(--color-claude-mark)] data-[state=on]:text-black"
           >
             New
           </ToggleGroupItem>
           <ToggleGroupItem
             value="existing"
-            className="uppercase tracking-wider data-[state=on]:bg-[var(--color-claude)] data-[state=on]:text-black"
+            className="uppercase tracking-wider data-[state=on]:bg-[var(--color-claude-mark)] data-[state=on]:text-black"
           >
             Existing
           </ToggleGroupItem>
@@ -619,7 +619,7 @@ function GithubRepoScopeFields({
     return (
       <div className="col-span-2">
         <label className="flex flex-col gap-1">
-          <span className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-3)]">
+          <span className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-muted)]">
             Repository
           </span>
           <SearchSelect
@@ -677,7 +677,7 @@ function GitlabProjectScopeFields({
     return (
       <div className="col-span-2">
         <label className="flex flex-col gap-1">
-          <span className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-3)]">
+          <span className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-muted)]">
             Project
           </span>
           <SearchSelect
@@ -801,7 +801,7 @@ function LabeledInput({
 }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-3)]">
+      <span className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-muted)]">
         {label}
       </span>
       <Input value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />
@@ -824,7 +824,7 @@ function LabeledSelect({
 }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-3)]">
+      <span className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-muted)]">
         {label}
       </span>
       <Select

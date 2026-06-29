@@ -28,15 +28,15 @@ export function InvitationsPage() {
           className="text-[34px] font-semibold leading-none tracking-tight text-[var(--color-text)]"
           style={{ fontFamily: 'var(--font-serif)' }}
         >
-          Invitations<em className="text-[var(--color-claude)] not-italic">.</em>
+          Invitations<em className="text-[var(--color-claude-mark)] not-italic">.</em>
         </h1>
         <p className="mt-2 font-mono text-[12px] text-[var(--color-text-2)]">
           Invitations sent to your email. Accepting joins you as a member; the active organization isn't changed.
         </p>
       </div>
 
-      <section className="rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-1)]">
-        <header className="border-b border-[var(--color-line)] px-4 py-3">
+      <section className="rounded-lg border border-[var(--color-divider)] bg-[var(--color-bg-panel)]">
+        <header className="border-b border-[var(--color-divider)] px-4 py-3">
           <h2 className="font-mono text-[13px] font-semibold">Pending</h2>
         </header>
         {isLoading && pending.length === 0 ? (
@@ -46,7 +46,7 @@ export function InvitationsPage() {
             No pending invitations.
           </div>
         ) : (
-          <ul className="divide-y divide-[var(--color-line)]">
+          <ul className="divide-y divide-[var(--color-divider)]">
             {pending.map((inv) => (
               <InvitationRow key={inv.id} invitation={inv} />
             ))}

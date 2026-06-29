@@ -12,7 +12,7 @@ export function NodeSummary({ node }: { node: NodeRunRow }) {
   const summary = node.conduitSummary;
   if (!summary) {
     return (
-      <div className="flex h-full items-center justify-center font-mono text-[12px] text-[var(--color-text-3)]">
+      <div className="flex h-full items-center justify-center font-mono text-[12px] text-[var(--color-text-muted)]">
         {node.status === 'COMPLETED'
           ? 'Agent did not write a summary.'
           : 'Summary appears after the node completes.'}

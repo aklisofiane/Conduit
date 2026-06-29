@@ -167,8 +167,8 @@ function OrganizationHeader({
   };
 
   return (
-    <section className="rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-1)]">
-      <div className="flex items-start justify-between gap-4 border-b border-[var(--color-line)] px-5 py-4">
+    <section className="rounded-lg border border-[var(--color-divider)] bg-[var(--color-bg-panel)]">
+      <div className="flex items-start justify-between gap-4 border-b border-[var(--color-divider)] px-5 py-4">
         <div className="min-w-0 flex-1">
           {renaming ? (
             <InlineRename
@@ -185,7 +185,7 @@ function OrganizationHeader({
               title={name}
             >
               {name}
-              <em className="text-[var(--color-claude)] not-italic">.</em>
+              <em className="text-[var(--color-claude-mark)] not-italic">.</em>
             </h1>
           )}
           <p className="mt-2 font-mono text-[11.5px] text-[var(--color-text-2)]">
@@ -229,8 +229,8 @@ function MembersSection({
   myRole: OrgRole | undefined;
 }) {
   return (
-    <section className="rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-1)]">
-      <header className="border-b border-[var(--color-line)] px-4 py-3">
+    <section className="rounded-lg border border-[var(--color-divider)] bg-[var(--color-bg-panel)]">
+      <header className="border-b border-[var(--color-divider)] px-4 py-3">
         <h2 className="font-mono text-[13px] font-semibold">Members</h2>
       </header>
       {loading && members.length === 0 ? (
@@ -240,7 +240,7 @@ function MembersSection({
           No members yet.
         </div>
       ) : (
-        <ul className="divide-y divide-[var(--color-line)]">
+        <ul className="divide-y divide-[var(--color-divider)]">
           {members.map((m) => (
             <MemberRow
               key={m.id}
@@ -355,8 +355,8 @@ function PendingInvitationsSection({
   canManage: boolean;
 }) {
   return (
-    <section className="rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-1)]">
-      <header className="border-b border-[var(--color-line)] px-4 py-3">
+    <section className="rounded-lg border border-[var(--color-divider)] bg-[var(--color-bg-panel)]">
+      <header className="border-b border-[var(--color-divider)] px-4 py-3">
         <h2 className="font-mono text-[13px] font-semibold">Pending invitations</h2>
       </header>
       {invitations.length === 0 ? (
@@ -364,7 +364,7 @@ function PendingInvitationsSection({
           No pending invitations.
         </div>
       ) : (
-        <ul className="divide-y divide-[var(--color-line)]">
+        <ul className="divide-y divide-[var(--color-divider)]">
           {invitations.map((inv) => (
             <InvitationRow key={inv.id} invitation={inv} canManage={canManage} />
           ))}
@@ -476,8 +476,8 @@ function InviteMemberSection() {
   const inviteUrl = created ? buildInviteUrl(created.id) : null;
 
   return (
-    <section className="rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-1)]">
-      <header className="border-b border-[var(--color-line)] px-4 py-3">
+    <section className="rounded-lg border border-[var(--color-divider)] bg-[var(--color-bg-panel)]">
+      <header className="border-b border-[var(--color-divider)] px-4 py-3">
         <h2 className="font-mono text-[13px] font-semibold">Invite member</h2>
       </header>
       <form onSubmit={onSubmit} className="flex flex-col gap-3 px-4 py-4" noValidate>
@@ -608,8 +608,8 @@ function DangerZoneSection({
   };
 
   return (
-    <section className="rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-1)]">
-      <header className="border-b border-[var(--color-line)] px-4 py-3">
+    <section className="rounded-lg border border-[var(--color-divider)] bg-[var(--color-bg-panel)]">
+      <header className="border-b border-[var(--color-divider)] px-4 py-3">
         <h2 className="font-mono text-[13px] font-semibold">Danger zone</h2>
       </header>
       <div className="flex flex-col gap-4 px-4 py-4">
@@ -628,7 +628,7 @@ function DangerZoneSection({
         )}
 
         {canDelete && (
-          <div className="flex flex-col gap-2 border-t border-[var(--color-line)] pt-4">
+          <div className="flex flex-col gap-2 border-t border-[var(--color-divider)] pt-4">
             <div className="flex items-center justify-between gap-4">
               <div className="font-mono text-[11.5px] text-[var(--color-text-2)]">
                 Permanently delete this organization and everything inside it.
@@ -642,7 +642,7 @@ function DangerZoneSection({
             {confirmingDelete && (
               <div className="flex flex-col gap-2 rounded-[var(--radius-sm)] border border-[var(--color-divider)] bg-[var(--color-bg)] p-3">
                 <div className="font-mono text-[11px] text-[var(--color-text)]">
-                  Type <code className="text-[var(--color-claude)]">{organizationName}</code> to confirm.
+                  Type <code className="text-[var(--color-claude-mark)]">{organizationName}</code> to confirm.
                 </div>
                 <Input
                   value={confirmName}

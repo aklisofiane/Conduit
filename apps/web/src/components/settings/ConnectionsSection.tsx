@@ -74,12 +74,12 @@ export function ConnectionsSection() {
       )}
 
       {isLoading && (
-        <div className="flex h-16 items-center justify-center font-mono text-[12px] text-[var(--color-text-3)]">
+        <div className="flex h-16 items-center justify-center font-mono text-[12px] text-[var(--color-text-muted)]">
           Loading…
         </div>
       )}
       {!isLoading && connections.length === 0 && !creating && (
-        <div className="flex h-24 items-center justify-center font-mono text-[12px] text-[var(--color-text-4)]">
+        <div className="flex h-24 items-center justify-center font-mono text-[12px] text-[var(--color-text-muted)]">
           No connections yet.
         </div>
       )}
@@ -146,14 +146,14 @@ function LabelPrompt({
   const topLevelError = ensure.error ? apiErrorMessage(ensure.error) : null;
 
   return (
-    <div className="border-b border-[var(--color-line)] px-4 py-4">
-      <div className="flex flex-col gap-3 rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-2,var(--color-bg-1))] p-3">
+    <div className="border-b border-[var(--color-divider)] px-4 py-4">
+      <div className="flex flex-col gap-3 rounded-lg border border-[var(--color-divider)] bg-[var(--color-pill-bg,var(--color-bg-panel))] p-3">
         <div className="font-mono text-[12px]">
           Connected{' '}
           <code className="text-[var(--color-text)]">{target.scopeLabel}</code>{' '}
           ✓
         </div>
-        <div className="font-mono text-[11px] text-[var(--color-text-3)]">
+        <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
           Add Conduit's workflow labels to this repo/project?
         </div>
 
@@ -252,14 +252,14 @@ function ConnectionRowView({ conn, onDelete }: { conn: ConnectionRow; onDelete: 
   };
 
   return (
-    <div className="border-b border-[var(--color-line)] last:border-b-0">
+    <div className="border-b border-[var(--color-divider)] last:border-b-0">
       <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4 px-4 py-3">
-        <span className="flex h-7 w-7 items-center justify-center rounded-md border border-[var(--color-line)] bg-[var(--color-bg-2)] font-mono text-[10.5px]">
+        <span className="flex h-7 w-7 items-center justify-center rounded-md border border-[var(--color-divider)] bg-[var(--color-pill-bg)] font-mono text-[10.5px]">
           {conn.credential.platform.slice(0, 2)}
         </span>
         <div>
           <div className="font-mono text-[13px] font-medium">{conn.name}</div>
-          <div className="font-mono text-[11px] text-[var(--color-text-3)]">
+          <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
             {conn.credential.name} · {conn.credential.platform.toLowerCase()}
             {conn.credential.hostUrl &&
               !isCloudHost(conn.credential.platform as Platform, conn.credential.hostUrl) &&
@@ -377,7 +377,7 @@ function AnalysisProgressCard({ analysis }: { analysis: ConnectionAnalysis }) {
   const failed = analysis.status === 'FAILED';
   return (
     <div className="px-4 pb-4">
-      <div className="flex flex-col gap-2 rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-2,var(--color-bg-1))] p-3">
+      <div className="flex flex-col gap-2 rounded-lg border border-[var(--color-divider)] bg-[var(--color-pill-bg,var(--color-bg-panel))] p-3">
         <div className="flex items-center gap-2 font-mono text-[12px]">
           <span className={`status-dot ${failed ? 'error' : 'running'}`} />
           {failed ? 'Analysis failed' : ANALYSIS_PHASE_LABEL[analysis.phase]}
@@ -389,7 +389,7 @@ function AnalysisProgressCard({ analysis }: { analysis: ConnectionAnalysis }) {
             </div>
           )
         ) : (
-          <div className="font-mono text-[11px] text-[var(--color-text-3)]">
+          <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
             Analyzing your repository — this can take a few minutes.
           </div>
         )}

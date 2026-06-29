@@ -68,7 +68,7 @@ export function ResetPasswordPage() {
           className="text-[26px] font-semibold leading-none tracking-tight text-[var(--color-text)]"
           style={{ fontFamily: 'var(--font-serif)' }}
         >
-          Invalid link<em className="text-[var(--color-claude)] not-italic">.</em>
+          Invalid link<em className="text-[var(--color-claude-mark)] not-italic">.</em>
         </h1>
         <p className="font-mono text-[11.5px] text-[var(--color-text-2)]">
           This reset link is missing its token.{' '}
@@ -88,7 +88,7 @@ export function ResetPasswordPage() {
           className="text-[26px] font-semibold leading-none tracking-tight text-[var(--color-text)]"
           style={{ fontFamily: 'var(--font-serif)' }}
         >
-          New password<em className="text-[var(--color-claude)] not-italic">.</em>
+          New password<em className="text-[var(--color-claude-mark)] not-italic">.</em>
         </h1>
         <p className="font-mono text-[11.5px] text-[var(--color-text-2)]">
           Choose a strong password — at least 8 characters.

@@ -14,7 +14,7 @@ export function IntegrationsPage() {
         className="text-[34px] font-semibold leading-none tracking-tight text-[var(--color-text)]"
         style={{ fontFamily: 'var(--font-serif)' }}
       >
-        Integrations<em className="text-[var(--color-claude)] not-italic">.</em>
+        Integrations<em className="text-[var(--color-claude-mark)] not-italic">.</em>
       </h1>
       <p className="font-mono text-[12px] text-[var(--color-text-2)]">
         Platform credentials and the connections built on top of them. Workflows reference connections directly.

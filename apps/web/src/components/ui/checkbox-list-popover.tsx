@@ -155,7 +155,7 @@ export function CheckboxListPopover<T>({
 
           {selectAll && !query && (
             <div className="flex items-center justify-between border-b border-[var(--color-divider)] px-2 py-1.5">
-              <label className="flex items-center gap-2 font-mono text-[11px] text-[var(--color-text-3)]">
+              <label className="flex items-center gap-2 font-mono text-[11px] text-[var(--color-text-muted)]">
                 <Checkbox checked={selectAll.checked} onCheckedChange={selectAll.onToggle} />
                 {selectAll.label}
               </label>
@@ -173,14 +173,14 @@ export function CheckboxListPopover<T>({
                   return (
                     <div key={group.name}>
                       <div className="flex items-center justify-between px-2 pb-1 pt-2">
-                        <div className="min-w-0 truncate font-mono text-[10px] uppercase tracking-wide text-[var(--color-text-3)]">
+                        <div className="min-w-0 truncate font-mono text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]">
                           {group.name}
                           {group.meta && (
-                            <span className="text-[var(--color-text-4)]"> · {group.meta}</span>
+                            <span className="text-[var(--color-text-muted)]"> · {group.meta}</span>
                           )}
                         </div>
                         <button
-                          className="flex-shrink-0 font-mono text-[10px] text-[var(--color-text-3)] hover:text-[var(--color-text)]"
+                          className="flex-shrink-0 font-mono text-[10px] text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
                           onClick={() => onToggleMany(ids, !allSelected)}
                         >
                           {allSelected ? 'none' : 'all'}
@@ -225,7 +225,7 @@ function CheckboxRow({
       <div className="min-w-0 flex-1">
         <div className="truncate font-mono text-[11px]">{label}</div>
         {description && (
-          <div className="truncate font-mono text-[10px] text-[var(--color-text-3)]">
+          <div className="truncate font-mono text-[10px] text-[var(--color-text-muted)]">
             {description}
           </div>
         )}

@@ -105,9 +105,9 @@ export function CredentialsSection() {
     >
       {creating && (
         <>
-          <div className="grid grid-cols-[120px_1fr_1fr_auto] items-end gap-3 border-b border-[var(--color-line)] px-4 py-3">
+          <div className="grid grid-cols-[120px_1fr_1fr_auto] items-end gap-3 border-b border-[var(--color-divider)] px-4 py-3">
             <label className="flex flex-col gap-1">
-              <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+              <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-muted)]">
                 Platform
               </span>
               <Select
@@ -118,7 +118,7 @@ export function CredentialsSection() {
               />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+              <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-muted)]">
                 Name
               </span>
               <Input
@@ -128,7 +128,7 @@ export function CredentialsSection() {
               />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+              <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-muted)]">
                 Secret
               </span>
               <Input
@@ -158,8 +158,8 @@ export function CredentialsSection() {
           </div>
 
           {isVcs && (
-            <div className="flex flex-col gap-2 border-b border-[var(--color-line)] px-4 py-3">
-              <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+            <div className="flex flex-col gap-2 border-b border-[var(--color-divider)] px-4 py-3">
+              <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-muted)]">
                 Instance
               </span>
               <ToggleGroup
@@ -200,12 +200,12 @@ export function CredentialsSection() {
 
       <div>
         {isLoading && (
-          <div className="flex h-16 items-center justify-center font-mono text-[12px] text-[var(--color-text-3)]">
+          <div className="flex h-16 items-center justify-center font-mono text-[12px] text-[var(--color-text-muted)]">
             Loading…
           </div>
         )}
         {!isLoading && credentials.length === 0 && !creating && (
-          <div className="flex h-24 items-center justify-center font-mono text-[12px] text-[var(--color-text-4)]">
+          <div className="flex h-24 items-center justify-center font-mono text-[12px] text-[var(--color-text-muted)]">
             No credentials yet.
           </div>
         )}
@@ -241,17 +241,17 @@ function CredentialRowView({ cred, onDelete }: { cred: CredentialRow; onDelete: 
   };
 
   return (
-    <div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-4 border-b border-[var(--color-line)] px-4 py-3 last:border-b-0">
-      <span className="flex h-7 w-7 items-center justify-center rounded-md border border-[var(--color-line)] bg-[var(--color-bg-2)] font-mono text-[10.5px]">
+    <div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-4 border-b border-[var(--color-divider)] px-4 py-3 last:border-b-0">
+      <span className="flex h-7 w-7 items-center justify-center rounded-md border border-[var(--color-divider)] bg-[var(--color-pill-bg)] font-mono text-[10.5px]">
         {cred.platform.slice(0, 2)}
       </span>
       <div>
         <div className="font-mono text-[13px] font-medium">{cred.name}</div>
-        <div className="flex items-center gap-1.5 font-mono text-[11px] text-[var(--color-text-3)]">
+        <div className="flex items-center gap-1.5 font-mono text-[11px] text-[var(--color-text-muted)]">
           <span>{cred.platform.toLowerCase()}</span>
           {cred.hostUrl && !isCloudHost(cred.platform as Platform, cred.hostUrl) && (
             <span
-              className="rounded border border-[var(--color-line)] bg-[var(--color-bg-2)] px-1 py-px text-[10px] tracking-wide"
+              className="rounded border border-[var(--color-divider)] bg-[var(--color-pill-bg)] px-1 py-px text-[10px] tracking-wide"
               title={`Self-hosted: ${cred.hostUrl}`}
             >
               {cred.hostUrl}
@@ -259,7 +259,7 @@ function CredentialRowView({ cred, onDelete }: { cred: CredentialRow; onDelete: 
           )}
           {cred.metadata?.source === 'oauth' && (
             <span
-              className="rounded border border-[var(--color-line)] bg-[var(--color-bg-2)] px-1 py-px text-[10px] uppercase tracking-wide"
+              className="rounded border border-[var(--color-divider)] bg-[var(--color-pill-bg)] px-1 py-px text-[10px] uppercase tracking-wide"
               title="Created from your GitHub sign-in. Rotate with a PAT to convert to a manual credential."
             >
               oauth
