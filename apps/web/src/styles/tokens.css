@@ -65,3 +65,67 @@
   --canvas-grid-color: rgba(0, 0, 0, 0.04);
   --canvas-grid-size: 32px;
 }
+
+/* ---------- Dark theme ----------
+   Applied as `data-theme="dark"` on <html> (set by the no-flash script in
+   index.html and lib/theme.ts). Because every primitive and page reads
+   `var(--color-*)`, dark mode is a pure token override — no component CSS
+   changes. The palette keeps the light theme's warm character (neutrals carry
+   a faint warm hue, ~70°) rather than going cold-gray, and lifts accent /
+   provider / status hues so they read on a dark ground. */
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --color-bg: oklch(0.17 0.005 70);
+  --color-bg-panel: oklch(0.2 0.005 70);
+  --color-bg-canvas: oklch(0.15 0.005 70);
+
+  --color-text: oklch(0.95 0.004 70);
+  --color-text-2: oklch(0.77 0.012 250);
+  --color-text-muted: oklch(0.61 0.014 250);
+
+  --color-divider: oklch(0.3 0.006 70);
+  --color-edge: oklch(0.5 0.015 260);
+
+  --color-success: oklch(0.72 0.14 145);
+  --color-running: oklch(0.7 0.16 250);
+  --color-warn: oklch(0.8 0.13 75);
+  --color-error: oklch(0.68 0.19 25);
+
+  --color-accent: oklch(0.72 0.15 255);
+  --color-accent-soft: oklch(0.72 0.15 255 / 0.32);
+
+  --color-primary: oklch(0.62 0.17 255);
+  --color-primary-text: #ffffff;
+  --color-primary-border: oklch(0.56 0.17 255);
+
+  --color-pill-bg: oklch(0.24 0.006 70);
+  --color-pill-border: oklch(0.32 0.006 70);
+  --color-footer-bg: oklch(0.15 0.005 70);
+
+  --color-trigger: oklch(0.78 0.03 260);
+  --color-trigger-bg: oklch(0.23 0.012 260);
+  --color-trigger-border: oklch(0.34 0.02 260);
+
+  --color-claude-mark: oklch(0.74 0.13 60);
+  --color-claude-card: oklch(0.23 0.02 55);
+  --color-claude-prompt: oklch(0.2 0.012 55);
+  --color-claude-prompt-border: oklch(0.34 0.03 55);
+  --color-claude-footer: oklch(0.2 0.02 55);
+  --color-claude-border: oklch(0.4 0.05 55);
+  --color-claude-tag-bg: oklch(0.32 0.06 55);
+  --color-claude-tag-text: oklch(0.83 0.11 65);
+
+  --color-codex-mark: oklch(0.72 0.12 155);
+  --color-codex-card: oklch(0.23 0.02 155);
+  --color-codex-prompt: oklch(0.2 0.012 155);
+  --color-codex-prompt-border: oklch(0.34 0.03 155);
+  --color-codex-footer: oklch(0.2 0.02 155);
+  --color-codex-border: oklch(0.4 0.05 155);
+  --color-codex-tag-bg: oklch(0.32 0.06 155);
+  --color-codex-tag-text: oklch(0.81 0.12 155);
+
+  --shadow-node: 0 1px 2px rgba(0, 0, 0, 0.45);
+
+  --canvas-grid-color: rgba(255, 255, 255, 0.045);
+}

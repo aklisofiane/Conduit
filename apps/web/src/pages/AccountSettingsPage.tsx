@@ -7,6 +7,9 @@ import { useUserInvitations } from '../api/organization.js';
 import { authClient, signOut, useSession } from '../lib/auth-client.js';
 import { FormField } from '../components/common/FormField.js';
 import { Button } from '../components/ui/button.js';
+import { ToggleGroup, ToggleGroupItem } from '../components/ui/toggle-group.js';
+import { useTheme } from '../hooks/use-theme.js';
+import type { ThemePref } from '../lib/theme.js';
 
 const passwordSchema = z
   .object({
@@ -87,10 +90,53 @@ export function AccountSettingsPage() {
 
       <OrganizationLinks />
 
+      <AppearanceSection />
+
       <ChangePasswordSection />
 
       <SignOutSection />
     </div>
+  );
+}
+
+const THEME_OPTIONS: { value: ThemePref; label: string }[] = [
+  { value: 'system', label: 'System' },
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
+];
+
+function AppearanceSection() {
+  const { pref, setPref } = useTheme();
+
+  return (
+    <section className="rounded-lg border border-[var(--color-divider)] bg-[var(--color-bg-panel)]">
+      <header className="border-b border-[var(--color-divider)] px-4 py-3">
+        <h2 className="font-mono text-[13px] font-semibold">Appearance</h2>
+      </header>
+      <div className="flex items-center justify-between gap-4 px-4 py-4">
+        <div className="flex flex-col gap-1">
+          <span className="font-mono text-[12.5px] text-[var(--color-text)]">Theme</span>
+          <span className="font-mono text-[11px] text-[var(--color-text-muted)]">
+            “System” follows your operating system setting.
+          </span>
+        </div>
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          value={pref}
+          onValueChange={(v) => {
+            if (v) setPref(v as ThemePref);
+          }}
+          aria-label="Theme preference"
+        >
+          {THEME_OPTIONS.map((opt) => (
+            <ToggleGroupItem key={opt.value} value={opt.value}>
+              {opt.label}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      </div>
+    </section>
   );
 }
 
