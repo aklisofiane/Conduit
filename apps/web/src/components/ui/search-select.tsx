@@ -39,13 +39,13 @@ export const searchSelectIconClass = 'flex-shrink-0 text-[var(--color-text-muted
 
 export const searchSelectInputClass = cn(
   'w-full border-0 bg-transparent outline-none',
-  'font-mono text-[11px] text-[var(--color-text)] placeholder:text-[var(--color-text-muted)]',
+  'font-mono text-small text-[var(--color-text)] placeholder:text-[var(--color-text-muted)]',
 );
 
 export const searchSelectListClass = 'overflow-y-auto p-1';
 
 export const searchSelectEmptyClass =
-  'p-2 text-center font-mono text-[11px] text-[var(--color-text-muted)]';
+  'p-2 text-center font-mono text-small text-[var(--color-text-muted)]';
 
 export const searchSelectItemSelectedClass = 'bg-[var(--color-accent-soft)] font-semibold';
 

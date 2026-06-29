@@ -135,7 +135,7 @@ export function IssuesTriggerPanel({
                   </Button>
                 </div>
               ) : boardConnections.length === 0 ? (
-                <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
+                <div className="font-mono text-small text-[var(--color-text-muted)]">
                   No Projects v2 connections yet — create one on the Connections page.
                 </div>
               ) : (
@@ -171,7 +171,7 @@ export function IssuesTriggerPanel({
                   })
                 }
               />
-              <span className="font-mono text-[11px] text-[var(--color-text-muted)]">
+              <span className="font-mono text-small text-[var(--color-text-muted)]">
                 sec
               </span>
             </div>
@@ -193,7 +193,7 @@ export function IssuesTriggerPanel({
               }
             />
             {!hasBoard && (
-              <div className="mt-2 font-mono text-[11px] text-[var(--color-text-muted)]">
+              <div className="mt-2 font-mono text-small text-[var(--color-text-muted)]">
                 Only `label` available — attach a board to unlock `status`.
               </div>
             )}

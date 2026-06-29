@@ -21,8 +21,8 @@ const inputVariants = cva(
     variants: {
       // The two form controls share every style except sizing/padding.
       as: {
-        input: 'h-[30px] px-[10px] font-sans text-[12px]',
-        textarea: 'h-auto py-2 px-[10px] resize-y font-sans text-[12px]',
+        input: 'h-[30px] px-[10px] font-sans text-small',
+        textarea: 'h-auto py-2 px-[10px] resize-y font-sans text-small',
       },
       // `compact` is the dense pill-field look used in popovers/menus (filter
       // boxes, inline create-org): auto height, tighter radius/padding, mono,
@@ -31,7 +31,7 @@ const inputVariants = cva(
       variant: {
         default: '',
         compact:
-          'h-auto rounded-[var(--radius-sm)] px-2 py-1 font-mono text-[11px] focus:border-[var(--color-text-muted)] focus:shadow-none',
+          'h-auto rounded-[var(--radius-sm)] px-2 py-1 font-mono text-small focus:border-[var(--color-text-muted)] focus:shadow-none',
       },
     },
     defaultVariants: {

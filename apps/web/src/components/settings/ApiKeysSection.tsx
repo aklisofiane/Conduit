@@ -70,7 +70,7 @@ export function ApiKeysSection() {
       {creating && (
         <div className="grid grid-cols-[120px_1fr_1fr_auto] items-end gap-3 border-b border-[var(--color-divider)] px-4 py-3">
           <label className="flex flex-col gap-1">
-            <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-muted)]">
+            <span className="font-mono text-caption uppercase tracking-wide text-[var(--color-text-muted)]">
               Provider
             </span>
             <Select
@@ -86,7 +86,7 @@ export function ApiKeysSection() {
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-muted)]">
+            <span className="font-mono text-caption uppercase tracking-wide text-[var(--color-text-muted)]">
               API key
             </span>
             <Input
@@ -97,7 +97,7 @@ export function ApiKeysSection() {
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-muted)]">
+            <span className="font-mono text-caption uppercase tracking-wide text-[var(--color-text-muted)]">
               Base URL (optional)
             </span>
             <Input
@@ -114,7 +114,7 @@ export function ApiKeysSection() {
             {create.isPending ? 'Saving…' : 'Save'}
           </Button>
           {error && (
-            <div className="col-span-4 font-mono text-[11px] text-[var(--color-danger)]">
+            <div className="col-span-4 font-mono text-small text-[var(--color-danger)]">
               {error}
             </div>
           )}
@@ -123,12 +123,12 @@ export function ApiKeysSection() {
 
       <div>
         {isLoading && (
-          <div className="flex h-16 items-center justify-center font-mono text-[12px] text-[var(--color-text-muted)]">
+          <div className="flex h-16 items-center justify-center font-mono text-small text-[var(--color-text-muted)]">
             Loading…
           </div>
         )}
         {!isLoading && configs.length === 0 && !creating && (
-          <div className="flex h-24 items-center justify-center font-mono text-[12px] text-[var(--color-text-muted)]">
+          <div className="flex h-24 items-center justify-center font-mono text-small text-[var(--color-text-muted)]">
             No provider keys yet. Workers will fall back to env defaults.
           </div>
         )}
@@ -183,12 +183,12 @@ function ProviderConfigRowView({
 
   return (
     <div className="grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-4 border-b border-[var(--color-divider)] px-4 py-3 last:border-b-0">
-      <span className="flex h-7 w-7 items-center justify-center rounded-md border border-[var(--color-divider)] bg-[var(--color-pill-bg)] font-mono text-[10.5px]">
+      <span className="flex h-7 w-7 items-center justify-center rounded-md border border-[var(--color-divider)] bg-[var(--color-pill-bg)] font-mono text-caption">
         {cfg.providerId.slice(0, 2)}
       </span>
       <div>
-        <div className="font-mono text-[13px] font-medium">{cfg.providerId}</div>
-        <div className="flex items-center gap-1.5 font-mono text-[11px] text-[var(--color-text-muted)]">
+        <div className="font-mono text-base font-medium">{cfg.providerId}</div>
+        <div className="flex items-center gap-1.5 font-mono text-small text-[var(--color-text-muted)]">
           <span>••••{cfg.suffix}</span>
           <span>· {cfg.baseUrl ?? 'default'}</span>
           <span>· rotated {relativeFromNow(cfg.updatedAt)}</span>

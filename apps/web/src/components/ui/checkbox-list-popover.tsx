@@ -125,7 +125,7 @@ export function CheckboxListPopover<T>({
       <Popover.Trigger
         className={cn(selectTriggerClass, triggerClassName, open && searchSelectOpenClass)}
       >
-        <span className={cn(searchSelectValueClass, 'font-mono text-[11px]')}>{triggerLabel}</span>
+        <span className={cn(searchSelectValueClass, 'font-mono text-small')}>{triggerLabel}</span>
         <span className={cn(selectChevronClass, open && 'rotate-180')}>
           <ChevronDown size={12} strokeWidth={1.5} />
         </span>
@@ -155,7 +155,7 @@ export function CheckboxListPopover<T>({
 
           {selectAll && !query && (
             <div className="flex items-center justify-between border-b border-[var(--color-divider)] px-2 py-1.5">
-              <label className="flex items-center gap-2 font-mono text-[11px] text-[var(--color-text-muted)]">
+              <label className="flex items-center gap-2 font-mono text-small text-[var(--color-text-muted)]">
                 <Checkbox checked={selectAll.checked} onCheckedChange={selectAll.onToggle} />
                 {selectAll.label}
               </label>
@@ -173,14 +173,14 @@ export function CheckboxListPopover<T>({
                   return (
                     <div key={group.name}>
                       <div className="flex items-center justify-between px-2 pb-1 pt-2">
-                        <div className="min-w-0 truncate font-mono text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]">
+                        <div className="min-w-0 truncate font-mono text-caption uppercase tracking-wide text-[var(--color-text-muted)]">
                           {group.name}
                           {group.meta && (
                             <span className="text-[var(--color-text-muted)]"> · {group.meta}</span>
                           )}
                         </div>
                         <button
-                          className="flex-shrink-0 font-mono text-[10px] text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
+                          className="flex-shrink-0 font-mono text-caption text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
                           onClick={() => onToggleMany(ids, !allSelected)}
                         >
                           {allSelected ? 'none' : 'all'}
@@ -223,9 +223,9 @@ function CheckboxRow({
         className="mt-0.5 flex-shrink-0"
       />
       <div className="min-w-0 flex-1">
-        <div className="truncate font-mono text-[11px]">{label}</div>
+        <div className="truncate font-mono text-small">{label}</div>
         {description && (
-          <div className="truncate font-mono text-[10px] text-[var(--color-text-muted)]">
+          <div className="truncate font-mono text-caption text-[var(--color-text-muted)]">
             {description}
           </div>
         )}

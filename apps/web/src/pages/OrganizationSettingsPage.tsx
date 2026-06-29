@@ -84,7 +84,7 @@ export function OrganizationSettingsPage() {
 
   if (orgLoading || !org) {
     return (
-      <div className="mx-auto w-full max-w-[900px] px-6 pt-10 font-mono text-[12px] text-[var(--color-text-muted)]">
+      <div className="mx-auto w-full max-w-[900px] px-6 pt-10 font-mono text-small text-[var(--color-text-muted)]">
         Loading…
       </div>
     );
@@ -176,11 +176,11 @@ function OrganizationHeader({
               saving={update.isPending}
               onCommit={handleCommit}
               onCancel={() => setRenaming(false)}
-              className="w-full max-w-[420px] rounded-[var(--radius-sm)] border border-[var(--color-divider)] bg-[var(--color-bg)] px-2 py-1 text-[24px] font-semibold text-[var(--color-text)] outline-none [font-family:var(--font-serif)] focus:border-[var(--color-text-muted)]"
+              className="w-full max-w-[420px] rounded-[var(--radius-sm)] border border-[var(--color-divider)] bg-[var(--color-bg)] px-2 py-1 text-heading font-semibold text-[var(--color-text)] outline-none [font-family:var(--font-serif)] focus:border-[var(--color-text-muted)]"
             />
           ) : (
             <h1
-              className="truncate text-[28px] font-semibold leading-none tracking-tight text-[var(--color-text)]"
+              className="truncate text-title font-semibold leading-none tracking-tight text-[var(--color-text)]"
               style={{ fontFamily: 'var(--font-serif)' }}
               title={name}
             >
@@ -188,16 +188,16 @@ function OrganizationHeader({
               <em className="text-[var(--color-claude-mark)] not-italic">.</em>
             </h1>
           )}
-          <p className="mt-2 font-mono text-[11.5px] text-[var(--color-text-2)]">
+          <p className="mt-2 font-mono text-caption text-[var(--color-text-2)]">
             Created {relativeFromNow(createdAt)} · {memberCount} member{memberCount === 1 ? '' : 's'}
           </p>
           {error && (
-            <p className="mt-1 font-mono text-[11px] text-[var(--color-error)]">{error}</p>
+            <p className="mt-1 font-mono text-small text-[var(--color-error)]">{error}</p>
           )}
         </div>
         <div className="flex shrink-0 flex-col items-end gap-2">
           {myRole && (
-            <span className="rounded-[var(--radius-sm)] border border-[var(--color-divider)] bg-[var(--color-pill-bg)] px-2 py-0.5 font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-2)]">
+            <span className="rounded-[var(--radius-sm)] border border-[var(--color-divider)] bg-[var(--color-pill-bg)] px-2 py-0.5 font-mono text-caption uppercase tracking-wide text-[var(--color-text-2)]">
               {myRole}
             </span>
           )}
@@ -231,12 +231,12 @@ function MembersSection({
   return (
     <section className="rounded-lg border border-[var(--color-divider)] bg-[var(--color-bg-panel)]">
       <header className="border-b border-[var(--color-divider)] px-4 py-3">
-        <h2 className="font-mono text-[13px] font-semibold">Members</h2>
+        <h2 className="font-mono text-base font-semibold">Members</h2>
       </header>
       {loading && members.length === 0 ? (
-        <div className="px-4 py-4 font-mono text-[11px] text-[var(--color-text-muted)]">Loading…</div>
+        <div className="px-4 py-4 font-mono text-small text-[var(--color-text-muted)]">Loading…</div>
       ) : members.length === 0 ? (
-        <div className="px-4 py-4 font-mono text-[11px] text-[var(--color-text-muted)]">
+        <div className="px-4 py-4 font-mono text-small text-[var(--color-text-muted)]">
           No members yet.
         </div>
       ) : (
@@ -294,24 +294,24 @@ function MemberRow({
       <div className="flex min-w-0 items-center gap-3">
         <div
           aria-hidden
-          className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[var(--color-pill-bg)] font-mono text-[10px] uppercase text-[var(--color-text-2)]"
+          className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[var(--color-pill-bg)] font-mono text-caption uppercase text-[var(--color-text-2)]"
         >
           {initials(display)}
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <span className="truncate font-mono text-[12px] text-[var(--color-text)]" title={display}>
+            <span className="truncate font-mono text-small text-[var(--color-text)]" title={display}>
               {display}
             </span>
             {isMe && (
-              <span className="font-mono text-[10px] text-[var(--color-text-muted)]">(you)</span>
+              <span className="font-mono text-caption text-[var(--color-text-muted)]">(you)</span>
             )}
           </div>
-          <div className="font-mono text-[10.5px] text-[var(--color-text-muted)]">
+          <div className="font-mono text-caption text-[var(--color-text-muted)]">
             joined {relativeFromNow(member.createdAt)}
           </div>
           {error && (
-            <div className="mt-1 font-mono text-[10.5px] text-[var(--color-error)]">{error}</div>
+            <div className="mt-1 font-mono text-caption text-[var(--color-error)]">{error}</div>
           )}
         </div>
       </div>
@@ -326,7 +326,7 @@ function MemberRow({
             options={ROLE_OPTIONS}
           />
         ) : (
-          <span className="font-mono text-[11px] text-[var(--color-text-2)]">{member.role}</span>
+          <span className="font-mono text-small text-[var(--color-text-2)]">{member.role}</span>
         )}
         {canManage && (
           <Button
@@ -357,10 +357,10 @@ function PendingInvitationsSection({
   return (
     <section className="rounded-lg border border-[var(--color-divider)] bg-[var(--color-bg-panel)]">
       <header className="border-b border-[var(--color-divider)] px-4 py-3">
-        <h2 className="font-mono text-[13px] font-semibold">Pending invitations</h2>
+        <h2 className="font-mono text-base font-semibold">Pending invitations</h2>
       </header>
       {invitations.length === 0 ? (
-        <div className="px-4 py-4 font-mono text-[11px] text-[var(--color-text-muted)]">
+        <div className="px-4 py-4 font-mono text-small text-[var(--color-text-muted)]">
           No pending invitations.
         </div>
       ) : (
@@ -411,18 +411,18 @@ function InvitationRow({
       <div className="min-w-0">
         <div className="flex items-baseline gap-3">
           <span
-            className="truncate font-mono text-[12px] text-[var(--color-text)]"
+            className="truncate font-mono text-small text-[var(--color-text)]"
             title={invitation.email}
           >
             {invitation.email}
           </span>
-          <span className="font-mono text-[11px] text-[var(--color-text-2)]">{invitation.role}</span>
+          <span className="font-mono text-small text-[var(--color-text-2)]">{invitation.role}</span>
         </div>
-        <div className="font-mono text-[10.5px] text-[var(--color-text-muted)]">
+        <div className="font-mono text-caption text-[var(--color-text-muted)]">
           expires {relativeFromNow(invitation.expiresAt)}
         </div>
         {error && (
-          <div className="mt-1 font-mono text-[10.5px] text-[var(--color-error)]">{error}</div>
+          <div className="mt-1 font-mono text-caption text-[var(--color-error)]">{error}</div>
         )}
       </div>
       <div className="flex shrink-0 items-center gap-2">
@@ -478,7 +478,7 @@ function InviteMemberSection() {
   return (
     <section className="rounded-lg border border-[var(--color-divider)] bg-[var(--color-bg-panel)]">
       <header className="border-b border-[var(--color-divider)] px-4 py-3">
-        <h2 className="font-mono text-[13px] font-semibold">Invite member</h2>
+        <h2 className="font-mono text-base font-semibold">Invite member</h2>
       </header>
       <form onSubmit={onSubmit} className="flex flex-col gap-3 px-4 py-4" noValidate>
         <div className="grid grid-cols-[1fr_140px_auto] items-end gap-3">
@@ -490,7 +490,7 @@ function InviteMemberSection() {
               {...form.register('email')}
             />
             {form.formState.errors.email?.message && (
-              <span className="mt-1 font-mono text-[10.5px] text-[var(--color-error)]">
+              <span className="mt-1 font-mono text-caption text-[var(--color-error)]">
                 {form.formState.errors.email.message}
               </span>
             )}
@@ -520,7 +520,7 @@ function InviteMemberSection() {
         </div>
 
         {rootError && (
-          <div role="alert" className="font-mono text-[11px] text-[var(--color-error)]">
+          <div role="alert" className="font-mono text-small text-[var(--color-error)]">
             {rootError}
           </div>
         )}
@@ -528,13 +528,13 @@ function InviteMemberSection() {
         {created && inviteUrl && (
           <div
             role="status"
-            className="rounded-[var(--radius-sm)] border border-[var(--color-divider)] bg-[var(--color-bg)] px-3 py-2 font-mono text-[11px] text-[var(--color-text-2)]"
+            className="rounded-[var(--radius-sm)] border border-[var(--color-divider)] bg-[var(--color-bg)] px-3 py-2 font-mono text-small text-[var(--color-text-2)]"
           >
             <div className="text-[var(--color-success)]">
               Invitation created · share this link with {created.email}
             </div>
             <div className="mt-1 flex items-center gap-2">
-              <code className="min-w-0 flex-1 truncate text-[10.5px] text-[var(--color-text)]">
+              <code className="min-w-0 flex-1 truncate text-caption text-[var(--color-text)]">
                 {inviteUrl}
               </code>
               <Button
@@ -610,12 +610,12 @@ function DangerZoneSection({
   return (
     <section className="rounded-lg border border-[var(--color-divider)] bg-[var(--color-bg-panel)]">
       <header className="border-b border-[var(--color-divider)] px-4 py-3">
-        <h2 className="font-mono text-[13px] font-semibold">Danger zone</h2>
+        <h2 className="font-mono text-base font-semibold">Danger zone</h2>
       </header>
       <div className="flex flex-col gap-4 px-4 py-4">
         {!soleOwner && (
           <div className="flex items-center justify-between gap-4">
-            <div className="font-mono text-[11.5px] text-[var(--color-text-2)]">
+            <div className="font-mono text-caption text-[var(--color-text-2)]">
               Leave this organization. Your access is removed; the org keeps running.
             </div>
             <Button onClick={handleLeave} disabled={leave.isPending}>
@@ -624,13 +624,13 @@ function DangerZoneSection({
           </div>
         )}
         {leaveError && (
-          <div className="font-mono text-[10.5px] text-[var(--color-error)]">{leaveError}</div>
+          <div className="font-mono text-caption text-[var(--color-error)]">{leaveError}</div>
         )}
 
         {canDelete && (
           <div className="flex flex-col gap-2 border-t border-[var(--color-divider)] pt-4">
             <div className="flex items-center justify-between gap-4">
-              <div className="font-mono text-[11.5px] text-[var(--color-text-2)]">
+              <div className="font-mono text-caption text-[var(--color-text-2)]">
                 Permanently delete this organization and everything inside it.
               </div>
               {!confirmingDelete && (
@@ -641,7 +641,7 @@ function DangerZoneSection({
             </div>
             {confirmingDelete && (
               <div className="flex flex-col gap-2 rounded-[var(--radius-sm)] border border-[var(--color-divider)] bg-[var(--color-bg)] p-3">
-                <div className="font-mono text-[11px] text-[var(--color-text)]">
+                <div className="font-mono text-small text-[var(--color-text)]">
                   Type <code className="text-[var(--color-claude-mark)]">{organizationName}</code> to confirm.
                 </div>
                 <Input
@@ -650,7 +650,7 @@ function DangerZoneSection({
                   autoFocus
                 />
                 {deleteError && (
-                  <div className="font-mono text-[10.5px] text-[var(--color-error)]">{deleteError}</div>
+                  <div className="font-mono text-caption text-[var(--color-error)]">{deleteError}</div>
                 )}
                 <div className="flex justify-end gap-2">
                   <Button

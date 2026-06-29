@@ -74,12 +74,12 @@ export function ConnectionsSection() {
       )}
 
       {isLoading && (
-        <div className="flex h-16 items-center justify-center font-mono text-[12px] text-[var(--color-text-muted)]">
+        <div className="flex h-16 items-center justify-center font-mono text-small text-[var(--color-text-muted)]">
           Loading…
         </div>
       )}
       {!isLoading && connections.length === 0 && !creating && (
-        <div className="flex h-24 items-center justify-center font-mono text-[12px] text-[var(--color-text-muted)]">
+        <div className="flex h-24 items-center justify-center font-mono text-small text-[var(--color-text-muted)]">
           No connections yet.
         </div>
       )}
@@ -148,12 +148,12 @@ function LabelPrompt({
   return (
     <div className="border-b border-[var(--color-divider)] px-4 py-4">
       <div className="flex flex-col gap-3 rounded-lg border border-[var(--color-divider)] bg-[var(--color-pill-bg,var(--color-bg-panel))] p-3">
-        <div className="font-mono text-[12px]">
+        <div className="font-mono text-small">
           Connected{' '}
           <code className="text-[var(--color-text)]">{target.scopeLabel}</code>{' '}
           ✓
         </div>
-        <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
+        <div className="font-mono text-small text-[var(--color-text-muted)]">
           Add Conduit's workflow labels to this repo/project?
         </div>
 
@@ -163,7 +163,7 @@ function LabelPrompt({
             return (
               <label
                 key={l.name}
-                className="flex items-center gap-2 font-mono text-[12px]"
+                className="flex items-center gap-2 font-mono text-small"
               >
                 <Checkbox
                   checked={selected.has(l.name)}
@@ -187,7 +187,7 @@ function LabelPrompt({
         </div>
 
         {topLevelError && (
-          <div className="font-mono text-[11px] text-[var(--color-danger,#dc322f)]">
+          <div className="font-mono text-small text-[var(--color-danger,#dc322f)]">
             {topLevelError}
           </div>
         )}
@@ -254,12 +254,12 @@ function ConnectionRowView({ conn, onDelete }: { conn: ConnectionRow; onDelete: 
   return (
     <div className="border-b border-[var(--color-divider)] last:border-b-0">
       <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4 px-4 py-3">
-        <span className="flex h-7 w-7 items-center justify-center rounded-md border border-[var(--color-divider)] bg-[var(--color-pill-bg)] font-mono text-[10.5px]">
+        <span className="flex h-7 w-7 items-center justify-center rounded-md border border-[var(--color-divider)] bg-[var(--color-pill-bg)] font-mono text-caption">
           {conn.credential.platform.slice(0, 2)}
         </span>
         <div>
-          <div className="font-mono text-[13px] font-medium">{conn.name}</div>
-          <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
+          <div className="font-mono text-base font-medium">{conn.name}</div>
+          <div className="font-mono text-small text-[var(--color-text-muted)]">
             {conn.credential.name} · {conn.credential.platform.toLowerCase()}
             {conn.credential.hostUrl &&
               !isCloudHost(conn.credential.platform as Platform, conn.credential.hostUrl) &&
@@ -329,19 +329,19 @@ function ConnectionRowView({ conn, onDelete }: { conn: ConnectionRow; onDelete: 
  */
 /** The small numbered badge ahead of each step in {@link AnalyzeRepoInfo}. */
 const stepNumClass =
-  'mt-px flex h-[17px] w-[17px] items-center justify-center rounded-[var(--radius-sm)] bg-[var(--color-accent-soft)] font-mono text-[10px] font-semibold text-[var(--color-accent)]';
+  'mt-px flex h-[17px] w-[17px] items-center justify-center rounded-[var(--radius-sm)] bg-[var(--color-accent-soft)] font-mono text-caption font-semibold text-[var(--color-accent)]';
 
 function AnalyzeRepoInfo() {
   return (
     <>
-      <div className="mb-2 flex items-center gap-[7px] font-mono text-[12px] font-semibold text-[var(--color-text)]">
+      <div className="mb-2 flex items-center gap-[7px] font-mono text-small font-semibold text-[var(--color-text)]">
         <span className="text-[var(--color-accent)]">✦</span> What “Analyze repo” does
       </div>
-      <p className="m-0 mb-2.5 text-[12px] leading-[1.5] text-[var(--color-text-2)] [&_b]:font-semibold [&_b]:text-[var(--color-text)]">
+      <p className="m-0 mb-2.5 text-small leading-[1.5] text-[var(--color-text-2)] [&_b]:font-semibold [&_b]:text-[var(--color-text)]">
         Conduit reads the repo and proposes <b>ready-to-import review workflows</b> — one per
         component it finds.
       </p>
-      <ul className="m-0 mb-2.5 grid list-none gap-[7px] p-0 [&>li]:grid [&>li]:grid-cols-[auto_1fr] [&>li]:gap-[9px] [&>li]:text-[11.5px] [&>li]:leading-[1.45] [&>li]:text-[var(--color-text-2)] [&_b]:font-semibold [&_b]:text-[var(--color-text)]">
+      <ul className="m-0 mb-2.5 grid list-none gap-[7px] p-0 [&>li]:grid [&>li]:grid-cols-[auto_1fr] [&>li]:gap-[9px] [&>li]:text-caption [&>li]:leading-[1.45] [&>li]:text-[var(--color-text-2)] [&_b]:font-semibold [&_b]:text-[var(--color-text)]">
         <li>
           <span className={stepNumClass}>1</span>
           <span>
@@ -361,7 +361,7 @@ function AnalyzeRepoInfo() {
           </span>
         </li>
       </ul>
-      <div className="border-t border-[var(--color-divider)] pt-2.5 font-mono text-[10.5px] text-[var(--color-text-muted)]">
+      <div className="border-t border-[var(--color-divider)] pt-2.5 font-mono text-caption text-[var(--color-text-muted)]">
         ~ a few minutes · read-only
       </div>
     </>
@@ -378,18 +378,18 @@ function AnalysisProgressCard({ analysis }: { analysis: ConnectionAnalysis }) {
   return (
     <div className="px-4 pb-4">
       <div className="flex flex-col gap-2 rounded-lg border border-[var(--color-divider)] bg-[var(--color-pill-bg,var(--color-bg-panel))] p-3">
-        <div className="flex items-center gap-2 font-mono text-[12px]">
+        <div className="flex items-center gap-2 font-mono text-small">
           <span className={`status-dot ${failed ? 'error' : 'running'}`} />
           {failed ? 'Analysis failed' : ANALYSIS_PHASE_LABEL[analysis.phase]}
         </div>
         {failed ? (
           analysis.error && (
-            <div className="font-mono text-[11px] text-[var(--color-danger,#dc322f)]">
+            <div className="font-mono text-small text-[var(--color-danger,#dc322f)]">
               {analysis.error}
             </div>
           )
         ) : (
-          <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
+          <div className="font-mono text-small text-[var(--color-text-muted)]">
             Analyzing your repository — this can take a few minutes.
           </div>
         )}

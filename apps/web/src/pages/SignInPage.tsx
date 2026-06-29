@@ -73,18 +73,18 @@ export function SignInPage() {
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-1">
         <h1
-          className="text-[26px] font-semibold leading-none tracking-tight text-[var(--color-text)]"
+          className="text-heading font-semibold leading-none tracking-tight text-[var(--color-text)]"
           style={{ fontFamily: 'var(--font-serif)' }}
         >
           Sign in<em className="text-[var(--color-claude-mark)] not-italic">.</em>
         </h1>
-        <p className="font-mono text-[11.5px] text-[var(--color-text-2)]">
+        <p className="font-mono text-caption text-[var(--color-text-2)]">
           Welcome back to Conduit.
         </p>
       </div>
 
       {oauthError && (
-        <div role="alert" className="font-mono text-[11px] text-[var(--color-error)]">
+        <div role="alert" className="font-mono text-small text-[var(--color-error)]">
           {oauthError.includes('invitation') ? 'Registration is by invitation only.' : 'Authentication failed. Please try again.'}
         </div>
       )}
@@ -111,7 +111,7 @@ export function SignInPage() {
         />
 
         {rootError && (
-          <div role="alert" className="font-mono text-[11px] text-[var(--color-error)]">
+          <div role="alert" className="font-mono text-small text-[var(--color-error)]">
             {rootError}
           </div>
         )}
@@ -125,7 +125,7 @@ export function SignInPage() {
           {form.formState.isSubmitting ? 'Signing in…' : 'Sign in'}
         </Button>
 
-        <div className="flex items-center justify-between font-mono text-[11px]">
+        <div className="flex items-center justify-between font-mono text-small">
           <Link to="/forgot-password" className="text-[var(--color-text-2)] hover:text-[var(--color-text)]">
             Forgot password?
           </Link>
@@ -153,7 +153,7 @@ function Divider() {
   return (
     <div className="flex items-center gap-3">
       <div className="h-px flex-1 bg-[var(--color-divider)]" />
-      <span className="font-mono text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">
+      <span className="font-mono text-caption uppercase tracking-wider text-[var(--color-text-muted)]">
         or
       </span>
       <div className="h-px flex-1 bg-[var(--color-divider)]" />

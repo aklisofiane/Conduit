@@ -48,7 +48,7 @@ export function NodePalette({
           />
         ))}
         {triggerSlotFilled && (
-          <div className="px-[2px] font-mono text-[10px] leading-[1.3] text-[var(--color-text-muted)]">
+          <div className="px-[2px] font-mono text-caption leading-[1.3] text-[var(--color-text-muted)]">
             Delete the existing trigger to add a different kind.
           </div>
         )}
@@ -81,7 +81,7 @@ function PaletteSection({
 }) {
   return (
     <div>
-      <div className="mb-[6px] font-mono text-[10px] font-medium uppercase tracking-[0.06em] text-[var(--color-text-muted)]">
+      <div className="mb-[6px] font-mono text-caption font-medium uppercase tracking-[0.06em] text-[var(--color-text-muted)]">
         {title}
       </div>
       <div className="flex flex-col gap-[6px]">{children}</div>
@@ -121,10 +121,10 @@ function TriggerPaletteCard({
           {icon}
         </NodeIconTile>
         <span className="min-w-0">
-          <span className="block font-sans text-[12px] font-medium text-[var(--color-text)]">
+          <span className="block font-sans text-small font-medium text-[var(--color-text)]">
             {name}
           </span>
-          <span className="block font-mono text-[11px] text-[var(--color-text-muted)]">
+          <span className="block font-mono text-small text-[var(--color-text-muted)]">
             {description}
           </span>
         </span>
@@ -167,13 +167,13 @@ function AgentPaletteCard({
         <span className="min-w-0">
           <span
             className={cn(
-              'block text-[12px] font-semibold text-[var(--color-text)]',
+              'block text-small font-semibold text-[var(--color-text)]',
               provider === 'claude' ? 'font-sans' : 'font-mono',
             )}
           >
             {name}
           </span>
-          <span className="block font-mono text-[11px] text-[var(--color-text-muted)]">
+          <span className="block font-mono text-small text-[var(--color-text-muted)]">
             {description}
           </span>
         </span>

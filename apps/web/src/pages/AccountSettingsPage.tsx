@@ -61,30 +61,30 @@ export function AccountSettingsPage() {
   return (
     <div className="mx-auto flex w-full max-w-[900px] flex-col gap-6 px-6 pb-16 pt-10">
       <h1
-        className="text-[34px] font-semibold leading-none tracking-tight text-[var(--color-text)]"
+        className="text-display font-semibold leading-none tracking-tight text-[var(--color-text)]"
         style={{ fontFamily: 'var(--font-serif)' }}
       >
         Account<em className="text-[var(--color-claude-mark)] not-italic">.</em>
       </h1>
-      <p className="font-mono text-[12px] text-[var(--color-text-2)]">
+      <p className="font-mono text-small text-[var(--color-text-2)]">
         Your profile and password. Organization-level settings live elsewhere.
       </p>
 
       <section className="rounded-lg border border-[var(--color-divider)] bg-[var(--color-bg-panel)]">
         <header className="border-b border-[var(--color-divider)] px-4 py-3">
-          <h2 className="font-mono text-[13px] font-semibold">Profile</h2>
+          <h2 className="font-mono text-base font-semibold">Profile</h2>
         </header>
         <dl className="grid grid-cols-[140px_1fr] items-center gap-y-3 px-4 py-4">
-          <dt className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-muted)]">
+          <dt className="font-mono text-caption uppercase tracking-wide text-[var(--color-text-muted)]">
             Name
           </dt>
-          <dd className="font-mono text-[12.5px] text-[var(--color-text)]">
+          <dd className="font-mono text-small text-[var(--color-text)]">
             {user?.name?.trim() || '—'}
           </dd>
-          <dt className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-muted)]">
+          <dt className="font-mono text-caption uppercase tracking-wide text-[var(--color-text-muted)]">
             Email
           </dt>
-          <dd className="font-mono text-[12.5px] text-[var(--color-text)]">{user?.email ?? '—'}</dd>
+          <dd className="font-mono text-small text-[var(--color-text)]">{user?.email ?? '—'}</dd>
         </dl>
       </section>
 
@@ -111,12 +111,12 @@ function AppearanceSection() {
   return (
     <section className="rounded-lg border border-[var(--color-divider)] bg-[var(--color-bg-panel)]">
       <header className="border-b border-[var(--color-divider)] px-4 py-3">
-        <h2 className="font-mono text-[13px] font-semibold">Appearance</h2>
+        <h2 className="font-mono text-base font-semibold">Appearance</h2>
       </header>
       <div className="flex items-center justify-between gap-4 px-4 py-4">
         <div className="flex flex-col gap-1">
-          <span className="font-mono text-[12.5px] text-[var(--color-text)]">Theme</span>
-          <span className="font-mono text-[11px] text-[var(--color-text-muted)]">
+          <span className="font-mono text-small text-[var(--color-text)]">Theme</span>
+          <span className="font-mono text-small text-[var(--color-text-muted)]">
             “System” follows your operating system setting.
           </span>
         </div>
@@ -150,10 +150,10 @@ function OrganizationLinks() {
         to="/account/organization"
         className="flex flex-col gap-1 rounded-lg border border-[var(--color-divider)] bg-[var(--color-bg-panel)] px-4 py-3 transition-colors hover:border-[var(--color-divider)] hover:bg-[var(--color-pill-bg)]"
       >
-        <span className="font-mono text-[12.5px] font-semibold text-[var(--color-text)]">
+        <span className="font-mono text-small font-semibold text-[var(--color-text)]">
           Organization
         </span>
-        <span className="font-mono text-[11px] text-[var(--color-text-2)]">
+        <span className="font-mono text-small text-[var(--color-text-2)]">
           Members, invitations, settings
         </span>
       </Link>
@@ -162,10 +162,10 @@ function OrganizationLinks() {
           to="/account/invitations"
           className="flex flex-col gap-1 rounded-lg border border-[var(--color-divider)] bg-[var(--color-bg-panel)] px-4 py-3 transition-colors hover:border-[var(--color-divider)] hover:bg-[var(--color-pill-bg)]"
         >
-          <span className="font-mono text-[12.5px] font-semibold text-[var(--color-text)]">
+          <span className="font-mono text-small font-semibold text-[var(--color-text)]">
             Pending invitations ({pendingCount})
           </span>
-          <span className="font-mono text-[11px] text-[var(--color-text-2)]">
+          <span className="font-mono text-small text-[var(--color-text-2)]">
             Accept or reject invitations sent to your email
           </span>
         </Link>
@@ -199,7 +199,7 @@ function ChangePasswordSection() {
   return (
     <section className="rounded-lg border border-[var(--color-divider)] bg-[var(--color-bg-panel)]">
       <header className="border-b border-[var(--color-divider)] px-4 py-3">
-        <h2 className="font-mono text-[13px] font-semibold">Change password</h2>
+        <h2 className="font-mono text-base font-semibold">Change password</h2>
       </header>
       <form onSubmit={onSubmit} className="flex flex-col gap-3 px-4 py-4" noValidate>
         <FormField
@@ -231,12 +231,12 @@ function ChangePasswordSection() {
         />
 
         {rootError && (
-          <div role="alert" className="font-mono text-[11px] text-[var(--color-error)]">
+          <div role="alert" className="font-mono text-small text-[var(--color-error)]">
             {rootError}
           </div>
         )}
         {done && (
-          <div className="font-mono text-[11px] text-[var(--color-success)]">
+          <div className="font-mono text-small text-[var(--color-success)]">
             Password updated.
           </div>
         )}
@@ -273,10 +273,10 @@ function SignOutSection() {
   return (
     <section className="rounded-lg border border-[var(--color-divider)] bg-[var(--color-bg-panel)]">
       <header className="border-b border-[var(--color-divider)] px-4 py-3">
-        <h2 className="font-mono text-[13px] font-semibold">Sign out</h2>
+        <h2 className="font-mono text-base font-semibold">Sign out</h2>
       </header>
       <div className="flex items-center justify-between gap-4 px-4 py-4">
-        <p className="font-mono text-[11.5px] text-[var(--color-text-2)]">
+        <p className="font-mono text-caption text-[var(--color-text-2)]">
           End this browser session.
         </p>
         <Button onClick={handleSignOut} disabled={busy}>

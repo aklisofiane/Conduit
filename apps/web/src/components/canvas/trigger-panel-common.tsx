@@ -37,7 +37,7 @@ export function PanelHeader({ trigger, isActive, title, onClose }: PanelHeaderPr
   return (
     <div className="flex items-start justify-between border-b border-[var(--color-divider)] px-5 py-4">
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2 font-mono text-[10px] font-medium uppercase tracking-[0.06em] text-[var(--color-text-muted)]">
+        <div className="flex items-center gap-2 font-mono text-caption font-medium uppercase tracking-[0.06em] text-[var(--color-text-muted)]">
           <span
             className={cn(
               'h-[6px] w-[6px] rounded-full',
@@ -46,7 +46,7 @@ export function PanelHeader({ trigger, isActive, title, onClose }: PanelHeaderPr
           />
           Trigger · {trigger.platform}
         </div>
-        <h3 className="mt-2 truncate font-sans text-[15px] font-semibold text-[var(--color-text)]">
+        <h3 className="mt-2 truncate font-sans text-base font-semibold text-[var(--color-text)]">
           <span>{title}</span>
           <span className="text-[var(--color-text-muted)]"> · config</span>
         </h3>
@@ -118,7 +118,7 @@ export function Hint({
   return (
     <div
       className={cn(
-        'font-mono text-[11px]',
+        'font-mono text-small',
         tone === 'danger'
           ? 'text-[var(--color-danger,#d54c4c)]'
           : 'text-[var(--color-text-muted)]',
@@ -142,7 +142,7 @@ export function ConnectionSelect({
 }) {
   if (connections.length === 0) {
     return (
-      <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
+      <div className="font-mono text-small text-[var(--color-text-muted)]">
         {emptyHint}
       </div>
     );
@@ -173,7 +173,7 @@ export function ActiveToggleField({
 }) {
   return (
     <Field label="Active" hint="pause the trigger without deleting it — saves immediately">
-      <label className="flex cursor-pointer items-center gap-2 font-mono text-[12px]">
+      <label className="flex cursor-pointer items-center gap-2 font-mono text-small">
         <Checkbox
           checked={isActive}
           onCheckedChange={(checked) => onActiveChange(checked === true)}
@@ -227,7 +227,7 @@ export function FilterEditor({
   return (
     <div className="space-y-2">
       {filters.length === 0 && (
-        <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
+        <div className="font-mono text-small text-[var(--color-text-muted)]">
           No filters — every matching event fires the workflow.
         </div>
       )}
@@ -401,7 +401,7 @@ function CreateLabelAction({
 
   return (
     <div className="rounded-[var(--radius)] border border-[var(--color-warning,#b58900)]/40 bg-[var(--color-warning,#b58900)]/10 px-2 py-1.5">
-      <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
+      <div className="font-mono text-small text-[var(--color-text-muted)]">
         Label{' '}
         <code className="text-[var(--color-text)]">{name}</code> isn't on{' '}
         <code className="text-[var(--color-text)]">{target.scopeLabel}</code> yet.
@@ -419,7 +419,7 @@ function CreateLabelAction({
           : `+ Create "${name}" on ${target.scopeLabel}`}
       </Button>
       {errorText && (
-        <div className="mt-1 font-mono text-[11px] text-[var(--color-danger,#dc322f)]">
+        <div className="mt-1 font-mono text-small text-[var(--color-danger,#dc322f)]">
           {errorText}
         </div>
       )}
@@ -440,10 +440,10 @@ export function BoardPickerHint({
   }
   return (
     <div className="space-y-1.5">
-      <div className="font-mono text-[12px] text-[var(--color-text)]">
+      <div className="font-mono text-small text-[var(--color-text)]">
         #{selectedBoard.number} · {selectedBoard.title}
       </div>
-      <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
+      <div className="font-mono text-small text-[var(--color-text-muted)]">
         <a
           href={selectedBoard.url}
           target="_blank"

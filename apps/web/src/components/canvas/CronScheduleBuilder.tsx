@@ -255,7 +255,7 @@ export function CronScheduleBuilder({ value, onChange }: CronScheduleBuilderProp
                       options={HOUR_OPTIONS}
                       className="w-[72px]"
                     />
-                    <span className="font-mono text-[13px] text-[var(--color-text-muted)]">
+                    <span className="font-mono text-base text-[var(--color-text-muted)]">
                       :
                     </span>
                   </>
@@ -295,7 +295,7 @@ export function CronScheduleBuilder({ value, onChange }: CronScheduleBuilderProp
       )}
 
       {description && (
-        <div className="rounded-[var(--radius)] bg-[var(--color-pill-bg)] px-3 py-2 font-mono text-[11px] text-[var(--color-text-muted)]">
+        <div className="rounded-[var(--radius)] bg-[var(--color-pill-bg)] px-3 py-2 font-mono text-small text-[var(--color-text-muted)]">
           {description}
         </div>
       )}

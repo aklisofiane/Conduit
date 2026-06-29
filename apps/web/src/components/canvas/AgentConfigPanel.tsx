@@ -113,14 +113,14 @@ export function AgentConfigPanel({
     <>
       <div className="flex items-start justify-between border-b border-[var(--color-divider)] px-5 py-4">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 font-mono text-[10px] font-medium uppercase tracking-[0.06em] text-[var(--color-text-muted)]">
+          <div className="flex items-center gap-2 font-mono text-caption font-medium uppercase tracking-[0.06em] text-[var(--color-text-muted)]">
             <span
               className="h-[6px] w-[6px] rounded-full"
               style={{ background: ps.mark }}
             />
             Agent · {ps.label}
           </div>
-          <h3 className="mt-2 truncate font-sans text-[15px] font-semibold text-[var(--color-text)]">
+          <h3 className="mt-2 truncate font-sans text-base font-semibold text-[var(--color-text)]">
             <span>{agent.name}</span>
             <span className="text-[var(--color-text-muted)]"> · config</span>
           </h3>
@@ -218,14 +218,14 @@ export function AgentConfigPanel({
 
           <div>
             <Label asChild>
-              <div>
+              <div className="font-normal text-caption">
                 Instructions
                 <Hint>system prompt</Hint>
                 <Button
                   variant="ghost"
                   size="inline"
                   onClick={() => setPromptEditorOpen(true)}
-                  className="ml-auto gap-1 rounded-[var(--radius-sm)] px-1.5 py-0.5 font-mono font-normal text-[10px] tracking-normal normal-case text-[var(--color-accent)] hover:bg-[var(--color-pill-bg)] hover:text-[var(--color-accent)]"
+                  className="ml-auto gap-1 rounded-[var(--radius-sm)] px-1.5 py-0.5 font-mono font-normal text-caption tracking-normal normal-case text-[var(--color-accent)] hover:bg-[var(--color-pill-bg)] hover:text-[var(--color-accent)]"
                 >
                   <Maximize2 size={11} strokeWidth={1.75} />
                   Expand
@@ -244,7 +244,7 @@ export function AgentConfigPanel({
               }}
               placeholder="You are an agent that…"
             />
-            <div className="mt-1 flex items-center justify-between font-mono text-[10px] text-[var(--color-text-muted)]">
+            <div className="mt-1 flex items-center justify-between font-mono text-caption text-[var(--color-text-muted)]">
               <span>
                 {promptCounts(agent.instructions).chars} chars ·{' '}
                 {promptCounts(agent.instructions).lines} lines
@@ -254,7 +254,7 @@ export function AgentConfigPanel({
           </div>
 
           <Field label="Web search">
-            <label className="flex cursor-pointer items-center gap-2 font-mono text-[12px]">
+            <label className="flex cursor-pointer items-center gap-2 font-mono text-small">
               <Checkbox
                 checked={agent.webSearch}
                 onCheckedChange={(checked) => onChange({ webSearch: checked === true })}
@@ -284,7 +284,7 @@ export function AgentConfigPanel({
 
           <Field label="Skills" hint="from .claude/skills/ + plugins">
             {providerSkills.length === 0 ? (
-              <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
+              <div className="font-mono text-small text-[var(--color-text-muted)]">
                 No skills discovered. Add SKILL.md files under .claude/skills/ on the worker or in a connected repo, or install a Claude Code plugin.
               </div>
             ) : (
@@ -331,7 +331,7 @@ function Field({
   return (
     <div>
       <Label asChild>
-        <div>
+        <div className="font-normal text-caption">
           {label}
           {hint && <Hint>{hint}</Hint>}
         </div>
@@ -409,7 +409,7 @@ function IssueWritebackControl({
 
   if (!trigger) {
     return (
-      <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
+      <div className="font-mono text-small text-[var(--color-text-muted)]">
         Add a trigger to enable issue writeback.
       </div>
     );
@@ -417,7 +417,7 @@ function IssueWritebackControl({
 
   return (
     <div className="space-y-2">
-      <label className="flex cursor-pointer items-center gap-2 font-mono text-[12px]">
+      <label className="flex cursor-pointer items-center gap-2 font-mono text-small">
         <Checkbox
           checked={enabled}
           onCheckedChange={(checked) => toggle(checked === true)}
@@ -482,7 +482,7 @@ function IssueWritebackControl({
             // Null-safe: workflows saved before the PR-state axis existed have
             // no `allowedPrStates` until the definition is re-parsed on save.
             (value.allowedPrStates?.length ?? 0) === 0 && (
-              <div className="font-mono text-[10.5px] text-[var(--color-text-muted)]">
+              <div className="font-mono text-caption text-[var(--color-text-muted)]">
                 Pick at least one {isPr ? 'state' : 'status'} or label — without
                 selections, the writeback turn is skipped at run time.
               </div>
@@ -505,11 +505,11 @@ function PillSection({
 }) {
   return (
     <div>
-      <div className="mb-1 font-mono text-[10.5px] uppercase tracking-[0.06em] text-[var(--color-text-muted)]">
+      <div className="mb-1 font-mono text-caption uppercase tracking-[0.06em] text-[var(--color-text-muted)]">
         {label}
       </div>
       {empty !== null ? (
-        <div className="font-mono text-[11px] text-[var(--color-text-muted)]">{empty}</div>
+        <div className="font-mono text-small text-[var(--color-text-muted)]">{empty}</div>
       ) : (
         children
       )}
@@ -548,7 +548,7 @@ function PillToggleGroup({
           variant="outline"
           size="sm"
           className={cn(
-            'h-auto rounded-[var(--radius-sm)] border-[var(--color-divider)] px-2 py-[3px] text-[11px]',
+            'h-auto rounded-[var(--radius-sm)] border-[var(--color-divider)] px-2 py-[3px] text-small',
             'text-[var(--color-text-muted)] hover:border-[var(--color-text-muted)] hover:text-[var(--color-text-muted)]',
             'data-[state=on]:border-[var(--color-accent)] data-[state=on]:bg-[var(--color-accent-soft)] data-[state=on]:font-normal data-[state=on]:text-[var(--color-text)]',
           )}

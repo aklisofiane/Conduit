@@ -91,7 +91,7 @@ export function RunDetailPage() {
   if (!runId) return null;
   if (!run) {
     return (
-      <div className="flex flex-1 items-center justify-center font-mono text-[12px] text-[var(--color-text-muted)]">
+      <div className="flex flex-1 items-center justify-center font-mono text-small text-[var(--color-text-muted)]">
         Loading run…
       </div>
     );
@@ -102,7 +102,7 @@ export function RunDetailPage() {
   return (
     <div className="flex flex-1 flex-col">
       <div className="border-b border-[var(--color-divider)] bg-[var(--color-bg-panel)] px-6 py-5">
-        <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
+        <div className="font-mono text-small text-[var(--color-text-muted)]">
           <Link to="/" className="hover:text-[var(--color-text)]">
             workflows
           </Link>{' '}
@@ -122,7 +122,7 @@ export function RunDetailPage() {
         <div className="mt-2 flex items-start gap-4">
           <div className="flex-1">
             <div
-              className="text-[24px] font-semibold leading-tight tracking-tight"
+              className="text-heading font-semibold leading-tight tracking-tight"
               style={{ fontFamily: 'var(--font-serif)' }}
             >
               {run.workflow.name}
@@ -133,7 +133,7 @@ export function RunDetailPage() {
                 </span>
               )}
             </div>
-            <div className="mt-1 flex flex-wrap items-center gap-3 font-mono text-[11px] text-[var(--color-text-muted)]">
+            <div className="mt-1 flex flex-wrap items-center gap-3 font-mono text-small text-[var(--color-text-muted)]">
               <StatusBadge status={status} />
               <span>
                 trigger: {run.trigger.source} · {run.trigger.event}
@@ -175,7 +175,7 @@ export function RunDetailPage() {
               )}
             </div>
             {rerunNote && (
-              <span className="font-mono text-[11px] text-[var(--color-text-muted)]">{rerunNote}</span>
+              <span className="font-mono text-small text-[var(--color-text-muted)]">{rerunNote}</span>
             )}
           </div>
         </div>
@@ -183,7 +183,7 @@ export function RunDetailPage() {
 
       <div className="flex min-h-0 flex-1">
         <aside className="w-[260px] shrink-0 border-r border-[var(--color-divider)] bg-[var(--color-bg-panel)] p-3">
-          <h4 className="mb-2 px-1 font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-muted)]">
+          <h4 className="mb-2 px-1 font-mono text-caption uppercase tracking-wider text-[var(--color-text-muted)]">
             Execution · {run.nodes.length} node{run.nodes.length === 1 ? '' : 's'}
           </h4>
           <div className="space-y-1">
@@ -201,7 +201,7 @@ export function RunDetailPage() {
               />
             ))}
             {run.nodes.length === 0 && (
-              <div className="px-2 font-mono text-[11px] text-[var(--color-text-muted)]">
+              <div className="px-2 font-mono text-small text-[var(--color-text-muted)]">
                 No nodes have started yet.
               </div>
             )}
@@ -210,7 +210,7 @@ export function RunDetailPage() {
 
         <section className="flex min-w-0 flex-1 flex-col">
           <div className="flex h-10 items-center gap-4 border-b border-[var(--color-divider)] bg-[var(--color-bg-panel)] px-4">
-            <div className="font-mono text-[12px] font-semibold">{selectedNode ?? '—'}</div>
+            <div className="font-mono text-small font-semibold">{selectedNode ?? '—'}</div>
             <ToggleGroup
               type="single"
               value={activeTab}
@@ -226,7 +226,7 @@ export function RunDetailPage() {
               ))}
             </ToggleGroup>
             {streaming && activeTab === 'timeline' && (
-              <div className="flex items-center gap-1.5 font-mono text-[11px] text-[var(--color-running)]">
+              <div className="flex items-center gap-1.5 font-mono text-small text-[var(--color-running)]">
                 <span
                   className="h-1.5 w-1.5 animate-pulse rounded-full"
                   style={{
@@ -238,7 +238,7 @@ export function RunDetailPage() {
               </div>
             )}
             {latestFrame && activeTab === 'timeline' && (
-              <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
+              <div className="font-mono text-small text-[var(--color-text-muted)]">
                 last: {latestFrame.event.type}
               </div>
             )}
@@ -252,7 +252,7 @@ export function RunDetailPage() {
                 streaming={streaming}
               />
             ) : (
-              <div className="flex h-full items-center justify-center font-mono text-[12px] text-[var(--color-text-muted)]">
+              <div className="flex h-full items-center justify-center font-mono text-small text-[var(--color-text-muted)]">
                 Select a node to inspect.
               </div>
             )}
@@ -304,9 +304,9 @@ function NodeRailItem({
     >
       <span className={cn('status-dot mt-1', statusClass(node.status))} />
       <div className="min-w-0 flex-1">
-        <div className="flex items-center justify-between font-mono text-[12px] font-medium">
+        <div className="flex items-center justify-between font-mono text-small font-medium">
           <span className="truncate">{node.nodeName}</span>
-          <span className="ml-2 font-mono text-[10.5px] text-[var(--color-text-muted)]">
+          <span className="ml-2 font-mono text-caption text-[var(--color-text-muted)]">
             {node.finishedAt
               ? duration(node.startedAt, node.finishedAt)
               : node.startedAt
@@ -314,7 +314,7 @@ function NodeRailItem({
                 : '—'}
           </span>
         </div>
-        <div className="font-mono text-[10.5px] text-[var(--color-text-muted)]">
+        <div className="font-mono text-caption text-[var(--color-text-muted)]">
           {labelForStatus(node.status)}
         </div>
       </div>
@@ -326,7 +326,7 @@ function StatusBadge({ status }: { status: string }) {
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 font-mono text-[10.5px] uppercase tracking-wider',
+        'inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 font-mono text-caption uppercase tracking-wider',
         statusBadgeClass(status),
       )}
     >

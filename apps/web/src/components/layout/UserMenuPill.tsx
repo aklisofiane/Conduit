@@ -105,7 +105,7 @@ export function UserMenuPill() {
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
-      <div className="pointer-events-auto inline-flex items-center rounded-[var(--radius-sm)] border border-[var(--color-divider)] bg-[var(--color-bg-panel)] font-mono text-[11px]">
+      <div className="pointer-events-auto inline-flex items-center rounded-[var(--radius-sm)] border border-[var(--color-divider)] bg-[var(--color-bg-panel)] font-mono text-small">
         <DropdownMenuTrigger asChild>
           <button
             type="button"
@@ -177,14 +177,14 @@ function UserMenuBody({ name, email, onClose }: UserMenuBodyProps) {
     <div className="flex flex-col overflow-hidden rounded-[var(--radius)]">
       <div className="border-b border-[var(--color-divider)] px-3 py-2.5">
         {name && (
-          <div className="truncate font-sans text-[12px] font-medium text-[var(--color-text)]" title={name}>
+          <div className="truncate font-sans text-small font-medium text-[var(--color-text)]" title={name}>
             {name}
           </div>
         )}
         {email && (
           <div
             className={cn(
-              'truncate font-mono text-[11px] text-[var(--color-text-muted)]',
+              'truncate font-mono text-small text-[var(--color-text-muted)]',
               name ? 'mt-0.5' : '',
             )}
             title={email}
@@ -210,7 +210,7 @@ function UserMenuBody({ name, email, onClose }: UserMenuBodyProps) {
             {pendingInvitationCount > 0 && (
               <span
                 aria-label={`${pendingInvitationCount} pending`}
-                className="rounded-full bg-[var(--color-claude-mark)] px-1.5 py-[1px] font-mono text-[10px] text-[var(--color-bg-panel)]"
+                className="rounded-full bg-[var(--color-claude-mark)] px-1.5 py-[1px] font-mono text-caption text-[var(--color-bg-panel)]"
               >
                 {pendingInvitationCount}
               </span>
@@ -279,10 +279,10 @@ function OrganizationSection({
 
   return (
     <div className="flex flex-col gap-1 border-t border-[var(--color-divider)] px-3 py-2">
-      <div className="font-mono text-[9.5px] uppercase tracking-wider text-[var(--color-text-muted)]">
+      <div className="font-mono text-caption uppercase tracking-wider text-[var(--color-text-muted)]">
         Organization
       </div>
-      <div className="font-mono text-[11.5px] text-[var(--color-text)]">
+      <div className="font-mono text-caption text-[var(--color-text)]">
         <span className="truncate align-middle" title={activeOrg?.name ?? ''}>
           {activeOrg?.name ?? '—'}
         </span>
@@ -332,14 +332,14 @@ function OrganizationSection({
         <Button
           variant="ghost"
           onClick={() => setCreating(true)}
-          className="mt-1 w-full justify-start gap-1 h-auto rounded-none border-0 px-1 py-1 text-left font-mono text-[11px] text-[var(--color-text-2)] hover:bg-transparent hover:text-[var(--color-text)]"
+          className="mt-1 w-full justify-start gap-1 h-auto rounded-none border-0 px-1 py-1 text-left font-mono text-small text-[var(--color-text-2)] hover:bg-transparent hover:text-[var(--color-text)]"
         >
           <Plus size={11} strokeWidth={1.5} /> Create organization
         </Button>
       )}
 
       {error && (
-        <div role="alert" className="font-mono text-[10.5px] text-[var(--color-error)]">
+        <div role="alert" className="font-mono text-caption text-[var(--color-error)]">
           {error}
         </div>
       )}
@@ -381,12 +381,12 @@ function SwitchOrgList({
           placeholder="Filter orgs…"
           aria-label="Filter organizations"
           variant="compact"
-          className="text-[10.5px]"
+          className="text-caption"
         />
       )}
       <div className="max-h-[140px] overflow-y-auto" role="listbox" aria-label="Switch organization">
         {others.length === 0 ? (
-          <div className="px-1 py-1 font-mono text-[10.5px] text-[var(--color-text-muted)]">
+          <div className="px-1 py-1 font-mono text-caption text-[var(--color-text-muted)]">
             {filter ? 'No matches' : 'No other organizations'}
           </div>
         ) : (
@@ -398,7 +398,7 @@ function SwitchOrgList({
               onClick={() => void onSwitch(o.id)}
               disabled={isSwitching}
               title={o.name}
-              className="w-full justify-start gap-2 h-auto rounded-[var(--radius-sm)] px-2 py-1 text-left font-mono text-[11px] text-[var(--color-text-2)] hover:bg-[var(--color-pill-bg)] hover:text-[var(--color-text)] disabled:opacity-60"
+              className="w-full justify-start gap-2 h-auto rounded-[var(--radius-sm)] px-2 py-1 text-left font-mono text-small text-[var(--color-text-2)] hover:bg-[var(--color-pill-bg)] hover:text-[var(--color-text)] disabled:opacity-60"
             >
               <span className="min-w-0 flex-1 truncate">{o.name}</span>
             </Button>
@@ -422,7 +422,7 @@ function NavMenuItem({
     <DropdownMenuItem
       onSelect={onSelect}
       disabled={disabled}
-      className="flex w-full items-center px-3 py-1.5 text-left font-mono text-[11px] text-[var(--color-text-2)] transition-colors hover:bg-[var(--color-pill-bg)] hover:text-[var(--color-text)] disabled:cursor-not-allowed disabled:opacity-60"
+      className="flex w-full items-center px-3 py-1.5 text-left font-mono text-small text-[var(--color-text-2)] transition-colors hover:bg-[var(--color-pill-bg)] hover:text-[var(--color-text)] disabled:cursor-not-allowed disabled:opacity-60"
     >
       {children}
     </DropdownMenuItem>

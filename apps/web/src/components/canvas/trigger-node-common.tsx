@@ -37,7 +37,7 @@ export function TriggerNodeShell({
       // overflow-visible: the original trigger root had no overflow rule, so the
       // right-edge source Handle dot must not be clipped by NodeShell's base
       // overflow-hidden (AgentNode keeps the clip; trigger nodes never had it).
-      className="overflow-visible px-3 py-[10px] text-[12px]"
+      className="overflow-visible px-3 py-[10px] text-small"
       style={{
         width: nodeSize.trigger.width,
         minHeight: nodeSize.trigger.minHeight,
@@ -47,19 +47,19 @@ export function TriggerNodeShell({
         <NodeIconTile tone="trigger" size="sm">
           {icon}
         </NodeIconTile>
-        <span className="font-sans text-[10px] font-semibold uppercase tracking-[0.06em] text-[var(--color-text-muted)]">
+        <span className="font-sans text-caption font-semibold uppercase tracking-[0.06em] text-[var(--color-text-muted)]">
           {label}
         </span>
         <NodeTag tone="neutral">{platform}</NodeTag>
       </div>
       {showHost && (
-        <div className="mt-[2px] truncate font-mono text-[9px] text-[var(--color-text-muted)]">
+        <div className="mt-[2px] truncate font-mono text-caption text-[var(--color-text-muted)]">
           {host}
         </div>
       )}
       <div className="mt-[6px] truncate font-medium">{detail}</div>
       {meta && (
-        <div className="mt-1 truncate font-mono text-[10px] text-[var(--color-text-muted)]">
+        <div className="mt-1 truncate font-mono text-caption text-[var(--color-text-muted)]">
           {meta}
         </div>
       )}

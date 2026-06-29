@@ -43,7 +43,7 @@ export function AgentNode({ data, selected }: NodeProps) {
         </NodeIconTile>
         <span
           className={cn(
-            'min-w-0 flex-1 truncate text-[13px] font-semibold leading-none',
+            'min-w-0 flex-1 truncate text-base font-semibold leading-none',
             provider === 'codex' ? 'font-mono' : 'font-sans',
           )}
         >
@@ -56,7 +56,7 @@ export function AgentNode({ data, selected }: NodeProps) {
       <div className="px-[10px] pb-2">
         <div
           className={cn(
-            'rounded-[var(--radius)] border px-[10px] py-2 text-[11.5px] leading-[1.45] text-[var(--color-text-2)]',
+            'rounded-[var(--radius)] border px-[10px] py-2 text-caption leading-[1.45] text-[var(--color-text-2)]',
             promptTint[provider],
           )}
         >
@@ -81,7 +81,7 @@ export function AgentNode({ data, selected }: NodeProps) {
       {/* Footer */}
       <div
         className={cn(
-          'flex items-center justify-between gap-2 border-t px-3 py-[6px] font-mono text-[10px] text-[var(--color-text-muted)]',
+          'flex items-center justify-between gap-2 border-t px-3 py-[6px] font-mono text-caption text-[var(--color-text-muted)]',
           footerTint[provider],
         )}
       >

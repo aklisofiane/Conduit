@@ -20,15 +20,15 @@ const badgeVariants = cva('inline-flex items-center', {
   variants: {
     variant: {
       pill: cn(
-        'gap-1.5 rounded-full border px-2.5 py-[3px] font-mono text-[11px]',
+        'gap-1.5 rounded-full border px-2.5 py-[3px] font-mono text-small',
         'border-[var(--color-divider)] bg-[var(--color-bg-panel)] text-[var(--color-text-2)]',
       ),
       chip: cn(
-        'gap-[5px] rounded-full border px-2 py-0.5 font-mono text-[10.5px]',
+        'gap-[5px] rounded-full border px-2 py-0.5 font-mono text-caption',
         'border-[var(--color-pill-border)] bg-[var(--color-pill-bg)] text-[var(--color-text-2)]',
       ),
       glyph:
-        'h-[18px] w-[18px] justify-center rounded-[var(--radius-sm)] font-mono text-[11px] font-bold',
+        'h-[18px] w-[18px] justify-center rounded-[var(--radius-sm)] font-mono text-small font-bold',
     },
     provider: {
       none: '',

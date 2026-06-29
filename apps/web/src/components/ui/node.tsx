@@ -120,7 +120,7 @@ NodeIconTile.displayName = 'NodeIconTile';
  * variant to keep call sites to a single `tone` prop.
  */
 const nodeTagVariants = cva(
-  'ml-auto rounded-[var(--radius-sm)] px-[6px] font-mono text-[9px] uppercase tracking-[0.06em]',
+  'ml-auto rounded-[var(--radius-sm)] px-[6px] font-mono text-caption uppercase tracking-[0.06em]',
   {
     variants: {
       tone: {
@@ -155,7 +155,7 @@ NodeTag.displayName = 'NodeTag';
  * `tone` is `claude` | `codex`; children carry the pill's text.
  */
 const nodePillVariants = cva(
-  'inline-flex items-center gap-[6px] rounded-[var(--radius-sm)] border px-[6px] py-[2px] font-mono text-[10px]',
+  'inline-flex items-center gap-[6px] rounded-[var(--radius-sm)] border px-[6px] py-[2px] font-mono text-caption',
   {
     variants: {
       tone: {

@@ -119,12 +119,12 @@ export function HomePage() {
     <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-8 px-6 pb-16 pt-10">
       <section className="flex flex-col gap-2">
         <h1
-          className="text-[44px] font-semibold leading-none tracking-tight text-[var(--color-text)]"
+          className="text-hero font-semibold leading-none tracking-tight text-[var(--color-text)]"
           style={{ fontFamily: 'var(--font-serif)', fontVariantLigatures: 'none' }}
         >
           Workflows
         </h1>
-        <div className="font-mono text-[12px] text-[var(--color-text-2)]">
+        <div className="font-mono text-small text-[var(--color-text-2)]">
           <b className="text-[var(--color-text)]">{activeCount} active</b> ·{' '}
           <b className="text-[var(--color-text)]">{runningCount} runs</b> in flight ·{' '}
           {failingCount > 0 ? (
@@ -148,7 +148,7 @@ export function HomePage() {
 
       <section className="flex flex-col gap-3">
         <div className="flex items-end justify-between">
-          <h2 className="flex items-baseline gap-2 font-mono text-[12px] uppercase tracking-wider text-[var(--color-text-2)]">
+          <h2 className="flex items-baseline gap-2 font-mono text-small uppercase tracking-wider text-[var(--color-text-2)]">
             Your workflows
             <span className="text-[var(--color-text-muted)]">{workflows.length}</span>
           </h2>
@@ -189,7 +189,7 @@ export function HomePage() {
                   onClick={() => toggleGroup(group.key)}
                   className="border-b border-[var(--color-divider)] last:border-b-0"
                 >
-                  <div className="flex items-baseline gap-2 font-mono text-[12px]">
+                  <div className="flex items-baseline gap-2 font-mono text-small">
                     {group.ref ? (
                       <>
                         <span className="font-semibold text-[var(--color-text)]">
@@ -207,7 +207,7 @@ export function HomePage() {
                       </>
                     )}
                   </div>
-                  <span className="ml-auto font-mono text-[11px] text-[var(--color-text-muted)]">
+                  <span className="ml-auto font-mono text-small text-[var(--color-text-muted)]">
                     {group.rows.length} workflow{group.rows.length === 1 ? '' : 's'}
                   </span>
                 </DisclosureButton>
@@ -244,23 +244,23 @@ export function HomePage() {
 function StatCard({ label, value, hint }: { label: string; value: string; hint: string }) {
   return (
     <Card>
-      <div className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-muted)]">
+      <div className="font-mono text-caption uppercase tracking-wider text-[var(--color-text-muted)]">
         {label}
       </div>
       <div
-        className="mt-2 text-[28px] font-semibold tracking-tight text-[var(--color-text)]"
+        className="mt-2 text-title font-semibold tracking-tight text-[var(--color-text)]"
         style={{ fontFamily: 'var(--font-serif)' }}
       >
         {value}
       </div>
-      <div className="mt-1 font-mono text-[11px] text-[var(--color-text-muted)]">{hint}</div>
+      <div className="mt-1 font-mono text-small text-[var(--color-text-muted)]">{hint}</div>
     </Card>
   );
 }
 
 function EmptyRow({ text }: { text: string }) {
   return (
-    <div className="flex h-16 items-center justify-center font-mono text-[12px] text-[var(--color-text-muted)]">
+    <div className="flex h-16 items-center justify-center font-mono text-small text-[var(--color-text-muted)]">
       {text}
     </div>
   );

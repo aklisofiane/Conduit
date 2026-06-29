@@ -73,7 +73,7 @@ export function WorkflowHeaderPill({ workflowId }: WorkflowHeaderPillProps) {
       <div
         ref={anchorRef}
         className={cn(
-          'pointer-events-auto inline-flex items-center rounded-[var(--radius-sm)] border border-[var(--color-divider)] bg-[var(--color-bg-panel)] font-mono text-[11px]',
+          'pointer-events-auto inline-flex items-center rounded-[var(--radius-sm)] border border-[var(--color-divider)] bg-[var(--color-bg-panel)] font-mono text-small',
           renaming ? 'px-1' : '',
         )}
       >
@@ -84,7 +84,7 @@ export function WorkflowHeaderPill({ workflowId }: WorkflowHeaderPillProps) {
             onCommit={handleRenameCommit}
             onCancel={handleRenameCancel}
             maxLength={NAME_MAX_LENGTH}
-            className="w-[200px] min-w-[120px] bg-transparent px-1 py-[3px] font-mono text-[11px] text-[var(--color-text)] outline-none"
+            className="w-[200px] min-w-[120px] bg-transparent px-1 py-[3px] font-mono text-small text-[var(--color-text)] outline-none"
           />
         ) : (
           <>
@@ -269,7 +269,7 @@ function SwitcherPopover({ anchorEl, currentId, onClose }: SwitcherPopoverProps)
         <Button
           variant="ghost"
           onClick={() => setShowCreateDialog(true)}
-          className="w-full justify-start gap-2 h-auto rounded-none px-3 py-2 font-mono text-[11px] text-[var(--color-text-2)] hover:bg-[var(--color-pill-bg)] hover:text-[var(--color-text)]"
+          className="w-full justify-start gap-2 h-auto rounded-none px-3 py-2 font-mono text-small text-[var(--color-text-2)] hover:bg-[var(--color-pill-bg)] hover:text-[var(--color-text)]"
         >
           <Plus size={12} strokeWidth={1.5} />
           New workflow
@@ -304,7 +304,7 @@ function SwitcherRow({
       onMouseEnter={onMouseEnter}
       onClick={onClick}
       className={cn(
-        'w-full justify-between gap-3 h-auto rounded-none px-3 py-1.5 text-left font-mono text-[11px]',
+        'w-full justify-between gap-3 h-auto rounded-none px-3 py-1.5 text-left font-mono text-small',
         highlighted
           ? 'bg-[var(--color-pill-bg)] text-[var(--color-text)]'
           : 'text-[var(--color-text-2)] hover:bg-transparent hover:text-[var(--color-text)]',
@@ -322,7 +322,7 @@ function SwitcherRow({
 
 function EmptyRow({ text }: { text: string }) {
   return (
-    <div className="px-3 py-3 font-mono text-[11px] text-[var(--color-text-muted)]">
+    <div className="px-3 py-3 font-mono text-small text-[var(--color-text-muted)]">
       {text}
     </div>
   );

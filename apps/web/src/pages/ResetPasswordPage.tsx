@@ -65,12 +65,12 @@ export function ResetPasswordPage() {
     return (
       <div className="flex flex-col gap-4">
         <h1
-          className="text-[26px] font-semibold leading-none tracking-tight text-[var(--color-text)]"
+          className="text-heading font-semibold leading-none tracking-tight text-[var(--color-text)]"
           style={{ fontFamily: 'var(--font-serif)' }}
         >
           Invalid link<em className="text-[var(--color-claude-mark)] not-italic">.</em>
         </h1>
-        <p className="font-mono text-[11.5px] text-[var(--color-text-2)]">
+        <p className="font-mono text-caption text-[var(--color-text-2)]">
           This reset link is missing its token.{' '}
           <Link to="/forgot-password" className="underline">
             Request a new one
@@ -85,18 +85,18 @@ export function ResetPasswordPage() {
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-1">
         <h1
-          className="text-[26px] font-semibold leading-none tracking-tight text-[var(--color-text)]"
+          className="text-heading font-semibold leading-none tracking-tight text-[var(--color-text)]"
           style={{ fontFamily: 'var(--font-serif)' }}
         >
           New password<em className="text-[var(--color-claude-mark)] not-italic">.</em>
         </h1>
-        <p className="font-mono text-[11.5px] text-[var(--color-text-2)]">
+        <p className="font-mono text-caption text-[var(--color-text-2)]">
           Choose a strong password — at least 8 characters.
         </p>
       </div>
 
       {done ? (
-        <div className="rounded-[var(--radius)] border border-[var(--color-divider)] bg-[var(--color-pill-bg)] px-3 py-3 font-mono text-[11.5px] text-[var(--color-text-2)]">
+        <div className="rounded-[var(--radius)] border border-[var(--color-divider)] bg-[var(--color-pill-bg)] px-3 py-3 font-mono text-caption text-[var(--color-text-2)]">
           Password updated. Redirecting to sign-in…
         </div>
       ) : (
@@ -110,14 +110,14 @@ export function ResetPasswordPage() {
               {...form.register('password')}
             />
             {form.formState.errors.password?.message && (
-              <span className="mt-1 font-mono text-[10.5px] text-[var(--color-error)]">
+              <span className="mt-1 font-mono text-caption text-[var(--color-error)]">
                 {form.formState.errors.password.message}
               </span>
             )}
           </label>
 
           {rootError && (
-            <div role="alert" className="font-mono text-[11px] text-[var(--color-error)]">
+            <div role="alert" className="font-mono text-small text-[var(--color-error)]">
               {rootError}
             </div>
           )}

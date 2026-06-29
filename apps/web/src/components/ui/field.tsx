@@ -11,7 +11,7 @@ import { cn } from '../../lib/cn.js';
  */
 const labelClass = cn(
   'flex items-center gap-[8px] mb-[6px] font-medium',
-  'font-mono text-[10px] tracking-[0.06em] uppercase text-[var(--color-text-muted)]',
+  'font-mono text-small tracking-[0.06em] uppercase text-[var(--color-text-muted)]',
 );
 
 export interface LabelProps extends React.LabelHTMLAttributes<HTMLLabelElement> {
@@ -30,7 +30,7 @@ Label.displayName = 'Label';
 export function Hint({ className, ...props }: React.HTMLAttributes<HTMLSpanElement>) {
   return (
     <span
-      className={cn('font-normal normal-case tracking-normal text-[var(--color-text-muted)]', className)}
+      className={cn('font-normal normal-case tracking-normal text-caption text-[var(--color-text-muted)]', className)}
       {...props}
     />
   );
@@ -57,7 +57,7 @@ export const Field = forwardRef<HTMLLabelElement, FieldProps>(
       </Label>
       {children}
       {error != null && error !== '' && (
-        <span className="mt-1 font-mono text-[10.5px] text-[var(--color-error)]">{error}</span>
+        <span className="mt-1 font-mono text-caption text-[var(--color-error)]">{error}</span>
       )}
     </label>
   ),

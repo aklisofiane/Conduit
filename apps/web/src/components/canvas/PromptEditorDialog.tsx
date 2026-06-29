@@ -81,7 +81,7 @@ export function PromptEditorDialog({
             <span>{name}</span>
             <span className="text-[var(--color-text-muted)]"> · instructions</span>
           </DialogTitle>
-          <span className="shrink-0 font-mono text-[11px] text-[var(--color-text-muted)]">
+          <span className="shrink-0 font-mono text-small text-[var(--color-text-muted)]">
             {contextLabel}
           </span>
         </div>
@@ -123,11 +123,11 @@ export function PromptEditorDialog({
               style={{ height: '50vh' }}
             >
               {buffer.trim() ? (
-                <article className="markdown text-[13px] leading-relaxed text-[var(--color-text)]">
+                <article className="markdown text-base leading-relaxed text-[var(--color-text)]">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{buffer}</ReactMarkdown>
                 </article>
               ) : (
-                <div className="font-mono text-[12px] text-[var(--color-text-muted)]">
+                <div className="font-mono text-small text-[var(--color-text-muted)]">
                   Nothing to preview yet.
                 </div>
               )}
@@ -136,7 +136,7 @@ export function PromptEditorDialog({
         </div>
 
         <div className="flex items-center justify-between border-t border-[var(--color-divider)] px-5 py-4">
-          <span className="font-mono text-[11px] text-[var(--color-text-muted)]">
+          <span className="font-mono text-small text-[var(--color-text-muted)]">
             {chars} chars · {lines} lines
           </span>
           <div className="flex gap-2">

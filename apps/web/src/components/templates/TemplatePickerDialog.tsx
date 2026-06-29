@@ -265,12 +265,12 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
         <header className="flex items-center justify-between border-b border-[var(--color-divider)] px-5 py-4">
           <div>
             <DialogTitle
-              className="text-[22px] font-semibold tracking-tight text-[var(--color-text)]"
+              className="text-lead font-semibold tracking-tight text-[var(--color-text)]"
               style={{ fontFamily: 'var(--font-serif)' }}
             >
               {selected ? `Configure ${selected.name}` : 'Start from a template'}
             </DialogTitle>
-            <p className="mt-0.5 font-mono text-[11px] text-[var(--color-text-muted)]">
+            <p className="mt-0.5 font-mono text-small text-[var(--color-text-muted)]">
               {selected
                 ? `${selected.workflowCount} workflow${selected.workflowCount === 1 ? '' : 's'} · ${orderedAliases.length} connection${orderedAliases.length === 1 ? '' : 's'} to bind`
                 : 'Pre-built workflow blueprints you can copy and edit.'}
@@ -284,7 +284,7 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {!selected && (
             <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-dashed border-[var(--color-divider)] bg-[var(--color-pill-bg)] px-4 py-3">
-              <div className="font-mono text-[11.5px] text-[var(--color-text-2)]">
+              <div className="font-mono text-caption text-[var(--color-text-2)]">
                 Have a workflow export? Import a <code>.json</code> bundle.
               </div>
               <Button type="button" onClick={() => fileInputRef.current?.click()}>
@@ -306,13 +306,13 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
           )}
 
           {isLoading && (
-            <div className="font-mono text-[12px] text-[var(--color-text-muted)]">
+            <div className="font-mono text-small text-[var(--color-text-muted)]">
               Loading templates…
             </div>
           )}
 
           {!selected && !isLoading && templates.length === 0 && (
-            <div className="font-mono text-[12px] text-[var(--color-text-muted)]">
+            <div className="font-mono text-small text-[var(--color-text-muted)]">
               No templates found — check that <code>/templates</code> exists at the repo root.
             </div>
           )}
@@ -331,14 +331,14 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
                 {selected.description.split('\n\n').map((para, i) => (
                   <p
                     key={i}
-                    className="font-mono text-[12px] leading-relaxed text-[var(--color-text-2)]"
+                    className="font-mono text-small leading-relaxed text-[var(--color-text-2)]"
                   >
                     {para}
                   </p>
                 ))}
               </div>
               {orderedAliases.length === 0 ? (
-                <div className="rounded-md border border-[var(--color-divider)] bg-[var(--color-pill-bg)] px-3 py-2 font-mono text-[12px] text-[var(--color-text-2)]">
+                <div className="rounded-md border border-[var(--color-divider)] bg-[var(--color-pill-bg)] px-3 py-2 font-mono text-small text-[var(--color-text-2)]">
                   No connection bindings needed.
                 </div>
               ) : (
@@ -362,9 +362,9 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
 
         <footer className="flex items-center justify-between border-t border-[var(--color-divider)] px-5 py-3">
           {error ? (
-            <div className="font-mono text-[11px] text-[var(--color-danger)]">{error}</div>
+            <div className="font-mono text-small text-[var(--color-danger)]">{error}</div>
           ) : (
-            <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
+            <div className="font-mono text-small text-[var(--color-text-muted)]">
               Workflows are created paused — review + activate on the canvas.
             </div>
           )}
@@ -399,14 +399,14 @@ function TemplateCard({ t, onPick }: { t: TemplateSummary; onPick: (t: TemplateS
       className="flex flex-col items-start gap-1 rounded-lg bg-[var(--color-pill-bg)] px-4 py-3 hover:border-[var(--color-claude-mark)]"
     >
       <div className="flex w-full items-center justify-between">
-        <span className="font-mono text-[13px] font-semibold text-[var(--color-text)]">
+        <span className="font-mono text-base font-semibold text-[var(--color-text)]">
           {t.name}
         </span>
-        <span className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-muted)]">
+        <span className="font-mono text-caption uppercase tracking-wider text-[var(--color-text-muted)]">
           {t.category} · {t.workflowCount} wf
         </span>
       </div>
-      <span className="line-clamp-2 font-mono text-[11.5px] leading-relaxed text-[var(--color-text-2)]">
+      <span className="line-clamp-2 font-mono text-caption leading-relaxed text-[var(--color-text-2)]">
         {t.description.split('\n\n')[0]}
       </span>
     </SelectableCard>
@@ -447,7 +447,7 @@ function BindingRow({
   return (
     <div className="rounded-md border border-[var(--color-divider)] bg-[var(--color-pill-bg)] p-3">
       <div className="flex items-center justify-between">
-        <div className="font-mono text-[12px] text-[var(--color-text)]">
+        <div className="font-mono text-small text-[var(--color-text)]">
           <span className="text-[var(--color-claude-mark)]">&lt;{alias}&gt;</span>{' '}
           <span className="text-[var(--color-text-muted)]">
             connection{isBoard ? ' · optional' : ''}
@@ -619,7 +619,7 @@ function GithubRepoScopeFields({
     return (
       <div className="col-span-2">
         <label className="flex flex-col gap-1">
-          <span className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-muted)]">
+          <span className="font-mono text-caption uppercase tracking-wider text-[var(--color-text-muted)]">
             Repository
           </span>
           <SearchSelect
@@ -677,7 +677,7 @@ function GitlabProjectScopeFields({
     return (
       <div className="col-span-2">
         <label className="flex flex-col gap-1">
-          <span className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-muted)]">
+          <span className="font-mono text-caption uppercase tracking-wider text-[var(--color-text-muted)]">
             Project
           </span>
           <SearchSelect
@@ -801,7 +801,7 @@ function LabeledInput({
 }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-muted)]">
+      <span className="font-mono text-caption uppercase tracking-wider text-[var(--color-text-muted)]">
         {label}
       </span>
       <Input value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />
@@ -824,7 +824,7 @@ function LabeledSelect({
 }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-muted)]">
+      <span className="font-mono text-caption uppercase tracking-wider text-[var(--color-text-muted)]">
         {label}
       </span>
       <Select

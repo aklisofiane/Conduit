@@ -47,7 +47,7 @@ export function RunTimeline({ events, streaming }: RunTimelineProps) {
 
   if (display.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center font-mono text-[12px] text-[var(--color-text-muted)]">
+      <div className="flex h-full items-center justify-center font-mono text-small text-[var(--color-text-muted)]">
         No events yet — waiting for the agent to start.
       </div>
     );
@@ -260,10 +260,10 @@ function TextRow({
 }) {
   return (
     <div className="rounded-md border border-[var(--color-divider)] bg-[var(--color-bg-panel)] px-3 py-2.5">
-      <div className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-muted)]">
+      <div className="font-mono text-caption uppercase tracking-wider text-[var(--color-text-muted)]">
         +{offset}s · text
       </div>
-      <div className="mt-1 whitespace-pre-wrap font-mono text-[12px] leading-relaxed text-[var(--color-text)]">
+      <div className="mt-1 whitespace-pre-wrap font-mono text-small leading-relaxed text-[var(--color-text)]">
         {item.delta}
         {cursor && <span className="cursor" />}
       </div>
@@ -280,10 +280,10 @@ function SystemRow({
 }) {
   return (
     <div className="rounded-md border border-dashed border-[var(--color-divider)] bg-[var(--color-bg-panel)] px-3 py-2">
-      <div className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-muted)]">
+      <div className="font-mono text-caption uppercase tracking-wider text-[var(--color-text-muted)]">
         +{offset}s · system
       </div>
-      <pre className="mt-1 whitespace-pre-wrap font-mono text-[11px] text-[var(--color-text-2)]">
+      <pre className="mt-1 whitespace-pre-wrap font-mono text-small text-[var(--color-text-2)]">
         {item.message}
       </pre>
     </div>
@@ -342,7 +342,7 @@ function ToolGroupRow({
         open={groupOpen}
         onClick={() => onToggle(item.id)}
         aria-label={`${groupOpen ? 'Collapse' : 'Expand'} ${item.tools.length} ${prettyToolName(item.toolName)} calls`}
-        className="font-mono text-[11px] text-[var(--color-text-muted)]"
+        className="font-mono text-small text-[var(--color-text-muted)]"
       >
         <span className="w-12 shrink-0 text-[var(--color-text-muted)]">
           +{secondsSince(item.tsMs, startMs)}s
@@ -395,7 +395,7 @@ function CollapsedToolHeader({
       size="sm"
       open={open}
       onClick={onToggle}
-      className={cn('font-mono text-[11.5px]', nested && 'pl-8')}
+      className={cn('font-mono text-caption', nested && 'pl-8')}
     >
       <span className="w-12 shrink-0 text-[var(--color-text-muted)]">+{offset}s</span>
       {!nested && (
@@ -417,20 +417,20 @@ function ExpandedToolBody({ tool }: { tool: ToolItem }) {
   return (
     <div className="space-y-2 border-t border-[var(--color-divider)] bg-[var(--color-bg)] px-3 py-2">
       <div>
-        <div className="font-mono text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">
+        <div className="font-mono text-caption uppercase tracking-wider text-[var(--color-text-muted)]">
           input
         </div>
-        <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap font-mono text-[11px] text-[var(--color-text-2)]">
+        <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap font-mono text-small text-[var(--color-text-2)]">
           {formatValue(tool.call.input)}
         </pre>
       </div>
       <div>
-        <div className="font-mono text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">
+        <div className="font-mono text-caption uppercase tracking-wider text-[var(--color-text-muted)]">
           {error ? 'error' : 'result'}
         </div>
         <pre
           className={cn(
-            'mt-1 max-h-64 overflow-auto whitespace-pre-wrap font-mono text-[11px]',
+            'mt-1 max-h-64 overflow-auto whitespace-pre-wrap font-mono text-small',
             error ? 'text-[var(--color-error)]' : 'text-[var(--color-text-2)]',
           )}
         >
@@ -446,7 +446,7 @@ function StatusPill({ status, label }: { status: ToolStatus; label?: string }) {
   return (
     <span
       className={cn(
-        'shrink-0 font-mono text-[10.5px]',
+        'shrink-0 font-mono text-caption',
         status === 'error' && 'text-[var(--color-error)]',
         status === 'ok' && 'text-[var(--color-text-muted)]',
         status === 'pending' && 'italic text-[var(--color-text-muted)]',

@@ -137,7 +137,7 @@ export function CronTriggerPanel({
               disabled={!trigger.connectionId || branchesQuery.isLoading}
             />
             {branchesQuery.isError && (
-              <p className="mt-1 font-mono text-[11px] text-[var(--color-danger,#dc322f)]">
+              <p className="mt-1 font-mono text-small text-[var(--color-danger,#dc322f)]">
                 {apiErrorMessage(branchesQuery.error)}
               </p>
             )}

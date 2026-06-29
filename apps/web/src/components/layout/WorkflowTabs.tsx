@@ -33,7 +33,7 @@ export function WorkflowTabs({ active, onChange }: WorkflowTabsProps) {
           value={t.id}
           disabled={!t.enabled}
           title={t.enabled ? undefined : 'Coming soon'}
-          className="px-3 font-sans text-[12px]"
+          className="px-3 font-sans text-small"
         >
           {t.label}
         </ToggleGroupItem>

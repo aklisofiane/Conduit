@@ -59,7 +59,7 @@ export function WorkflowEdge({
               border: `1px solid ${tokens.color.accent}`,
               background: tokens.color.bgPanel,
               color: tokens.color.accent,
-              fontSize: 11,
+              fontSize: 14,
               lineHeight: 1,
               cursor: 'pointer',
             }}

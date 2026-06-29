@@ -72,12 +72,12 @@ export function SignUpPage() {
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-1">
         <h1
-          className="text-[26px] font-semibold leading-none tracking-tight text-[var(--color-text)]"
+          className="text-heading font-semibold leading-none tracking-tight text-[var(--color-text)]"
           style={{ fontFamily: 'var(--font-serif)' }}
         >
           Create account<em className="text-[var(--color-claude-mark)] not-italic">.</em>
         </h1>
-        <p className="font-mono text-[11.5px] text-[var(--color-text-2)]">
+        <p className="font-mono text-caption text-[var(--color-text-2)]">
           {inviteOnly ? 'Registration is by invitation only.' : 'Spin up workflows in minutes.'}
         </p>
       </div>
@@ -113,7 +113,7 @@ export function SignUpPage() {
         />
 
         {rootError && (
-          <div role="alert" className="font-mono text-[11px] text-[var(--color-error)]">
+          <div role="alert" className="font-mono text-small text-[var(--color-error)]">
             {rootError}
           </div>
         )}
@@ -127,7 +127,7 @@ export function SignUpPage() {
           {form.formState.isSubmitting ? 'Creating account…' : 'Create account'}
         </Button>
 
-        <div className="flex justify-end font-mono text-[11px]">
+        <div className="flex justify-end font-mono text-small">
           <Link
             to={`/sign-in${next ? `?next=${encodeURIComponent(next)}` : ''}`}
             className="text-[var(--color-text-2)] hover:text-[var(--color-text)]"
@@ -152,7 +152,7 @@ function Divider() {
   return (
     <div className="flex items-center gap-3">
       <div className="h-px flex-1 bg-[var(--color-divider)]" />
-      <span className="font-mono text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">
+      <span className="font-mono text-caption uppercase tracking-wider text-[var(--color-text-muted)]">
         or
       </span>
       <div className="h-px flex-1 bg-[var(--color-divider)]" />

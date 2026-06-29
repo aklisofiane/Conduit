@@ -17,7 +17,7 @@ const dropdownContentClass = cn(
 
 const dropdownItemClass = cn(
   'flex items-center gap-2 px-2 py-1.5 select-none cursor-pointer outline-none',
-  'font-sans text-[12px] text-[var(--color-text)] rounded-[var(--radius-sm)]',
+  'font-sans text-small text-[var(--color-text)] rounded-[var(--radius-sm)]',
   'data-[highlighted]:bg-[var(--color-pill-bg)]',
   'data-[disabled]:text-[var(--color-text-muted)] data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed',
 );
@@ -30,7 +30,7 @@ const dropdownItemDangerClass = cn(
 const dropdownSeparatorClass = 'h-px -mx-1 my-1 bg-[var(--color-divider)]';
 
 export const dropdownLabelClass = cn(
-  'px-2 py-1 font-mono text-[10px] uppercase tracking-[0.06em] text-[var(--color-text-muted)]',
+  'px-2 py-1 font-mono text-caption uppercase tracking-[0.06em] text-[var(--color-text-muted)]',
 );
 
 export const DropdownMenu = RxMenu.Root;

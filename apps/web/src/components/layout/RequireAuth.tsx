@@ -28,7 +28,7 @@ export function RequireAuth({ children }: RequireAuthProps) {
 function SessionLoader() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[var(--color-bg)]">
-      <div className="font-mono text-[12px] text-[var(--color-text-muted)]">Loading…</div>
+      <div className="font-mono text-small text-[var(--color-text-muted)]">Loading…</div>
     </div>
   );
 }

@@ -16,7 +16,7 @@ import { dropdownLabelClass } from './dropdown-menu.js';
 export const selectTriggerClass = cn(
   'group inline-flex w-full min-w-0 h-[30px] items-center justify-between gap-2 px-2.5',
   'bg-[var(--color-bg)] border border-[var(--color-divider)] rounded-[var(--radius)]',
-  'font-mono text-[11px] text-[var(--color-text)] cursor-pointer outline-none',
+  'font-mono text-small text-[var(--color-text)] cursor-pointer outline-none',
   'transition-[border-color,box-shadow] duration-[120ms] ease-[ease]',
   'enabled:hover:border-[var(--color-text-muted)]',
   'focus-visible:border-[var(--color-accent)] focus-visible:shadow-[var(--shadow-focus)]',
@@ -40,7 +40,7 @@ export const selectValueClass = 'block flex-1 min-w-0 text-left truncate';
 /** A row in the listbox — Radix data-state drives highlight/checked/disabled. */
 export const selectItemClass = cn(
   'relative flex items-center justify-between gap-2 px-2 py-1.5 select-none cursor-pointer outline-none',
-  'font-mono text-[11px] text-[var(--color-text)] rounded-[var(--radius-sm)]',
+  'font-mono text-small text-[var(--color-text)] rounded-[var(--radius-sm)]',
   'data-[highlighted]:bg-[var(--color-pill-bg)]',
   'data-[state=checked]:bg-[var(--color-accent-soft)] data-[state=checked]:font-semibold',
   'data-[disabled]:text-[var(--color-text-muted)] data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed',

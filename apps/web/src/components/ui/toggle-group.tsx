@@ -43,10 +43,10 @@ const toggleGroupItemVariants = cva(
         ),
       },
       size: {
-        sm: 'h-6 rounded-[var(--radius-sm)] px-2 text-[10.5px]',
-        md: 'h-7 rounded-[var(--radius)] px-2.5 text-[11px]',
-        box: 'h-8 w-10 rounded-[var(--radius-sm)] text-[11px] font-medium',
-        pill: 'rounded-full px-3 py-1 text-[11px]',
+        sm: 'h-6 rounded-[var(--radius-sm)] px-2 text-caption',
+        md: 'h-7 rounded-[var(--radius)] px-2.5 text-small',
+        box: 'h-8 w-10 rounded-[var(--radius-sm)] text-small font-medium',
+        pill: 'rounded-full px-3 py-1 text-small',
       },
     },
     defaultVariants: {

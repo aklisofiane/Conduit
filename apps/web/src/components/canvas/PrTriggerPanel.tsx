@@ -83,7 +83,7 @@ export function PrTriggerPanel({
                   })
                 }
               />
-              <span className="font-mono text-[11px] text-[var(--color-text-muted)]">
+              <span className="font-mono text-small text-[var(--color-text-muted)]">
                 sec
               </span>
             </div>

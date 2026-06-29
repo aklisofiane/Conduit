@@ -82,12 +82,12 @@ export function CreateWorkflowDialog({ onClose, onCreate, isPending }: CreateWor
         <header className="flex items-center justify-between border-b border-[var(--color-divider)] px-5 py-4">
           <div>
             <DialogTitle
-              className="text-[22px] font-semibold tracking-tight text-[var(--color-text)]"
+              className="text-lead font-semibold tracking-tight text-[var(--color-text)]"
               style={{ fontFamily: 'var(--font-serif)' }}
             >
               New workflow
             </DialogTitle>
-            <p className="mt-0.5 font-mono text-[11px] text-[var(--color-text-muted)]">
+            <p className="mt-0.5 font-mono text-small text-[var(--color-text-muted)]">
               Name it and pick a trigger to get started.
             </p>
           </div>
@@ -98,7 +98,7 @@ export function CreateWorkflowDialog({ onClose, onCreate, isPending }: CreateWor
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
           <label className="flex flex-col gap-1">
-            <span className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-muted)]">
+            <span className="font-mono text-caption uppercase tracking-wider text-[var(--color-text-muted)]">
               Name
             </span>
             <Input
@@ -113,7 +113,7 @@ export function CreateWorkflowDialog({ onClose, onCreate, isPending }: CreateWor
           </label>
 
           <div className="mt-4">
-            <span className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-muted)]">
+            <span className="font-mono text-caption uppercase tracking-wider text-[var(--color-text-muted)]">
               Trigger
             </span>
             <div className="mt-1.5 flex flex-col gap-[6px]">
@@ -135,10 +135,10 @@ export function CreateWorkflowDialog({ onClose, onCreate, isPending }: CreateWor
                     {opt.icon}
                   </span>
                   <span className="min-w-0">
-                    <span className="block text-[12px] font-medium text-[var(--color-text)]">
+                    <span className="block text-small font-medium text-[var(--color-text)]">
                       {opt.label}
                     </span>
-                    <span className="block font-mono text-[11px] text-[var(--color-text-muted)]">
+                    <span className="block font-mono text-small text-[var(--color-text-muted)]">
                       {opt.description}
                     </span>
                   </span>
@@ -149,7 +149,7 @@ export function CreateWorkflowDialog({ onClose, onCreate, isPending }: CreateWor
 
           {triggerType && repoConnections.length > 0 && (
             <div className="mt-4">
-              <span className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-muted)]">
+              <span className="font-mono text-caption uppercase tracking-wider text-[var(--color-text-muted)]">
                 Connection <span className="normal-case tracking-normal">(optional)</span>
               </span>
               <div className="mt-1.5">
@@ -164,7 +164,7 @@ export function CreateWorkflowDialog({ onClose, onCreate, isPending }: CreateWor
                   }))}
                 />
               </div>
-              <p className="mt-1 font-mono text-[10.5px] text-[var(--color-text-muted)]">
+              <p className="mt-1 font-mono text-caption text-[var(--color-text-muted)]">
                 Pre-wires the trigger to this repo. You can change it on the canvas.
               </p>
             </div>

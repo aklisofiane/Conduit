@@ -57,7 +57,7 @@ export function InlineRename({
       onClick={(e) => e.stopPropagation()}
       className={
         className ??
-        'w-full bg-transparent px-1 py-[3px] font-mono text-[13px] text-[var(--color-text)] outline-none'
+        'w-full bg-transparent px-1 py-[3px] font-mono text-base text-[var(--color-text)] outline-none'
       }
     />
   );

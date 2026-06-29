@@ -31,10 +31,10 @@ const buttonVariants = cva(
         link: 'border-transparent bg-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text)]',
       },
       size: {
-        md: 'h-7 px-3 text-[11.5px]',
-        sm: 'h-6 px-2 text-[11px]',
+        md: 'h-7 px-3 text-caption',
+        sm: 'h-6 px-2 text-small',
         icon: 'h-6 w-6 p-0',
-        inline: 'h-auto p-0 text-[11px]',
+        inline: 'h-auto p-0 text-small',
       },
     },
     defaultVariants: {

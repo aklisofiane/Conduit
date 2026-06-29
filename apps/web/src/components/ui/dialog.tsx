@@ -18,10 +18,10 @@ const dialogContentClass = cn(
 );
 
 const dialogTitleClass =
-  'm-0 font-sans text-[14px] font-semibold text-[var(--color-text)]';
+  'm-0 font-sans text-base font-semibold text-[var(--color-text)]';
 
 const dialogDescriptionClass =
-  'm-0 font-mono text-[11px] text-[var(--color-text-muted)]';
+  'm-0 font-mono text-small text-[var(--color-text-muted)]';
 
 export const Dialog = RxDialog.Root;
 export const DialogTrigger = RxDialog.Trigger;

@@ -17,7 +17,7 @@ export function WorkflowRunsList({ workflowId }: WorkflowRunsListProps) {
 
   return (
     <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-3 px-6 pb-16 pt-8">
-      <h2 className="flex items-baseline gap-2 font-mono text-[12px] uppercase tracking-wider text-[var(--color-text-2)]">
+      <h2 className="flex items-baseline gap-2 font-mono text-small uppercase tracking-wider text-[var(--color-text-2)]">
         Runs
         <span className="text-[var(--color-text-muted)]">{runs.length}</span>
       </h2>
@@ -71,13 +71,13 @@ function RunRow({ run }: { run: WorkflowRunListItem }) {
     >
       <span className={cn('status-dot', statusClass(run.status))} />
       <div className="min-w-0">
-        <div className="truncate font-mono text-[13px] font-medium text-[var(--color-text)]">
+        <div className="truncate font-mono text-base font-medium text-[var(--color-text)]">
           {triggerHeadline(run.trigger)}
         </div>
         {subtitle && (
           <div
             className={cn(
-              'mt-0.5 truncate font-mono text-[11px]',
+              'mt-0.5 truncate font-mono text-small',
               isError ? 'text-[var(--color-error)]' : 'text-[var(--color-text-muted)]',
             )}
           >
@@ -85,7 +85,7 @@ function RunRow({ run }: { run: WorkflowRunListItem }) {
           </div>
         )}
       </div>
-      <div className="font-mono text-[11px] text-[var(--color-text-2)]">
+      <div className="font-mono text-small text-[var(--color-text-2)]">
         {total > 0 ? (
           <>
             <b className="text-[var(--color-text)]">{done}</b>
@@ -98,10 +98,10 @@ function RunRow({ run }: { run: WorkflowRunListItem }) {
           <span className="text-[var(--color-text-muted)]">—</span>
         )}
       </div>
-      <div className="font-mono text-[11px] text-[var(--color-text-2)]">
+      <div className="font-mono text-small text-[var(--color-text-2)]">
         {relativeFromNow(run.startedAt)}
       </div>
-      <div className="flex items-center justify-end gap-2 text-right font-mono text-[11px] text-[var(--color-text-2)]">
+      <div className="flex items-center justify-end gap-2 text-right font-mono text-small text-[var(--color-text-2)]">
         {run.status === 'FAILED' &&
           (note ? (
             <span className="text-[var(--color-text-muted)]">{note}</span>
@@ -123,7 +123,7 @@ function RunRow({ run }: { run: WorkflowRunListItem }) {
 
 function EmptyRow({ text }: { text: string }) {
   return (
-    <div className="flex h-16 items-center justify-center font-mono text-[12px] text-[var(--color-text-muted)]">
+    <div className="flex h-16 items-center justify-center font-mono text-small text-[var(--color-text-muted)]">
       {text}
     </div>
   );

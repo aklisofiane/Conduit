@@ -103,14 +103,14 @@ export function WorkflowRowItem({
             onCommit={handleRenameCommit}
             onCancel={onEndRename}
             maxLength={NAME_MAX_LENGTH}
-            className="w-full bg-transparent px-0 py-0 font-mono text-[13px] font-medium text-[var(--color-text)] outline-none"
+            className="w-full bg-transparent px-0 py-0 font-mono text-base font-medium text-[var(--color-text)] outline-none"
           />
         ) : (
-          <div className="truncate font-mono text-[13px] font-medium text-[var(--color-text)]">
+          <div className="truncate font-mono text-base font-medium text-[var(--color-text)]">
             {wf.name}
           </div>
         )}
-        <div className="mt-0.5 flex items-center gap-2 font-mono text-[11px] text-[var(--color-text-muted)]">
+        <div className="mt-0.5 flex items-center gap-2 font-mono text-small text-[var(--color-text-muted)]">
           {providers.has('claude') && (
             <Badge variant="glyph" provider="claude">
               C
@@ -126,7 +126,7 @@ export function WorkflowRowItem({
           </span>
         </div>
       </div>
-      <div className="truncate font-mono text-[11px] text-[var(--color-text-2)]">
+      <div className="truncate font-mono text-small text-[var(--color-text-2)]">
         {trigger?.platform ? (
           <>
             <b className="text-[var(--color-text)]">
@@ -138,7 +138,7 @@ export function WorkflowRowItem({
           <span className="text-[var(--color-text-muted)]">— trigger not configured</span>
         )}
       </div>
-      <div className="font-mono text-[11px] text-[var(--color-text-2)]">
+      <div className="font-mono text-small text-[var(--color-text-2)]">
         {lastRun ? (
           <>
             <span className={cn('status-dot mr-1.5 inline-block', statusClass(lastRun.status))} />

@@ -64,24 +64,24 @@ export function ForgotPasswordPage() {
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-1">
         <h1
-          className="text-[26px] font-semibold leading-none tracking-tight text-[var(--color-text)]"
+          className="text-heading font-semibold leading-none tracking-tight text-[var(--color-text)]"
           style={{ fontFamily: 'var(--font-serif)' }}
         >
           Reset password<em className="text-[var(--color-claude-mark)] not-italic">.</em>
         </h1>
-        <p className="font-mono text-[11.5px] text-[var(--color-text-2)]">
+        <p className="font-mono text-caption text-[var(--color-text-2)]">
           Enter your email and we'll send you a reset link.
         </p>
       </div>
 
       {submitted ? (
         <div className="flex flex-col gap-3">
-          <div className="rounded-[var(--radius)] border border-[var(--color-divider)] bg-[var(--color-pill-bg)] px-3 py-3 font-mono text-[11.5px] text-[var(--color-text-2)]">
+          <div className="rounded-[var(--radius)] border border-[var(--color-divider)] bg-[var(--color-pill-bg)] px-3 py-3 font-mono text-caption text-[var(--color-text-2)]">
             If an account matches that email, a reset link is on its way.
           </div>
           <Link
             to="/sign-in"
-            className="font-mono text-[11px] text-[var(--color-text-2)] hover:text-[var(--color-text)]"
+            className="font-mono text-small text-[var(--color-text-2)] hover:text-[var(--color-text)]"
           >
             Back to sign in
           </Link>
@@ -97,14 +97,14 @@ export function ForgotPasswordPage() {
               {...form.register('email')}
             />
             {form.formState.errors.email?.message && (
-              <span className="mt-1 font-mono text-[10.5px] text-[var(--color-error)]">
+              <span className="mt-1 font-mono text-caption text-[var(--color-error)]">
                 {form.formState.errors.email.message}
               </span>
             )}
           </label>
 
           {rootError && (
-            <div role="alert" className="font-mono text-[11px] text-[var(--color-error)]">
+            <div role="alert" className="font-mono text-small text-[var(--color-error)]">
               {rootError}
             </div>
           )}
@@ -118,7 +118,7 @@ export function ForgotPasswordPage() {
             {form.formState.isSubmitting ? 'Sending…' : 'Send reset link'}
           </Button>
 
-          <div className="flex justify-start font-mono text-[11px]">
+          <div className="flex justify-start font-mono text-small">
             <Link to="/sign-in" className="text-[var(--color-text-2)] hover:text-[var(--color-text)]">
               Back to sign in
             </Link>
