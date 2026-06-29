@@ -19,6 +19,7 @@ import { providerStyle } from '../../styles/theme.js';
 import { Select, type SelectItem } from '../ui/select.js';
 import { Button } from '../ui/button.js';
 import { Input, Textarea } from '../ui/input.js';
+import { Checkbox } from '../ui/checkbox.js';
 import { Label, Hint } from '../ui/field.js';
 import { Maximize2, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -252,10 +253,9 @@ export function AgentConfigPanel({
 
           <Field label="Web search">
             <label className="flex cursor-pointer items-center gap-2 font-mono text-[12px]">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={agent.webSearch}
-                onChange={(e) => onChange({ webSearch: e.target.checked })}
+                onCheckedChange={(checked) => onChange({ webSearch: checked === true })}
               />
               <span>Enable</span>
             </label>
@@ -416,10 +416,9 @@ function IssueWritebackControl({
   return (
     <div className="space-y-2">
       <label className="flex cursor-pointer items-center gap-2 font-mono text-[12px]">
-        <input
-          type="checkbox"
+        <Checkbox
           checked={enabled}
-          onChange={(e) => toggle(e.target.checked)}
+          onCheckedChange={(checked) => toggle(checked === true)}
         />
         <span>Allow updating issue/PR status &amp; labels</span>
       </label>

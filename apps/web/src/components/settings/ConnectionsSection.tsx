@@ -23,6 +23,7 @@ import { InfoPopover } from '../ui/info-popover.js';
 import { SettingsSection } from '../common/SettingsSection.js';
 import { Badge, BadgeDot } from '../ui/badge.js';
 import { Button } from '../ui/button.js';
+import { Checkbox } from '../ui/checkbox.js';
 import { CreateConnectionForm } from './ConnectionForm.js';
 import { SuggestionsGalleryDialog } from './SuggestionsGalleryDialog.js';
 
@@ -164,11 +165,10 @@ function LabelPrompt({
                 key={l.name}
                 className="flex items-center gap-2 font-mono text-[12px]"
               >
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={selected.has(l.name)}
                   disabled={ensure.isPending || done}
-                  onChange={() => toggle(l.name)}
+                  onCheckedChange={() => toggle(l.name)}
                 />
                 <code className="text-[var(--color-text)]">{l.name}</code>
                 {r &&

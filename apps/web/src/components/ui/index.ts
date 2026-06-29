@@ -1,6 +1,7 @@
 export { Badge, BadgeDot, badgeVariants, type BadgeProps, type BadgeDotProps } from './badge.js';
 export { Button, buttonVariants, type ButtonProps } from './button.js';
 export { Card, cardVariants, type CardProps } from './card.js';
+export { Checkbox, checkboxVariants, type CheckboxProps } from './checkbox.js';
 export {
   NodeShell,
   NodeIconTile,

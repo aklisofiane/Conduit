@@ -15,6 +15,7 @@ import { scopeSummary, type EnsureLabelTarget } from '../../lib/connection.js';
 import { Select } from '../ui/select.js';
 import { Button } from '../ui/button.js';
 import { Input } from '../ui/input.js';
+import { Checkbox } from '../ui/checkbox.js';
 import { Label, Hint as FieldHint } from '../ui/field.js';
 
 /**
@@ -173,10 +174,9 @@ export function ActiveToggleField({
   return (
     <Field label="Active" hint="pause the trigger without deleting it — saves immediately">
       <label className="flex cursor-pointer items-center gap-2 font-mono text-[12px]">
-        <input
-          type="checkbox"
+        <Checkbox
           checked={isActive}
-          onChange={(e) => onActiveChange(e.target.checked)}
+          onCheckedChange={(checked) => onActiveChange(checked === true)}
         />
         <span>{isActive ? 'active — receiving events' : 'paused'}</span>
       </label>

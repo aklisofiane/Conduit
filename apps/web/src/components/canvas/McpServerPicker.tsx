@@ -16,6 +16,7 @@ import { connectionLabel } from '../../lib/connection.js';
 import { CheckboxListPopover } from '../ui/checkbox-list-popover.js';
 import { Select } from '../ui/select.js';
 import { Button } from '../ui/button.js';
+import { Checkbox } from '../ui/checkbox.js';
 import { Input } from '../ui/input.js';
 import { Card } from '../ui/card.js';
 
@@ -160,10 +161,9 @@ function ServerCard({
       )}
     >
       <div className="flex items-start gap-3">
-        <input
-          type="checkbox"
+        <Checkbox
           checked={attached}
-          onChange={onToggleAttached}
+          onCheckedChange={onToggleAttached}
           className="mt-1"
           aria-label={`Attach ${server.name} to this agent`}
         />

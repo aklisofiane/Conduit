@@ -2,6 +2,7 @@ import { useMemo, useRef, useState, type ReactNode } from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import { ChevronDown, Search } from 'lucide-react';
 import { cn } from '../../lib/cn.js';
+import { Checkbox } from './checkbox.js';
 import { selectChevronClass, selectItemClass, selectTriggerClass } from './select.js';
 import {
   searchSelectContentClass,
@@ -155,7 +156,7 @@ export function CheckboxListPopover<T>({
           {selectAll && !query && (
             <div className="flex items-center justify-between border-b border-[var(--color-divider)] px-2 py-1.5">
               <label className="flex items-center gap-2 font-mono text-[11px] text-[var(--color-text-3)]">
-                <input type="checkbox" checked={selectAll.checked} onChange={selectAll.onToggle} />
+                <Checkbox checked={selectAll.checked} onCheckedChange={selectAll.onToggle} />
                 {selectAll.label}
               </label>
             </div>
@@ -216,10 +217,9 @@ function CheckboxRow({
         checked && searchSelectItemSelectedClass,
       )}
     >
-      <input
-        type="checkbox"
+      <Checkbox
         checked={checked}
-        onChange={onToggle}
+        onCheckedChange={onToggle}
         className="mt-0.5 flex-shrink-0"
       />
       <div className="min-w-0 flex-1">

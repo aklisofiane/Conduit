@@ -7,6 +7,7 @@ import type { DroppedComponent, TemplateBinding } from '../../api/types.js';
 import { formatCadence } from '../../lib/cron.js';
 import { Dialog, DialogContent, DialogTitle } from '../ui/dialog.js';
 import { Button } from '../ui/button.js';
+import { Checkbox } from '../ui/checkbox.js';
 
 // The analyzer's bundle binds exactly one connection placeholder — the repo it
 // analyzed — under this alias (the `<github-repo>` placeholder without its
@@ -212,10 +213,9 @@ function SuggestionCard({
 
   return (
     <label className="flex cursor-pointer gap-3 rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-2)] px-4 py-3">
-      <input
-        type="checkbox"
+      <Checkbox
         checked={selected}
-        onChange={onToggle}
+        onCheckedChange={onToggle}
         className="mt-0.5"
       />
       <div className="flex flex-1 flex-col gap-1.5">
