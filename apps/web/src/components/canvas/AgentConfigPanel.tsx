@@ -18,6 +18,7 @@ import { cn } from '../../lib/cn.js';
 import { providerStyle } from '../../styles/theme.js';
 import { Select, type SelectItem } from '../ui/select.js';
 import { Button } from '../ui/button.js';
+import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group.js';
 import { Input, Textarea } from '../ui/input.js';
 import { Checkbox } from '../ui/checkbox.js';
 import { Label, Hint } from '../ui/field.js';
@@ -220,14 +221,15 @@ export function AgentConfigPanel({
               <div>
                 Instructions
                 <Hint>system prompt</Hint>
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
+                  size="inline"
                   onClick={() => setPromptEditorOpen(true)}
-                  className="ml-auto inline-flex items-center gap-1 rounded-[var(--radius-sm)] px-1.5 py-0.5 font-mono text-[10px] tracking-normal text-[var(--color-accent)] normal-case transition-colors hover:bg-[var(--color-pill-bg)]"
+                  className="ml-auto gap-1 rounded-[var(--radius-sm)] px-1.5 py-0.5 font-mono font-normal text-[10px] tracking-normal normal-case text-[var(--color-accent)] hover:bg-[var(--color-pill-bg)] hover:text-[var(--color-accent)]"
                 >
                   <Maximize2 size={11} strokeWidth={1.75} />
                   Expand
-                </button>
+                </Button>
               </div>
             </Label>
             <Textarea
@@ -525,23 +527,36 @@ function PillToggleGroup({
   onToggle: (value: string) => void;
 }) {
   return (
-    <div className="flex flex-wrap gap-1.5">
+    <ToggleGroup
+      type="multiple"
+      value={selected}
+      onValueChange={(next) => {
+        // Radix hands back the full new selection; reduce it to the single
+        // item that flipped so we preserve the parent's per-value toggle API.
+        const changed =
+          next.length > selected.length
+            ? next.find((v) => !selected.includes(v))
+            : selected.find((v) => !next.includes(v));
+        if (changed !== undefined) onToggle(changed);
+      }}
+      className="flex flex-wrap gap-1.5"
+    >
       {options.map((opt) => (
-        <button
+        <ToggleGroupItem
           key={opt}
-          type="button"
-          onClick={() => onToggle(opt)}
+          value={opt}
+          variant="outline"
+          size="sm"
           className={cn(
-            'rounded-[var(--radius-sm)] border px-2 py-[3px] font-mono text-[11px] transition-colors',
-            selected.includes(opt)
-              ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-text)]'
-              : 'border-[var(--color-divider)] text-[var(--color-text-muted)] hover:border-[var(--color-text-muted)]',
+            'h-auto rounded-[var(--radius-sm)] border-[var(--color-divider)] px-2 py-[3px] text-[11px]',
+            'text-[var(--color-text-muted)] hover:border-[var(--color-text-muted)] hover:text-[var(--color-text-muted)]',
+            'data-[state=on]:border-[var(--color-accent)] data-[state=on]:bg-[var(--color-accent-soft)] data-[state=on]:font-normal data-[state=on]:text-[var(--color-text)]',
           )}
         >
           {opt}
-        </button>
+        </ToggleGroupItem>
       ))}
-    </div>
+    </ToggleGroup>
   );
 }
 

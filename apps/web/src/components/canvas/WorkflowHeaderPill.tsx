@@ -88,25 +88,27 @@ export function WorkflowHeaderPill({ workflowId }: WorkflowHeaderPillProps) {
           />
         ) : (
           <>
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="inline"
               title={name}
               onClick={() => setRenaming(true)}
-              className="max-w-[260px] truncate px-2 py-[3px] text-left text-[var(--color-text-2)] hover:text-[var(--color-text)]"
+              className="max-w-[260px] justify-start truncate rounded-none px-2 py-[3px] text-left font-normal text-[var(--color-text-2)] hover:bg-transparent hover:text-[var(--color-text)]"
             >
               {name}
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
               aria-label="Switch workflow"
               onClick={togglePopover}
               className={cn(
-                'flex h-full items-center border-l border-[var(--color-divider)] px-1.5 py-[3px] text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text)]',
+                'h-full w-auto rounded-none border-l-[var(--color-divider)] px-1.5 py-[3px] text-[var(--color-text-muted)] hover:bg-transparent',
                 popoverOpen && 'text-[var(--color-text)]',
               )}
             >
               <ChevronDown size={12} strokeWidth={1.5} />
-            </button>
+            </Button>
           </>
         )}
       </div>
