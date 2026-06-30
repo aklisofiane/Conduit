@@ -15,7 +15,7 @@ export function toModelPrice(row: {
   outputPerM: DecimalLike;
 }): ModelPrice {
   return {
-    inputPerM: Number(row.inputPerM),
-    outputPerM: Number(row.outputPerM),
+    inputPerM: decimalToNumber(row.inputPerM),
+    outputPerM: decimalToNumber(row.outputPerM),
   };
 }
