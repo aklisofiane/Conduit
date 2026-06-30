@@ -8,6 +8,7 @@ import { NodeSummary } from '../components/run/NodeSummary.js';
 import { RunTimeline } from '../components/run/RunTimeline.js';
 import { useRunUpdates } from '../hooks/use-run-updates.js';
 import { duration, relativeFromNow } from '../lib/time.js';
+import { formatTokens, formatUsd } from '../lib/cost.js';
 import { cn } from '../lib/cn.js';
 import { workflowNodeRank } from '../lib/node-order.js';
 import { statusClass } from '../lib/status.js';
@@ -153,8 +154,16 @@ export function RunDetailPage() {
               <span>started {relativeFromNow(run.startedAt)}</span>
               <span>elapsed {duration(run.startedAt, run.finishedAt)}</span>
               <span>
-                tokens: {tokens.input.toLocaleString()} in · {tokens.output.toLocaleString()} out
+                {/* Prefer the finalized run rollup; fall back to the live node
+                    sum while the run is still in flight (rollup is null then). */}
+                tokens: {formatTokens(run.totalInputTokens ?? tokens.input)} in ·{' '}
+                {formatTokens(run.totalOutputTokens ?? tokens.output)} out
               </span>
+              {run.totalCostUsd != null && (
+                <span>
+                  cost: <span className="text-[var(--color-text)]">{formatUsd(run.totalCostUsd)}</span>
+                </span>
+              )}
               {branchName && (
                 <span className="text-[var(--color-text-2)]">
                   branch · <span className="text-[var(--color-text)]">{branchName}</span>

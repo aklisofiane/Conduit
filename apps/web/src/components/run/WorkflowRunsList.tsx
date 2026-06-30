@@ -5,6 +5,7 @@ import type { RunTrigger, WorkflowRunListItem } from '../../api/types.js';
 import { cn } from '../../lib/cn.js';
 import { statusClass } from '../../lib/status.js';
 import { duration, relativeFromNow } from '../../lib/time.js';
+import { formatUsd } from '../../lib/cost.js';
 import { Button } from '../ui/button.js';
 import { Card } from '../ui/card.js';
 
@@ -99,7 +100,10 @@ function RunRow({ run }: { run: WorkflowRunListItem }) {
         )}
       </div>
       <div className="font-mono text-small text-[var(--color-text-2)]">
-        {relativeFromNow(run.startedAt)}
+        <div>{relativeFromNow(run.startedAt)}</div>
+        {run.totalCostUsd != null && (
+          <div className="text-[var(--color-text-muted)]">{formatUsd(run.totalCostUsd)}</div>
+        )}
       </div>
       <div className="flex items-center justify-end gap-2 text-right font-mono text-small text-[var(--color-text-2)]">
         {run.status === 'FAILED' &&

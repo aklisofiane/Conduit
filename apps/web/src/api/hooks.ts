@@ -21,6 +21,7 @@ import type {
   CredentialRow,
   DiscoveredSkill,
   ExecutionLogRow,
+  ModelPriceRow,
   ProviderConfig,
   RunDetail,
   TemplateBinding,
@@ -258,6 +259,34 @@ export function useDeleteProviderConfig() {
   return useMutation({
     mutationFn: (id: string) => api.delete<void>(`/provider-configs/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: PROVIDER_CONFIGS }),
+  });
+}
+
+const MODEL_PRICES = ['model-pricing'] as const;
+
+/** Per-org per-model price overrides; sparse (only overridden models have a row). */
+export function useModelPrices() {
+  return useQuery({
+    queryKey: MODEL_PRICES,
+    queryFn: () => api.get<ModelPriceRow[]>('/model-pricing'),
+  });
+}
+
+export function useUpsertModelPrice() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { model: string; inputPerM: number; outputPerM: number }) =>
+      api.put<ModelPriceRow>('/model-pricing', body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: MODEL_PRICES }),
+  });
+}
+
+export function useDeleteModelPrice() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (model: string) =>
+      api.delete<void>(`/model-pricing/${encodeURIComponent(model)}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: MODEL_PRICES }),
   });
 }
 

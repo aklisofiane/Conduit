@@ -20,7 +20,7 @@ export class RunsService {
   ) {}
 
   async listForWorkflow(orgId: string, workflowId: string, limit = 50) {
-    return this.prisma.workflowRun.findMany({
+    const runs = await this.prisma.workflowRun.findMany({
       where: { workflowId, orgId },
       orderBy: { startedAt: 'desc' },
       take: limit,
@@ -28,6 +28,9 @@ export class RunsService {
         nodes: { select: { id: true, nodeName: true, status: true, startedAt: true, finishedAt: true } },
       },
     });
+    // `totalCostUsd` is a Prisma Decimal — surface it as a plain number so the
+    // web client can format it directly (the token columns are already Int).
+    return runs.map((run) => ({ ...run, totalCostUsd: decimalToNumber(run.totalCostUsd) }));
   }
 
   async get(orgId: string, runId: string) {
@@ -38,7 +41,14 @@ export class RunsService {
         nodes: true,
       },
     });
-    return orNotFound(run, 'Run', runId);
+    const found = orNotFound(run, 'Run', runId);
+    // Convert the snapshot-at-write Decimal columns (run rollup + per-node
+    // cost) to numbers; everything else passes through untouched.
+    return {
+      ...found,
+      totalCostUsd: decimalToNumber(found.totalCostUsd),
+      nodes: found.nodes.map((node) => ({ ...node, costUsd: decimalToNumber(node.costUsd) })),
+    };
   }
 
   async cancel(orgId: string, runId: string) {
@@ -98,4 +108,9 @@ export class RunsService {
       take,
     });
   }
+}
+
+/** Coerce a nullable Prisma `Decimal` to a plain number, preserving `null`. */
+function decimalToNumber(value: { toString(): string } | null): number | null {
+  return value == null ? null : Number(value);
 }

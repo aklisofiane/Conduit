@@ -14,9 +14,10 @@ import { cleanupRunActivity } from './cleanup-run';
  * exercised; only prisma + the log writer are mocked.
  */
 
-const { findUnique, findMany, update, writeSystemLog } = vi.hoisted(() => ({
+const { findUnique, findMany, aggregate, update, writeSystemLog } = vi.hoisted(() => ({
   findUnique: vi.fn(),
   findMany: vi.fn(),
+  aggregate: vi.fn(),
   update: vi.fn(),
   writeSystemLog: vi.fn(),
 }));
@@ -24,7 +25,7 @@ const { findUnique, findMany, update, writeSystemLog } = vi.hoisted(() => ({
 vi.mock('../runtime/prisma', () => ({
   prisma: () => ({
     workflowRun: { findUnique, update },
-    nodeRun: { findMany },
+    nodeRun: { findMany, aggregate },
   }),
 }));
 
@@ -39,6 +40,7 @@ describe('cleanupRunActivity', () => {
     conduitHome = await fs.mkdtemp(path.join(os.tmpdir(), 'conduit-cleanup-run-'));
     process.env.CONDUIT_HOME = conduitHome;
     findUnique.mockResolvedValue({ orgId: 'org_1' });
+    aggregate.mockResolvedValue({ _sum: { costUsd: null } });
     update.mockResolvedValue({});
     writeSystemLog.mockResolvedValue(undefined);
   });
@@ -83,5 +85,40 @@ describe('cleanupRunActivity', () => {
       String(c[3]).includes('unpushed-commit check failed'),
     );
     expect(warned).toBe(false);
+  });
+
+  it('rolls the run total tokens (from usage) and cost into the WorkflowRun', async () => {
+    // Two completed agent nodes with usage; cost is summed in SQL (mocked).
+    findMany.mockResolvedValue([
+      { usage: { inputTokens: 100, outputTokens: 40 } },
+      { usage: { inputTokens: 25, outputTokens: 10 } },
+    ]);
+    aggregate.mockResolvedValue({ _sum: { costUsd: 0.00513 } });
+
+    await cleanupRunActivity({ runId: 'run_2', status: 'COMPLETED' });
+
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'run_2' },
+        data: expect.objectContaining({
+          status: 'COMPLETED',
+          totalInputTokens: 125,
+          totalOutputTokens: 50,
+          totalCostUsd: 0.00513,
+        }),
+      }),
+    );
+  });
+
+  it('leaves the run totals null when no node recorded usage', async () => {
+    findMany.mockResolvedValue([{ usage: null }]);
+    aggregate.mockResolvedValue({ _sum: { costUsd: null } });
+
+    await cleanupRunActivity({ runId: 'run_3', status: 'COMPLETED' });
+
+    const data = update.mock.calls.at(-1)?.[0]?.data ?? {};
+    expect(data.totalInputTokens).toBeUndefined();
+    expect(data.totalOutputTokens).toBeUndefined();
+    expect(data.totalCostUsd).toBeUndefined();
   });
 });

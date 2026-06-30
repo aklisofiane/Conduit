@@ -7,18 +7,21 @@ import { Button } from '../ui/button.js';
  * "+ New / Cancel" create toggle. Each section supplies its own create-form and
  * row list as `children` — the markup of those parts varies per section, but the
  * outer scaffolding is identical.
+ *
+ * Omit `onToggleCreate` for sections with a fixed row set (e.g. model pricing,
+ * one row per known model) — the create toggle is then hidden.
  */
 export function SettingsSection({
   title,
   description,
-  creating,
+  creating = false,
   onToggleCreate,
   children,
 }: {
   title: string;
   description: ReactNode;
-  creating: boolean;
-  onToggleCreate: () => void;
+  creating?: boolean;
+  onToggleCreate?: () => void;
   children: ReactNode;
 }) {
   return (
@@ -28,9 +31,11 @@ export function SettingsSection({
           <h2 className="font-mono text-base font-semibold">{title}</h2>
           <p className="font-mono text-small text-[var(--color-text-muted)]">{description}</p>
         </div>
-        <Button className="shrink-0 whitespace-nowrap" onClick={onToggleCreate}>
-          {creating ? 'Cancel' : '+ New'}
-        </Button>
+        {onToggleCreate && (
+          <Button className="shrink-0 whitespace-nowrap" onClick={onToggleCreate}>
+            {creating ? 'Cancel' : '+ New'}
+          </Button>
+        )}
       </header>
 
       {children}

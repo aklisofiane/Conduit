@@ -28,6 +28,7 @@ import {
   type TriggerEvent,
   type WorkflowMcpServer,
 } from '@conduit/shared';
+import { resolveModelPrice } from '@conduit/shared/agent';
 import type { RunnerEvent, RunnerRequest } from '@conduit/shared/runner';
 import { errorMessage } from '@conduit/shared/runtime';
 import { gitlabApiUrl } from '@conduit/shared/platform';
@@ -43,6 +44,7 @@ import { makeCredentialLookup } from '../runtime/credential-lookup';
 import { publishRunUpdate } from '../runtime/event-bus';
 import { writeAgentEventLog, writeSystemLog } from '../runtime/log-writer';
 import { prisma } from '../runtime/prisma';
+import { loadModelPricing } from '../runtime/model-pricing';
 import { loadProviderConfig } from '../runtime/provider-config';
 import { resolveRunnerSpawner } from '../runtime/runner';
 import { makeTicketBranchStore } from '../runtime/ticket-branch-store';
@@ -413,6 +415,19 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
       branchName: workspace.branchName,
     };
 
+    // Snapshot-at-write cost: freeze the dollar amount onto the row using the
+    // price resolved for this node's model, so later price edits never rewrite
+    // history. Per-org overrides (set in settings) win over the shipped
+    // defaults; the resolved `source` records which was used. One Prisma read
+    // per node activity, mirroring loadProviderConfig. Unknown model with no
+    // override → no price → skip cost.
+    const priceOverrides = await loadModelPricing(orgId);
+    const price = resolveModelPrice(node.model, priceOverrides);
+    const costUsd = price
+      ? (usage.inputTokens / 1_000_000) * price.inputPerM +
+        (usage.outputTokens / 1_000_000) * price.outputPerM
+      : undefined;
+
     await prisma().nodeRun.update({
       where: { id: nodeRun.id },
       data: {
@@ -420,6 +435,8 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
         finishedAt: new Date(),
         output: output as unknown as object,
         usage: usage as unknown as object,
+        costUsd,
+        priceSnapshot: price ? (price as unknown as object) : undefined,
         workspacePath: workspace.path,
         conduitSummary: terminal.conduitSummary ?? undefined,
       },

@@ -10,6 +10,7 @@
     "declarationMap": false,
     "baseUrl": ".",
     "paths": {
+      "@conduit/shared/agent": ["../../packages/shared/src/agent/index.ts"],
       "@conduit/shared/crypto": ["../../packages/shared/src/crypto/index.ts"],
       "@conduit/shared/platform": ["../../packages/shared/src/platform/index.ts"],
       "@conduit/shared/runner": ["../../packages/shared/src/runner/index.ts"],
