@@ -1,4 +1,4 @@
-import type { ModelPrice } from '@conduit/shared/agent';
+import { type ModelPrice, toModelPrice } from '@conduit/shared/agent';
 import { prisma } from './prisma';
 
 /**
@@ -21,10 +21,5 @@ export async function loadModelPricing(
   });
   if (!row) return {};
 
-  return {
-    [row.model]: {
-      inputPerM: Number(row.inputPerM),
-      outputPerM: Number(row.outputPerM),
-    },
-  };
+  return { [row.model]: toModelPrice(row) };
 }

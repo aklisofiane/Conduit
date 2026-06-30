@@ -1,11 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { toModelPrice } from '@conduit/shared/agent';
 import { PrismaService } from '../../common/prisma.service';
 import type { UpsertModelPriceDto } from './dto';
 
 /**
  * Row shape returned to the UI. The `Decimal(12, 6)` columns are converted to
  * plain numbers so the settings form can round-trip them as `<input>` values;
- * the worker's `loadModelPricing` does the same conversion independently.
+ * the worker's `loadModelPricing` uses the same shared conversion.
  */
 export interface ModelPriceRow {
   model: string;
@@ -69,10 +70,11 @@ function toRow(row: {
   outputPerM: { toString(): string };
   updatedAt: Date;
 }): ModelPriceRow {
+  const price = toModelPrice(row);
   return {
     model: row.model,
-    inputPerM: Number(row.inputPerM),
-    outputPerM: Number(row.outputPerM),
+    inputPerM: price.inputPerM,
+    outputPerM: price.outputPerM,
     updatedAt: row.updatedAt,
   };
 }
