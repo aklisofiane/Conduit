@@ -66,6 +66,18 @@ The activity is now an **orchestrator** — it never imports a provider SDK. All
    paths until a terminal `exit` arrives.
 7. On `exit ok=true` persist NodeRun COMPLETED with output (files, head,
    workspaceKind, branchName) and the runner-returned `.conduit/<NodeName>.md`.
+   Also records `costUsd` and `priceSnapshot` (frozen at write time so later
+   price edits don't rewrite history) via two paths:
+   - **Claude** — provider reports `total_cost_usd` per turn; the activity sums
+     these directly. No per-model price lookup.
+   - **Codex** — provider reports no cost. The activity calls
+     `loadModelPricing(orgId, node.model)`: a single `findUnique` on
+     `ModelPrice.(orgId, model)`, returning the org's override or `{}`. Falls
+     through to `resolveModelPrice` built-in defaults. The resolved price is
+     multiplied against each token bucket (full-rate input, cached-read at
+     `cacheReadPerM ?? inputPerM × 0.1`, cache-write at
+     `cacheWritePerM ?? inputPerM × 1.25`, output). Unknown model with no
+     override → no price → `costUsd` left unset.
    On `exit ok=false` or missing terminal event, throw — Temporal flips to FAILED.
 8. On cancel: the abort signal flows through `RunnerHandle.cancel()` — `docker kill`
    in docker mode, a process-group SIGTERM→SIGKILL in host mode — the runner is

@@ -449,7 +449,7 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
     if (reportedCost.present) {
       costUsd = reportedCost.usd;
     } else {
-      const priceOverrides = await loadModelPricing(orgId);
+      const priceOverrides = await loadModelPricing(orgId, node.model);
       const price = resolveModelPrice(node.model, priceOverrides);
       if (price) {
         const cacheReadPerM = price.cacheReadPerM ?? price.inputPerM * 0.1;
