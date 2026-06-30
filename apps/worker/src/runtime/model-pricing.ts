@@ -1,4 +1,4 @@
-import type { ModelPrice } from '@conduit/shared/agent';
+import { type ModelPrice, toModelPrice } from '@conduit/shared/agent';
 import { prisma } from './prisma';
 
 /**
@@ -18,10 +18,7 @@ export async function loadModelPricing(
   const rows = await prisma().modelPrice.findMany({ where: { orgId } });
   const out: Record<string, ModelPrice> = {};
   for (const row of rows) {
-    out[row.model] = {
-      inputPerM: Number(row.inputPerM),
-      outputPerM: Number(row.outputPerM),
-    };
+    out[row.model] = toModelPrice(row);
   }
   return out;
 }

@@ -1,5 +1,6 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import type { ExecutionLogKind, TriggerEvent } from '@conduit/shared';
+import { decimalToNumber } from '@conduit/shared/agent';
 import { PrismaService } from '../../common/prisma.service';
 import { orNotFound } from '../../common/or-not-found';
 import { TemporalService } from '../../temporal/temporal.service';
@@ -108,9 +109,4 @@ export class RunsService {
       take,
     });
   }
-}
-
-/** Coerce a nullable Prisma `Decimal` to a plain number, preserving `null`. */
-function decimalToNumber(value: { toString(): string } | null): number | null {
-  return value == null ? null : Number(value);
 }
