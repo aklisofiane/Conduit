@@ -81,7 +81,7 @@ export function AcceptInvitationPage() {
         className="text-title font-semibold leading-none tracking-tight text-[var(--color-text)]"
         style={{ fontFamily: 'var(--font-serif)' }}
       >
-        Invitation<em className="text-[var(--color-claude-mark)] not-italic">.</em>
+        Invitation
       </h1>
 
       <section className="rounded-lg border border-[var(--color-divider)] bg-[var(--color-bg-panel)] p-5">

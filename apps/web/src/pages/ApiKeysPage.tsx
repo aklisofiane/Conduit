@@ -12,7 +12,7 @@ export function ApiKeysPage() {
         className="text-display font-semibold leading-none tracking-tight text-[var(--color-text)]"
         style={{ fontFamily: 'var(--font-serif)' }}
       >
-        API keys<em className="text-[var(--color-claude-mark)] not-italic">.</em>
+        API keys
       </h1>
       <p className="font-mono text-small text-[var(--color-text-2)]">
         Per-org provider keys consumed by the agent runtime. Set keys here to override the worker's env defaults — useful for LiteLLM / OpenAI-compatible proxies.

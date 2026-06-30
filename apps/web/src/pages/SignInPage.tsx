@@ -76,7 +76,7 @@ export function SignInPage() {
           className="text-heading font-semibold leading-none tracking-tight text-[var(--color-text)]"
           style={{ fontFamily: 'var(--font-serif)' }}
         >
-          Sign in<em className="text-[var(--color-claude-mark)] not-italic">.</em>
+          Sign in
         </h1>
         <p className="font-mono text-caption text-[var(--color-text-2)]">
           Welcome back to Conduit.

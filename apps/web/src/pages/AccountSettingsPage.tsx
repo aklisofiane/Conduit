@@ -63,7 +63,7 @@ export function AccountSettingsPage() {
         className="text-display font-semibold leading-none tracking-tight text-[var(--color-text)]"
         style={{ fontFamily: 'var(--font-serif)' }}
       >
-        Account<em className="text-[var(--color-claude-mark)] not-italic">.</em>
+        Account
       </h1>
       <p className="font-mono text-small text-[var(--color-text-2)]">
         Your profile and password. Organization-level settings live elsewhere.

@@ -38,13 +38,17 @@ export function PanelHeader({ trigger, isActive, title, onClose }: PanelHeaderPr
     <div className="flex items-start justify-between border-b border-[var(--color-divider)] px-5 py-4">
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 font-mono text-caption font-medium uppercase tracking-[0.06em] text-[var(--color-text-muted)]">
+          Trigger · {trigger.platform}
           <span
             className={cn(
-              'h-[6px] w-[6px] rounded-full',
-              isActive ? 'bg-[var(--color-success)]' : 'bg-[var(--color-text-muted)]',
+              'ml-auto rounded-[var(--radius-sm)] border px-[6px] py-[1px] tracking-[0.06em]',
+              isActive
+                ? 'border-[var(--color-success)] text-[var(--color-success)]'
+                : 'border-[var(--color-pill-border)] bg-[var(--color-pill-bg)] text-[var(--color-text-muted)]',
             )}
-          />
-          Trigger · {trigger.platform}
+          >
+            {isActive ? 'Active' : 'Inactive'}
+          </span>
         </div>
         <h3 className="mt-2 truncate font-sans text-base font-semibold text-[var(--color-text)]">
           <span>{title}</span>

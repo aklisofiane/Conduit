@@ -113,11 +113,7 @@ export function AgentConfigPanel({
     <>
       <div className="flex items-start justify-between border-b border-[var(--color-divider)] px-5 py-4">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 font-mono text-caption font-medium uppercase tracking-[0.06em] text-[var(--color-text-muted)]">
-            <span
-              className="h-[6px] w-[6px] rounded-full"
-              style={{ background: ps.mark }}
-            />
+          <div className="font-mono text-caption font-medium uppercase tracking-[0.06em] text-[var(--color-text-muted)]">
             Agent · {ps.label}
           </div>
           <h3 className="mt-2 truncate font-sans text-base font-semibold text-[var(--color-text)]">

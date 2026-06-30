@@ -185,7 +185,6 @@ function OrganizationHeader({
               title={name}
             >
               {name}
-              <em className="text-[var(--color-claude-mark)] not-italic">.</em>
             </h1>
           )}
           <p className="mt-2 font-mono text-caption text-[var(--color-text-2)]">

@@ -28,7 +28,7 @@ export function InvitationsPage() {
           className="text-display font-semibold leading-none tracking-tight text-[var(--color-text)]"
           style={{ fontFamily: 'var(--font-serif)' }}
         >
-          Invitations<em className="text-[var(--color-claude-mark)] not-italic">.</em>
+          Invitations
         </h1>
         <p className="mt-2 font-mono text-small text-[var(--color-text-2)]">
           Invitations sent to your email. Accepting joins you as a member; the active organization isn't changed.
