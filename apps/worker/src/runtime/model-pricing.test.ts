@@ -2,38 +2,41 @@ import { describe, expect, it, vi } from 'vitest';
 import { loadModelPricing } from './model-pricing';
 
 /**
- * `loadModelPricing` maps the org's `ModelPrice` rows into the
- * `model -> { inputPerM, outputPerM }` lookup that `resolveModelPrice` takes
- * as its `overrides` arg, converting Prisma `Decimal` columns to numbers.
+ * `loadModelPricing` issues a single `findUnique` on the compound key
+ * `(orgId, model)` and returns a 0-or-1-entry record for `resolveModelPrice`,
+ * converting Prisma `Decimal` columns to plain JS numbers.
  * Only prisma is mocked.
  */
 
-const { findMany } = vi.hoisted(() => ({ findMany: vi.fn() }));
+const { findUnique } = vi.hoisted(() => ({ findUnique: vi.fn() }));
 
 vi.mock('./prisma', () => ({
-  prisma: () => ({ modelPrice: { findMany } }),
+  prisma: () => ({ modelPrice: { findUnique } }),
 }));
 
 describe('loadModelPricing', () => {
-  it('maps rows to a {model: {inputPerM, outputPerM}} record, Decimal -> number', async () => {
-    findMany.mockResolvedValue([
-      // Prisma returns Decimal instances; Number(...) must coerce them.
-      { model: 'claude-opus-4-8', inputPerM: { toString: () => '12.5' }, outputPerM: { toString: () => '60' } },
-      { model: 'gpt-5.5', inputPerM: 1, outputPerM: 8 },
-    ]);
+  it('returns a single-entry record and converts Decimal values to numbers', async () => {
+    // Prisma returns Decimal instances; Number(...) must coerce them.
+    findUnique.mockResolvedValue({
+      model: 'claude-opus-4-8',
+      inputPerM: { toString: () => '12.5' },
+      outputPerM: { toString: () => '60' },
+    });
 
-    const overrides = await loadModelPricing('org_1');
+    const overrides = await loadModelPricing('org_1', 'claude-opus-4-8');
 
-    expect(findMany).toHaveBeenCalledWith({ where: { orgId: 'org_1' } });
+    expect(findUnique).toHaveBeenCalledWith({
+      where: { orgId_model: { orgId: 'org_1', model: 'claude-opus-4-8' } },
+    });
     expect(overrides).toEqual({
       'claude-opus-4-8': { inputPerM: 12.5, outputPerM: 60 },
-      'gpt-5.5': { inputPerM: 1, outputPerM: 8 },
     });
     expect(typeof overrides['claude-opus-4-8']?.inputPerM).toBe('number');
+    expect(typeof overrides['claude-opus-4-8']?.outputPerM).toBe('number');
   });
 
-  it('returns an empty record when the org has no overrides', async () => {
-    findMany.mockResolvedValue([]);
-    await expect(loadModelPricing('org_2')).resolves.toEqual({});
+  it('returns an empty record when no override exists for the model', async () => {
+    findUnique.mockResolvedValue(null);
+    await expect(loadModelPricing('org_2', 'unknown-model')).resolves.toEqual({});
   });
 });
