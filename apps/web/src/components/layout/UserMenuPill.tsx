@@ -17,7 +17,8 @@ import {
 } from '../../api/organization.js';
 import { useSession, signOut } from '../../lib/auth-client.js';
 import { cn } from '../../lib/cn.js';
-import { ChevronDown, Plus } from 'lucide-react';
+import { ChevronDown, Plus, Settings } from 'lucide-react';
+import { SETTINGS_NAV } from '../settings/settings-nav.js';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -202,21 +203,30 @@ function UserMenuBody({ name, email, onClose }: UserMenuBodyProps) {
       />
 
       <div className="flex flex-col border-t border-[var(--color-divider)] py-1">
-        <NavMenuItem onSelect={goTo('/account')}>Account settings</NavMenuItem>
-        <NavMenuItem onSelect={goTo('/account/organization')}>Organization settings</NavMenuItem>
-        <NavMenuItem onSelect={goTo('/account/invitations')}>
-          <span className="flex w-full items-center justify-between gap-2">
-            <span>Pending invitations</span>
-            {pendingInvitationCount > 0 && (
-              <span
-                aria-label={`${pendingInvitationCount} pending`}
-                className="rounded-full bg-[var(--color-claude-mark)] px-1.5 py-[1px] font-mono text-caption text-[var(--color-bg-panel)]"
-              >
-                {pendingInvitationCount}
+        <div className="flex items-center gap-2 px-3 py-1.5 font-mono text-small font-medium text-[var(--color-text)]">
+          <Settings size={14} strokeWidth={1.5} />
+          <span>Settings</span>
+        </div>
+        {SETTINGS_NAV.map((entry) => {
+          const Icon = entry.icon;
+          const badge = entry.key === 'invitations' ? pendingInvitationCount : 0;
+          return (
+            <NavMenuItem key={entry.key} onSelect={goTo(entry.path)}>
+              <span className="flex w-full items-center gap-2 pl-4">
+                <Icon size={14} strokeWidth={1.5} />
+                <span>{entry.label}</span>
+                {badge > 0 && (
+                  <span
+                    aria-label={`${badge} pending`}
+                    className="ml-auto rounded-full bg-[var(--color-claude-mark)] px-1.5 py-[1px] font-mono text-caption text-[var(--color-bg-panel)]"
+                  >
+                    {badge}
+                  </span>
+                )}
               </span>
-            )}
-          </span>
-        </NavMenuItem>
+            </NavMenuItem>
+          );
+        })}
       </div>
 
       <div className="flex flex-col border-t border-[var(--color-divider)] py-1">

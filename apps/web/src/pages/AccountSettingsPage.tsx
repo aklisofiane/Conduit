@@ -1,9 +1,8 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useForm, type UseFormSetError } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useUserInvitations } from '../api/organization.js';
 import { authClient, signOut, useSession } from '../lib/auth-client.js';
 import { FormField } from '../components/common/FormField.js';
 import { Button } from '../components/ui/button.js';
@@ -88,8 +87,6 @@ export function AccountSettingsPage() {
         </dl>
       </section>
 
-      <OrganizationLinks />
-
       <AppearanceSection />
 
       <ChangePasswordSection />
@@ -136,40 +133,6 @@ function AppearanceSection() {
           ))}
         </ToggleGroup>
       </div>
-    </section>
-  );
-}
-
-function OrganizationLinks() {
-  const { data: invitations = [] } = useUserInvitations();
-  const pendingCount = invitations.filter((i) => i.status === 'pending').length;
-
-  return (
-    <section className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-      <Link
-        to="/account/organization"
-        className="flex flex-col gap-1 rounded-lg border border-[var(--color-divider)] bg-[var(--color-bg-panel)] px-4 py-3 transition-colors hover:border-[var(--color-divider)] hover:bg-[var(--color-pill-bg)]"
-      >
-        <span className="font-mono text-small font-semibold text-[var(--color-text)]">
-          Organization
-        </span>
-        <span className="font-mono text-small text-[var(--color-text-2)]">
-          Members, invitations, settings
-        </span>
-      </Link>
-      {pendingCount > 0 && (
-        <Link
-          to="/account/invitations"
-          className="flex flex-col gap-1 rounded-lg border border-[var(--color-divider)] bg-[var(--color-bg-panel)] px-4 py-3 transition-colors hover:border-[var(--color-divider)] hover:bg-[var(--color-pill-bg)]"
-        >
-          <span className="font-mono text-small font-semibold text-[var(--color-text)]">
-            Pending invitations ({pendingCount})
-          </span>
-          <span className="font-mono text-small text-[var(--color-text-2)]">
-            Accept or reject invitations sent to your email
-          </span>
-        </Link>
-      )}
     </section>
   );
 }

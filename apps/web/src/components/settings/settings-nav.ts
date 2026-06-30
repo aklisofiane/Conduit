@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Key, LayoutGrid } from 'lucide-react';
+import { Building2, Key, LayoutGrid, Mail, UserRound } from 'lucide-react';
 
 interface SettingsNavEntry {
   key: string;
@@ -9,6 +9,12 @@ interface SettingsNavEntry {
 }
 
 export const SETTINGS_NAV: ReadonlyArray<SettingsNavEntry> = [
+  {
+    key: 'account',
+    label: 'Account',
+    path: '/settings/account',
+    icon: UserRound,
+  },
   {
     key: 'integrations',
     label: 'Integrations',
@@ -20,5 +26,17 @@ export const SETTINGS_NAV: ReadonlyArray<SettingsNavEntry> = [
     label: 'API keys',
     path: '/settings/api-keys',
     icon: Key,
+  },
+  {
+    key: 'organization',
+    label: 'Organization',
+    path: '/settings/organization',
+    icon: Building2,
+  },
+  {
+    key: 'invitations',
+    label: 'Invitations',
+    path: '/settings/invitations',
+    icon: Mail,
   },
 ];
