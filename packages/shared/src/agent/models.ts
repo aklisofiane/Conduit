@@ -34,15 +34,16 @@ export interface ResolvedModelPrice extends ModelPrice {
  * Two-rate (input/output) only — providers emit flat token counts, so cache /
  * reasoning breakdowns are out of scope (see .specs/token-cost-per-run.md).
  *
- * Values track current public list prices by tier: Claude Opus $15/$75,
- * Sonnet $3/$15, Haiku $1/$5; the GPT-5 / Codex family at the published GPT-5
- * rate of $1.25/$10. These are the "default value right now" — orgs override
- * per-model in settings, and runs snapshot the resolved price at write time.
+ * Values track current public list prices by tier: Claude Opus 4.x $5/$25,
+ * Sonnet 4.6 $3/$15, Haiku 4.5 $1/$5; the GPT-5 / Codex family at the published
+ * GPT-5 rate of $1.25/$10. These are the "default value right now" — orgs
+ * override per-model in settings, and runs snapshot the resolved price at write
+ * time.
  */
 export const MODEL_PRICING: Record<string, ModelPrice> = {
-  // Claude
-  'claude-opus-4-8': { inputPerM: 15, outputPerM: 75 },
-  'claude-opus-4-6': { inputPerM: 15, outputPerM: 75 },
+  // Claude (Opus 4.x is $5/$25 — the older $15/$75 was Claude 3 Opus)
+  'claude-opus-4-8': { inputPerM: 5, outputPerM: 25 },
+  'claude-opus-4-6': { inputPerM: 5, outputPerM: 25 },
   'claude-sonnet-4-6': { inputPerM: 3, outputPerM: 15 },
   'claude-haiku-4-5': { inputPerM: 1, outputPerM: 5 },
   // Codex (GPT-5 family)

@@ -13,8 +13,8 @@ describe('MODEL_PRICING', () => {
 describe('resolveModelPrice', () => {
   it('returns the shipped default with source "default"', () => {
     expect(resolveModelPrice('claude-opus-4-8')).toEqual({
-      inputPerM: 15,
-      outputPerM: 75,
+      inputPerM: 5,
+      outputPerM: 25,
       source: 'default',
     });
   });

@@ -25,14 +25,17 @@ import { startHarness, type Harness } from './harness';
 
 const WEBHOOK_SECRET = 'run-cost-secret';
 const NODE_NAME = 'Triage';
-const MODEL = 'claude-opus-4-8'; // MODEL_PRICING default: $15 in / $75 out per 1M.
+const MODEL = 'claude-opus-4-8'; // MODEL_PRICING default: $5 in / $25 out per 1M.
+const INPUT_PER_M = 5;
+const OUTPUT_PER_M = 25;
 
 const USAGE_INPUT_TOKENS = 137;
 const USAGE_OUTPUT_TOKENS = 41;
 
 // Expected snapshot-at-write cost from the defaults above.
 const EXPECTED_COST =
-  (USAGE_INPUT_TOKENS / 1_000_000) * 15 + (USAGE_OUTPUT_TOKENS / 1_000_000) * 75;
+  (USAGE_INPUT_TOKENS / 1_000_000) * INPUT_PER_M +
+  (USAGE_OUTPUT_TOKENS / 1_000_000) * OUTPUT_PER_M;
 
 interface CreateWorkflowResponse {
   id: string;
@@ -130,7 +133,11 @@ describe('Run cost — per-node snapshot + run rollup land in the DB', () => {
       where: { runId_nodeName: { runId, nodeName: NODE_NAME } },
     });
     expect(Number(nodeRun.costUsd)).toBeCloseTo(EXPECTED_COST, 6);
-    expect(nodeRun.priceSnapshot).toEqual({ inputPerM: 15, outputPerM: 75, source: 'default' });
+    expect(nodeRun.priceSnapshot).toEqual({
+      inputPerM: INPUT_PER_M,
+      outputPerM: OUTPUT_PER_M,
+      source: 'default',
+    });
 
     // Run rollup: tokens summed from NodeRun.usage, cost summed from costUsd.
     const workflowRun = await prisma.workflowRun.findUniqueOrThrow({ where: { id: runId } });
