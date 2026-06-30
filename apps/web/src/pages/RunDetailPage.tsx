@@ -89,7 +89,11 @@ export function RunDetailPage() {
         (acc, n) => {
           const u = n.usage ?? {};
           return {
-            input: acc.input + (u.inputTokens ?? 0),
+            input:
+              acc.input +
+              (u.inputTokens ?? 0) +
+              (u.cachedInputTokens ?? 0) +
+              (u.cacheCreationInputTokens ?? 0),
             output: acc.output + (u.outputTokens ?? 0),
           };
         },
@@ -161,7 +165,8 @@ export function RunDetailPage() {
               </span>
               {run.totalCostUsd != null && (
                 <span>
-                  cost: <span className="text-[var(--color-text)]">{formatUsd(run.totalCostUsd)}</span>
+                  cost:{' '}
+                  <span className="text-[var(--color-text)]">{formatUsd(run.totalCostUsd)}</span>
                 </span>
               )}
               {branchName && (
@@ -196,7 +201,9 @@ export function RunDetailPage() {
               )}
             </div>
             {rerunNote && (
-              <span className="font-mono text-small text-[var(--color-text-muted)]">{rerunNote}</span>
+              <span className="font-mono text-small text-[var(--color-text-muted)]">
+                {rerunNote}
+              </span>
             )}
           </div>
         </div>

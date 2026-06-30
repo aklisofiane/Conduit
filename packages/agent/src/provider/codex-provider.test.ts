@@ -110,6 +110,46 @@ describe('CodexProvider', () => {
     expect(events[5]).toEqual({ type: 'done' });
   });
 
+  it('normalizes per-turn usage: cached is subtracted from input, reasoning surfaced separately', async () => {
+    installStub({
+      scriptedEvents: [
+        {
+          type: 'turn.completed',
+          // Codex `input_tokens` *includes* `cached_input_tokens`; `output_tokens`
+          // already includes `reasoning_output_tokens`.
+          usage: {
+            input_tokens: 100000,
+            cached_input_tokens: 96000,
+            output_tokens: 1500,
+            reasoning_output_tokens: 1100,
+          },
+        },
+      ],
+    });
+
+    const events: unknown[] = [];
+    const session = new CodexProvider().startSession(
+      {
+        model: 'gpt-5.5',
+        systemPrompt: 'sys',
+        mcpServers: [],
+        workspacePath: '/tmp/x',
+        constraints: {},
+      } as never,
+      new AbortController().signal,
+    );
+    for await (const e of session.run('user')) events.push(e);
+
+    expect(events.find((e) => (e as { type?: string }).type === 'usage')).toEqual({
+      type: 'usage',
+      // 100000 input − 96000 cached = 4000 full-rate.
+      inputTokens: 4000,
+      cachedInputTokens: 96000,
+      outputTokens: 1500,
+      reasoningOutputTokens: 1100,
+    });
+  });
+
   it('forwards additionalDirectories to startThread so the agent can write outside the workspace dir', async () => {
     let threadOptions: Record<string, unknown> | undefined;
     installStub({

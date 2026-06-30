@@ -138,8 +138,9 @@ interface CodexSdkModule {
   Codex: new (options?: Record<string, unknown>) => CodexInstance;
 }
 
-const codexSdk = makeLazySdkLoader<CodexSdkModule>('@openai/codex-sdk', () =>
-  import('@openai/codex-sdk'),
+const codexSdk = makeLazySdkLoader<CodexSdkModule>(
+  '@openai/codex-sdk',
+  () => import('@openai/codex-sdk'),
 );
 
 /** Test-only: inject a custom SDK loader and reset the cached module. */
@@ -261,7 +262,12 @@ function translate(
   const ev = raw as {
     type?: string;
     item?: { id?: string; type?: string } & Record<string, unknown>;
-    usage?: { input_tokens?: number; output_tokens?: number };
+    usage?: {
+      input_tokens?: number;
+      cached_input_tokens?: number;
+      output_tokens?: number;
+      reasoning_output_tokens?: number;
+    };
     error?: { message?: string } | string;
     message?: string;
   };
@@ -275,10 +281,27 @@ function translate(
     case 'turn.completed': {
       const events: AgentEvent[] = [];
       if (ev.usage) {
+        // Codex usage is *cumulative across the thread* — every turn.completed
+        // reports the running session total, so turn 2's `input_tokens` already
+        // includes turn 1. The activity accumulator replaces (not sums) codex
+        // usage for this reason; emitting the raw cumulative figure here is what
+        // it expects. `cached_input_tokens` is a *subset* of `input_tokens` (not
+        // additive), so the full-rate portion is the difference — pricing the
+        // cached slice at the cheaper cache-read rate downstream. `output_tokens`
+        // already includes `reasoning_output_tokens` (OpenAI Responses
+        // semantics), so we never add reasoning to output or to a total — it's
+        // surfaced for display only. No cost is reported; it's computed from the
+        // per-model price table.
+        const input = ev.usage.input_tokens ?? 0;
+        const cached = Math.min(ev.usage.cached_input_tokens ?? 0, input);
         events.push({
           type: 'usage',
-          inputTokens: ev.usage.input_tokens ?? 0,
+          inputTokens: input - cached,
+          cachedInputTokens: cached,
           outputTokens: ev.usage.output_tokens ?? 0,
+          ...(ev.usage.reasoning_output_tokens
+            ? { reasoningOutputTokens: ev.usage.reasoning_output_tokens }
+            : {}),
         });
       }
       events.push({ type: 'done' });

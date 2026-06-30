@@ -92,10 +92,21 @@ async function rollupRunTotals(runId: string): Promise<{
   let totalOutputTokens = 0;
   let hasUsage = false;
   for (const node of nodes) {
-    const usage = node.usage as { inputTokens?: number; outputTokens?: number } | null;
+    const usage = node.usage as {
+      inputTokens?: number;
+      outputTokens?: number;
+      cachedInputTokens?: number;
+      cacheCreationInputTokens?: number;
+    } | null;
     if (!usage) continue;
     hasUsage = true;
-    totalInputTokens += usage.inputTokens ?? 0;
+    // Headline "input" is everything the model read — full-rate plus the cache
+    // buckets — so the run total reflects true consumption, not just the
+    // uncached slice. Cost is rolled up separately (snapshot costUsd per node).
+    totalInputTokens +=
+      (usage.inputTokens ?? 0) +
+      (usage.cachedInputTokens ?? 0) +
+      (usage.cacheCreationInputTokens ?? 0);
     totalOutputTokens += usage.outputTokens ?? 0;
   }
 

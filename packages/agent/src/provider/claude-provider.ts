@@ -36,9 +36,7 @@ export class ClaudeProvider implements AgentProvider {
   }
 
   startSession(req: AgentRequest, signal: AbortSignal): AgentSession {
-    const mcpServers = Object.fromEntries(
-      req.mcpServers.map((s) => [s.id, sdkMcpConfig(s)]),
-    );
+    const mcpServers = Object.fromEntries(req.mcpServers.map((s) => [s.id, sdkMcpConfig(s)]));
     const canUseTool = makeCanUseTool(req.mcpServers);
     const input = new AsyncQueue<SdkUserMessage>();
     let iterator: AsyncIterator<unknown> | undefined;
@@ -112,14 +110,13 @@ type ClaudeSdk = {
   query(args: unknown): AsyncIterable<unknown>;
 };
 
-const claudeSdk = makeLazySdkLoader<ClaudeSdk>('@anthropic-ai/claude-agent-sdk', () =>
-  import('@anthropic-ai/claude-agent-sdk'),
+const claudeSdk = makeLazySdkLoader<ClaudeSdk>(
+  '@anthropic-ai/claude-agent-sdk',
+  () => import('@anthropic-ai/claude-agent-sdk'),
 );
 
 /** Test-only: inject a custom SDK loader and reset the cached module. */
-export function __setClaudeSdkLoaderForTests(
-  loader: (() => Promise<ClaudeSdk>) | undefined,
-): void {
+export function __setClaudeSdkLoaderForTests(loader: (() => Promise<ClaudeSdk>) | undefined): void {
   claudeSdk.setLoaderForTests(loader);
 }
 
@@ -218,7 +215,6 @@ function translate(raw: unknown): AgentEvent[] {
   if (m.type === 'assistant' && m.message && typeof m.message === 'object') {
     const msg = m.message as {
       content?: Array<{ type?: string; id?: string; name?: string; input?: unknown }>;
-      usage?: { input_tokens?: number; output_tokens?: number };
     };
     const events: AgentEvent[] = [];
     for (const block of msg.content ?? []) {
@@ -231,13 +227,13 @@ function translate(raw: unknown): AgentEvent[] {
         });
       }
     }
-    if (msg.usage) {
-      events.push({
-        type: 'usage',
-        inputTokens: msg.usage.input_tokens ?? 0,
-        outputTokens: msg.usage.output_tokens ?? 0,
-      });
-    }
+    // Deliberately *don't* emit usage per assistant message. Each assistant
+    // message's `usage.input_tokens` is the per-API-request input, which in an
+    // agentic loop re-counts the whole growing context every turn (and omits
+    // the cache buckets that hold the bulk of it). Summing them over-reports.
+    // We take the SDK's cumulative-per-turn rollup off the `result` message
+    // instead — see the `result` branch below. This is what the Agent SDK
+    // cost-tracking docs recommend ("prefer the result message").
     return events;
   }
 
@@ -268,7 +264,34 @@ function translate(raw: unknown): AgentEvent[] {
     if (m.is_error) {
       throw new Error(formatClaudeResultError(m));
     }
-    return [{ type: 'done' }];
+    const events: AgentEvent[] = [];
+    const r = m as {
+      usage?: {
+        input_tokens?: number;
+        output_tokens?: number;
+        cache_creation_input_tokens?: number;
+        cache_read_input_tokens?: number;
+      };
+      total_cost_usd?: number;
+    };
+    // One cumulative usage event per turn, taken from the SDK's own rollup.
+    // `input_tokens` here already excludes cache; the two cache buckets are
+    // tracked separately so cost can price each correctly. `total_cost_usd` is
+    // the SDK's authoritative-ish estimate for this turn — we surface it as
+    // `costUsd` and the activity uses it directly (Claude bypasses the
+    // per-model price table).
+    if (r.usage || typeof r.total_cost_usd === 'number') {
+      events.push({
+        type: 'usage',
+        inputTokens: r.usage?.input_tokens ?? 0,
+        outputTokens: r.usage?.output_tokens ?? 0,
+        cachedInputTokens: r.usage?.cache_read_input_tokens ?? 0,
+        cacheCreationInputTokens: r.usage?.cache_creation_input_tokens ?? 0,
+        ...(typeof r.total_cost_usd === 'number' ? { costUsd: r.total_cost_usd } : {}),
+      });
+    }
+    events.push({ type: 'done' });
+    return events;
   }
 
   return [];

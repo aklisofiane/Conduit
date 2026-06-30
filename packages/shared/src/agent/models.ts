@@ -21,6 +21,20 @@ export interface ModelPrice {
   inputPerM: number;
   /** USD per 1M output tokens. */
   outputPerM: number;
+  /**
+   * USD per 1M cached-input (cache-read) tokens. Optional — when unset, callers
+   * default to `inputPerM * 0.1` (the standard cache-read discount). Used to
+   * price the cached portion of Codex usage at the discounted rate instead of
+   * charging full input for tokens served from cache.
+   */
+  cacheReadPerM?: number;
+  /**
+   * USD per 1M cache-write tokens. Optional — when unset, callers default to
+   * `inputPerM * 1.25`. Only Claude reports cache-creation tokens; Codex never
+   * does, so this is effectively Claude-only and unused while Claude cost comes
+   * from the SDK's `total_cost_usd`.
+   */
+  cacheWritePerM?: number;
 }
 
 export interface ResolvedModelPrice extends ModelPrice {
@@ -31,8 +45,11 @@ export interface ResolvedModelPrice extends ModelPrice {
 /**
  * Default USD price per 1M tokens for each known model, used as the fallback
  * when an org hasn't set a per-model override (see the `ModelPrice` table).
- * Two-rate (input/output) only — providers emit flat token counts, so cache /
- * reasoning breakdowns are out of scope (see .specs/token-cost-per-run.md).
+ * Input/output rates are explicit; the cache-read and cache-write rates are
+ * optional and default to `inputPerM * 0.1` / `inputPerM * 1.25` at the call
+ * site, so the cached portion of Codex usage prices at the discount rather than
+ * full input. (Claude cost comes from the SDK's `total_cost_usd` and bypasses
+ * this table entirely — these rates only bite for Codex.)
  *
  * Values track current public list prices by tier: Claude Opus 4.x $5/$25,
  * Sonnet 4.6 $3/$15, Haiku 4.5 $1/$5; the GPT-5 / Codex family at the published
@@ -63,8 +80,22 @@ export function resolveModelPrice(
   overrides?: Record<string, ModelPrice>,
 ): ResolvedModelPrice | null {
   const override = overrides?.[model];
-  if (override) return { inputPerM: override.inputPerM, outputPerM: override.outputPerM, source: 'override' };
+  if (override)
+    return {
+      inputPerM: override.inputPerM,
+      outputPerM: override.outputPerM,
+      cacheReadPerM: override.cacheReadPerM,
+      cacheWritePerM: override.cacheWritePerM,
+      source: 'override',
+    };
   const fallback = MODEL_PRICING[model];
-  if (fallback) return { inputPerM: fallback.inputPerM, outputPerM: fallback.outputPerM, source: 'default' };
+  if (fallback)
+    return {
+      inputPerM: fallback.inputPerM,
+      outputPerM: fallback.outputPerM,
+      cacheReadPerM: fallback.cacheReadPerM,
+      cacheWritePerM: fallback.cacheWritePerM,
+      source: 'default',
+    };
   return null;
 }

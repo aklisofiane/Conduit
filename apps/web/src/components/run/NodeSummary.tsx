@@ -1,7 +1,7 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { NodeRunRow } from '../../api/types.js';
-import { formatTokens, formatUsd } from '../../lib/cost.js';
+import { formatTokens, formatUsd, totalInputTokens } from '../../lib/cost.js';
 
 /**
  * Render `.conduit/<NodeName>.md` for a node, captured at the end of the
@@ -13,8 +13,9 @@ import { formatTokens, formatUsd } from '../../lib/cost.js';
 export function NodeSummary({ node }: { node: NodeRunRow }) {
   const summary = node.conduitSummary;
   const usage = node.usage;
-  const hasStats =
-    usage?.inputTokens != null || usage?.outputTokens != null || node.costUsd != null;
+  const inputTotal = totalInputTokens(usage);
+  const cached = usage?.cachedInputTokens ?? 0;
+  const hasStats = inputTotal != null || usage?.outputTokens != null || node.costUsd != null;
 
   if (!summary && !hasStats) {
     return (
@@ -30,8 +31,13 @@ export function NodeSummary({ node }: { node: NodeRunRow }) {
       {hasStats && (
         <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-small text-[var(--color-text-muted)]">
           <span>
-            tokens: {formatTokens(usage?.inputTokens ?? null)} in ·{' '}
-            {formatTokens(usage?.outputTokens ?? null)} out
+            tokens: {formatTokens(inputTotal)} in · {formatTokens(usage?.outputTokens ?? null)} out
+            {cached > 0 && (
+              <span className="text-[var(--color-text-muted)]">
+                {' '}
+                ({formatTokens(cached)} cached)
+              </span>
+            )}
           </span>
           {node.costUsd != null && (
             <span>

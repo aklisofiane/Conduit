@@ -103,7 +103,21 @@ export interface NodeRunRow {
     isBranchedWorktree?: boolean;
     branchName?: string;
   } | null;
-  usage: { inputTokens?: number; outputTokens?: number; toolCalls?: number; turns?: number } | null;
+  /**
+   * Per-node token usage. `inputTokens` is the full-rate (non-cached) portion;
+   * `cachedInputTokens` and `cacheCreationInputTokens` are the cache buckets.
+   * Display "input" totals should sum all three. `reasoningOutputTokens` is a
+   * subset of `outputTokens` (display only — never add it to a total).
+   */
+  usage: {
+    inputTokens?: number;
+    outputTokens?: number;
+    cachedInputTokens?: number;
+    cacheCreationInputTokens?: number;
+    reasoningOutputTokens?: number;
+    toolCalls?: number;
+    turns?: number;
+  } | null;
   /** Snapshot-at-write dollar cost of this node (Decimal → number). Null on non-agent / pre-feature nodes. */
   costUsd: number | null;
   priceSnapshot: PriceSnapshot | null;

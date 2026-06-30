@@ -360,7 +360,18 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
       },
     };
 
-    const usage = { inputTokens: 0, outputTokens: 0, toolCalls: 0, turns: 0 };
+    const usage: NodeUsageAccumulator = {
+      inputTokens: 0,
+      outputTokens: 0,
+      cachedInputTokens: 0,
+      cacheCreationInputTokens: 0,
+      reasoningOutputTokens: 0,
+      toolCalls: 0,
+      turns: 0,
+    };
+    // Provider-reported cost (Claude's `total_cost_usd`), summed across turns.
+    // When no turn reports a cost (Codex), we fall back to per-model pricing.
+    const reportedCost = { usd: 0, present: false };
     // Independent of the runner's event flow so a long-blocking tool call
     // doesn't trip Temporal's liveness check.
     const heartbeater = setInterval(() => {
@@ -377,7 +388,15 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
     try {
       for await (const event of handle.events) {
         if (event.kind === 'agent') {
-          await onAgentEvent(runId, orgId, node.name, event.event, usage);
+          await onAgentEvent(
+            runId,
+            orgId,
+            node.name,
+            event.event,
+            usage,
+            reportedCost,
+            node.provider === 'codex',
+          );
         } else if (event.kind === 'system') {
           await Promise.all([
             publishSystemEvent(runId, node.name, event.message),
@@ -415,18 +434,34 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
       branchName: workspace.branchName,
     };
 
-    // Snapshot-at-write cost: freeze the dollar amount onto the row using the
-    // price resolved for this node's model, so later price edits never rewrite
-    // history. Per-org overrides (set in settings) win over the shipped
-    // defaults; the resolved `source` records which was used. One Prisma read
-    // per node activity, mirroring loadProviderConfig. Unknown model with no
-    // override → no price → skip cost.
-    const priceOverrides = await loadModelPricing(orgId);
-    const price = resolveModelPrice(node.model, priceOverrides);
-    const costUsd = price
-      ? (usage.inputTokens / 1_000_000) * price.inputPerM +
-        (usage.outputTokens / 1_000_000) * price.outputPerM
-      : undefined;
+    // Snapshot-at-write cost, frozen onto the row so later price edits never
+    // rewrite history. Two sources:
+    //   • Claude reports an authoritative-ish `total_cost_usd` per turn (summed
+    //     into `reportedCost`); we use it directly and record no price snapshot
+    //     (Claude bypasses the per-org price table — see .specs).
+    //   • Codex reports no cost, so we price each token bucket from the resolved
+    //     per-model price: full-rate input, cached input at the cache-read rate
+    //     (defaulting to 0.1× input), cache-creation at the cache-write rate
+    //     (defaulting to 1.25× input), and output. Unknown model with no
+    //     override → no price → skip cost.
+    let costUsd: number | undefined;
+    let priceSnapshot: object | undefined;
+    if (reportedCost.present) {
+      costUsd = reportedCost.usd;
+    } else {
+      const priceOverrides = await loadModelPricing(orgId);
+      const price = resolveModelPrice(node.model, priceOverrides);
+      if (price) {
+        const cacheReadPerM = price.cacheReadPerM ?? price.inputPerM * 0.1;
+        const cacheWritePerM = price.cacheWritePerM ?? price.inputPerM * 1.25;
+        costUsd =
+          (usage.inputTokens / 1_000_000) * price.inputPerM +
+          (usage.cachedInputTokens / 1_000_000) * cacheReadPerM +
+          (usage.cacheCreationInputTokens / 1_000_000) * cacheWritePerM +
+          (usage.outputTokens / 1_000_000) * price.outputPerM;
+        priceSnapshot = price as unknown as object;
+      }
+    }
 
     await prisma().nodeRun.update({
       where: { id: nodeRun.id },
@@ -436,7 +471,7 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
         output: output as unknown as object,
         usage: usage as unknown as object,
         costUsd,
-        priceSnapshot: price ? (price as unknown as object) : undefined,
+        priceSnapshot,
         workspacePath: workspace.path,
         conduitSummary: terminal.conduitSummary ?? undefined,
       },
@@ -458,18 +493,53 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
   }
 }
 
+interface NodeUsageAccumulator {
+  inputTokens: number;
+  outputTokens: number;
+  cachedInputTokens: number;
+  cacheCreationInputTokens: number;
+  reasoningOutputTokens: number;
+  toolCalls: number;
+  turns: number;
+}
+
 async function onAgentEvent(
   runId: string,
   orgId: string,
   nodeName: string,
   event: AgentEvent,
-  usage: { inputTokens: number; outputTokens: number; toolCalls: number; turns: number },
+  usage: NodeUsageAccumulator,
+  reportedCost: { usd: number; present: boolean },
+  cumulativeUsage: boolean,
 ): Promise<void> {
   if (event.type === 'tool_call') usage.toolCalls += 1;
   if (event.type === 'usage') {
-    usage.inputTokens += event.inputTokens;
-    usage.outputTokens += event.outputTokens;
+    // Two provider shapes flow through here. Codex reports a *cumulative*
+    // thread total on every turn.completed (turn 2 already includes turn 1),
+    // so the latest event supersedes the previous — replace, don't sum, or a
+    // node's multiple turns (main / writeback / summary on one thread) get
+    // counted 2-3×. Claude emits an independent per-turn rollup from each
+    // `result` message (the SDK's own dedup-by-id accumulation — "prefer the
+    // result message" per the Agent SDK cost-tracking docs), so those are
+    // summed across the node's turns.
+    if (cumulativeUsage) {
+      usage.inputTokens = event.inputTokens;
+      usage.outputTokens = event.outputTokens;
+      usage.cachedInputTokens = event.cachedInputTokens ?? 0;
+      usage.cacheCreationInputTokens = event.cacheCreationInputTokens ?? 0;
+      usage.reasoningOutputTokens = event.reasoningOutputTokens ?? 0;
+    } else {
+      usage.inputTokens += event.inputTokens;
+      usage.outputTokens += event.outputTokens;
+      usage.cachedInputTokens += event.cachedInputTokens ?? 0;
+      usage.cacheCreationInputTokens += event.cacheCreationInputTokens ?? 0;
+      usage.reasoningOutputTokens += event.reasoningOutputTokens ?? 0;
+    }
     usage.turns += 1;
+    if (typeof event.costUsd === 'number') {
+      reportedCost.usd += event.costUsd;
+      reportedCost.present = true;
+    }
   }
   await Promise.all([
     event.type === 'usage' ? Promise.resolve() : writeAgentEventLog(runId, orgId, nodeName, event),

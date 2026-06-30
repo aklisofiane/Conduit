@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatTokens, formatUsd } from './cost.js';
+import { formatTokens, formatUsd, totalInputTokens } from './cost.js';
 
 describe('formatUsd', () => {
   it('renders sub-dollar amounts with four decimals', () => {
@@ -31,5 +31,28 @@ describe('formatTokens', () => {
   it('renders null/undefined as an em dash', () => {
     expect(formatTokens(null)).toBe('—');
     expect(formatTokens(undefined)).toBe('—');
+  });
+});
+
+describe('totalInputTokens', () => {
+  it('sums the full-rate slice and both cache buckets', () => {
+    expect(
+      totalInputTokens({
+        inputTokens: 1200,
+        cachedInputTokens: 240000,
+        cacheCreationInputTokens: 3000,
+      }),
+    ).toBe(244200);
+  });
+
+  it('treats missing buckets as zero', () => {
+    expect(totalInputTokens({ inputTokens: 500 })).toBe(500);
+    expect(totalInputTokens({ cachedInputTokens: 50 })).toBe(50);
+  });
+
+  it('returns null when no input bucket is present so callers render an em dash', () => {
+    expect(totalInputTokens(null)).toBeNull();
+    expect(totalInputTokens(undefined)).toBeNull();
+    expect(totalInputTokens({ outputTokens: 10 } as never)).toBeNull();
   });
 });

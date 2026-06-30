@@ -89,9 +89,12 @@ describe('cleanupRunActivity', () => {
 
   it('rolls the run total tokens (from usage) and cost into the WorkflowRun', async () => {
     // Two completed agent nodes with usage; cost is summed in SQL (mocked).
+    // Headline input sums the full-rate slice *and* both cache buckets so the
+    // run total reflects everything the model read: node A = 100+900+0,
+    // node B = 25+0+50.
     findMany.mockResolvedValue([
-      { usage: { inputTokens: 100, outputTokens: 40 } },
-      { usage: { inputTokens: 25, outputTokens: 10 } },
+      { usage: { inputTokens: 100, cachedInputTokens: 900, outputTokens: 40 } },
+      { usage: { inputTokens: 25, cacheCreationInputTokens: 50, outputTokens: 10 } },
     ]);
     aggregate.mockResolvedValue({ _sum: { costUsd: 0.00513 } });
 
@@ -102,7 +105,7 @@ describe('cleanupRunActivity', () => {
         where: { id: 'run_2' },
         data: expect.objectContaining({
           status: 'COMPLETED',
-          totalInputTokens: 125,
+          totalInputTokens: 1075,
           totalOutputTokens: 50,
           totalCostUsd: 0.00513,
         }),

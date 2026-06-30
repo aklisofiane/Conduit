@@ -49,7 +49,10 @@ function applyCounters(event: AgentEvent, counters: ProviderCounters): boolean {
     return true;
   }
   if (event.type === 'usage') {
-    counters.inputTokens += event.inputTokens;
+    // Count *all* input the model processed (full-rate + cache) so the
+    // maxTokens backstop reflects true consumption, not just the uncached slice.
+    counters.inputTokens +=
+      event.inputTokens + (event.cachedInputTokens ?? 0) + (event.cacheCreationInputTokens ?? 0);
     counters.outputTokens += event.outputTokens;
     counters.turns += 1;
     return true;

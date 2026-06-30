@@ -17,3 +17,24 @@ export function formatTokens(value: number | null | undefined): string {
   if (value == null) return '—';
   return value.toLocaleString();
 }
+
+/**
+ * Total input tokens the model processed for a node — the full-rate slice plus
+ * both cache buckets. Providers split input across these so cost can price each
+ * at its own rate; for display we want the honest combined total (otherwise
+ * cache-heavy runs read as near-zero input). Returns null when no input bucket
+ * is present so the caller can render an em dash.
+ */
+export function totalInputTokens(
+  usage:
+    | { inputTokens?: number; cachedInputTokens?: number; cacheCreationInputTokens?: number }
+    | null
+    | undefined,
+): number | null {
+  if (!usage) return null;
+  const { inputTokens, cachedInputTokens, cacheCreationInputTokens } = usage;
+  if (inputTokens == null && cachedInputTokens == null && cacheCreationInputTokens == null) {
+    return null;
+  }
+  return (inputTokens ?? 0) + (cachedInputTokens ?? 0) + (cacheCreationInputTokens ?? 0);
+}
