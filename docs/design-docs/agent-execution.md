@@ -66,6 +66,18 @@ The activity is now an **orchestrator** — it never imports a provider SDK. All
    paths until a terminal `exit` arrives.
 7. On `exit ok=true` persist NodeRun COMPLETED with output (files, head,
    workspaceKind, branchName) and the runner-returned `.conduit/<NodeName>.md`.
+   Also records `costUsd` and `priceSnapshot` (frozen at write time so later
+   price edits don't rewrite history) via two paths:
+   - **Claude** — provider reports `total_cost_usd` per turn; the activity sums
+     these directly. No per-model price lookup.
+   - **Codex** — provider reports no cost. The activity calls
+     `loadModelPricing(orgId, node.model)`: a single `findUnique` on
+     `ModelPrice.(orgId, model)`, returning the org's override or `{}`. Falls
+     through to `resolveModelPrice` built-in defaults. The resolved price is
+     multiplied against each token bucket (full-rate input, cached-read at
+     `cacheReadPerM ?? inputPerM × 0.1`, cache-write at
+     `cacheWritePerM ?? inputPerM × 1.25`, output). Unknown model with no
+     override → no price → `costUsd` left unset.
    On `exit ok=false` or missing terminal event, throw — Temporal flips to FAILED.
 8. On cancel: the abort signal flows through `RunnerHandle.cancel()` — `docker kill`
    in docker mode, a process-group SIGTERM→SIGKILL in host mode — the runner is
@@ -320,6 +332,8 @@ Ownership angle (why `conduit/*` is one-run-at-a-time): [branch-management.md](.
 ## Constraints enforcement
 
 `AgentConstraints` (max turns, tokens, tool calls, timeout) are enforced **cumulatively across all turns within a session** via a shared `ConstraintState` object (`packages/agent/src/provider/constraints.ts`). Each provider's `startSession` creates one `ConstraintState` (counters + wall-clock start time) and passes it to every `enforceConstraints` call — so when a session runs its main turn, optional writeback turn, and summary turn, the limits apply to the aggregate, not per-turn. `enforceConstraints` wraps the provider's raw `AgentEvent` stream, counting events and throwing `ConstraintExceededError` when breached. Timeout is a Temporal activity-level `startToCloseTimeout` *and* a provider-level wall-clock guard (belt + suspenders).
+
+**Codex cumulative usage.** Codex emits `usage` events carrying *thread-wide running totals* — every `turn.completed` reports the cumulative `input_tokens`/`output_tokens` for the whole session, not a per-turn delta. Naively summing these would double-count tokens across turns and cause spurious `maxTokens` trips. `ConstraintState` carries an opt-in `cumulativeUsage` flag (default `false`): when `true`, each `usage` event *replaces* the running `inputTokens`/`outputTokens` counters instead of adding to them. `CodexProvider` sets `cumulativeUsage: true` when it creates its `ConstraintState`. The `turns` counter is always additive — each `usage` event increments it by one — so per-turn limits apply correctly under both modes. `ClaudeProvider` and `StubProvider` leave the flag at `false` (their SDKs emit per-turn deltas).
 
 ## Polling pipeline
 

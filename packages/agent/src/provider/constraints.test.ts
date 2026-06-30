@@ -154,4 +154,116 @@ describe('enforceConstraints with shared ConstraintState', () => {
       ),
     ).rejects.toBeInstanceOf(ConstraintExceededError);
   });
+
+  it('cumulative-mode usage replaces token counters instead of summing', async () => {
+    const state = createConstraintState({ cumulativeUsage: true });
+    const req = baseRequest();
+
+    await collect(
+      enforceConstraints(
+        fakeSource([
+          { type: 'usage', inputTokens: 100, outputTokens: 50 },
+          { type: 'done' },
+        ]),
+        req,
+        state,
+      ),
+    );
+
+    await collect(
+      enforceConstraints(
+        fakeSource([
+          { type: 'usage', inputTokens: 200, outputTokens: 80 },
+          { type: 'done' },
+        ]),
+        req,
+        state,
+      ),
+    );
+
+    expect(state.counters.inputTokens).toBe(200);
+    expect(state.counters.outputTokens).toBe(80);
+  });
+
+  it('cumulative-mode usage still increments the turn counter additively', async () => {
+    const state = createConstraintState({ cumulativeUsage: true });
+    const req = baseRequest();
+
+    await collect(
+      enforceConstraints(
+        fakeSource([
+          { type: 'usage', inputTokens: 100, outputTokens: 50 },
+          { type: 'done' },
+        ]),
+        req,
+        state,
+      ),
+    );
+
+    await collect(
+      enforceConstraints(
+        fakeSource([
+          { type: 'usage', inputTokens: 200, outputTokens: 80 },
+          { type: 'done' },
+        ]),
+        req,
+        state,
+      ),
+    );
+
+    expect(state.counters.turns).toBe(2);
+  });
+
+  it('cumulative-mode: second usage event within one invocation supersedes the first', async () => {
+    const state = createConstraintState({ cumulativeUsage: true });
+    const req = baseRequest();
+
+    await collect(
+      enforceConstraints(
+        fakeSource([
+          { type: 'usage', inputTokens: 100, outputTokens: 50 },
+          { type: 'usage', inputTokens: 200, outputTokens: 80 },
+          { type: 'done' },
+        ]),
+        req,
+        state,
+      ),
+    );
+
+    expect(state.counters.inputTokens).toBe(200);
+    expect(state.counters.outputTokens).toBe(80);
+  });
+
+  it('cumulative mode does not trip maxTokens prematurely when the running total stays below the limit', async () => {
+    const state = createConstraintState({ cumulativeUsage: true });
+    // maxTokens: 500. With additive counting, turn 1 (200) + turn 2 (400) = 600 → throws.
+    // With replacement, counters reflect only the latest cumulative total (400) → no throw.
+    const req = baseRequest({ constraints: { maxTokens: 500 } });
+
+    await collect(
+      enforceConstraints(
+        fakeSource([
+          { type: 'usage', inputTokens: 150, outputTokens: 50 },
+          { type: 'done' },
+        ]),
+        req,
+        state,
+      ),
+    );
+
+    // Second turn reports the cumulative thread total (400), not a per-turn delta.
+    await collect(
+      enforceConstraints(
+        fakeSource([
+          { type: 'usage', inputTokens: 300, outputTokens: 100 },
+          { type: 'done' },
+        ]),
+        req,
+        state,
+      ),
+    );
+
+    expect(state.counters.inputTokens).toBe(300);
+    expect(state.counters.outputTokens).toBe(100);
+  });
 });

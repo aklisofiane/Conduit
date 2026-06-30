@@ -18,7 +18,7 @@ Prisma schema spec for Conduit.
 
 ### Tenant-scoped business models
 
-Ten models carry a non-nullable `orgId String` FK to `Organization.id` (cascade-delete from the org). These are Conduit's business data; everything else is Better Auth or the audit log.
+Eleven models carry a non-nullable `orgId String` FK to `Organization.id` (cascade-delete from the org). These are Conduit's business data; everything else is Better Auth or the audit log.
 
 | Model | What it holds | `orgId` source |
 |---|---|---|
@@ -26,6 +26,7 @@ Ten models carry a non-nullable `orgId String` FK to `Organization.id` (cascade-
 | `Credential` | Rotatable platform secret (e.g. GitHub PAT), encrypted at rest. One row per token; rotation propagates to every Connection. `hostUrl` set once for VCS platforms. | stamped on create |
 | `Connection` | Named, typed binding over a Credential — the unit a workflow references. `scope` JSON is the Zod discriminated union from `@conduit/shared/connection`. | must equal `Credential.orgId` |
 | `ProviderConfig` | Per-org agent provider API key (`claude`/`codex`), consumed by the runtime — never bound to a Connection. At most one row per `(orgId, providerId)`. | stamped on create |
+| `ModelPrice` | Per-org pricing override for a specific model (`inputPerM`/`outputPerM` in USD). Unique key is `(orgId, model)` — looked up with a single `findUnique` at node completion. Absent rows fall back to the shipped `MODEL_PRICING` defaults in `@conduit/shared`. Drives `costUsd`/`priceSnapshot` on `NodeRun` for Codex nodes (Claude reports its own cost; see [agent-execution.md](./design-docs/agent-execution.md#runagentnode-lifecycle)). Decoupled from `ProviderConfig` — an org can override prices even when running off an env-var API key. | stamped on create |
 | `PollSnapshot` | One row per polling workflow; last-poll matching IDs for diff-based dedup. Overwritten each cycle. | copied from `Workflow.orgId` |
 | `TicketBranch` | Naming cache for `ticket-branch` workspaces — keeps the slug stable across runs. Unique key is 6 columns: `(orgId, platform, hostUrl, owner, repo, ticketId)`. | stamped on create |
 | `WorkflowRun` | One row per run; status, normalized trigger, Temporal handles. | copied from `Workflow.orgId` |
