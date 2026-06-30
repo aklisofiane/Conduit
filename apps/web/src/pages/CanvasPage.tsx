@@ -59,6 +59,7 @@ import { downloadWorkflowExport } from '../lib/export-workflow.js';
 import { useWorkflowEditor } from '../state/workflow-editor.js';
 import { useTopbarSlots } from '../state/topbar-slots.js';
 import { relativeFromNow } from '../lib/time.js';
+import { Button } from '../components/ui/button.js';
 
 const NODE_TYPES: NodeTypes = { agent: AgentNode, ...TRIGGER_NODE_TYPES };
 const EDGE_TYPES = { workflow: WorkflowEdge } as const;
@@ -415,7 +416,7 @@ function CanvasInner() {
   if (!id) return null;
   if (isLoading || !draft) {
     return (
-      <div className="flex flex-1 items-center justify-center font-mono text-[12px] text-[var(--color-text-muted)]">
+      <div className="flex flex-1 items-center justify-center font-mono text-small text-[var(--color-text-muted)]">
         Loading workflow…
       </div>
     );
@@ -450,7 +451,7 @@ function CanvasInner() {
         >
           <div className="pointer-events-none absolute left-[14px] top-3 z-[2] flex gap-[6px]">
             <WorkflowHeaderPill workflowId={id} />
-            <span className="pointer-events-auto rounded-[var(--radius-sm)] border border-[var(--color-divider)] bg-[var(--color-bg-panel)] px-2 py-[3px] font-mono text-[11px] text-[var(--color-text-muted)]">
+            <span className="pointer-events-auto rounded-[var(--radius-sm)] border border-[var(--color-divider)] bg-[var(--color-bg-panel)] px-2 py-[3px] font-mono text-small text-[var(--color-text-muted)]">
               {lastRunLabel}
             </span>
           </div>
@@ -536,8 +537,8 @@ function TriggerPanelByType({ trigger, onChange, ...rest }: TriggerPanelByTypePr
   }
   // No dedicated editor (today: the legacy `webhook` variant).
   return (
-    <div className="flex flex-1 flex-col gap-3 px-5 py-4 font-mono text-[11px] text-[var(--color-text-muted)]">
-      <div className="font-sans text-[12px] font-medium text-[var(--color-text)]">
+    <div className="flex flex-1 flex-col gap-3 px-5 py-4 font-mono text-small text-[var(--color-text-muted)]">
+      <div className="font-sans text-small font-medium text-[var(--color-text)]">
         Webhook trigger
       </div>
       <div>event: {trigger.type === 'webhook' ? trigger.event : ''}</div>
@@ -545,9 +546,9 @@ function TriggerPanelByType({ trigger, onChange, ...rest }: TriggerPanelByTypePr
         No editor yet — delete this trigger and re-add an Issues, Pull requests, or Schedule
         trigger from the palette.
       </div>
-      <button className="btn mt-2" onClick={rest.onClose}>
+      <Button className="mt-2" onClick={rest.onClose}>
         Close
-      </button>
+      </Button>
     </div>
   );
 }

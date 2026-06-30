@@ -10,8 +10,11 @@ import {
 } from '../../api/hooks.js';
 import { ApiError } from '../../api/client.js';
 import { relativeFromNow } from '../../lib/time.js';
-import { Select } from '../common/Select.js';
+import { Select } from '../ui/select.js';
 import { SettingsSection } from '../common/SettingsSection.js';
+import { Button } from '../ui/button.js';
+import { Input } from '../ui/input.js';
+import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group.js';
 
 const PLATFORMS = ['GITHUB', 'GITLAB', 'JIRA', 'SLACK', 'DISCORD'] as const;
 
@@ -102,9 +105,9 @@ export function CredentialsSection() {
     >
       {creating && (
         <>
-          <div className="grid grid-cols-[120px_1fr_1fr_auto] items-end gap-3 border-b border-[var(--color-line)] px-4 py-3">
+          <div className="grid grid-cols-[120px_1fr_1fr_auto] items-end gap-3 border-b border-[var(--color-divider)] px-4 py-3">
             <label className="flex flex-col gap-1">
-              <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+              <span className="font-mono text-caption uppercase tracking-wide text-[var(--color-text-muted)]">
                 Platform
               </span>
               <Select
@@ -115,30 +118,28 @@ export function CredentialsSection() {
               />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+              <span className="font-mono text-caption uppercase tracking-wide text-[var(--color-text-muted)]">
                 Name
               </span>
-              <input
-                className="field-input"
+              <Input
                 placeholder="e.g. acme-github-pat"
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+              <span className="font-mono text-caption uppercase tracking-wide text-[var(--color-text-muted)]">
                 Secret
               </span>
-              <input
-                className="field-input"
+              <Input
                 type="password"
                 autoComplete="new-password"
                 value={form.secret}
                 onChange={(e) => setForm((f) => ({ ...f, secret: e.target.value }))}
               />
             </label>
-            <button
-              className="btn primary"
+            <Button
+              variant="primary"
               disabled={
                 !form.name ||
                 !form.secret ||
@@ -148,47 +149,35 @@ export function CredentialsSection() {
               onClick={handleCreate}
             >
               {create.isPending ? 'Saving…' : 'Save'}
-            </button>
+            </Button>
             {error && (
-              <div className="col-span-4 font-mono text-[11px] text-[var(--color-danger)]">
+              <div className="col-span-4 font-mono text-small text-[var(--color-danger)]">
                 {error}
               </div>
             )}
           </div>
 
           {isVcs && (
-            <div className="flex flex-col gap-2 border-b border-[var(--color-line)] px-4 py-3">
-              <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+            <div className="flex flex-col gap-2 border-b border-[var(--color-divider)] px-4 py-3">
+              <span className="font-mono text-caption uppercase tracking-wide text-[var(--color-text-muted)]">
                 Instance
               </span>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  className={`rounded-full px-3 py-1 font-mono text-[11px] transition-colors ${
-                    !form.selfHosted
-                      ? 'bg-[var(--color-accent)] text-white'
-                      : 'bg-[var(--color-bg-2)] text-[var(--color-text-3)] hover:text-[var(--color-text-2)]'
-                  }`}
-                  onClick={() => handleSelfHostedChange(false)}
-                >
-                  Cloud
-                </button>
-                <button
-                  type="button"
-                  className={`rounded-full px-3 py-1 font-mono text-[11px] transition-colors ${
-                    form.selfHosted
-                      ? 'bg-[var(--color-accent)] text-white'
-                      : 'bg-[var(--color-bg-2)] text-[var(--color-text-3)] hover:text-[var(--color-text-2)]'
-                  }`}
-                  onClick={() => handleSelfHostedChange(true)}
-                >
-                  Self-hosted
-                </button>
-              </div>
+              <ToggleGroup
+                type="single"
+                value={form.selfHosted ? 'self' : 'cloud'}
+                onValueChange={(v) => {
+                  if (v) handleSelfHostedChange(v === 'self');
+                }}
+                variant="solid"
+                size="pill"
+                aria-label="Instance type"
+              >
+                <ToggleGroupItem value="cloud">Cloud</ToggleGroupItem>
+                <ToggleGroupItem value="self">Self-hosted</ToggleGroupItem>
+              </ToggleGroup>
               {form.selfHosted && (
                 <div className="flex flex-col gap-1">
-                  <input
-                    className="field-input"
+                  <Input
                     placeholder="ghe.example.com"
                     value={form.hostUrl}
                     onChange={(e) => {
@@ -198,7 +187,7 @@ export function CredentialsSection() {
                     onBlur={(e) => validateHost(e.target.value)}
                   />
                   {hostError && (
-                    <span className="font-mono text-[11px] text-[var(--color-danger)]">
+                    <span className="font-mono text-small text-[var(--color-danger)]">
                       {hostError}
                     </span>
                   )}
@@ -211,12 +200,12 @@ export function CredentialsSection() {
 
       <div>
         {isLoading && (
-          <div className="flex h-16 items-center justify-center font-mono text-[12px] text-[var(--color-text-3)]">
+          <div className="flex h-16 items-center justify-center font-mono text-small text-[var(--color-text-muted)]">
             Loading…
           </div>
         )}
         {!isLoading && credentials.length === 0 && !creating && (
-          <div className="flex h-24 items-center justify-center font-mono text-[12px] text-[var(--color-text-4)]">
+          <div className="flex h-24 items-center justify-center font-mono text-small text-[var(--color-text-muted)]">
             No credentials yet.
           </div>
         )}
@@ -252,17 +241,17 @@ function CredentialRowView({ cred, onDelete }: { cred: CredentialRow; onDelete: 
   };
 
   return (
-    <div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-4 border-b border-[var(--color-line)] px-4 py-3 last:border-b-0">
-      <span className="flex h-7 w-7 items-center justify-center rounded-md border border-[var(--color-line)] bg-[var(--color-bg-2)] font-mono text-[10.5px]">
+    <div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-4 border-b border-[var(--color-divider)] px-4 py-3 last:border-b-0">
+      <span className="flex h-7 w-7 items-center justify-center rounded-md border border-[var(--color-divider)] bg-[var(--color-pill-bg)] font-mono text-caption">
         {cred.platform.slice(0, 2)}
       </span>
       <div>
-        <div className="font-mono text-[13px] font-medium">{cred.name}</div>
-        <div className="flex items-center gap-1.5 font-mono text-[11px] text-[var(--color-text-3)]">
+        <div className="font-mono text-base font-medium">{cred.name}</div>
+        <div className="flex items-center gap-1.5 font-mono text-small text-[var(--color-text-muted)]">
           <span>{cred.platform.toLowerCase()}</span>
           {cred.hostUrl && !isCloudHost(cred.platform as Platform, cred.hostUrl) && (
             <span
-              className="rounded border border-[var(--color-line)] bg-[var(--color-bg-2)] px-1 py-px text-[10px] tracking-wide"
+              className="rounded border border-[var(--color-divider)] bg-[var(--color-pill-bg)] px-1 py-px text-caption tracking-wide"
               title={`Self-hosted: ${cred.hostUrl}`}
             >
               {cred.hostUrl}
@@ -270,7 +259,7 @@ function CredentialRowView({ cred, onDelete }: { cred: CredentialRow; onDelete: 
           )}
           {cred.metadata?.source === 'oauth' && (
             <span
-              className="rounded border border-[var(--color-line)] bg-[var(--color-bg-2)] px-1 py-px text-[10px] uppercase tracking-wide"
+              className="rounded border border-[var(--color-divider)] bg-[var(--color-pill-bg)] px-1 py-px text-caption uppercase tracking-wide"
               title="Created from your GitHub sign-in. Rotate with a PAT to convert to a manual credential."
             >
               oauth
@@ -281,40 +270,37 @@ function CredentialRowView({ cred, onDelete }: { cred: CredentialRow; onDelete: 
         </div>
         {rotating && (
           <div className="mt-2 flex items-center gap-2">
-            <input
-              className="field-input"
+            <Input
               type="password"
               placeholder="New secret"
               value={newSecret}
               onChange={(e) => setNewSecret(e.target.value)}
               autoFocus
             />
-            <button
-              className="btn primary"
+            <Button
+              variant="primary"
               onClick={handleRotate}
               disabled={!newSecret || update.isPending}
             >
               {update.isPending ? 'Rotating…' : 'Rotate'}
-            </button>
-            <button
-              className="btn"
+            </Button>
+            <Button
               onClick={() => {
                 setRotating(false);
                 setNewSecret('');
               }}
             >
               Cancel
-            </button>
+            </Button>
           </div>
         )}
       </div>
       {!rotating && (
-        <button className="btn" onClick={() => setRotating(true)}>
+        <Button onClick={() => setRotating(true)}>
           Rotate
-        </button>
+        </Button>
       )}
-      <button
-        className="btn"
+      <Button
         onClick={onDelete}
         disabled={cred.connectionCount > 0}
         title={
@@ -324,7 +310,7 @@ function CredentialRowView({ cred, onDelete }: { cred: CredentialRow; onDelete: 
         }
       >
         Delete
-      </button>
+      </Button>
     </div>
   );
 }

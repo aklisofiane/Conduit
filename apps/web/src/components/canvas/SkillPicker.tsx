@@ -4,7 +4,7 @@ import type { DiscoveredSkill } from '../../api/types.js';
 import {
   CheckboxListPopover,
   type CheckboxListGroup,
-} from '../common/CheckboxListPopover.js';
+} from '../ui/checkbox-list-popover.js';
 
 interface Props {
   /** Skills already filtered to the agent's provider. */

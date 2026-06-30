@@ -1,6 +1,6 @@
 # Frontend
 
-React 19 + Vite 8 + `@xyflow/react` + TanStack Query + Zustand + Tailwind v4. Headless primitives come from Radix UI (`@radix-ui/react-dialog`, `react-dropdown-menu`, `react-select`) — wrapped thinly in `apps/web/src/components/common/` (`Dialog`, `DropdownMenu`, `Select`) and styled with custom CSS in `apps/web/src/styles/globals.css`. No shadcn/ui — we use Radix directly so we don't carry a generated component layer.
+React 19 + Vite 8 + `@xyflow/react` + TanStack Query + Zustand + Tailwind v4. Headless primitives come from Radix UI (`@radix-ui/react-dialog`, `react-dropdown-menu`, `react-select`) — wrapped thinly in the `cva`-based primitive layer at `apps/web/src/components/ui/` (`Dialog`, `DropdownMenu`, `Select`, …) and styled with tokens + the shared CSS in `apps/web/src/styles/globals.css`. No shadcn/ui — we use Radix directly so we don't carry a generated component layer.
 
 Icons come from `lucide-react`. Call sites import the specific component they need (`import { Pencil } from 'lucide-react'`); tree-shaking handles the bundle, TypeScript handles the typo gate. Brand identity marks — the Conduit `Logo` and the per-provider `ProviderGlyph` (Claude sparkle / Codex chevrons) — stay custom and live in `apps/web/src/components/common/BrandGlyph.tsx`. No `<Icon name="…">` string-union wrapper.
 
@@ -24,7 +24,7 @@ Icons come from `lucide-react`. Call sites import the specific component they ne
 
 `apps/web/src/routes/router.tsx` splits into two top-level branches: an `AuthLayout` branch (centered card, no `TopChrome`) wrapped in `<RedirectIfAuthed />` for the four auth routes, and the existing `AppLayout` branch wrapped in `<RequireAuth />` for everything else. `RequireAuth` redirects to `/sign-in?next=<encoded-current-path>` when `useSession()` resolves with no user, and shows a small loader while it's pending. `RedirectIfAuthed` is the inverse — sends a logged-in user to `?next` (path-prefixed only) or `/` so they don't see the login form.
 
-Form pages use `react-hook-form` + `@hookform/resolvers/zod` + Conduit's design primitives (`.btn`, `.btn.primary`, `.field-input`, `.field-label`, the `--color-claude` accent dot, `font-serif` headings). Each page exports a pure `submit*` helper so the submit logic can be unit-tested in plain `.test.ts` without jsdom or testing-library — see [design-docs/web-auth-ui.md](./design-docs/web-auth-ui.md) for the full surface, the cookie wiring, and the Better Auth client API names (notably `requestPasswordReset`, not `forgetPassword`, in 1.6.9).
+Form pages use `react-hook-form` + `@hookform/resolvers/zod` + Conduit's design primitives (`.btn`, `.btn.primary`, `.field-input`, `.field-label`, the `--color-claude-mark` accent dot, `font-serif` headings). Each page exports a pure `submit*` helper so the submit logic can be unit-tested in plain `.test.ts` without jsdom or testing-library — see [design-docs/web-auth-ui.md](./design-docs/web-auth-ui.md) for the full surface, the cookie wiring, and the Better Auth client API names (notably `requestPasswordReset`, not `forgetPassword`, in 1.6.9).
 
 ## Create from template
 

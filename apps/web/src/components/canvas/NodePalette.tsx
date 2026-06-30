@@ -1,6 +1,8 @@
 import type { DragEvent as ReactDragEvent, ReactNode } from 'react';
 import type { AgentConfig } from '@conduit/shared';
-import { tokens, providerStyle, type ProviderId } from '../../styles/theme.js';
+import { type ProviderId } from '../../styles/theme.js';
+import { cn } from '../../lib/cn.js';
+import { NodeShell, NodeIconTile } from '../ui/node.js';
 import { ProviderGlyph } from '../common/BrandGlyph.js';
 import { ADDABLE_TRIGGERS, type PaletteTriggerType } from './trigger-registry.js';
 
@@ -32,13 +34,7 @@ export function NodePalette({
   triggerSlotFilled,
 }: NodePaletteProps) {
   return (
-    <aside
-      className="flex w-[240px] shrink-0 flex-col gap-4 border-r px-[14px] py-4 text-[var(--color-text)]"
-      style={{
-        borderColor: tokens.color.divider,
-        background: tokens.color.bgPanel,
-      }}
-    >
+    <aside className="flex w-[240px] shrink-0 flex-col gap-4 border-r border-[var(--color-divider)] bg-[var(--color-bg-panel)] px-[14px] py-4 text-[var(--color-text)]">
       <PaletteSection title="Triggers">
         {ADDABLE_TRIGGERS.map(({ type, palette }) => (
           <TriggerPaletteCard
@@ -52,7 +48,7 @@ export function NodePalette({
           />
         ))}
         {triggerSlotFilled && (
-          <div className="px-[2px] font-mono text-[10px] leading-[1.3] text-[var(--color-text-muted)]">
+          <div className="px-[2px] font-mono text-caption leading-[1.3] text-[var(--color-text-muted)]">
             Delete the existing trigger to add a different kind.
           </div>
         )}
@@ -85,10 +81,7 @@ function PaletteSection({
 }) {
   return (
     <div>
-      <div
-        className="mb-[6px] font-mono text-[10px] font-medium uppercase tracking-[0.06em]"
-        style={{ color: tokens.color.textMuted }}
-      >
+      <div className="mb-[6px] font-mono text-caption font-medium uppercase tracking-[0.06em] text-[var(--color-text-muted)]">
         {title}
       </div>
       <div className="flex flex-col gap-[6px]">{children}</div>
@@ -112,36 +105,31 @@ function TriggerPaletteCard({
   onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
-      draggable={!disabled}
-      onDragStart={disabled ? undefined : onPaletteDragStart(payload)}
-      onClick={disabled ? undefined : onClick}
-      disabled={disabled}
-      className="flex w-full items-start gap-[10px] rounded-[var(--radius)] border px-[10px] py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50 active:cursor-grabbing"
-      style={{
-        background: tokens.color.triggerBg,
-        borderColor: tokens.color.triggerBorder,
-      }}
+    <NodeShell
+      asChild
+      tone="trigger"
+      className="flex w-full items-start gap-[10px] px-[10px] py-2 text-left shadow-none transition-colors disabled:cursor-not-allowed disabled:opacity-50 active:cursor-grabbing"
     >
-      <span
-        className="mt-[1px] grid h-[18px] w-[18px] shrink-0 place-items-center rounded-[5px]"
-        style={{ background: tokens.color.trigger }}
+      <button
+        type="button"
+        draggable={!disabled}
+        onDragStart={disabled ? undefined : onPaletteDragStart(payload)}
+        onClick={disabled ? undefined : onClick}
+        disabled={disabled}
       >
-        {icon}
-      </span>
-      <span className="min-w-0">
-        <span className="block font-sans text-[12px] font-medium text-[var(--color-text)]">
-          {name}
+        <NodeIconTile tone="trigger" size="sm" className="mt-[1px]">
+          {icon}
+        </NodeIconTile>
+        <span className="min-w-0">
+          <span className="block font-sans text-small font-medium text-[var(--color-text)]">
+            {name}
+          </span>
+          <span className="block font-mono text-small text-[var(--color-text-muted)]">
+            {description}
+          </span>
         </span>
-        <span
-          className="block font-mono text-[11px]"
-          style={{ color: tokens.color.textMuted }}
-        >
-          {description}
-        </span>
-      </span>
-    </button>
+      </button>
+    </NodeShell>
   );
 }
 
@@ -156,46 +144,41 @@ function AgentPaletteCard({
   description: string;
   onClick: () => void;
 }) {
-  const ps = providerStyle(provider);
   const payload: PaletteDragPayload = { kind: 'agent', provider };
   return (
-    <button
-      type="button"
-      draggable
-      onDragStart={onPaletteDragStart(payload)}
-      onClick={onClick}
-      className="relative flex w-full items-center gap-[10px] overflow-hidden rounded-[var(--radius-md)] border py-[10px] pl-[14px] pr-[10px] text-left transition-colors active:cursor-grabbing"
-      style={{
-        background: ps.card,
-        borderColor: ps.border,
-      }}
+    <NodeShell
+      asChild
+      tone={provider}
+      className="relative flex w-full items-center gap-[10px] rounded-[var(--radius-md)] py-[10px] pl-[14px] pr-[10px] text-left shadow-none transition-colors active:cursor-grabbing"
     >
-      <span
-        aria-hidden
-        className="absolute left-0 top-0 bottom-0 w-1"
-        style={{ background: ps.mark }}
-      />
-      <span
-        className="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-[var(--radius-md)]"
-        style={{ background: ps.mark }}
-      >
-        <ProviderGlyph provider={provider} size={14} color="#FFFFFF" />
-      </span>
-      <span className="min-w-0">
+      <button type="button" draggable onDragStart={onPaletteDragStart(payload)} onClick={onClick}>
         <span
-          className="block text-[12px] font-semibold text-[var(--color-text)]"
-          style={{ fontFamily: ps.font }}
-        >
-          {name}
+          aria-hidden
+          className={cn(
+            'absolute left-0 top-0 bottom-0 w-1',
+            provider === 'claude'
+              ? 'bg-[var(--color-claude-mark)]'
+              : 'bg-[var(--color-codex-mark)]',
+          )}
+        />
+        <NodeIconTile tone={provider} size="lg">
+          <ProviderGlyph provider={provider} size={14} color="#FFFFFF" />
+        </NodeIconTile>
+        <span className="min-w-0">
+          <span
+            className={cn(
+              'block text-small font-semibold text-[var(--color-text)]',
+              provider === 'claude' ? 'font-sans' : 'font-mono',
+            )}
+          >
+            {name}
+          </span>
+          <span className="block font-mono text-small text-[var(--color-text-muted)]">
+            {description}
+          </span>
         </span>
-        <span
-          className="block font-mono text-[11px]"
-          style={{ color: tokens.color.textMuted }}
-        >
-          {description}
-        </span>
-      </span>
-    </button>
+      </button>
+    </NodeShell>
   );
 }
 

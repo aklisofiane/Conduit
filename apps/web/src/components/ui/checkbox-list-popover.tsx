@@ -2,6 +2,19 @@ import { useMemo, useRef, useState, type ReactNode } from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import { ChevronDown, Search } from 'lucide-react';
 import { cn } from '../../lib/cn.js';
+import { Checkbox } from './checkbox.js';
+import { selectChevronClass, selectItemClass, selectTriggerClass } from './select.js';
+import {
+  searchSelectContentClass,
+  searchSelectEmptyClass,
+  searchSelectIconClass,
+  searchSelectInputClass,
+  searchSelectInputRowClass,
+  searchSelectItemSelectedClass,
+  searchSelectListClass,
+  searchSelectOpenClass,
+  searchSelectValueClass,
+} from './search-select.js';
 
 /**
  * Searchable multi-select popover with a checkbox list — the shared shell behind
@@ -110,10 +123,10 @@ export function CheckboxListPopover<T>({
       }}
     >
       <Popover.Trigger
-        className={cn('select-trigger', triggerClassName, open && 'search-select-open')}
+        className={cn(selectTriggerClass, triggerClassName, open && searchSelectOpenClass)}
       >
-        <span className="search-select-value font-mono text-[11px]">{triggerLabel}</span>
-        <span className={cn('select-trigger-chevron', open && 'search-select-chevron-open')}>
+        <span className={cn(searchSelectValueClass, 'font-mono text-small')}>{triggerLabel}</span>
+        <span className={cn(selectChevronClass, open && 'rotate-180')}>
           <ChevronDown size={12} strokeWidth={1.5} />
         </span>
       </Popover.Trigger>
@@ -122,18 +135,18 @@ export function CheckboxListPopover<T>({
         <Popover.Content
           sideOffset={4}
           align="start"
-          className="search-select-content"
+          className={searchSelectContentClass}
           style={{ maxHeight }}
           onOpenAutoFocus={(e) => {
             e.preventDefault();
             inputRef.current?.focus();
           }}
         >
-          <div className="search-select-input-row">
-            <Search size={12} strokeWidth={1.5} className="search-select-icon" />
+          <div className={searchSelectInputRowClass}>
+            <Search size={12} strokeWidth={1.5} className={searchSelectIconClass} />
             <input
               ref={inputRef}
-              className="search-select-input"
+              className={searchSelectInputClass}
               placeholder={placeholder}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -142,16 +155,16 @@ export function CheckboxListPopover<T>({
 
           {selectAll && !query && (
             <div className="flex items-center justify-between border-b border-[var(--color-divider)] px-2 py-1.5">
-              <label className="flex items-center gap-2 font-mono text-[11px] text-[var(--color-text-3)]">
-                <input type="checkbox" checked={selectAll.checked} onChange={selectAll.onToggle} />
+              <label className="flex items-center gap-2 font-mono text-small text-[var(--color-text-muted)]">
+                <Checkbox checked={selectAll.checked} onCheckedChange={selectAll.onToggle} />
                 {selectAll.label}
               </label>
             </div>
           )}
 
-          <div className="search-select-list">
+          <div className={searchSelectListClass}>
             {(groups ? groups.length === 0 : filtered.length === 0) && (
-              <div className="search-select-empty">{emptyLabel}</div>
+              <div className={searchSelectEmptyClass}>{emptyLabel}</div>
             )}
             {groups
               ? groups.map((group) => {
@@ -160,14 +173,14 @@ export function CheckboxListPopover<T>({
                   return (
                     <div key={group.name}>
                       <div className="flex items-center justify-between px-2 pb-1 pt-2">
-                        <div className="min-w-0 truncate font-mono text-[10px] uppercase tracking-wide text-[var(--color-text-3)]">
+                        <div className="min-w-0 truncate font-mono text-caption uppercase tracking-wide text-[var(--color-text-muted)]">
                           {group.name}
                           {group.meta && (
-                            <span className="text-[var(--color-text-4)]"> · {group.meta}</span>
+                            <span className="text-[var(--color-text-muted)]"> · {group.meta}</span>
                           )}
                         </div>
                         <button
-                          className="flex-shrink-0 font-mono text-[10px] text-[var(--color-text-3)] hover:text-[var(--color-text)]"
+                          className="flex-shrink-0 font-mono text-caption text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
                           onClick={() => onToggleMany(ids, !allSelected)}
                         >
                           {allSelected ? 'none' : 'all'}
@@ -199,20 +212,20 @@ function CheckboxRow({
   return (
     <label
       className={cn(
-        'select-item flex items-start gap-2',
-        checked && 'search-select-item-selected',
+        selectItemClass,
+        'flex items-start gap-2',
+        checked && searchSelectItemSelectedClass,
       )}
     >
-      <input
-        type="checkbox"
+      <Checkbox
         checked={checked}
-        onChange={onToggle}
+        onCheckedChange={onToggle}
         className="mt-0.5 flex-shrink-0"
       />
       <div className="min-w-0 flex-1">
-        <div className="truncate font-mono text-[11px]">{label}</div>
+        <div className="truncate font-mono text-small">{label}</div>
         {description && (
-          <div className="truncate font-mono text-[10px] text-[var(--color-text-3)]">
+          <div className="truncate font-mono text-caption text-[var(--color-text-muted)]">
             {description}
           </div>
         )}

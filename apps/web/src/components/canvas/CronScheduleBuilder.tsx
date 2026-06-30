@@ -2,7 +2,11 @@ import { useCallback, useMemo, useState } from 'react';
 import cronstrue from 'cronstrue';
 import { ChevronDown } from 'lucide-react';
 import { CRON_EXPRESSION_RE } from '@conduit/shared';
-import { Select } from '../common/Select.js';
+import { Select } from '../ui/select.js';
+import { Input } from '../ui/input.js';
+import { Label, Hint as FieldHint } from '../ui/field.js';
+import { Button } from '../ui/button.js';
+import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group.js';
 import { cn } from '../../lib/cn.js';
 import { Hint } from './trigger-panel-common.js';
 
@@ -179,25 +183,15 @@ export function CronScheduleBuilder({ value, onChange }: CronScheduleBuilderProp
     [value, updateSchedule],
   );
 
-  const toggleDay = useCallback(
-    (day: number) => {
-      const current = schedule.daysOfWeek;
-      if (current.includes(day) && current.length === 1) return;
-      const next = current.includes(day)
-        ? current.filter((d) => d !== day)
-        : [...current, day];
-      updateSchedule({ daysOfWeek: next });
-    },
-    [schedule.daysOfWeek, updateSchedule],
-  );
-
   const description = useMemo(() => describeCron(value), [value]);
   const isValid = useMemo(() => CRON_EXPRESSION_RE.test(value), [value]);
 
   return (
     <div className="space-y-4">
       <div>
-        <div className="field-label">Repeat</div>
+        <Label asChild>
+          <div>Repeat</div>
+        </Label>
         <Select
           ariaLabel="Schedule frequency"
           value={isCustom ? 'custom' : schedule.frequency}
@@ -210,30 +204,34 @@ export function CronScheduleBuilder({ value, onChange }: CronScheduleBuilderProp
         <>
           {schedule.frequency === 'weekly' && (
             <div>
-              <div className="field-label">On</div>
-              <div className="flex gap-1">
+              <Label asChild>
+                <div>On</div>
+              </Label>
+              <ToggleGroup
+                type="multiple"
+                value={schedule.daysOfWeek.map(String)}
+                onValueChange={(vals) => {
+                  if (vals.length === 0) return;
+                  updateSchedule({ daysOfWeek: vals.map(Number) });
+                }}
+                variant="solid"
+                size="box"
+                aria-label="Days of week"
+              >
                 {DAYS.map((label, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => toggleDay(i)}
-                    className={cn(
-                      'flex h-8 w-10 items-center justify-center rounded-[var(--radius-sm)] font-mono text-[11px] font-medium transition-colors',
-                      schedule.daysOfWeek.includes(i)
-                        ? 'bg-[var(--color-accent)] text-white'
-                        : 'bg-[var(--color-pill-bg)] text-[var(--color-text-muted)] hover:bg-[var(--color-divider)]',
-                    )}
-                  >
+                  <ToggleGroupItem key={i} value={String(i)}>
                     {label}
-                  </button>
+                  </ToggleGroupItem>
                 ))}
-              </div>
+              </ToggleGroup>
             </div>
           )}
 
           {schedule.frequency === 'monthly' && (
             <div>
-              <div className="field-label">Day of month</div>
+              <Label asChild>
+                <div>Day of month</div>
+              </Label>
               <Select
                 ariaLabel="Day of month"
                 value={String(schedule.dayOfMonth)}
@@ -244,9 +242,9 @@ export function CronScheduleBuilder({ value, onChange }: CronScheduleBuilderProp
           )}
 
           <div>
-            <div className="field-label">
-              {schedule.frequency === 'hourly' ? 'At minute' : 'At'}
-            </div>
+            <Label asChild>
+              <div>{schedule.frequency === 'hourly' ? 'At minute' : 'At'}</div>
+            </Label>
               <div className="flex items-center gap-1.5">
                 {schedule.frequency !== 'hourly' && (
                   <>
@@ -257,7 +255,7 @@ export function CronScheduleBuilder({ value, onChange }: CronScheduleBuilderProp
                       options={HOUR_OPTIONS}
                       className="w-[72px]"
                     />
-                    <span className="font-mono text-[13px] text-[var(--color-text-muted)]">
+                    <span className="font-mono text-base text-[var(--color-text-muted)]">
                       :
                     </span>
                   </>
@@ -276,12 +274,13 @@ export function CronScheduleBuilder({ value, onChange }: CronScheduleBuilderProp
 
       {isCustom && (
         <div>
-          <div className="field-label">
-            Cron expression
-            <span className="hint">5-field POSIX (min hour dom month dow)</span>
-          </div>
-          <input
-            className="field-input"
+          <Label asChild>
+            <div>
+              Cron expression
+              <FieldHint>5-field POSIX (min hour dom month dow)</FieldHint>
+            </div>
+          </Label>
+          <Input
             type="text"
             placeholder="0 9 * * *"
             value={value}
@@ -296,17 +295,19 @@ export function CronScheduleBuilder({ value, onChange }: CronScheduleBuilderProp
       )}
 
       {description && (
-        <div className="rounded-[var(--radius)] bg-[var(--color-pill-bg)] px-3 py-2 font-mono text-[11px] text-[var(--color-text-muted)]">
+        <div className="rounded-[var(--radius)] bg-[var(--color-pill-bg)] px-3 py-2 font-mono text-small text-[var(--color-text-muted)]">
           {description}
         </div>
       )}
 
       {!isCustom && (
         <div>
-          <button
-            type="button"
-            onClick={() => setShowAdvanced(!showAdvanced)}
-            className="flex items-center gap-1 font-mono text-[11px] text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text)]"
+          <Button
+            variant="link"
+            size="inline"
+            className="gap-1 font-mono font-normal"
+            aria-expanded={showAdvanced}
+            onClick={() => setShowAdvanced((v) => !v)}
           >
             <ChevronDown
               size={12}
@@ -317,10 +318,10 @@ export function CronScheduleBuilder({ value, onChange }: CronScheduleBuilderProp
               )}
             />
             {showAdvanced ? 'Hide' : 'Show'} cron expression
-          </button>
+          </Button>
           {showAdvanced && (
-            <input
-              className="field-input mt-2"
+            <Input
+              className="mt-2"
               type="text"
               value={value}
               readOnly

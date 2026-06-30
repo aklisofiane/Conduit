@@ -11,7 +11,7 @@ export function SettingsLayout() {
     <div className="flex flex-1">
       <aside className="w-[220px] shrink-0 border-r border-[var(--color-divider)] bg-[var(--color-bg-panel)] py-6">
         <div className="mb-3 px-5">
-          <h2 className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+          <h2 className="font-mono text-caption uppercase tracking-wide text-[var(--color-text-muted)]">
             Settings
           </h2>
         </div>
@@ -24,7 +24,7 @@ export function SettingsLayout() {
                 to={entry.path}
                 className={({ isActive }) =>
                   cn(
-                    'flex items-center gap-2 rounded-[var(--radius)] px-3 py-1.5 font-mono text-[12px] transition-colors',
+                    'flex items-center gap-2 rounded-[var(--radius)] px-3 py-1.5 font-mono text-small transition-colors',
                     isActive
                       ? 'bg-[var(--color-pill-bg)] text-[var(--color-text)]'
                       : 'text-[var(--color-text-2)] hover:bg-[var(--color-pill-bg)] hover:text-[var(--color-text)]',

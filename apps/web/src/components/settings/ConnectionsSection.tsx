@@ -19,8 +19,11 @@ import {
   scopeSummary,
   type EnsureLabelTarget,
 } from '../../lib/connection.js';
-import { InfoPopover } from '../common/InfoPopover.js';
+import { InfoPopover } from '../ui/info-popover.js';
 import { SettingsSection } from '../common/SettingsSection.js';
+import { Badge, BadgeDot } from '../ui/badge.js';
+import { Button } from '../ui/button.js';
+import { Checkbox } from '../ui/checkbox.js';
 import { CreateConnectionForm } from './ConnectionForm.js';
 import { SuggestionsGalleryDialog } from './SuggestionsGalleryDialog.js';
 
@@ -71,12 +74,12 @@ export function ConnectionsSection() {
       )}
 
       {isLoading && (
-        <div className="flex h-16 items-center justify-center font-mono text-[12px] text-[var(--color-text-3)]">
+        <div className="flex h-16 items-center justify-center font-mono text-small text-[var(--color-text-muted)]">
           Loading…
         </div>
       )}
       {!isLoading && connections.length === 0 && !creating && (
-        <div className="flex h-24 items-center justify-center font-mono text-[12px] text-[var(--color-text-4)]">
+        <div className="flex h-24 items-center justify-center font-mono text-small text-[var(--color-text-muted)]">
           No connections yet.
         </div>
       )}
@@ -143,14 +146,14 @@ function LabelPrompt({
   const topLevelError = ensure.error ? apiErrorMessage(ensure.error) : null;
 
   return (
-    <div className="border-b border-[var(--color-line)] px-4 py-4">
-      <div className="flex flex-col gap-3 rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-2,var(--color-bg-1))] p-3">
-        <div className="font-mono text-[12px]">
+    <div className="border-b border-[var(--color-divider)] px-4 py-4">
+      <div className="flex flex-col gap-3 rounded-lg border border-[var(--color-divider)] bg-[var(--color-pill-bg,var(--color-bg-panel))] p-3">
+        <div className="font-mono text-small">
           Connected{' '}
           <code className="text-[var(--color-text)]">{target.scopeLabel}</code>{' '}
           ✓
         </div>
-        <div className="font-mono text-[11px] text-[var(--color-text-3)]">
+        <div className="font-mono text-small text-[var(--color-text-muted)]">
           Add Conduit's workflow labels to this repo/project?
         </div>
 
@@ -160,13 +163,12 @@ function LabelPrompt({
             return (
               <label
                 key={l.name}
-                className="flex items-center gap-2 font-mono text-[12px]"
+                className="flex items-center gap-2 font-mono text-small"
               >
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={selected.has(l.name)}
                   disabled={ensure.isPending || done}
-                  onChange={() => toggle(l.name)}
+                  onCheckedChange={() => toggle(l.name)}
                 />
                 <code className="text-[var(--color-text)]">{l.name}</code>
                 {r &&
@@ -185,23 +187,22 @@ function LabelPrompt({
         </div>
 
         {topLevelError && (
-          <div className="font-mono text-[11px] text-[var(--color-danger,#dc322f)]">
+          <div className="font-mono text-small text-[var(--color-danger,#dc322f)]">
             {topLevelError}
           </div>
         )}
 
         <div className="flex justify-end gap-2">
           {done ? (
-            <button className="btn" onClick={onDismiss}>
+            <Button onClick={onDismiss}>
               Done
-            </button>
+            </Button>
           ) : (
             <>
-              <button className="btn" onClick={onDismiss}>
+              <Button onClick={onDismiss}>
                 Skip
-              </button>
-              <button
-                className="btn"
+              </Button>
+              <Button
                 disabled={ensure.isPending || selected.size === 0}
                 onClick={add}
               >
@@ -210,7 +211,7 @@ function LabelPrompt({
                   : hasFailures
                     ? 'Retry'
                     : 'Add labels'}
-              </button>
+              </Button>
             </>
           )}
         </div>
@@ -251,14 +252,14 @@ function ConnectionRowView({ conn, onDelete }: { conn: ConnectionRow; onDelete: 
   };
 
   return (
-    <div className="border-b border-[var(--color-line)] last:border-b-0">
+    <div className="border-b border-[var(--color-divider)] last:border-b-0">
       <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4 px-4 py-3">
-        <span className="flex h-7 w-7 items-center justify-center rounded-md border border-[var(--color-line)] bg-[var(--color-bg-2)] font-mono text-[10.5px]">
+        <span className="flex h-7 w-7 items-center justify-center rounded-md border border-[var(--color-divider)] bg-[var(--color-pill-bg)] font-mono text-caption">
           {conn.credential.platform.slice(0, 2)}
         </span>
         <div>
-          <div className="font-mono text-[13px] font-medium">{conn.name}</div>
-          <div className="font-mono text-[11px] text-[var(--color-text-3)]">
+          <div className="font-mono text-base font-medium">{conn.name}</div>
+          <div className="font-mono text-small text-[var(--color-text-muted)]">
             {conn.credential.name} · {conn.credential.platform.toLowerCase()}
             {conn.credential.hostUrl &&
               !isCloudHost(conn.credential.platform as Platform, conn.credential.hostUrl) &&
@@ -268,21 +269,22 @@ function ConnectionRowView({ conn, onDelete }: { conn: ConnectionRow; onDelete: 
         </div>
         <div className="flex items-center gap-2">
           {isRepoScoped && ready && (
-            <button type="button" className="pill" onClick={() => setGalleryOpen(true)}>
-              <span className="dot" />
-              {imported ? 'Suggestions imported' : 'Suggestions ready'}
-            </button>
+            <Badge asChild>
+              <button type="button" onClick={() => setGalleryOpen(true)}>
+                <BadgeDot />
+                {imported ? 'Suggestions imported' : 'Suggestions ready'}
+              </button>
+            </Badge>
           )}
           {isRepoScoped &&
             (() => {
               const analyzeButton = (
-                <button
-                  className="btn"
+                <Button
                   disabled={running || startAnalysis.isPending}
                   onClick={onAnalyze}
                 >
                   {running ? 'Analyzing…' : ready ? 'Re-analyze' : 'Analyze repo'}
-                </button>
+                </Button>
               );
               // Explain the action on first run, when its purpose is opaque.
               // Once it's running (progress card) or ready (suggestions pill),
@@ -295,9 +297,9 @@ function ConnectionRowView({ conn, onDelete }: { conn: ConnectionRow; onDelete: 
                 analyzeButton
               );
             })()}
-          <button className="btn" onClick={onDelete}>
+          <Button onClick={onDelete}>
             Delete
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -325,37 +327,43 @@ function ConnectionRowView({ conn, onDelete }: { conn: ConnectionRow; onDelete: 
  * read-only multi-minute run nothing imports without consent. Mirrors the
  * phase labels in {@link ANALYSIS_PHASE_LABEL} in plain language.
  */
+/** The small numbered badge ahead of each step in {@link AnalyzeRepoInfo}. */
+const stepNumClass =
+  'mt-px flex h-[17px] w-[17px] items-center justify-center rounded-[var(--radius-sm)] bg-[var(--color-accent-soft)] font-mono text-caption font-semibold text-[var(--color-accent)]';
+
 function AnalyzeRepoInfo() {
   return (
     <>
-      <div className="info-popover-title">
-        <span className="spark">✦</span> What “Analyze repo” does
+      <div className="mb-2 flex items-center gap-[7px] font-mono text-small font-semibold text-[var(--color-text)]">
+        <span className="text-[var(--color-accent)]">✦</span> What “Analyze repo” does
       </div>
-      <p className="info-popover-lede">
+      <p className="m-0 mb-2.5 text-small leading-[1.5] text-[var(--color-text-2)] [&_b]:font-semibold [&_b]:text-[var(--color-text)]">
         Conduit reads the repo and proposes <b>ready-to-import review workflows</b> — one per
         component it finds.
       </p>
-      <ul className="info-popover-steps">
+      <ul className="m-0 mb-2.5 grid list-none gap-[7px] p-0 [&>li]:grid [&>li]:grid-cols-[auto_1fr] [&>li]:gap-[9px] [&>li]:text-caption [&>li]:leading-[1.45] [&>li]:text-[var(--color-text-2)] [&_b]:font-semibold [&_b]:text-[var(--color-text)]">
         <li>
-          <span className="n">1</span>
+          <span className={stepNumClass}>1</span>
           <span>
             <b>Maps the components</b> in the codebase
           </span>
         </li>
         <li>
-          <span className="n">2</span>
+          <span className={stepNumClass}>2</span>
           <span>
             <b>Designs a scheduled review</b> for each — reviewer focus and a cadence
           </span>
         </li>
         <li>
-          <span className="n">3</span>
+          <span className={stepNumClass}>3</span>
           <span>
             You <b>pick which to import</b>; nothing runs until you do
           </span>
         </li>
       </ul>
-      <div className="info-popover-foot">~ a few minutes · read-only</div>
+      <div className="border-t border-[var(--color-divider)] pt-2.5 font-mono text-caption text-[var(--color-text-muted)]">
+        ~ a few minutes · read-only
+      </div>
     </>
   );
 }
@@ -369,19 +377,19 @@ function AnalysisProgressCard({ analysis }: { analysis: ConnectionAnalysis }) {
   const failed = analysis.status === 'FAILED';
   return (
     <div className="px-4 pb-4">
-      <div className="flex flex-col gap-2 rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-2,var(--color-bg-1))] p-3">
-        <div className="flex items-center gap-2 font-mono text-[12px]">
+      <div className="flex flex-col gap-2 rounded-lg border border-[var(--color-divider)] bg-[var(--color-pill-bg,var(--color-bg-panel))] p-3">
+        <div className="flex items-center gap-2 font-mono text-small">
           <span className={`status-dot ${failed ? 'error' : 'running'}`} />
           {failed ? 'Analysis failed' : ANALYSIS_PHASE_LABEL[analysis.phase]}
         </div>
         {failed ? (
           analysis.error && (
-            <div className="font-mono text-[11px] text-[var(--color-danger,#dc322f)]">
+            <div className="font-mono text-small text-[var(--color-danger,#dc322f)]">
               {analysis.error}
             </div>
           )
         ) : (
-          <div className="font-mono text-[11px] text-[var(--color-text-3)]">
+          <div className="font-mono text-small text-[var(--color-text-muted)]">
             Analyzing your repository — this can take a few minutes.
           </div>
         )}

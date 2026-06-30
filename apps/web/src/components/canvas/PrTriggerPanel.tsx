@@ -11,6 +11,7 @@ import {
   PanelHeader,
 } from './trigger-panel-common.js';
 import { ensureLabelTarget, repoScopedConnections } from '../../lib/connection.js';
+import { Input } from '../ui/input.js';
 
 type PrTrigger = Extract<TriggerConfig, { type: 'pull_requests' }>;
 
@@ -71,8 +72,7 @@ export function PrTriggerPanel({
 
           <Field label="Poll every" hint="seconds between poll cycles">
             <div className="flex items-center gap-2">
-              <input
-                className="field-input"
+              <Input
                 type="number"
                 min={10}
                 step={10}
@@ -83,7 +83,7 @@ export function PrTriggerPanel({
                   })
                 }
               />
-              <span className="font-mono text-[11px] text-[var(--color-text-muted)]">
+              <span className="font-mono text-small text-[var(--color-text-muted)]">
                 sec
               </span>
             </div>

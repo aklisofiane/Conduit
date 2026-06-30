@@ -18,7 +18,7 @@ export function TopChrome() {
         <div className="flex items-center gap-1 text-[var(--color-text)]">
           <NavLink
             to="/"
-            className="flex items-center gap-2 font-sans text-[14px] font-semibold"
+            className="flex items-center gap-2 font-sans text-base font-semibold"
           >
             <Logo size={20} color="var(--color-accent)" />
             <span>Conduit</span>

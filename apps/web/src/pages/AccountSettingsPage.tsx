@@ -6,6 +6,10 @@ import { z } from 'zod';
 import { useUserInvitations } from '../api/organization.js';
 import { authClient, signOut, useSession } from '../lib/auth-client.js';
 import { FormField } from '../components/common/FormField.js';
+import { Button } from '../components/ui/button.js';
+import { ToggleGroup, ToggleGroupItem } from '../components/ui/toggle-group.js';
+import { useTheme } from '../hooks/use-theme.js';
+import type { ThemePref } from '../lib/theme.js';
 
 const passwordSchema = z
   .object({
@@ -57,39 +61,82 @@ export function AccountSettingsPage() {
   return (
     <div className="mx-auto flex w-full max-w-[900px] flex-col gap-6 px-6 pb-16 pt-10">
       <h1
-        className="text-[34px] font-semibold leading-none tracking-tight text-[var(--color-text)]"
+        className="text-display font-semibold leading-none tracking-tight text-[var(--color-text)]"
         style={{ fontFamily: 'var(--font-serif)' }}
       >
-        Account<em className="text-[var(--color-claude)] not-italic">.</em>
+        Account<em className="text-[var(--color-claude-mark)] not-italic">.</em>
       </h1>
-      <p className="font-mono text-[12px] text-[var(--color-text-2)]">
+      <p className="font-mono text-small text-[var(--color-text-2)]">
         Your profile and password. Organization-level settings live elsewhere.
       </p>
 
-      <section className="rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-1)]">
-        <header className="border-b border-[var(--color-line)] px-4 py-3">
-          <h2 className="font-mono text-[13px] font-semibold">Profile</h2>
+      <section className="rounded-lg border border-[var(--color-divider)] bg-[var(--color-bg-panel)]">
+        <header className="border-b border-[var(--color-divider)] px-4 py-3">
+          <h2 className="font-mono text-base font-semibold">Profile</h2>
         </header>
         <dl className="grid grid-cols-[140px_1fr] items-center gap-y-3 px-4 py-4">
-          <dt className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+          <dt className="font-mono text-caption uppercase tracking-wide text-[var(--color-text-muted)]">
             Name
           </dt>
-          <dd className="font-mono text-[12.5px] text-[var(--color-text)]">
+          <dd className="font-mono text-small text-[var(--color-text)]">
             {user?.name?.trim() || '—'}
           </dd>
-          <dt className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+          <dt className="font-mono text-caption uppercase tracking-wide text-[var(--color-text-muted)]">
             Email
           </dt>
-          <dd className="font-mono text-[12.5px] text-[var(--color-text)]">{user?.email ?? '—'}</dd>
+          <dd className="font-mono text-small text-[var(--color-text)]">{user?.email ?? '—'}</dd>
         </dl>
       </section>
 
       <OrganizationLinks />
 
+      <AppearanceSection />
+
       <ChangePasswordSection />
 
       <SignOutSection />
     </div>
+  );
+}
+
+const THEME_OPTIONS: { value: ThemePref; label: string }[] = [
+  { value: 'system', label: 'System' },
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
+];
+
+function AppearanceSection() {
+  const { pref, setPref } = useTheme();
+
+  return (
+    <section className="rounded-lg border border-[var(--color-divider)] bg-[var(--color-bg-panel)]">
+      <header className="border-b border-[var(--color-divider)] px-4 py-3">
+        <h2 className="font-mono text-base font-semibold">Appearance</h2>
+      </header>
+      <div className="flex items-center justify-between gap-4 px-4 py-4">
+        <div className="flex flex-col gap-1">
+          <span className="font-mono text-small text-[var(--color-text)]">Theme</span>
+          <span className="font-mono text-small text-[var(--color-text-muted)]">
+            “System” follows your operating system setting.
+          </span>
+        </div>
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          value={pref}
+          onValueChange={(v) => {
+            if (v) setPref(v as ThemePref);
+          }}
+          aria-label="Theme preference"
+        >
+          {THEME_OPTIONS.map((opt) => (
+            <ToggleGroupItem key={opt.value} value={opt.value}>
+              {opt.label}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      </div>
+    </section>
   );
 }
 
@@ -101,24 +148,24 @@ function OrganizationLinks() {
     <section className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <Link
         to="/account/organization"
-        className="flex flex-col gap-1 rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-1)] px-4 py-3 transition-colors hover:border-[var(--color-divider)] hover:bg-[var(--color-pill-bg)]"
+        className="flex flex-col gap-1 rounded-lg border border-[var(--color-divider)] bg-[var(--color-bg-panel)] px-4 py-3 transition-colors hover:border-[var(--color-divider)] hover:bg-[var(--color-pill-bg)]"
       >
-        <span className="font-mono text-[12.5px] font-semibold text-[var(--color-text)]">
+        <span className="font-mono text-small font-semibold text-[var(--color-text)]">
           Organization
         </span>
-        <span className="font-mono text-[11px] text-[var(--color-text-2)]">
+        <span className="font-mono text-small text-[var(--color-text-2)]">
           Members, invitations, settings
         </span>
       </Link>
       {pendingCount > 0 && (
         <Link
           to="/account/invitations"
-          className="flex flex-col gap-1 rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-1)] px-4 py-3 transition-colors hover:border-[var(--color-divider)] hover:bg-[var(--color-pill-bg)]"
+          className="flex flex-col gap-1 rounded-lg border border-[var(--color-divider)] bg-[var(--color-bg-panel)] px-4 py-3 transition-colors hover:border-[var(--color-divider)] hover:bg-[var(--color-pill-bg)]"
         >
-          <span className="font-mono text-[12.5px] font-semibold text-[var(--color-text)]">
+          <span className="font-mono text-small font-semibold text-[var(--color-text)]">
             Pending invitations ({pendingCount})
           </span>
-          <span className="font-mono text-[11px] text-[var(--color-text-2)]">
+          <span className="font-mono text-small text-[var(--color-text-2)]">
             Accept or reject invitations sent to your email
           </span>
         </Link>
@@ -150,9 +197,9 @@ function ChangePasswordSection() {
   const rootError = form.formState.errors.root?.message;
 
   return (
-    <section className="rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-1)]">
-      <header className="border-b border-[var(--color-line)] px-4 py-3">
-        <h2 className="font-mono text-[13px] font-semibold">Change password</h2>
+    <section className="rounded-lg border border-[var(--color-divider)] bg-[var(--color-bg-panel)]">
+      <header className="border-b border-[var(--color-divider)] px-4 py-3">
+        <h2 className="font-mono text-base font-semibold">Change password</h2>
       </header>
       <form onSubmit={onSubmit} className="flex flex-col gap-3 px-4 py-4" noValidate>
         <FormField
@@ -184,24 +231,24 @@ function ChangePasswordSection() {
         />
 
         {rootError && (
-          <div role="alert" className="font-mono text-[11px] text-[var(--color-error)]">
+          <div role="alert" className="font-mono text-small text-[var(--color-error)]">
             {rootError}
           </div>
         )}
         {done && (
-          <div className="font-mono text-[11px] text-[var(--color-success)]">
+          <div className="font-mono text-small text-[var(--color-success)]">
             Password updated.
           </div>
         )}
 
         <div className="flex">
-          <button
+          <Button
             type="submit"
-            className="btn primary"
+            variant="primary"
             disabled={form.formState.isSubmitting}
           >
             {form.formState.isSubmitting ? 'Updating…' : 'Update password'}
-          </button>
+          </Button>
         </div>
       </form>
     </section>
@@ -224,17 +271,17 @@ function SignOutSection() {
   };
 
   return (
-    <section className="rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-1)]">
-      <header className="border-b border-[var(--color-line)] px-4 py-3">
-        <h2 className="font-mono text-[13px] font-semibold">Sign out</h2>
+    <section className="rounded-lg border border-[var(--color-divider)] bg-[var(--color-bg-panel)]">
+      <header className="border-b border-[var(--color-divider)] px-4 py-3">
+        <h2 className="font-mono text-base font-semibold">Sign out</h2>
       </header>
       <div className="flex items-center justify-between gap-4 px-4 py-4">
-        <p className="font-mono text-[11.5px] text-[var(--color-text-2)]">
+        <p className="font-mono text-caption text-[var(--color-text-2)]">
           End this browser session.
         </p>
-        <button className="btn" onClick={handleSignOut} disabled={busy}>
+        <Button onClick={handleSignOut} disabled={busy}>
           {busy ? 'Signing out…' : 'Sign out'}
-        </button>
+        </Button>
       </div>
     </section>
   );

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronRight, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { TemplatePickerDialog } from '../components/templates/TemplatePickerDialog.js';
 import { CreateWorkflowDialog } from '../components/workflow-list/CreateWorkflowDialog.js';
 import type { PaletteTriggerType } from '../components/canvas/NodePalette.js';
@@ -8,7 +8,9 @@ import { WorkflowRowItem } from '../components/workflow-list/WorkflowRowItem.js'
 import { useConnections, useCreateWorkflow, useWorkflows } from '../api/hooks.js';
 import type { ConnectionRow, WorkflowRow } from '../api/types.js';
 import { repoGroupRef, type RepoGroupRef } from '../lib/connection.js';
-import { cn } from '../lib/cn.js';
+import { Button } from '../components/ui/button.js';
+import { Card } from '../components/ui/card.js';
+import { DisclosureButton } from '../components/ui/disclosure.js';
 
 const NO_REPO_KEY = '__no_repo__';
 
@@ -102,7 +104,12 @@ export function HomePage() {
     });
   };
 
-  const handleCreate = async (name: string, triggerType: PaletteTriggerType, connectionId?: string, platform?: 'github' | 'gitlab') => {
+  const handleCreate = async (
+    name: string,
+    triggerType: PaletteTriggerType,
+    connectionId?: string,
+    platform?: 'github' | 'gitlab',
+  ) => {
     const created = await createWorkflow.mutateAsync({ name, triggerType, connectionId, platform });
     setShowCreateDialog(false);
     navigate(`/workflows/${created.id}`);
@@ -112,18 +119,18 @@ export function HomePage() {
     <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-8 px-6 pb-16 pt-10">
       <section className="flex flex-col gap-2">
         <h1
-          className="text-[44px] font-semibold leading-none tracking-tight text-[var(--color-text)]"
+          className="text-hero font-semibold leading-none tracking-tight text-[var(--color-text)]"
           style={{ fontFamily: 'var(--font-serif)', fontVariantLigatures: 'none' }}
         >
           Workflows
         </h1>
-        <div className="font-mono text-[12px] text-[var(--color-text-2)]">
+        <div className="font-mono text-small text-[var(--color-text-2)]">
           <b className="text-[var(--color-text)]">{activeCount} active</b> ·{' '}
           <b className="text-[var(--color-text)]">{runningCount} runs</b> in flight ·{' '}
           {failingCount > 0 ? (
             <span className="text-[var(--color-error)]">{failingCount} needs attention</span>
           ) : (
-            <span className="text-[var(--color-text-3)]">all good</span>
+            <span className="text-[var(--color-text-muted)]">all good</span>
           )}
         </div>
       </section>
@@ -141,27 +148,27 @@ export function HomePage() {
 
       <section className="flex flex-col gap-3">
         <div className="flex items-end justify-between">
-          <h2 className="flex items-baseline gap-2 font-mono text-[12px] uppercase tracking-wider text-[var(--color-text-2)]">
+          <h2 className="flex items-baseline gap-2 font-mono text-small uppercase tracking-wider text-[var(--color-text-2)]">
             Your workflows
-            <span className="text-[var(--color-text-4)]">{workflows.length}</span>
+            <span className="text-[var(--color-text-muted)]">{workflows.length}</span>
           </h2>
           <div className="flex items-center gap-2">
-            <button className="btn" onClick={() => setShowTemplatePicker(true)}>
-              From template
-            </button>
-            <button className="btn primary" onClick={() => setShowCreateDialog(true)}>
+            <Button onClick={() => setShowTemplatePicker(true)}>From template</Button>
+            <Button variant="primary" onClick={() => setShowCreateDialog(true)}>
               <Plus size={12} strokeWidth={2.5} />
               New workflow
-            </button>
+            </Button>
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-1)]">
+        <Card padded={false}>
           {isLoading && <EmptyRow text="Loading workflows…" />}
           {!isLoading && workflows.length === 0 && (
             <EmptyRow text="No workflows yet — click “New workflow” to get started." />
           )}
-          {!isLoading && workflows.length > 0 && groups === null &&
+          {!isLoading &&
+            workflows.length > 0 &&
+            groups === null &&
             workflows.map((wf) => (
               <WorkflowRowItem
                 key={wf.id}
@@ -171,32 +178,24 @@ export function HomePage() {
                 onEndRename={() => setRenamingId((curr) => (curr === wf.id ? null : curr))}
               />
             ))}
-          {!isLoading && groups !== null &&
+          {!isLoading &&
+            groups !== null &&
             groups.flatMap((group) => {
               const collapsed = collapsedGroups.has(group.key);
               const header = (
-                <button
+                <DisclosureButton
                   key={`${group.key}:header`}
-                  type="button"
+                  open={!collapsed}
                   onClick={() => toggleGroup(group.key)}
-                  aria-expanded={!collapsed}
-                  className="flex w-full items-center gap-3 border-b border-[var(--color-line)] px-4 py-2.5 text-left transition-colors last:border-b-0 hover:bg-[var(--color-bg-2)]"
+                  className="border-b border-[var(--color-divider)] last:border-b-0"
                 >
-                  <ChevronRight
-                    size={12}
-                    strokeWidth={2}
-                    className={cn(
-                      'text-[var(--color-text-3)] transition-transform',
-                      !collapsed && 'rotate-90',
-                    )}
-                  />
-                  <div className="flex items-baseline gap-2 font-mono text-[12px]">
+                  <div className="flex items-baseline gap-2 font-mono text-small">
                     {group.ref ? (
                       <>
                         <span className="font-semibold text-[var(--color-text)]">
                           {group.ref.label}
                         </span>
-                        <span className="text-[var(--color-text-3)]">
+                        <span className="text-[var(--color-text-muted)]">
                           · {group.ref.platform}
                           {group.ref.hostUrl ? ` · ${group.ref.hostUrl}` : ''}
                         </span>
@@ -204,14 +203,14 @@ export function HomePage() {
                     ) : (
                       <>
                         <span className="font-semibold text-[var(--color-text)]">No repo</span>
-                        <span className="text-[var(--color-text-3)]">· cron or unconfigured</span>
+                        <span className="text-[var(--color-text-muted)]">· cron or unconfigured</span>
                       </>
                     )}
                   </div>
-                  <span className="ml-auto font-mono text-[11px] text-[var(--color-text-3)]">
+                  <span className="ml-auto font-mono text-small text-[var(--color-text-muted)]">
                     {group.rows.length} workflow{group.rows.length === 1 ? '' : 's'}
                   </span>
-                </button>
+                </DisclosureButton>
               );
               if (collapsed) return [header];
               return [
@@ -222,19 +221,15 @@ export function HomePage() {
                     wf={wf}
                     renaming={renamingId === wf.id}
                     onStartRename={() => setRenamingId(wf.id)}
-                    onEndRename={() =>
-                      setRenamingId((curr) => (curr === wf.id ? null : curr))
-                    }
+                    onEndRename={() => setRenamingId((curr) => (curr === wf.id ? null : curr))}
                   />
                 )),
               ];
             })}
-        </div>
+        </Card>
       </section>
 
-      {showTemplatePicker && (
-        <TemplatePickerDialog onClose={() => setShowTemplatePicker(false)} />
-      )}
+      {showTemplatePicker && <TemplatePickerDialog onClose={() => setShowTemplatePicker(false)} />}
       {showCreateDialog && (
         <CreateWorkflowDialog
           onClose={() => setShowCreateDialog(false)}
@@ -248,24 +243,24 @@ export function HomePage() {
 
 function StatCard({ label, value, hint }: { label: string; value: string; hint: string }) {
   return (
-    <div className="rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-1)] p-4">
-      <div className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-3)]">
+    <Card>
+      <div className="font-mono text-caption uppercase tracking-wider text-[var(--color-text-muted)]">
         {label}
       </div>
       <div
-        className="mt-2 text-[28px] font-semibold tracking-tight text-[var(--color-text)]"
+        className="mt-2 text-title font-semibold tracking-tight text-[var(--color-text)]"
         style={{ fontFamily: 'var(--font-serif)' }}
       >
         {value}
       </div>
-      <div className="mt-1 font-mono text-[11px] text-[var(--color-text-3)]">{hint}</div>
-    </div>
+      <div className="mt-1 font-mono text-small text-[var(--color-text-muted)]">{hint}</div>
+    </Card>
   );
 }
 
 function EmptyRow({ text }: { text: string }) {
   return (
-    <div className="flex h-16 items-center justify-center font-mono text-[12px] text-[var(--color-text-3)]">
+    <div className="flex h-16 items-center justify-center font-mono text-small text-[var(--color-text-muted)]">
       {text}
     </div>
   );

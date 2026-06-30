@@ -9,6 +9,7 @@ import {
 import { triggerSummary } from '../../lib/trigger-defaults.js';
 import type { WorkflowRow } from '../../api/types.js';
 import { cn } from '../../lib/cn.js';
+import { Badge, BadgeDot } from '../ui/badge.js';
 import { downloadWorkflowExport } from '../../lib/export-workflow.js';
 import { duration, relativeFromNow } from '../../lib/time.js';
 import { statusClass } from '../../lib/status.js';
@@ -102,22 +103,30 @@ export function WorkflowRowItem({
             onCommit={handleRenameCommit}
             onCancel={onEndRename}
             maxLength={NAME_MAX_LENGTH}
-            className="w-full bg-transparent px-0 py-0 font-mono text-[13px] font-medium text-[var(--color-text)] outline-none"
+            className="w-full bg-transparent px-0 py-0 font-mono text-base font-medium text-[var(--color-text)] outline-none"
           />
         ) : (
-          <div className="truncate font-mono text-[13px] font-medium text-[var(--color-text)]">
+          <div className="truncate font-mono text-base font-medium text-[var(--color-text)]">
             {wf.name}
           </div>
         )}
-        <div className="mt-0.5 flex items-center gap-2 font-mono text-[11px] text-[var(--color-text-3)]">
-          {providers.has('claude') && <span className="prov-glyph claude">C</span>}
-          {providers.has('codex') && <span className="prov-glyph codex">X</span>}
+        <div className="mt-0.5 flex items-center gap-2 font-mono text-small text-[var(--color-text-muted)]">
+          {providers.has('claude') && (
+            <Badge variant="glyph" provider="claude">
+              C
+            </Badge>
+          )}
+          {providers.has('codex') && (
+            <Badge variant="glyph" provider="codex">
+              X
+            </Badge>
+          )}
           <span>
             {agentCount} agent{agentCount === 1 ? '' : 's'}
           </span>
         </div>
       </div>
-      <div className="truncate font-mono text-[11px] text-[var(--color-text-2)]">
+      <div className="truncate font-mono text-small text-[var(--color-text-2)]">
         {trigger?.platform ? (
           <>
             <b className="text-[var(--color-text)]">
@@ -126,10 +135,10 @@ export function WorkflowRowItem({
             · {triggerSummary(trigger)}
           </>
         ) : (
-          <span className="text-[var(--color-text-4)]">— trigger not configured</span>
+          <span className="text-[var(--color-text-muted)]">— trigger not configured</span>
         )}
       </div>
-      <div className="font-mono text-[11px] text-[var(--color-text-2)]">
+      <div className="font-mono text-small text-[var(--color-text-2)]">
         {lastRun ? (
           <>
             <span className={cn('status-dot mr-1.5 inline-block', statusClass(lastRun.status))} />
@@ -141,27 +150,30 @@ export function WorkflowRowItem({
                 : duration(lastRun.startedAt, lastRun.finishedAt)}
           </>
         ) : (
-          <span className="text-[var(--color-text-4)]">never run</span>
+          <span className="text-[var(--color-text-muted)]">never run</span>
         )}
       </div>
       <div className="flex justify-end">
-        <button
-          type="button"
-          aria-label={wf.isActive ? 'Deactivate workflow' : 'Activate workflow'}
-          aria-pressed={wf.isActive}
-          onClick={handleToggleActive}
-          disabled={update.isPending}
+        <Badge
+          asChild
           className={cn(
-            'pill cursor-pointer transition-opacity hover:opacity-100 hover:ring-1 hover:ring-[var(--color-line)] disabled:cursor-default disabled:opacity-60',
+            'cursor-pointer transition-opacity hover:opacity-100 hover:ring-1 hover:ring-[var(--color-divider)] disabled:cursor-default disabled:opacity-60',
             wf.isActive ? '' : 'opacity-40',
           )}
         >
-          <span
-            className="dot"
-            style={{ background: wf.isActive ? 'var(--color-success)' : 'var(--color-text-4)' }}
-          />
-          {wf.isActive ? 'on' : 'off'}
-        </button>
+          <button
+            type="button"
+            aria-label={wf.isActive ? 'Deactivate workflow' : 'Activate workflow'}
+            aria-pressed={wf.isActive}
+            onClick={handleToggleActive}
+            disabled={update.isPending}
+          >
+            <BadgeDot
+              className={wf.isActive ? 'bg-[var(--color-success)]' : 'bg-[var(--color-text-muted)]'}
+            />
+            {wf.isActive ? 'on' : 'off'}
+          </button>
+        </Badge>
       </div>
       <div className="flex justify-end">
         {renaming ? null : (
@@ -180,7 +192,7 @@ export function WorkflowRowItem({
                 e.preventDefault();
                 e.stopPropagation();
               }}
-              className="flex h-6 w-6 items-center justify-center rounded text-[var(--color-text-3)] transition-colors hover:bg-[var(--color-bg-2)] hover:text-[var(--color-text)] data-[state=open]:bg-[var(--color-bg-2)] data-[state=open]:text-[var(--color-text)]"
+              className="flex h-6 w-6 items-center justify-center rounded text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-pill-bg)] hover:text-[var(--color-text)] data-[state=open]:bg-[var(--color-pill-bg)] data-[state=open]:text-[var(--color-text)]"
             >
               <MoreVertical size={14} strokeWidth={1.5} />
             </button>
@@ -197,7 +209,7 @@ export function WorkflowRowItem({
   return (
     <Link
       to={`/workflows/${wf.id}`}
-      className={cn(rowClassName, 'transition-colors hover:bg-[var(--color-bg-2)]')}
+      className={cn(rowClassName, 'transition-colors hover:bg-[var(--color-pill-bg)]')}
     >
       {inner}
     </Link>
@@ -205,4 +217,4 @@ export function WorkflowRowItem({
 }
 
 const rowClassName =
-  'grid grid-cols-[20px_minmax(0,1fr)_minmax(0,1fr)_140px_60px_28px] items-center gap-4 border-b border-[var(--color-line)] px-4 py-3 last:border-b-0';
+  'grid grid-cols-[20px_minmax(0,1fr)_minmax(0,1fr)_140px_60px_28px] items-center gap-4 border-b border-[var(--color-divider)] px-4 py-3 last:border-b-0';

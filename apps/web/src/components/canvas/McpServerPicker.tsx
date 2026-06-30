@@ -13,8 +13,13 @@ import { useConnections, useIntrospectMcp } from '../../api/hooks.js';
 import { useWorkflowEditor } from '../../state/workflow-editor.js';
 import { cn } from '../../lib/cn.js';
 import { connectionLabel } from '../../lib/connection.js';
-import { CheckboxListPopover } from '../common/CheckboxListPopover.js';
-import { Select } from '../common/Select.js';
+import { CheckboxListPopover } from '../ui/checkbox-list-popover.js';
+import { Select } from '../ui/select.js';
+import { Button } from '../ui/button.js';
+import { Checkbox } from '../ui/checkbox.js';
+import { Input } from '../ui/input.js';
+import { Card } from '../ui/card.js';
+import { SelectableCard } from '../ui/selectable-card.js';
 
 interface Props {
   agent: AgentConfig;
@@ -34,11 +39,7 @@ interface Props {
  * (`discoveredTools`), so reopening the panel doesn't re-hit the MCP binary.
  * "Refresh tools" re-runs introspection on demand.
  */
-const TRANSPORT_KINDS: ReadonlyArray<McpTransport['kind']> = [
-  'stdio',
-  'sse',
-  'streamable-http',
-];
+const TRANSPORT_KINDS: ReadonlyArray<McpTransport['kind']> = ['stdio', 'sse', 'streamable-http'];
 
 export function McpServerPicker({ agent, workflowId, onChange }: Props) {
   const addMcpServer = useWorkflowEditor((s) => s.addMcpServer);
@@ -73,7 +74,7 @@ export function McpServerPicker({ agent, workflowId, onChange }: Props) {
   return (
     <div className="flex flex-col gap-3">
       {servers.length === 0 && !showAdd && (
-        <div className="font-mono text-[11px] text-[var(--color-text-4)]">
+        <div className="font-mono text-small text-[var(--color-text-muted)]">
           No MCP servers yet. Add one to expose GitHub, Slack, or a custom service to this agent.
         </div>
       )}
@@ -107,9 +108,7 @@ export function McpServerPicker({ agent, workflowId, onChange }: Props) {
           }}
         />
       ) : (
-        <button className="btn" onClick={() => setShowAdd(true)}>
-          + Add MCP server
-        </button>
+        <Button onClick={() => setShowAdd(true)}>+ Add MCP server</Button>
       )}
     </div>
   );
@@ -150,43 +149,38 @@ function ServerCard({
   };
 
   return (
-    <div
+    <Card
       className={cn(
-        'rounded-md border bg-[var(--color-bg-2)] p-3',
-        attached ? 'border-[var(--color-line-2)]' : 'border-[var(--color-line)]',
+        'rounded-md bg-[var(--color-pill-bg)] p-3',
+        attached ? 'border-[var(--color-divider)]' : 'border-[var(--color-divider)]',
       )}
     >
       <div className="flex items-start gap-3">
-        <input
-          type="checkbox"
+        <Checkbox
           checked={attached}
-          onChange={onToggleAttached}
+          onCheckedChange={onToggleAttached}
           className="mt-1"
           aria-label={`Attach ${server.name} to this agent`}
         />
         <div className="flex-1">
-          <div className="flex items-center gap-2 font-mono text-[12px] font-medium">
+          <div className="flex items-center gap-2 font-mono text-small font-medium">
             {server.name}
-            <span className="font-mono text-[10.5px] text-[var(--color-text-3)]">
+            <span className="font-mono text-caption text-[var(--color-text-muted)]">
               · {server.transport.kind}
             </span>
           </div>
-          <div className="mt-0.5 font-mono text-[10.5px] text-[var(--color-text-3)]">
+          <div className="mt-0.5 font-mono text-caption text-[var(--color-text-muted)]">
             {transportSummary(server.transport)}
           </div>
         </div>
-        <button
-          className="btn"
-          onClick={onRemoveFromWorkflow}
-          title="Remove from workflow"
-        >
+        <Button onClick={onRemoveFromWorkflow} title="Remove from workflow">
           ✕
-        </button>
+        </Button>
       </div>
 
       <div className="mt-3 grid grid-cols-[1fr_auto] items-end gap-2">
         <label className="flex flex-col gap-1">
-          <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+          <span className="font-mono text-caption uppercase tracking-wide text-[var(--color-text-muted)]">
             Connection
           </span>
           <Select
@@ -204,14 +198,13 @@ function ServerCard({
             }))}
           />
         </label>
-        <button
-          className="btn"
+        <Button
           onClick={handleIntrospect}
           disabled={introspect.isPending}
           title="Run tools/list on this server"
         >
           {introspect.isPending ? '…' : server.discoveredTools ? 'Refresh tools' : 'Load tools'}
-        </button>
+        </Button>
       </div>
 
       {attached && server.discoveredTools && (
@@ -221,7 +214,7 @@ function ServerCard({
           onChange={onSetAllowedTools}
         />
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -264,7 +257,7 @@ function ToolAllowList({
   };
 
   return (
-    <div className="mt-3 flex items-center gap-2 border-t border-[var(--color-line)] pt-3">
+    <div className="mt-3 flex items-center gap-2 border-t border-[var(--color-divider)] pt-3">
       <CheckboxListPopover
         items={tools}
         getId={toolName}
@@ -285,9 +278,7 @@ function ToolAllowList({
         placeholder="Filter tools…"
         emptyLabel="No matching tools"
         triggerLabel={
-          allAllowed
-            ? `All tools (${tools.length})`
-            : `${selected.size} of ${tools.length} tools`
+          allAllowed ? `All tools (${tools.length})` : `${selected.size} of ${tools.length} tools`
         }
         selectAll={{ checked: allAllowed, onToggle: toggleAll, label: 'Select all' }}
       />
@@ -307,29 +298,27 @@ function AddServerForm({
   const [mode, setMode] = useState<'preset' | 'custom'>('preset');
 
   return (
-    <div className="rounded-md border border-[var(--color-line)] bg-[var(--color-bg-2)] p-3">
+    <Card className="rounded-md bg-[var(--color-pill-bg)] p-3">
       <div className="flex items-center gap-2">
-        <button
-          className={cn('btn', mode === 'preset' && 'primary')}
+        <Button
+          variant={mode === 'preset' ? 'primary' : 'secondary'}
           onClick={() => setMode('preset')}
         >
           Preset
-        </button>
-        <button
-          className={cn('btn', mode === 'custom' && 'primary')}
+        </Button>
+        <Button
+          variant={mode === 'custom' ? 'primary' : 'secondary'}
           onClick={() => setMode('custom')}
         >
           Custom
-        </button>
+        </Button>
         <div className="flex-1" />
-        <button className="btn" onClick={onCancel}>
-          Cancel
-        </button>
+        <Button onClick={onCancel}>Cancel</Button>
       </div>
 
       {mode === 'preset' && <PresetPicker connections={connections} onAdd={onAdd} />}
       {mode === 'custom' && <CustomServerForm connections={connections} onAdd={onAdd} />}
-    </div>
+    </Card>
   );
 }
 
@@ -368,31 +357,27 @@ function PresetPicker({
     <div className="mt-3 flex flex-col gap-3">
       <div className="grid grid-cols-1 gap-2">
         {MCP_PRESETS.map((preset) => (
-          <button
+          <SelectableCard
             key={preset.id}
-            className={cn(
-              'rounded-md border bg-[var(--color-bg-1)] p-3 text-left transition-colors',
-              selected?.id === preset.id
-                ? 'border-[var(--color-line-2)]'
-                : 'border-[var(--color-line)] hover:border-[var(--color-line-2)]',
-            )}
+            selected={selected?.id === preset.id}
             onClick={() => setSelected(preset)}
+            className="bg-[var(--color-bg-panel)] p-3"
           >
-            <div className="font-mono text-[12px] font-medium">{preset.name}</div>
-            <div className="mt-1 font-mono text-[10.5px] text-[var(--color-text-3)]">
+            <div className="font-mono text-small font-medium">{preset.name}</div>
+            <div className="mt-1 font-mono text-caption text-[var(--color-text-muted)]">
               {preset.description}
             </div>
-            <div className="mt-1 font-mono text-[10.5px] text-[var(--color-text-4)]">
+            <div className="mt-1 font-mono text-caption text-[var(--color-text-muted)]">
               Requires {preset.platform.toLowerCase()} credential · {preset.credentialHint}
             </div>
-          </button>
+          </SelectableCard>
         ))}
       </div>
 
       {selected && (
         <>
           <label className="flex flex-col gap-1">
-            <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+            <span className="font-mono text-caption uppercase tracking-wide text-[var(--color-text-muted)]">
               Connection (optional — can set later)
             </span>
             <Select
@@ -403,14 +388,15 @@ function PresetPicker({
               options={eligible.map((c) => ({ value: c.id, label: c.name }))}
             />
             {eligible.length === 0 && (
-              <span className="font-mono text-[10.5px] text-[var(--color-text-4)]">
-                No {selected.platform.toLowerCase()} connection yet — add one from the Connections page.
+              <span className="font-mono text-caption text-[var(--color-text-muted)]">
+                No {selected.platform.toLowerCase()} connection yet — add one from the Connections
+                page.
               </span>
             )}
           </label>
-          <button className="btn primary" onClick={handleAdd}>
+          <Button variant="primary" onClick={handleAdd}>
             Add {selected.name}
-          </button>
+          </Button>
         </>
       )}
     </div>
@@ -430,7 +416,9 @@ function KeyValueEditor({
 }) {
   const update = (i: number, col: 0 | 1, value: string) => {
     const next = entries.map((row, j) =>
-      j === i ? ([col === 0 ? value : row[0], col === 1 ? value : row[1]] as [string, string]) : row,
+      j === i
+        ? ([col === 0 ? value : row[0], col === 1 ? value : row[1]] as [string, string])
+        : row,
     );
     onChange(next);
   };
@@ -441,29 +429,26 @@ function KeyValueEditor({
     <div className="flex flex-col gap-1.5">
       {entries.map(([k, v], i) => (
         <div key={i} className="flex items-center gap-1.5">
-          <input
-            className="field-input flex-1 font-mono text-[11px]"
+          <Input
+            className="flex-1 font-mono text-small"
             placeholder={keyPlaceholder}
             value={k}
             onChange={(e) => update(i, 0, e.target.value)}
           />
-          <input
-            className="field-input flex-[2] font-mono text-[11px]"
+          <Input
+            className="flex-[2] font-mono text-small"
             placeholder={valuePlaceholder}
             value={v}
             onChange={(e) => update(i, 1, e.target.value)}
           />
-          <button className="btn" onClick={() => remove(i)} title="Remove">
+          <Button onClick={() => remove(i)} title="Remove">
             ✕
-          </button>
+          </Button>
         </div>
       ))}
-      <button
-        className="btn self-start"
-        onClick={() => onChange([...entries, ['', '']])}
-      >
+      <Button className="self-start" onClick={() => onChange([...entries, ['', '']])}>
         + Add
-      </button>
+      </Button>
     </div>
   );
 }
@@ -519,18 +504,17 @@ function CustomServerForm({
   return (
     <div className="mt-3 flex flex-col gap-3">
       <label className="flex flex-col gap-1">
-        <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+        <span className="font-mono text-caption uppercase tracking-wide text-[var(--color-text-muted)]">
           Name
         </span>
-        <input
-          className="field-input"
+        <Input
           placeholder="e.g. Internal API"
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
       </label>
       <label className="flex flex-col gap-1">
-        <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+        <span className="font-mono text-caption uppercase tracking-wide text-[var(--color-text-muted)]">
           Transport
         </span>
         <Select
@@ -544,29 +528,23 @@ function CustomServerForm({
       {kind === 'stdio' ? (
         <>
           <label className="flex flex-col gap-1">
-            <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+            <span className="font-mono text-caption uppercase tracking-wide text-[var(--color-text-muted)]">
               Command
             </span>
-            <input
-              className="field-input"
-              placeholder="npx"
-              value={command}
-              onChange={(e) => setCommand(e.target.value)}
-            />
+            <Input placeholder="npx" value={command} onChange={(e) => setCommand(e.target.value)} />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+            <span className="font-mono text-caption uppercase tracking-wide text-[var(--color-text-muted)]">
               Args (space-separated)
             </span>
-            <input
-              className="field-input"
+            <Input
               placeholder="-y @my-org/mcp-something"
               value={args}
               onChange={(e) => setArgs(e.target.value)}
             />
           </label>
           <div className="flex flex-col gap-1">
-            <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+            <span className="font-mono text-caption uppercase tracking-wide text-[var(--color-text-muted)]">
               Environment variables
             </span>
             <KeyValueEditor
@@ -580,18 +558,17 @@ function CustomServerForm({
       ) : (
         <>
           <label className="flex flex-col gap-1">
-            <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+            <span className="font-mono text-caption uppercase tracking-wide text-[var(--color-text-muted)]">
               URL
             </span>
-            <input
-              className="field-input"
+            <Input
               placeholder="https://tools.example.com/mcp"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
             />
           </label>
           <div className="flex flex-col gap-1">
-            <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+            <span className="font-mono text-caption uppercase tracking-wide text-[var(--color-text-muted)]">
               Headers
             </span>
             <KeyValueEditor
@@ -605,7 +582,7 @@ function CustomServerForm({
       )}
 
       <label className="flex flex-col gap-1">
-        <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+        <span className="font-mono text-caption uppercase tracking-wide text-[var(--color-text-muted)]">
           Connection (optional)
         </span>
         <Select
@@ -620,9 +597,9 @@ function CustomServerForm({
         />
       </label>
 
-      <button className="btn primary" disabled={!canSave} onClick={handleAdd}>
+      <Button variant="primary" disabled={!canSave} onClick={handleAdd}>
         Add server
-      </button>
+      </Button>
     </div>
   );
 }

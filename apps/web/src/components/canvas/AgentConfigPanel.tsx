@@ -16,7 +16,12 @@ import {
 import type { AgentPreset } from '../../api/types.js';
 import { cn } from '../../lib/cn.js';
 import { providerStyle } from '../../styles/theme.js';
-import { Select, type SelectItem } from '../common/Select.js';
+import { Select, type SelectItem } from '../ui/select.js';
+import { Button } from '../ui/button.js';
+import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group.js';
+import { Input, Textarea } from '../ui/input.js';
+import { Checkbox } from '../ui/checkbox.js';
+import { Label, Hint } from '../ui/field.js';
 import { Maximize2, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { McpServerPicker } from './McpServerPicker.js';
@@ -108,33 +113,34 @@ export function AgentConfigPanel({
     <>
       <div className="flex items-start justify-between border-b border-[var(--color-divider)] px-5 py-4">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 font-mono text-[10px] font-medium uppercase tracking-[0.06em] text-[var(--color-text-muted)]">
+          <div className="flex items-center gap-2 font-mono text-caption font-medium uppercase tracking-[0.06em] text-[var(--color-text-muted)]">
             <span
               className="h-[6px] w-[6px] rounded-full"
               style={{ background: ps.mark }}
             />
             Agent · {ps.label}
           </div>
-          <h3 className="mt-2 truncate font-sans text-[15px] font-semibold text-[var(--color-text)]">
+          <h3 className="mt-2 truncate font-sans text-base font-semibold text-[var(--color-text)]">
             <span>{agent.name}</span>
             <span className="text-[var(--color-text-muted)]"> · config</span>
           </h3>
         </div>
-        <button
+        <Button
+          variant="ghost"
+          size="icon"
           type="button"
           onClick={onClose}
           aria-label="Close inspector"
-          className="ml-2 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-[var(--radius-sm)] text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-pill-bg)] hover:text-[var(--color-text)]"
+          className="ml-2 shrink-0 rounded-[var(--radius-sm)] text-[var(--color-text-muted)] hover:bg-[var(--color-pill-bg)] hover:text-[var(--color-text)]"
         >
           <X size={14} strokeWidth={1.5} />
-        </button>
+        </Button>
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 py-4">
         <div className="space-y-5">
           <Field label="Name">
-            <input
-              className="field-input"
+            <Input
               value={agent.name}
               onChange={(e) => onChange({ name: e.target.value })}
             />
@@ -211,20 +217,22 @@ export function AgentConfigPanel({
           </Field>
 
           <div>
-            <div className="field-label">
-              Instructions
-              <span className="hint">system prompt</span>
-              <button
-                type="button"
-                onClick={() => setPromptEditorOpen(true)}
-                className="ml-auto inline-flex items-center gap-1 rounded-[var(--radius-sm)] px-1.5 py-0.5 font-mono text-[10px] tracking-normal text-[var(--color-accent)] normal-case transition-colors hover:bg-[var(--color-pill-bg)]"
-              >
-                <Maximize2 size={11} strokeWidth={1.75} />
-                Expand
-              </button>
-            </div>
-            <textarea
-              className="field-input"
+            <Label asChild>
+              <div className="font-normal text-caption">
+                Instructions
+                <Hint>system prompt</Hint>
+                <Button
+                  variant="ghost"
+                  size="inline"
+                  onClick={() => setPromptEditorOpen(true)}
+                  className="ml-auto gap-1 rounded-[var(--radius-sm)] px-1.5 py-0.5 font-mono font-normal text-caption tracking-normal normal-case text-[var(--color-accent)] hover:bg-[var(--color-pill-bg)] hover:text-[var(--color-accent)]"
+                >
+                  <Maximize2 size={11} strokeWidth={1.75} />
+                  Expand
+                </Button>
+              </div>
+            </Label>
+            <Textarea
               rows={8}
               value={agent.instructions}
               onChange={(e) => onChange({ instructions: e.target.value })}
@@ -236,7 +244,7 @@ export function AgentConfigPanel({
               }}
               placeholder="You are an agent that…"
             />
-            <div className="mt-1 flex items-center justify-between font-mono text-[10px] text-[var(--color-text-muted)]">
+            <div className="mt-1 flex items-center justify-between font-mono text-caption text-[var(--color-text-muted)]">
               <span>
                 {promptCounts(agent.instructions).chars} chars ·{' '}
                 {promptCounts(agent.instructions).lines} lines
@@ -246,11 +254,10 @@ export function AgentConfigPanel({
           </div>
 
           <Field label="Web search">
-            <label className="flex cursor-pointer items-center gap-2 font-mono text-[12px]">
-              <input
-                type="checkbox"
+            <label className="flex cursor-pointer items-center gap-2 font-mono text-small">
+              <Checkbox
                 checked={agent.webSearch}
-                onChange={(e) => onChange({ webSearch: e.target.checked })}
+                onCheckedChange={(checked) => onChange({ webSearch: checked === true })}
               />
               <span>Enable</span>
             </label>
@@ -277,7 +284,7 @@ export function AgentConfigPanel({
 
           <Field label="Skills" hint="from .claude/skills/ + plugins">
             {providerSkills.length === 0 ? (
-              <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
+              <div className="font-mono text-small text-[var(--color-text-muted)]">
                 No skills discovered. Add SKILL.md files under .claude/skills/ on the worker or in a connected repo, or install a Claude Code plugin.
               </div>
             ) : (
@@ -292,12 +299,12 @@ export function AgentConfigPanel({
       </div>
 
       <div className="flex gap-2 border-t border-[var(--color-divider)] bg-[var(--color-bg-panel)] px-5 py-4">
-        <button className="btn flex-1" onClick={onDiscard} disabled={!dirty}>
+        <Button className="flex-1" onClick={onDiscard} disabled={!dirty}>
           Discard
-        </button>
-        <button className="btn primary flex-1" onClick={onSave} disabled={!dirty || saving}>
+        </Button>
+        <Button variant="primary" className="flex-1" onClick={onSave} disabled={!dirty || saving}>
           {saving ? 'Saving…' : 'Save changes'}
-        </button>
+        </Button>
       </div>
 
       <PromptEditorDialog
@@ -323,10 +330,12 @@ function Field({
 }) {
   return (
     <div>
-      <div className="field-label">
-        {label}
-        {hint && <span className="hint">{hint}</span>}
-      </div>
+      <Label asChild>
+        <div className="font-normal text-caption">
+          {label}
+          {hint && <Hint>{hint}</Hint>}
+        </div>
+      </Label>
       {children}
     </div>
   );
@@ -400,7 +409,7 @@ function IssueWritebackControl({
 
   if (!trigger) {
     return (
-      <div className="font-mono text-[11px] text-[var(--color-text-muted)]">
+      <div className="font-mono text-small text-[var(--color-text-muted)]">
         Add a trigger to enable issue writeback.
       </div>
     );
@@ -408,11 +417,10 @@ function IssueWritebackControl({
 
   return (
     <div className="space-y-2">
-      <label className="flex cursor-pointer items-center gap-2 font-mono text-[12px]">
-        <input
-          type="checkbox"
+      <label className="flex cursor-pointer items-center gap-2 font-mono text-small">
+        <Checkbox
           checked={enabled}
-          onChange={(e) => toggle(e.target.checked)}
+          onCheckedChange={(checked) => toggle(checked === true)}
         />
         <span>Allow updating issue/PR status &amp; labels</span>
       </label>
@@ -474,7 +482,7 @@ function IssueWritebackControl({
             // Null-safe: workflows saved before the PR-state axis existed have
             // no `allowedPrStates` until the definition is re-parsed on save.
             (value.allowedPrStates?.length ?? 0) === 0 && (
-              <div className="font-mono text-[10.5px] text-[var(--color-text-muted)]">
+              <div className="font-mono text-caption text-[var(--color-text-muted)]">
                 Pick at least one {isPr ? 'state' : 'status'} or label — without
                 selections, the writeback turn is skipped at run time.
               </div>
@@ -497,11 +505,11 @@ function PillSection({
 }) {
   return (
     <div>
-      <div className="mb-1 font-mono text-[10.5px] uppercase tracking-[0.06em] text-[var(--color-text-muted)]">
+      <div className="mb-1 font-mono text-caption uppercase tracking-[0.06em] text-[var(--color-text-muted)]">
         {label}
       </div>
       {empty !== null ? (
-        <div className="font-mono text-[11px] text-[var(--color-text-muted)]">{empty}</div>
+        <div className="font-mono text-small text-[var(--color-text-muted)]">{empty}</div>
       ) : (
         children
       )}
@@ -519,23 +527,36 @@ function PillToggleGroup({
   onToggle: (value: string) => void;
 }) {
   return (
-    <div className="flex flex-wrap gap-1.5">
+    <ToggleGroup
+      type="multiple"
+      value={selected}
+      onValueChange={(next) => {
+        // Radix hands back the full new selection; reduce it to the single
+        // item that flipped so we preserve the parent's per-value toggle API.
+        const changed =
+          next.length > selected.length
+            ? next.find((v) => !selected.includes(v))
+            : selected.find((v) => !next.includes(v));
+        if (changed !== undefined) onToggle(changed);
+      }}
+      className="flex flex-wrap gap-1.5"
+    >
       {options.map((opt) => (
-        <button
+        <ToggleGroupItem
           key={opt}
-          type="button"
-          onClick={() => onToggle(opt)}
+          value={opt}
+          variant="outline"
+          size="sm"
           className={cn(
-            'rounded-[var(--radius-sm)] border px-2 py-[3px] font-mono text-[11px] transition-colors',
-            selected.includes(opt)
-              ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-text)]'
-              : 'border-[var(--color-divider)] text-[var(--color-text-muted)] hover:border-[var(--color-text-muted)]',
+            'h-auto rounded-[var(--radius-sm)] border-[var(--color-divider)] px-2 py-[3px] text-small',
+            'text-[var(--color-text-muted)] hover:border-[var(--color-text-muted)] hover:text-[var(--color-text-muted)]',
+            'data-[state=on]:border-[var(--color-accent)] data-[state=on]:bg-[var(--color-accent-soft)] data-[state=on]:font-normal data-[state=on]:text-[var(--color-text)]',
           )}
         >
           {opt}
-        </button>
+        </ToggleGroupItem>
       ))}
-    </div>
+    </ToggleGroup>
   );
 }
 

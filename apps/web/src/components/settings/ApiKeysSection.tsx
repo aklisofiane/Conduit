@@ -9,8 +9,10 @@ import {
 } from '../../api/hooks.js';
 import { ApiError } from '../../api/client.js';
 import { relativeFromNow } from '../../lib/time.js';
-import { Select } from '../common/Select.js';
+import { Select } from '../ui/select.js';
 import { SettingsSection } from '../common/SettingsSection.js';
+import { Button } from '../ui/button.js';
+import { Input } from '../ui/input.js';
 
 const PROVIDER_OPTIONS = agentProviderIdSchema.options.map((p) => ({ value: p, label: p }));
 
@@ -66,9 +68,9 @@ export function ApiKeysSection() {
       onToggleCreate={() => setCreating((v) => !v)}
     >
       {creating && (
-        <div className="grid grid-cols-[120px_1fr_1fr_auto] items-end gap-3 border-b border-[var(--color-line)] px-4 py-3">
+        <div className="grid grid-cols-[120px_1fr_1fr_auto] items-end gap-3 border-b border-[var(--color-divider)] px-4 py-3">
           <label className="flex flex-col gap-1">
-            <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+            <span className="font-mono text-caption uppercase tracking-wide text-[var(--color-text-muted)]">
               Provider
             </span>
             <Select
@@ -84,11 +86,10 @@ export function ApiKeysSection() {
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+            <span className="font-mono text-caption uppercase tracking-wide text-[var(--color-text-muted)]">
               API key
             </span>
-            <input
-              className="field-input"
+            <Input
               type="password"
               autoComplete="new-password"
               value={form.apiKey}
@@ -96,25 +97,24 @@ export function ApiKeysSection() {
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+            <span className="font-mono text-caption uppercase tracking-wide text-[var(--color-text-muted)]">
               Base URL (optional)
             </span>
-            <input
-              className="field-input"
+            <Input
               placeholder={BASE_URL_PLACEHOLDER[form.providerId]}
               value={form.baseUrl}
               onChange={(e) => setForm((f) => ({ ...f, baseUrl: e.target.value }))}
             />
           </label>
-          <button
-            className="btn primary"
+          <Button
+            variant="primary"
             disabled={!form.apiKey || create.isPending}
             onClick={handleCreate}
           >
             {create.isPending ? 'Saving…' : 'Save'}
-          </button>
+          </Button>
           {error && (
-            <div className="col-span-4 font-mono text-[11px] text-[var(--color-danger)]">
+            <div className="col-span-4 font-mono text-small text-[var(--color-danger)]">
               {error}
             </div>
           )}
@@ -123,12 +123,12 @@ export function ApiKeysSection() {
 
       <div>
         {isLoading && (
-          <div className="flex h-16 items-center justify-center font-mono text-[12px] text-[var(--color-text-3)]">
+          <div className="flex h-16 items-center justify-center font-mono text-small text-[var(--color-text-muted)]">
             Loading…
           </div>
         )}
         {!isLoading && configs.length === 0 && !creating && (
-          <div className="flex h-24 items-center justify-center font-mono text-[12px] text-[var(--color-text-4)]">
+          <div className="flex h-24 items-center justify-center font-mono text-small text-[var(--color-text-muted)]">
             No provider keys yet. Workers will fall back to env defaults.
           </div>
         )}
@@ -182,92 +182,87 @@ function ProviderConfigRowView({
   };
 
   return (
-    <div className="grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-4 border-b border-[var(--color-line)] px-4 py-3 last:border-b-0">
-      <span className="flex h-7 w-7 items-center justify-center rounded-md border border-[var(--color-line)] bg-[var(--color-bg-2)] font-mono text-[10.5px]">
+    <div className="grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-4 border-b border-[var(--color-divider)] px-4 py-3 last:border-b-0">
+      <span className="flex h-7 w-7 items-center justify-center rounded-md border border-[var(--color-divider)] bg-[var(--color-pill-bg)] font-mono text-caption">
         {cfg.providerId.slice(0, 2)}
       </span>
       <div>
-        <div className="font-mono text-[13px] font-medium">{cfg.providerId}</div>
-        <div className="flex items-center gap-1.5 font-mono text-[11px] text-[var(--color-text-3)]">
+        <div className="font-mono text-base font-medium">{cfg.providerId}</div>
+        <div className="flex items-center gap-1.5 font-mono text-small text-[var(--color-text-muted)]">
           <span>••••{cfg.suffix}</span>
           <span>· {cfg.baseUrl ?? 'default'}</span>
           <span>· rotated {relativeFromNow(cfg.updatedAt)}</span>
         </div>
         {rotating && (
           <div className="mt-2 flex items-center gap-2">
-            <input
-              className="field-input"
+            <Input
               type="password"
               placeholder="New API key"
               value={newSecret}
               onChange={(e) => setNewSecret(e.target.value)}
               autoFocus
             />
-            <button
-              className="btn primary"
+            <Button
+              variant="primary"
               onClick={handleRotate}
               disabled={!newSecret || update.isPending}
             >
               {update.isPending ? 'Rotating…' : 'Rotate'}
-            </button>
-            <button
-              className="btn"
+            </Button>
+            <Button
               onClick={() => {
                 setRotating(false);
                 setNewSecret('');
               }}
             >
               Cancel
-            </button>
+            </Button>
           </div>
         )}
         {editingBaseUrl && (
           <div className="mt-2 flex items-center gap-2">
-            <input
-              className="field-input"
+            <Input
               placeholder={`${BASE_URL_PLACEHOLDER[cfg.providerId]} (leave empty to clear)`}
               value={newBaseUrl}
               onChange={(e) => setNewBaseUrl(e.target.value)}
               autoFocus
             />
-            <button
-              className="btn primary"
+            <Button
+              variant="primary"
               onClick={handleSaveBaseUrl}
               disabled={update.isPending}
             >
               {update.isPending ? 'Saving…' : 'Save'}
-            </button>
-            <button
-              className="btn"
+            </Button>
+            <Button
               onClick={() => {
                 setEditingBaseUrl(false);
                 setNewBaseUrl('');
               }}
             >
               Cancel
-            </button>
+            </Button>
           </div>
         )}
       </div>
       {!rotating && !editingBaseUrl && (
         <>
-          <button className="btn" onClick={() => setRotating(true)}>
+          <Button onClick={() => setRotating(true)}>
             Rotate
-          </button>
-          <button
-            className="btn"
+          </Button>
+          <Button
             onClick={() => {
               setNewBaseUrl(cfg.baseUrl ?? '');
               setEditingBaseUrl(true);
             }}
           >
             Edit base URL
-          </button>
+          </Button>
         </>
       )}
-      <button className="btn" onClick={onDelete} title="Delete">
+      <Button onClick={onDelete} title="Delete">
         Delete
-      </button>
+      </Button>
     </div>
   );
 }

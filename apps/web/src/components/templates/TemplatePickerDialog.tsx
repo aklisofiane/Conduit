@@ -1,11 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { ConnectionScope } from '@conduit/shared';
-import {
-  summarizeTemplate,
-  templateFileSchema,
-  type TemplateFile,
-} from '@conduit/shared/template';
+import { summarizeTemplate, templateFileSchema, type TemplateFile } from '@conduit/shared/template';
 import { Upload } from 'lucide-react';
 import { ApiError } from '../../api/client.js';
 import {
@@ -25,9 +21,13 @@ import type {
   TemplateSummary,
 } from '../../api/types.js';
 import { connectionLabel, repoScopedConnections } from '../../lib/connection.js';
-import { Dialog, DialogContent, DialogTitle } from '../common/Dialog.js';
-import { SearchSelect } from '../common/SearchSelect.js';
-import { Select, type SelectOption } from '../common/Select.js';
+import { Dialog, DialogContent, DialogTitle } from '../ui/dialog.js';
+import { SearchSelect } from '../ui/search-select.js';
+import { Select, type SelectOption } from '../ui/select.js';
+import { Button } from '../ui/button.js';
+import { Input } from '../ui/input.js';
+import { SelectableCard } from '../ui/selectable-card.js';
+import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group.js';
 
 function credentialPlatform(
   credentialId: string,
@@ -106,9 +106,7 @@ function defaultBindingForBoard(
   credentials: CredentialRow[],
   connections: ConnectionRow[],
 ): TemplateBinding {
-  const eligible = connections.filter(
-    (c) => c.scope.kind === 'github_projects_v2',
-  );
+  const eligible = connections.filter((c) => c.scope.kind === 'github_projects_v2');
   const only = eligible.length === 1 ? eligible[0] : undefined;
   if (eligible.length > 0) {
     return { mode: 'existing', connectionId: only?.id ?? '' };
@@ -134,10 +132,7 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
 
   const pending = createFromTemplate.isPending || importTemplate.isPending;
 
-  const boardAliasSet = useMemo(
-    () => new Set(selected?.boardAliases ?? []),
-    [selected],
-  );
+  const boardAliasSet = useMemo(() => new Set(selected?.boardAliases ?? []), [selected]);
   const repoAliases = useMemo(
     () => (selected?.placeholders ?? []).filter((p) => !boardAliasSet.has(p)),
     [selected, boardAliasSet],
@@ -189,10 +184,9 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
       Object.fromEntries(
         t.placeholders
           .filter((alias) => !boards.has(alias))
-          .map<[string, TemplateBinding]>((alias) => [
-            alias,
-            defaultBindingForRepo(alias, credentials, connections),
-          ]),
+          .map<
+            [string, TemplateBinding]
+          >((alias) => [alias, defaultBindingForRepo(alias, credentials, connections)]),
       ),
     );
     setError(null);
@@ -267,42 +261,36 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
         if (!o) onClose();
       }}
     >
-      <DialogContent
-        className="flex max-h-[85vh] w-[680px] max-w-[94vw] flex-col overflow-hidden rounded-xl border border-[var(--color-line)] bg-[var(--color-bg-1)] p-0 shadow-none"
-      >
-        <header className="flex items-center justify-between border-b border-[var(--color-line)] px-5 py-4">
+      <DialogContent className="flex max-h-[85vh] w-[680px] max-w-[94vw] flex-col overflow-hidden rounded-xl border border-[var(--color-divider)] bg-[var(--color-bg-panel)] p-0 shadow-none">
+        <header className="flex items-center justify-between border-b border-[var(--color-divider)] px-5 py-4">
           <div>
             <DialogTitle
-              className="text-[22px] font-semibold tracking-tight text-[var(--color-text)]"
+              className="text-lead font-semibold tracking-tight text-[var(--color-text)]"
               style={{ fontFamily: 'var(--font-serif)' }}
             >
               {selected ? `Configure ${selected.name}` : 'Start from a template'}
             </DialogTitle>
-            <p className="mt-0.5 font-mono text-[11px] text-[var(--color-text-3)]">
+            <p className="mt-0.5 font-mono text-small text-[var(--color-text-muted)]">
               {selected
                 ? `${selected.workflowCount} workflow${selected.workflowCount === 1 ? '' : 's'} · ${orderedAliases.length} connection${orderedAliases.length === 1 ? '' : 's'} to bind`
                 : 'Pre-built workflow blueprints you can copy and edit.'}
             </p>
           </div>
-          <button className="btn" onClick={onClose} aria-label="Close">
+          <Button onClick={onClose} aria-label="Close">
             ✕
-          </button>
+          </Button>
         </header>
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {!selected && (
-            <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-dashed border-[var(--color-line)] bg-[var(--color-bg-2)] px-4 py-3">
-              <div className="font-mono text-[11.5px] text-[var(--color-text-2)]">
+            <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-dashed border-[var(--color-divider)] bg-[var(--color-pill-bg)] px-4 py-3">
+              <div className="font-mono text-caption text-[var(--color-text-2)]">
                 Have a workflow export? Import a <code>.json</code> bundle.
               </div>
-              <button
-                type="button"
-                className="btn"
-                onClick={() => fileInputRef.current?.click()}
-              >
+              <Button type="button" onClick={() => fileInputRef.current?.click()}>
                 <Upload size={12} strokeWidth={1.5} />
                 Import from file
-              </button>
+              </Button>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -317,10 +305,14 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
             </div>
           )}
 
-          {isLoading && <div className="font-mono text-[12px] text-[var(--color-text-3)]">Loading templates…</div>}
+          {isLoading && (
+            <div className="font-mono text-small text-[var(--color-text-muted)]">
+              Loading templates…
+            </div>
+          )}
 
           {!selected && !isLoading && templates.length === 0 && (
-            <div className="font-mono text-[12px] text-[var(--color-text-3)]">
+            <div className="font-mono text-small text-[var(--color-text-muted)]">
               No templates found — check that <code>/templates</code> exists at the repo root.
             </div>
           )}
@@ -339,14 +331,14 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
                 {selected.description.split('\n\n').map((para, i) => (
                   <p
                     key={i}
-                    className="font-mono text-[12px] leading-relaxed text-[var(--color-text-2)]"
+                    className="font-mono text-small leading-relaxed text-[var(--color-text-2)]"
                   >
                     {para}
                   </p>
                 ))}
               </div>
               {orderedAliases.length === 0 ? (
-                <div className="rounded-md border border-[var(--color-line)] bg-[var(--color-bg-2)] px-3 py-2 font-mono text-[12px] text-[var(--color-text-2)]">
+                <div className="rounded-md border border-[var(--color-divider)] bg-[var(--color-pill-bg)] px-3 py-2 font-mono text-small text-[var(--color-text-2)]">
                   No connection bindings needed.
                 </div>
               ) : (
@@ -359,9 +351,7 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
                       binding={bindings[alias]}
                       credentials={credentials}
                       connections={connections}
-                      onChange={(b) =>
-                        setBindings((prev) => ({ ...prev, [alias]: b }))
-                      }
+                      onChange={(b) => setBindings((prev) => ({ ...prev, [alias]: b }))}
                     />
                   ))}
                 </div>
@@ -370,22 +360,22 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
           )}
         </div>
 
-        <footer className="flex items-center justify-between border-t border-[var(--color-line)] px-5 py-3">
+        <footer className="flex items-center justify-between border-t border-[var(--color-divider)] px-5 py-3">
           {error ? (
-            <div className="font-mono text-[11px] text-[var(--color-danger)]">{error}</div>
+            <div className="font-mono text-small text-[var(--color-danger)]">{error}</div>
           ) : (
-            <div className="font-mono text-[11px] text-[var(--color-text-3)]">
+            <div className="font-mono text-small text-[var(--color-text-muted)]">
               Workflows are created paused — review + activate on the canvas.
             </div>
           )}
           <div className="flex items-center gap-2">
             {selected && (
-              <button className="btn" onClick={handleBack} disabled={pending}>
+              <Button onClick={handleBack} disabled={pending}>
                 ← Back
-              </button>
+              </Button>
             )}
-            <button
-              className="btn primary"
+            <Button
+              variant="primary"
               onClick={handleCreate}
               disabled={!selected || !canCreate || pending}
             >
@@ -394,7 +384,7 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
                 : selected
                   ? `Create ${selected.workflowCount === 1 ? 'workflow' : `${selected.workflowCount} workflows`}`
                   : 'Pick a template'}
-            </button>
+            </Button>
           </div>
         </footer>
       </DialogContent>
@@ -402,31 +392,24 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
-function TemplateCard({
-  t,
-  onPick,
-}: {
-  t: TemplateSummary;
-  onPick: (t: TemplateSummary) => void;
-}) {
+function TemplateCard({ t, onPick }: { t: TemplateSummary; onPick: (t: TemplateSummary) => void }) {
   return (
-    <button
-      type="button"
+    <SelectableCard
       onClick={() => onPick(t)}
-      className="flex flex-col items-start gap-1 rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-2)] px-4 py-3 text-left transition-colors hover:border-[var(--color-claude)]"
+      className="flex flex-col items-start gap-1 rounded-lg bg-[var(--color-pill-bg)] px-4 py-3 hover:border-[var(--color-claude-mark)]"
     >
       <div className="flex w-full items-center justify-between">
-        <span className="font-mono text-[13px] font-semibold text-[var(--color-text)]">
+        <span className="font-mono text-base font-semibold text-[var(--color-text)]">
           {t.name}
         </span>
-        <span className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-3)]">
+        <span className="font-mono text-caption uppercase tracking-wider text-[var(--color-text-muted)]">
           {t.category} · {t.workflowCount} wf
         </span>
       </div>
-      <span className="line-clamp-2 font-mono text-[11.5px] leading-relaxed text-[var(--color-text-2)]">
+      <span className="line-clamp-2 font-mono text-caption leading-relaxed text-[var(--color-text-2)]">
         {t.description.split('\n\n')[0]}
       </span>
-    </button>
+    </SelectableCard>
   );
 }
 
@@ -452,9 +435,7 @@ function BindingRow({
 
   const handleNewClick = () => {
     const credId =
-      (binding?.mode === 'new' ? binding.credentialId : '') ||
-      credentials[0]?.id ||
-      '';
+      (binding?.mode === 'new' ? binding.credentialId : '') || credentials[0]?.id || '';
     if (isBoard) {
       onChange(newBindingForBoard(alias, credId));
     } else {
@@ -464,31 +445,42 @@ function BindingRow({
   };
 
   return (
-    <div className="rounded-md border border-[var(--color-line)] bg-[var(--color-bg-2)] p-3">
+    <div className="rounded-md border border-[var(--color-divider)] bg-[var(--color-pill-bg)] p-3">
       <div className="flex items-center justify-between">
-        <div className="font-mono text-[12px] text-[var(--color-text)]">
-          <span className="text-[var(--color-claude)]">&lt;{alias}&gt;</span>{' '}
-          <span className="text-[var(--color-text-3)]">
+        <div className="font-mono text-small text-[var(--color-text)]">
+          <span className="text-[var(--color-claude-mark)]">&lt;{alias}&gt;</span>{' '}
+          <span className="text-[var(--color-text-muted)]">
             connection{isBoard ? ' · optional' : ''}
           </span>
         </div>
-        <div className="flex gap-1 rounded-md border border-[var(--color-line)] p-0.5">
-          <ModeButton active={mode === 'new'} onClick={handleNewClick}>
-            New
-          </ModeButton>
-          <ModeButton
-            active={mode === 'existing'}
-            onClick={() =>
+        <ToggleGroup
+          type="single"
+          value={mode}
+          onValueChange={(v) => {
+            if (v === 'new') handleNewClick();
+            else if (v === 'existing')
               onChange({
                 mode: 'existing',
-                connectionId:
-                  binding?.mode === 'existing' ? binding.connectionId : '',
-              })
-            }
+                connectionId: binding?.mode === 'existing' ? binding.connectionId : '',
+              });
+          }}
+          variant="subtle"
+          size="sm"
+          className="rounded-md border border-[var(--color-divider)] p-0.5"
+        >
+          <ToggleGroupItem
+            value="new"
+            className="uppercase tracking-wider data-[state=on]:bg-[var(--color-claude-mark)] data-[state=on]:text-black"
+          >
+            New
+          </ToggleGroupItem>
+          <ToggleGroupItem
+            value="existing"
+            className="uppercase tracking-wider data-[state=on]:bg-[var(--color-claude-mark)] data-[state=on]:text-black"
           >
             Existing
-          </ModeButton>
-        </div>
+          </ToggleGroupItem>
+        </ToggleGroup>
       </div>
 
       {binding?.mode === 'new' && (
@@ -627,7 +619,7 @@ function GithubRepoScopeFields({
     return (
       <div className="col-span-2">
         <label className="flex flex-col gap-1">
-          <span className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-3)]">
+          <span className="font-mono text-caption uppercase tracking-wider text-[var(--color-text-muted)]">
             Repository
           </span>
           <SearchSelect
@@ -635,7 +627,8 @@ function GithubRepoScopeFields({
             value={selected}
             onValueChange={(v) => {
               const slash = v.indexOf('/');
-              if (slash > 0) setScope({ ...scope, owner: v.slice(0, slash), repo: v.slice(slash + 1) });
+              if (slash > 0)
+                setScope({ ...scope, owner: v.slice(0, slash), repo: v.slice(slash + 1) });
             }}
             placeholder={reposQuery.isFetching ? 'Loading…' : '— pick a repo —'}
             options={options}
@@ -684,7 +677,7 @@ function GitlabProjectScopeFields({
     return (
       <div className="col-span-2">
         <label className="flex flex-col gap-1">
-          <span className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-3)]">
+          <span className="font-mono text-caption uppercase tracking-wider text-[var(--color-text-muted)]">
             Project
           </span>
           <SearchSelect
@@ -755,9 +748,7 @@ function BoardScopeFields({
           <LabeledSelect
             label="Owner type"
             value={scope.ownerType}
-            onChange={(v) =>
-              setScope({ ...scope, ownerType: v as 'user' | 'org' })
-            }
+            onChange={(v) => setScope({ ...scope, ownerType: v as 'user' | 'org' })}
             options={[
               { value: 'org', label: 'Org' },
               { value: 'user', label: 'User' },
@@ -797,31 +788,6 @@ function BoardScopeFields({
   );
 }
 
-function ModeButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={
-        'rounded px-2 py-0.5 font-mono text-[10.5px] uppercase tracking-wider transition-colors ' +
-        (active
-          ? 'bg-[var(--color-claude)] text-black'
-          : 'text-[var(--color-text-2)] hover:text-[var(--color-text)]')
-      }
-    >
-      {children}
-    </button>
-  );
-}
-
 function LabeledInput({
   label,
   value,
@@ -835,15 +801,10 @@ function LabeledInput({
 }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-3)]">
+      <span className="font-mono text-caption uppercase tracking-wider text-[var(--color-text-muted)]">
         {label}
       </span>
-      <input
-        className="field-input"
-        value={value}
-        placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value)}
-      />
+      <Input value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />
     </label>
   );
 }
@@ -863,7 +824,7 @@ function LabeledSelect({
 }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-3)]">
+      <span className="font-mono text-caption uppercase tracking-wider text-[var(--color-text-muted)]">
         {label}
       </span>
       <Select

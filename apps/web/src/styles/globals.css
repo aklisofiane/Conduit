@@ -6,6 +6,28 @@
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
   --font-serif: var(--font-serif);
+
+  /* ---------- Type scale ----------
+     One modular scale (~1.2–1.25× per step), anchored at 16px body. Small
+     increments at the body end where fine control matters, wider jumps at the
+     display end. Each --text-* var auto-generates the matching `text-*`
+     utility (Tailwind v4). Use these instead of arbitrary `text-[NNpx]`. */
+  --text-caption: 11px; /* micro labels, badges, timestamps */
+  --text-caption--line-height: 1.4;
+  --text-small: 14px; /* secondary text, dense UI labels */
+  --text-small--line-height: 1.45;
+  --text-base: 16px; /* body — the default */
+  --text-base--line-height: 1.5;
+  --text-lead: 20px; /* emphasized text, small headings */
+  --text-lead--line-height: 1.4;
+  --text-heading: 24px; /* panel / section titles */
+  --text-heading--line-height: 1.3;
+  --text-title: 30px; /* page titles */
+  --text-title--line-height: 1.25;
+  --text-display: 38px; /* hero numbers */
+  --text-display--line-height: 1.15;
+  --text-hero: 48px; /* the one big number */
+  --text-hero--line-height: 1.1;
 }
 
 html,
@@ -13,7 +35,7 @@ body {
   background: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-sans);
-  font-size: 13px;
+  font-size: 16px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -42,10 +64,6 @@ body {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-text-muted);
-}
-
-.mono {
-  font-family: var(--font-mono);
 }
 
 /* ---------- React Flow overrides ---------- */
@@ -95,334 +113,28 @@ body {
 }
 
 /* ---------- Reusable component primitives ---------- */
-.btn {
-  font-family: var(--font-sans);
-  font-size: 11.5px;
-  font-weight: 500;
-  height: 28px;
-  padding: 0 12px;
-  border-radius: var(--radius);
-  border: 1px solid var(--color-divider);
-  color: var(--color-text);
-  background: var(--color-bg);
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  transition:
-    background-color 150ms ease,
-    color 150ms ease,
-    border-color 150ms ease,
-    box-shadow 150ms ease;
-}
-.btn:hover {
-  background: var(--color-pill-bg);
-  border-color: var(--color-text-muted);
-}
-.btn:focus-visible {
-  outline: none;
-  border-color: var(--color-accent);
-  box-shadow: var(--shadow-focus);
-}
-.btn.primary {
-  background: var(--color-primary);
-  color: var(--color-primary-text);
-  border-color: var(--color-primary-border);
-}
-.btn.primary:hover {
-  background: var(--color-primary-border);
-  border-color: var(--color-primary-border);
-}
-.btn.danger {
-  color: var(--color-error);
-  border-color: color-mix(in oklch, var(--color-error) 30%, transparent);
-}
-.btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
+/* `.btn` was removed once every consumer migrated to the <Button> primitive
+   in components/ui/button.tsx — its variants are now the single source of
+   truth for button styling. See .specs/ui-primitive-layer.md. */
 
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 2px 8px;
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  color: var(--color-text-2);
-  background: var(--color-pill-bg);
-  border: 1px solid var(--color-pill-border);
-  border-radius: 999px;
-}
-.chip .dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 999px;
-  background: var(--color-text-muted);
-}
-.chip.claude {
-  color: var(--color-claude-tag-text);
-  background: var(--color-claude-tag-bg);
-  border-color: var(--color-claude-border);
-}
-.chip.claude .dot {
-  background: var(--color-claude-mark);
-}
-.chip.codex {
-  color: var(--color-codex-tag-text);
-  background: var(--color-codex-tag-bg);
-  border-color: var(--color-codex-border);
-}
-.chip.codex .dot {
-  background: var(--color-codex-mark);
-}
+/* `.chip` / `.pill` / `.prov-glyph` were removed once every consumer migrated
+   to the <Badge>/<BadgeDot> primitive in components/ui/badge.tsx — its pill /
+   chip / glyph variants are now the single source of truth for the labeled-pill
+   family. See .specs/ui-primitive-layer.md (wave 3). */
 
-.field-label {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-  margin-bottom: 6px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 500;
-}
-.field-label .hint {
-  color: var(--color-text-muted);
-  font-weight: 400;
-  text-transform: none;
-  letter-spacing: 0;
-}
+/* `.field-label` and `.field-input` were removed once every consumer migrated
+   to the <Label>/<Hint>/<Input>/<Textarea> primitives in components/ui/ —
+   those primitives are now the single source of truth for form-field styling.
+   See .specs/ui-primitive-layer.md (wave 2). */
 
-.field-input {
-  width: 100%;
-  height: 30px;
-  background: var(--color-bg);
-  border: 1px solid var(--color-divider);
-  border-radius: var(--radius);
-  padding: 0 10px;
-  font-family: var(--font-sans);
-  font-size: 12px;
-  color: var(--color-text);
-  outline: none;
-  transition:
-    border-color 120ms ease,
-    box-shadow 120ms ease;
-}
-.field-input::placeholder {
-  color: var(--color-text-muted);
-  opacity: 1;
-}
-.field-input:focus,
-.field-input:focus-visible {
-  border-color: var(--color-accent);
-  box-shadow: var(--shadow-focus);
-}
-textarea.field-input {
-  height: auto;
-  padding: 8px 10px;
-  resize: vertical;
-  font-family: var(--font-sans);
-}
-
-/* ---------- Select primitive (Radix-based) ---------- */
-.select-trigger {
-  width: 100%;
-  min-width: 0;
-  height: 30px;
-  background: var(--color-bg);
-  border: 1px solid var(--color-divider);
-  border-radius: var(--radius);
-  padding: 0 10px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--color-text);
-  cursor: pointer;
-  outline: none;
-  transition:
-    border-color 120ms ease,
-    box-shadow 120ms ease;
-}
-/* Truncate Radix's Select.Value (rendered as a bare <span>) so long option
-   labels collapse to an ellipsis instead of overflowing the trigger. The
-   explicit `text-align: left` overrides the UA-default `text-align: center`
-   that <button> elements inherit to flex children once the span grows. */
-.select-trigger > span:not(.select-trigger-chevron) {
-  flex: 1 1 0;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  display: block;
-  text-align: left;
-}
-.select-trigger:hover:not(:disabled) {
-  border-color: var(--color-text-muted);
-}
-.select-trigger:focus-visible,
-.select-trigger[data-state='open'] {
-  border-color: var(--color-accent);
-  box-shadow: var(--shadow-focus);
-}
-.select-trigger[data-placeholder] {
-  color: var(--color-text-muted);
-}
-.select-trigger:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-.select-trigger-chevron {
-  color: var(--color-text-muted);
-  transition: transform 150ms ease;
-  display: inline-flex;
-}
-.select-trigger[data-state='open'] .select-trigger-chevron {
-  transform: rotate(180deg);
-}
-
-.select-content {
-  z-index: 80;
-  min-width: var(--radix-select-trigger-width);
-  max-height: var(--radix-select-content-available-height);
-  background: var(--color-bg-panel);
-  border: 1px solid var(--color-divider);
-  border-radius: var(--radius);
-  box-shadow:
-    0 4px 16px rgba(11, 16, 32, 0.06),
-    0 1px 2px rgba(11, 16, 32, 0.04);
-  overflow: hidden;
-}
-.select-viewport {
-  padding: 4px;
-}
-.select-item {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 6px 8px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--color-text);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  outline: none;
-  user-select: none;
-}
-.select-item[data-highlighted] {
-  background: var(--color-pill-bg);
-}
-.select-item[data-state='checked'] {
-  background: var(--color-accent-soft);
-  font-weight: 600;
-}
-.select-item[data-disabled] {
-  color: var(--color-text-muted);
-  pointer-events: none;
-  cursor: not-allowed;
-}
-.select-item-indicator {
-  display: inline-flex;
-  align-items: center;
-  color: var(--color-accent);
-}
-
-/* ---------- SearchSelect (Popover-based combobox) ---------- */
-.search-select-open {
-  border-color: var(--color-accent);
-  box-shadow: var(--shadow-focus);
-}
-.search-select-chevron-open {
-  transform: rotate(180deg);
-}
-.search-select-value {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
-}
-.search-select-placeholder {
-  color: var(--color-text-muted);
-}
-.search-select-content {
-  z-index: 80;
-  width: var(--radix-popover-trigger-width);
-  max-height: 260px;
-  background: var(--color-bg-panel);
-  border: 1px solid var(--color-divider);
-  border-radius: var(--radius);
-  box-shadow:
-    0 4px 16px rgba(11, 16, 32, 0.06),
-    0 1px 2px rgba(11, 16, 32, 0.04);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-.search-select-input-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
-  border-bottom: 1px solid var(--color-divider);
-}
-.search-select-icon {
-  color: var(--color-text-muted);
-  flex-shrink: 0;
-}
-.search-select-input {
-  width: 100%;
-  border: none;
-  background: transparent;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--color-text);
-  outline: none;
-}
-.search-select-input::placeholder {
-  color: var(--color-text-muted);
-}
-.search-select-list {
-  overflow-y: auto;
-  padding: 4px;
-}
-.search-select-empty {
-  padding: 8px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--color-text-muted);
-  text-align: center;
-}
-.search-select-item-selected {
-  background: var(--color-accent-soft);
-  font-weight: 600;
-}
-
-/* ---------- InfoPopover primitive (Radix-based) ---------- */
-.info-popover {
-  z-index: 80;
-  width: 312px;
-  background: var(--color-bg-panel);
-  border: 1px solid var(--color-divider);
-  border-radius: var(--radius);
-  box-shadow:
-    0 4px 16px rgba(11, 16, 32, 0.06),
-    0 1px 2px rgba(11, 16, 32, 0.04);
-  padding: 14px;
-  font-family: var(--font-sans);
-  animation: info-popover-in 140ms ease;
-}
-.info-popover-arrow {
-  fill: var(--color-bg-panel);
-  /* Radix draws the arrow as a triangle below the border; nudge it to overlap
-     the 1px frame so the seam reads as a continuous edge. */
-}
+/* The Radix-wrapper CSS (.select-* / .search-select-* / .info-popover-* /
+   .dropdown-* / .dialog-*) was removed once Select / SearchSelect /
+   CheckboxListPopover / InfoPopover / DropdownMenu / Dialog became
+   self-contained Tailwind in components/ui/ — those primitives are now the
+   single source of truth. See .specs/ui-primitive-layer.md (wave 7).
+   The one survivor is the InfoPopover entrance animation, kept here next to
+   the other keyframe primitives (pulse / blink) and referenced via
+   `animate-[info-popover-in_...]`. */
 @keyframes info-popover-in {
   from {
     opacity: 0;
@@ -433,163 +145,6 @@ textarea.field-input {
     transform: translateY(0);
   }
 }
-.info-popover-title {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-text);
-  margin-bottom: 8px;
-}
-.info-popover-title .spark {
-  color: var(--color-accent);
-}
-.info-popover-lede {
-  margin: 0 0 10px;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--color-text-2);
-}
-.info-popover-lede b {
-  color: var(--color-text);
-  font-weight: 600;
-}
-.info-popover-steps {
-  list-style: none;
-  margin: 0 0 10px;
-  padding: 0;
-  display: grid;
-  gap: 7px;
-}
-.info-popover-steps li {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 9px;
-  font-size: 11.5px;
-  line-height: 1.45;
-  color: var(--color-text-2);
-}
-.info-popover-steps .n {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 17px;
-  height: 17px;
-  margin-top: 1px;
-  border-radius: var(--radius-sm);
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 600;
-}
-.info-popover-steps b {
-  color: var(--color-text);
-  font-weight: 600;
-}
-.info-popover-foot {
-  border-top: 1px solid var(--color-divider);
-  padding-top: 10px;
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  color: var(--color-text-muted);
-}
-
-/* ---------- DropdownMenu primitive (Radix-based) ---------- */
-.dropdown-content {
-  z-index: 60;
-  min-width: 168px;
-  background: var(--color-bg-panel);
-  border: 1px solid var(--color-divider);
-  border-radius: var(--radius);
-  box-shadow:
-    0 4px 16px rgba(11, 16, 32, 0.06),
-    0 1px 2px rgba(11, 16, 32, 0.04);
-  padding: 4px;
-  overflow: hidden;
-}
-.dropdown-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  font-family: var(--font-sans);
-  font-size: 12px;
-  color: var(--color-text);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  outline: none;
-  user-select: none;
-}
-.dropdown-item[data-highlighted] {
-  background: var(--color-pill-bg);
-}
-.dropdown-item[data-disabled] {
-  color: var(--color-text-muted);
-  pointer-events: none;
-  cursor: not-allowed;
-}
-.dropdown-item.is-danger {
-  color: var(--color-error);
-}
-.dropdown-item.is-danger[data-highlighted] {
-  background: color-mix(in oklch, var(--color-error) 10%, transparent);
-}
-.dropdown-separator {
-  height: 1px;
-  background: var(--color-divider);
-  margin: 4px -4px;
-}
-.dropdown-label {
-  padding: 4px 8px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-}
-
-/* ---------- Dialog primitive (Radix-based) ---------- */
-.dialog-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(11, 16, 32, 0.32);
-  z-index: 70;
-}
-.dialog-content {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 71;
-  background: var(--color-bg-panel);
-  border: 1px solid var(--color-divider);
-  border-radius: var(--radius-lg);
-  box-shadow:
-    0 12px 40px rgba(11, 16, 32, 0.18),
-    0 2px 8px rgba(11, 16, 32, 0.08);
-  outline: none;
-  max-height: calc(100vh - 48px);
-  max-width: calc(100vw - 48px);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-.dialog-title {
-  font-family: var(--font-sans);
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--color-text);
-  margin: 0;
-}
-.dialog-description {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--color-text-muted);
-  margin: 0;
-}
 
 .kbd {
   font-family: var(--font-mono);
@@ -599,28 +154,6 @@ textarea.field-input {
   padding: 1px 5px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--color-divider);
-}
-
-.pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 10px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--color-text-2);
-  background: var(--color-bg-panel);
-  border: 1px solid var(--color-divider);
-  border-radius: 999px;
-}
-.pill .dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: var(--color-success);
-}
-.pill.error .dot {
-  background: var(--color-error);
 }
 
 .status-dot {
@@ -656,27 +189,6 @@ textarea.field-input {
   50% {
     opacity: 0.4;
   }
-}
-
-/* Provider glyph tile (the "C" / "X" badges used outside the canvas) */
-.prov-glyph {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  border-radius: var(--radius-sm);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 700;
-}
-.prov-glyph.claude {
-  background: var(--color-claude-mark);
-  color: #ffffff;
-}
-.prov-glyph.codex {
-  background: var(--color-codex-mark);
-  color: #ffffff;
 }
 
 .cursor {

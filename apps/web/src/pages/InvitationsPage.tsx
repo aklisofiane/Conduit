@@ -8,6 +8,7 @@ import {
   useUserInvitations,
   type UserInvitation,
 } from '../api/organization.js';
+import { Button } from '../components/ui/button.js';
 
 export function filterPendingInvitations(
   invitations: ReadonlyArray<UserInvitation>,
@@ -24,28 +25,28 @@ export function InvitationsPage() {
     <div className="mx-auto flex w-full max-w-[900px] flex-col gap-6 px-6 pb-16 pt-10">
       <div>
         <h1
-          className="text-[34px] font-semibold leading-none tracking-tight text-[var(--color-text)]"
+          className="text-display font-semibold leading-none tracking-tight text-[var(--color-text)]"
           style={{ fontFamily: 'var(--font-serif)' }}
         >
-          Invitations<em className="text-[var(--color-claude)] not-italic">.</em>
+          Invitations<em className="text-[var(--color-claude-mark)] not-italic">.</em>
         </h1>
-        <p className="mt-2 font-mono text-[12px] text-[var(--color-text-2)]">
+        <p className="mt-2 font-mono text-small text-[var(--color-text-2)]">
           Invitations sent to your email. Accepting joins you as a member; the active organization isn't changed.
         </p>
       </div>
 
-      <section className="rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-1)]">
-        <header className="border-b border-[var(--color-line)] px-4 py-3">
-          <h2 className="font-mono text-[13px] font-semibold">Pending</h2>
+      <section className="rounded-lg border border-[var(--color-divider)] bg-[var(--color-bg-panel)]">
+        <header className="border-b border-[var(--color-divider)] px-4 py-3">
+          <h2 className="font-mono text-base font-semibold">Pending</h2>
         </header>
         {isLoading && pending.length === 0 ? (
-          <div className="px-4 py-4 font-mono text-[11px] text-[var(--color-text-muted)]">Loading…</div>
+          <div className="px-4 py-4 font-mono text-small text-[var(--color-text-muted)]">Loading…</div>
         ) : pending.length === 0 ? (
-          <div className="px-4 py-4 font-mono text-[11px] text-[var(--color-text-muted)]">
+          <div className="px-4 py-4 font-mono text-small text-[var(--color-text-muted)]">
             No pending invitations.
           </div>
         ) : (
-          <ul className="divide-y divide-[var(--color-line)]">
+          <ul className="divide-y divide-[var(--color-divider)]">
             {pending.map((inv) => (
               <InvitationRow key={inv.id} invitation={inv} />
             ))}
@@ -84,32 +85,32 @@ function InvitationRow({ invitation }: { invitation: UserInvitation }) {
     <li className="flex items-center justify-between gap-4 px-4 py-3">
       <div className="min-w-0">
         <div className="flex items-baseline gap-3">
-          <span className="truncate font-mono text-[12px] text-[var(--color-text)]" title={orgLabel}>
+          <span className="truncate font-mono text-small text-[var(--color-text)]" title={orgLabel}>
             {orgLabel}
           </span>
-          <span className="font-mono text-[11px] text-[var(--color-text-2)]">
+          <span className="font-mono text-small text-[var(--color-text-2)]">
             invited as {invitation.role}
           </span>
         </div>
-        <div className="font-mono text-[10.5px] text-[var(--color-text-muted)]">
+        <div className="font-mono text-caption text-[var(--color-text-muted)]">
           {invitation.inviterEmail ? `from ${invitation.inviterEmail} · ` : ''}
           expires {relativeFromNow(invitation.expiresAt)}
         </div>
         {error && (
-          <div className="mt-1 font-mono text-[10.5px] text-[var(--color-error)]">{error}</div>
+          <div className="mt-1 font-mono text-caption text-[var(--color-error)]">{error}</div>
         )}
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        <button className="btn" onClick={handleReject} disabled={reject.isPending || accept.isPending}>
+        <Button onClick={handleReject} disabled={reject.isPending || accept.isPending}>
           {reject.isPending ? 'Rejecting…' : 'Reject'}
-        </button>
-        <button
-          className="btn primary"
+        </Button>
+        <Button
+          variant="primary"
           onClick={handleAccept}
           disabled={reject.isPending || accept.isPending}
         >
           {accept.isPending ? 'Accepting…' : 'Accept'}
-        </button>
+        </Button>
       </div>
     </li>
   );

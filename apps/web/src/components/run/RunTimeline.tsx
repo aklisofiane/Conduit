@@ -1,11 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AgentEvent, ExecutionLogRow } from '../../api/types.js';
 import { cn } from '../../lib/cn.js';
-import {
-  prettyToolName,
-  summarizeToolCall,
-  type ToolStatus,
-} from './tool-summary.js';
+import { DisclosureButton } from '../ui/disclosure.js';
+import { prettyToolName, summarizeToolCall, type ToolStatus } from './tool-summary.js';
 
 interface RunTimelineProps {
   events: ExecutionLogRow[];
@@ -50,7 +47,7 @@ export function RunTimeline({ events, streaming }: RunTimelineProps) {
 
   if (display.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center font-mono text-[12px] text-[var(--color-text-4)]">
+      <div className="flex h-full items-center justify-center font-mono text-small text-[var(--color-text-muted)]">
         No events yet — waiting for the agent to start.
       </div>
     );
@@ -80,7 +77,7 @@ export function RunTimeline({ events, streaming }: RunTimelineProps) {
               return (
                 <div
                   key={item.id}
-                  className="overflow-hidden rounded-md border border-[var(--color-line)] bg-[var(--color-bg-1)]"
+                  className="overflow-hidden rounded-md border border-[var(--color-divider)] bg-[var(--color-bg-panel)]"
                 >
                   <ExpandableTool
                     tool={item.tool}
@@ -262,11 +259,11 @@ function TextRow({
   cursor: boolean;
 }) {
   return (
-    <div className="rounded-md border border-[var(--color-line)] bg-[var(--color-bg-1)] px-3 py-2.5">
-      <div className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-4)]">
+    <div className="rounded-md border border-[var(--color-divider)] bg-[var(--color-bg-panel)] px-3 py-2.5">
+      <div className="font-mono text-caption uppercase tracking-wider text-[var(--color-text-muted)]">
         +{offset}s · text
       </div>
-      <div className="mt-1 whitespace-pre-wrap font-mono text-[12px] leading-relaxed text-[var(--color-text)]">
+      <div className="mt-1 whitespace-pre-wrap font-mono text-small leading-relaxed text-[var(--color-text)]">
         {item.delta}
         {cursor && <span className="cursor" />}
       </div>
@@ -282,11 +279,11 @@ function SystemRow({
   offset: string;
 }) {
   return (
-    <div className="rounded-md border border-dashed border-[var(--color-line)] bg-[var(--color-bg-1)] px-3 py-2">
-      <div className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-4)]">
+    <div className="rounded-md border border-dashed border-[var(--color-divider)] bg-[var(--color-bg-panel)] px-3 py-2">
+      <div className="font-mono text-caption uppercase tracking-wider text-[var(--color-text-muted)]">
         +{offset}s · system
       </div>
-      <pre className="mt-1 whitespace-pre-wrap font-mono text-[11px] text-[var(--color-text-2)]">
+      <pre className="mt-1 whitespace-pre-wrap font-mono text-small text-[var(--color-text-2)]">
         {item.message}
       </pre>
     </div>
@@ -339,30 +336,29 @@ function ToolGroupRow({
   cursor: boolean;
 }) {
   return (
-    <div className="overflow-hidden rounded-md border border-[var(--color-line)] bg-[var(--color-bg-1)]">
-      <button
-        type="button"
+    <div className="overflow-hidden rounded-md border border-[var(--color-divider)] bg-[var(--color-bg-panel)]">
+      <DisclosureButton
+        size="sm"
+        open={groupOpen}
         onClick={() => onToggle(item.id)}
-        aria-expanded={groupOpen}
         aria-label={`${groupOpen ? 'Collapse' : 'Expand'} ${item.tools.length} ${prettyToolName(item.toolName)} calls`}
-        className="group flex w-full cursor-pointer items-center gap-3 px-3 py-2 text-left font-mono text-[11px] text-[var(--color-text-3)] transition-colors hover:bg-[var(--color-bg-2)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-claude)] focus-visible:ring-inset"
+        className="font-mono text-small text-[var(--color-text-muted)]"
       >
-        <Chevron open={groupOpen} />
-        <span className="w-12 shrink-0 text-[var(--color-text-4)]">
+        <span className="w-12 shrink-0 text-[var(--color-text-muted)]">
           +{secondsSince(item.tsMs, startMs)}s
         </span>
-        <span className="shrink-0 text-[var(--color-claude)] group-hover:text-[var(--color-text)]">
+        <span className="shrink-0 text-[var(--color-claude-mark)] group-hover:text-[var(--color-text)]">
           {prettyToolName(item.toolName)}
         </span>
-        <span className="shrink-0 text-[var(--color-text-4)]">× {item.tools.length}</span>
+        <span className="shrink-0 text-[var(--color-text-muted)]">× {item.tools.length}</span>
         <span className="flex-1" />
         <StatusPill status={item.status} label={item.statusLabel} />
         {cursor && !groupOpen && <span className="cursor" />}
-      </button>
+      </DisclosureButton>
       {groupOpen && (
         <div>
           {item.tools.map((tool, idx) => (
-            <div key={tool.id} className="border-t border-[var(--color-line)]">
+            <div key={tool.id} className="border-t border-[var(--color-divider)]">
               <ExpandableTool
                 tool={tool}
                 offset={secondsSince(tool.tsMs, startMs)}
@@ -395,70 +391,50 @@ function CollapsedToolHeader({
   nested: boolean;
 }) {
   return (
-    <button
-      type="button"
+    <DisclosureButton
+      size="sm"
+      open={open}
       onClick={onToggle}
-      aria-expanded={open}
-      className={cn(
-        'group flex w-full cursor-pointer items-center gap-3 px-3 py-2 text-left font-mono text-[11.5px] transition-colors hover:bg-[var(--color-bg-2)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-claude)] focus-visible:ring-inset',
-        nested && 'pl-8',
-      )}
+      className={cn('font-mono text-caption', nested && 'pl-8')}
     >
-      <Chevron open={open} />
-      <span className="w-12 shrink-0 text-[var(--color-text-4)]">+{offset}s</span>
+      <span className="w-12 shrink-0 text-[var(--color-text-muted)]">+{offset}s</span>
       {!nested && (
-        <span className="shrink-0 text-[var(--color-claude)]">
+        <span className="shrink-0 text-[var(--color-claude-mark)]">
           {prettyToolName(tool.call.name)}
         </span>
       )}
-      <span className="min-w-0 flex-1 truncate text-[var(--color-text-3)] group-hover:text-[var(--color-text)]">
+      <span className="min-w-0 flex-1 truncate text-[var(--color-text-muted)] group-hover:text-[var(--color-text)]">
         {tool.summary}
       </span>
       <StatusPill status={tool.status} />
       {cursor && <span className="cursor" />}
-    </button>
-  );
-}
-
-function Chevron({ open }: { open: boolean }) {
-  return (
-    <span
-      aria-hidden
-      className={cn(
-        'inline-block w-3 shrink-0 text-[var(--color-text-3)] transition-transform duration-150 group-hover:text-[var(--color-text)]',
-        open && 'rotate-90',
-      )}
-    >
-      ▸
-    </span>
+    </DisclosureButton>
   );
 }
 
 function ExpandedToolBody({ tool }: { tool: ToolItem }) {
   const error = tool.result?.error;
   return (
-    <div className="space-y-2 border-t border-[var(--color-line)] bg-[var(--color-bg)] px-3 py-2">
+    <div className="space-y-2 border-t border-[var(--color-divider)] bg-[var(--color-bg)] px-3 py-2">
       <div>
-        <div className="font-mono text-[10px] uppercase tracking-wider text-[var(--color-text-4)]">
+        <div className="font-mono text-caption uppercase tracking-wider text-[var(--color-text-muted)]">
           input
         </div>
-        <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap font-mono text-[11px] text-[var(--color-text-2)]">
+        <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap font-mono text-small text-[var(--color-text-2)]">
           {formatValue(tool.call.input)}
         </pre>
       </div>
       <div>
-        <div className="font-mono text-[10px] uppercase tracking-wider text-[var(--color-text-4)]">
+        <div className="font-mono text-caption uppercase tracking-wider text-[var(--color-text-muted)]">
           {error ? 'error' : 'result'}
         </div>
         <pre
           className={cn(
-            'mt-1 max-h-64 overflow-auto whitespace-pre-wrap font-mono text-[11px]',
+            'mt-1 max-h-64 overflow-auto whitespace-pre-wrap font-mono text-small',
             error ? 'text-[var(--color-error)]' : 'text-[var(--color-text-2)]',
           )}
         >
-          {tool.result === undefined
-            ? '(streaming…)'
-            : (error ?? formatValue(tool.result.output))}
+          {tool.result === undefined ? '(streaming…)' : (error ?? formatValue(tool.result.output))}
         </pre>
       </div>
     </div>
@@ -470,10 +446,10 @@ function StatusPill({ status, label }: { status: ToolStatus; label?: string }) {
   return (
     <span
       className={cn(
-        'shrink-0 font-mono text-[10.5px]',
+        'shrink-0 font-mono text-caption',
         status === 'error' && 'text-[var(--color-error)]',
-        status === 'ok' && 'text-[var(--color-text-3)]',
-        status === 'pending' && 'italic text-[var(--color-text-4)]',
+        status === 'ok' && 'text-[var(--color-text-muted)]',
+        status === 'pending' && 'italic text-[var(--color-text-muted)]',
       )}
     >
       {text}
@@ -523,7 +499,10 @@ function formatStructured(v: unknown, indent: number): string {
 
   if (typeof v === 'string') {
     if (!v.includes('\n')) return v;
-    const body = v.split('\n').map((l) => pad + l).join('\n');
+    const body = v
+      .split('\n')
+      .map((l) => pad + l)
+      .join('\n');
     return '|\n' + body;
   }
 

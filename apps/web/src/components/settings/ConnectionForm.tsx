@@ -8,8 +8,10 @@ import {
   useListViewerOrgs,
 } from '../../api/hooks.js';
 import type { CredentialRow } from '../../api/types.js';
-import { SearchSelect } from '../common/SearchSelect.js';
-import { Select } from '../common/Select.js';
+import { SearchSelect } from '../ui/search-select.js';
+import { Select } from '../ui/select.js';
+import { Button } from '../ui/button.js';
+import { Input } from '../ui/input.js';
 
 export type CreateBody = {
   credentialId: string;
@@ -111,21 +113,20 @@ export function CreateConnectionForm({
   };
 
   return (
-    <div className="flex flex-col gap-3 border-b border-[var(--color-line)] px-4 py-4">
+    <div className="flex flex-col gap-3 border-b border-[var(--color-divider)] px-4 py-4">
       <div className="grid grid-cols-2 gap-3">
         <label className="flex flex-col gap-1">
-          <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+          <span className="font-mono text-caption uppercase tracking-wide text-[var(--color-text-muted)]">
             Name
           </span>
-          <input
-            className="field-input"
+          <Input
             placeholder="e.g. acme/shop repo"
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+          <span className="font-mono text-caption uppercase tracking-wide text-[var(--color-text-muted)]">
             Credential
           </span>
           <Select
@@ -144,7 +145,7 @@ export function CreateConnectionForm({
       </div>
 
       <label className="flex flex-col gap-1">
-        <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+        <span className="font-mono text-caption uppercase tracking-wide text-[var(--color-text-muted)]">
           Scope kind
         </span>
         <Select
@@ -187,17 +188,17 @@ export function CreateConnectionForm({
       )}
 
       <div className="flex justify-end gap-2">
-        <button className="btn" onClick={onCancel}>
+        <Button onClick={onCancel}>
           Cancel
-        </button>
-        <button
-          className="btn primary"
+        </Button>
+        <Button
+          variant="primary"
           disabled={!canSave || pending}
           onClick={handleSave}
           title={saveBlocker}
         >
           {pending ? 'Saving…' : 'Save'}
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -250,7 +251,7 @@ function RepoScopeRow({
   return (
     <div className="flex flex-col gap-2">
       <label className="flex flex-col gap-1">
-        <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+        <span className="font-mono text-caption uppercase tracking-wide text-[var(--color-text-muted)]">
           Repository
         </span>
         {showDropdown ? (
@@ -266,8 +267,7 @@ function RepoScopeRow({
             options={options}
           />
         ) : (
-          <input
-            className="field-input"
+          <Input
             placeholder="owner/repo"
             value={manualValue}
             onChange={(e) => {
@@ -319,7 +319,7 @@ function GitlabProjectScopeRow({
   return (
     <div className="flex flex-col gap-2">
       <label className="flex flex-col gap-1">
-        <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+        <span className="font-mono text-caption uppercase tracking-wide text-[var(--color-text-muted)]">
           Project
         </span>
         {showDropdown ? (
@@ -334,8 +334,7 @@ function GitlabProjectScopeRow({
             }))}
           />
         ) : (
-          <input
-            className="field-input"
+          <Input
             placeholder="group/project"
             value={projectPath}
             onChange={(e) => onSelect(e.target.value.trim())}
@@ -379,7 +378,7 @@ function BoardOwnerField({
   if (showOwnerDropdown) {
     return (
       <label className="flex min-w-0 flex-col gap-1">
-        <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+        <span className="font-mono text-caption uppercase tracking-wide text-[var(--color-text-muted)]">
           Owner
         </span>
         <Select
@@ -402,7 +401,7 @@ function BoardOwnerField({
   return (
     <>
       <label className="flex min-w-0 flex-col gap-1">
-        <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+        <span className="font-mono text-caption uppercase tracking-wide text-[var(--color-text-muted)]">
           Owner type
         </span>
         <Select
@@ -416,11 +415,10 @@ function BoardOwnerField({
         />
       </label>
       <label className="flex min-w-0 flex-col gap-1">
-        <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+        <span className="font-mono text-caption uppercase tracking-wide text-[var(--color-text-muted)]">
           Owner
         </span>
-        <input
-          className="field-input"
+        <Input
           placeholder="acme"
           value={owner}
           onChange={(e) => onOwner(e.target.value)}
@@ -497,7 +495,7 @@ function BoardScopeRow({
           onOwnerSelect={onOwnerSelect}
         />
         <label className="flex min-w-0 flex-col gap-1">
-          <span className="font-mono text-[10.5px] uppercase tracking-wide text-[var(--color-text-3)]">
+          <span className="font-mono text-caption uppercase tracking-wide text-[var(--color-text-muted)]">
             Project
           </span>
           {showBoardDropdown ? (
@@ -512,8 +510,7 @@ function BoardScopeRow({
               }))}
             />
           ) : (
-            <input
-              className="field-input"
+            <Input
               type="number"
               min={1}
               placeholder="5"
@@ -550,21 +547,21 @@ function AutoLoadHint({
   if (!credentialId) return null;
   if (isLoading) {
     return (
-      <span className="font-mono text-[11px] text-[var(--color-text-3)]">
+      <span className="font-mono text-small text-[var(--color-text-muted)]">
         Loading {itemLabel}…
       </span>
     );
   }
   if (errorMessage) {
     return (
-      <span className="font-mono text-[11px] text-[var(--color-danger,#d54c4c)]">
+      <span className="font-mono text-small text-[var(--color-danger,#d54c4c)]">
         Couldn't load {itemLabel} ({errorMessage}). You can type manually.
       </span>
     );
   }
   if (itemCount === 0) {
     return (
-      <span className="font-mono text-[11px] text-[var(--color-text-3)]">
+      <span className="font-mono text-small text-[var(--color-text-muted)]">
         No {itemLabel} found. You can type manually.
       </span>
     );

@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { cn } from '../../lib/cn.js';
-import { Dialog, DialogContent, DialogTitle } from '../common/Dialog.js';
+import { Dialog, DialogContent, DialogTitle } from '../ui/dialog.js';
+import { Button } from '../ui/button.js';
+import { Textarea } from '../ui/input.js';
+import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group.js';
 
 /** Char + line counts for the prompt editors. Empty text reads as zero lines. */
 export function promptCounts(value: string): { chars: number; lines: number } {
@@ -79,34 +81,31 @@ export function PromptEditorDialog({
             <span>{name}</span>
             <span className="text-[var(--color-text-muted)]"> · instructions</span>
           </DialogTitle>
-          <span className="shrink-0 font-mono text-[11px] text-[var(--color-text-muted)]">
+          <span className="shrink-0 font-mono text-small text-[var(--color-text-muted)]">
             {contextLabel}
           </span>
         </div>
 
-        <div className="flex gap-1 px-5 pt-3">
-          {(['write', 'preview'] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => setMode(m)}
-              className={cn(
-                'rounded-[var(--radius-sm)] px-2.5 py-1 font-mono text-[11px] capitalize transition-colors',
-                mode === m
-                  ? 'bg-[var(--color-pill-bg)] text-[var(--color-text)]'
-                  : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]',
-              )}
-            >
-              {m}
-            </button>
-          ))}
-        </div>
+        <ToggleGroup
+          type="single"
+          value={mode}
+          onValueChange={(v) => v && setMode(v as 'write' | 'preview')}
+          variant="subtle"
+          className="px-5 pt-3"
+          aria-label="Editor mode"
+        >
+          <ToggleGroupItem value="write" className="capitalize">
+            write
+          </ToggleGroupItem>
+          <ToggleGroupItem value="preview" className="capitalize">
+            preview
+          </ToggleGroupItem>
+        </ToggleGroup>
 
         <div className="px-5 pb-4 pt-2">
           {mode === 'write' ? (
-            <textarea
+            <Textarea
               ref={textareaRef}
-              className="field-input"
               style={{ height: '50vh', resize: 'none' }}
               value={buffer}
               onChange={(e) => setBuffer(e.target.value)}
@@ -124,11 +123,11 @@ export function PromptEditorDialog({
               style={{ height: '50vh' }}
             >
               {buffer.trim() ? (
-                <article className="markdown text-[13px] leading-relaxed text-[var(--color-text)]">
+                <article className="markdown text-base leading-relaxed text-[var(--color-text)]">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{buffer}</ReactMarkdown>
                 </article>
               ) : (
-                <div className="font-mono text-[12px] text-[var(--color-text-muted)]">
+                <div className="font-mono text-small text-[var(--color-text-muted)]">
                   Nothing to preview yet.
                 </div>
               )}
@@ -137,16 +136,16 @@ export function PromptEditorDialog({
         </div>
 
         <div className="flex items-center justify-between border-t border-[var(--color-divider)] px-5 py-4">
-          <span className="font-mono text-[11px] text-[var(--color-text-muted)]">
+          <span className="font-mono text-small text-[var(--color-text-muted)]">
             {chars} chars · {lines} lines
           </span>
           <div className="flex gap-2">
-            <button className="btn" type="button" onClick={() => onOpenChange(false)}>
+            <Button type="button" onClick={() => onOpenChange(false)}>
               Cancel
-            </button>
-            <button className="btn primary" type="button" onClick={commit}>
+            </Button>
+            <Button variant="primary" type="button" onClick={commit}>
               Done
-            </button>
+            </Button>
           </div>
         </div>
       </DialogContent>

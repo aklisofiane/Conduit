@@ -1,4 +1,4 @@
-import { cn } from '../../lib/cn.js';
+import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group.js';
 
 export type WorkflowTabId = 'build' | 'runs';
 
@@ -20,28 +20,24 @@ const TABS: TabDef[] = [
 
 export function WorkflowTabs({ active, onChange }: WorkflowTabsProps) {
   return (
-    <div className="flex items-center gap-1">
-      {TABS.map((t) => {
-        const isActive = active === t.id;
-        return (
-          <button
-            key={t.id}
-            type="button"
-            disabled={!t.enabled}
-            title={t.enabled ? undefined : 'Coming soon'}
-            onClick={() => t.enabled && onChange?.(t.id)}
-            className={cn(
-              'h-7 rounded-[var(--radius)] border px-3 font-sans text-[12px] transition-colors',
-              isActive
-                ? 'border-[var(--color-divider)] bg-[var(--color-bg)] font-medium text-[var(--color-text)]'
-                : 'border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text)]',
-              !t.enabled && 'cursor-not-allowed opacity-60 hover:text-[var(--color-text-muted)]',
-            )}
-          >
-            {t.label}
-          </button>
-        );
-      })}
-    </div>
+    <ToggleGroup
+      type="single"
+      value={active}
+      onValueChange={(v) => v && onChange?.(v as WorkflowTabId)}
+      variant="outline"
+      aria-label="Workflow view"
+    >
+      {TABS.map((t) => (
+        <ToggleGroupItem
+          key={t.id}
+          value={t.id}
+          disabled={!t.enabled}
+          title={t.enabled ? undefined : 'Coming soon'}
+          className="px-3 font-sans text-small"
+        >
+          {t.label}
+        </ToggleGroupItem>
+      ))}
+    </ToggleGroup>
   );
 }

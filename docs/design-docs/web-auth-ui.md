@@ -16,7 +16,7 @@ Browser-side authentication surface for Conduit. Owns the unauthenticated route 
 | `apps/web/src/pages/SignUpPage.tsx` | Name + email + password + GitHub OAuth button (same gate). Always navigates to `/` on success — `?next` is not honored on signup by design. |
 | `apps/web/src/pages/ForgotPasswordPage.tsx` | Email field calls `requestPasswordReset({ email, redirectTo: '/reset-password' })`. End-to-end no-op until email transport ships — page exists so the route works the day email lands. |
 | `apps/web/src/pages/ResetPasswordPage.tsx` | Reads `?token=<x>`. Functional today given a valid token. Renders an "invalid link" state when no token is present. |
-| `apps/web/src/pages/AccountSettingsPage.tsx` | `/account`, inside `AppLayout`. Profile readout (name, email), change-password form (current + new + confirm with `refine`-based confirm match), and a Sign-out section. Visual shape mirrors `CredentialsPage` (centered `max-w-[900px]`, serif heading with the `--color-claude` accent dot, mono helper text). |
+| `apps/web/src/pages/AccountSettingsPage.tsx` | `/account`, inside `AppLayout`. Profile readout (name, email), change-password form (current + new + confirm with `refine`-based confirm match), and a Sign-out section. Visual shape mirrors `CredentialsPage` (centered `max-w-[900px]`, serif heading with the `--color-claude-mark` accent dot, mono helper text). |
 
 ## Routing
 

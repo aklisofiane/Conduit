@@ -2,13 +2,21 @@ import { useState } from 'react';
 import { CircleDot, Clock, GitPullRequest } from 'lucide-react';
 import { useConnections } from '../../api/hooks.js';
 import { scopeSummary } from '../../lib/connection.js';
-import { Dialog, DialogContent, DialogTitle } from '../common/Dialog.js';
-import { Select } from '../common/Select.js';
+import { Dialog, DialogContent, DialogTitle } from '../ui/dialog.js';
+import { Select } from '../ui/select.js';
+import { Button } from '../ui/button.js';
+import { Input } from '../ui/input.js';
+import { SelectableCard } from '../ui/selectable-card.js';
 import type { PaletteTriggerType } from '../canvas/NodePalette.js';
 
 interface CreateWorkflowDialogProps {
   onClose: () => void;
-  onCreate: (name: string, triggerType: PaletteTriggerType, connectionId?: string, platform?: 'github' | 'gitlab') => void;
+  onCreate: (
+    name: string,
+    triggerType: PaletteTriggerType,
+    connectionId?: string,
+    platform?: 'github' | 'gitlab',
+  ) => void;
   isPending: boolean;
 }
 
@@ -38,15 +46,9 @@ const TRIGGER_OPTIONS: Array<{
   },
 ];
 
-export function CreateWorkflowDialog({
-  onClose,
-  onCreate,
-  isPending,
-}: CreateWorkflowDialogProps) {
+export function CreateWorkflowDialog({ onClose, onCreate, isPending }: CreateWorkflowDialogProps) {
   const [name, setName] = useState('');
-  const [triggerType, setTriggerType] = useState<PaletteTriggerType | null>(
-    null,
-  );
+  const [triggerType, setTriggerType] = useState<PaletteTriggerType | null>(null);
   const [connectionId, setConnectionId] = useState('');
   const { data: connections = [] } = useConnections();
 
@@ -59,8 +61,14 @@ export function CreateWorkflowDialog({
   const handleCreate = () => {
     if (!canCreate || !triggerType) return;
     const conn = repoConnections.find((c) => c.id === connectionId);
-    const platform = conn?.credential.platform === 'GITLAB' ? 'gitlab' as const : 'github' as const;
-    onCreate(name.trim(), triggerType, connectionId || undefined, connectionId ? platform : undefined);
+    const platform =
+      conn?.credential.platform === 'GITLAB' ? ('gitlab' as const) : ('github' as const);
+    onCreate(
+      name.trim(),
+      triggerType,
+      connectionId || undefined,
+      connectionId ? platform : undefined,
+    );
   };
 
   return (
@@ -70,33 +78,30 @@ export function CreateWorkflowDialog({
         if (!o && !isPending) onClose();
       }}
     >
-      <DialogContent
-        className="flex max-h-[85vh] w-[480px] max-w-[94vw] flex-col overflow-hidden rounded-xl border border-[var(--color-line)] bg-[var(--color-bg-1)] p-0 shadow-none"
-      >
-        <header className="flex items-center justify-between border-b border-[var(--color-line)] px-5 py-4">
+      <DialogContent className="flex max-h-[85vh] w-[480px] max-w-[94vw] flex-col overflow-hidden rounded-xl border border-[var(--color-divider)] bg-[var(--color-bg-panel)] p-0 shadow-none">
+        <header className="flex items-center justify-between border-b border-[var(--color-divider)] px-5 py-4">
           <div>
             <DialogTitle
-              className="text-[22px] font-semibold tracking-tight text-[var(--color-text)]"
+              className="text-lead font-semibold tracking-tight text-[var(--color-text)]"
               style={{ fontFamily: 'var(--font-serif)' }}
             >
               New workflow
             </DialogTitle>
-            <p className="mt-0.5 font-mono text-[11px] text-[var(--color-text-3)]">
+            <p className="mt-0.5 font-mono text-small text-[var(--color-text-muted)]">
               Name it and pick a trigger to get started.
             </p>
           </div>
-          <button className="btn" onClick={onClose} aria-label="Close" disabled={isPending}>
+          <Button onClick={onClose} aria-label="Close" disabled={isPending}>
             ✕
-          </button>
+          </Button>
         </header>
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
           <label className="flex flex-col gap-1">
-            <span className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-3)]">
+            <span className="font-mono text-caption uppercase tracking-wider text-[var(--color-text-muted)]">
               Name
             </span>
-            <input
-              className="field-input"
+            <Input
               value={name}
               placeholder="My workflow"
               autoFocus
@@ -108,58 +113,43 @@ export function CreateWorkflowDialog({
           </label>
 
           <div className="mt-4">
-            <span className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-3)]">
+            <span className="font-mono text-caption uppercase tracking-wider text-[var(--color-text-muted)]">
               Trigger
             </span>
             <div className="mt-1.5 flex flex-col gap-[6px]">
               {TRIGGER_OPTIONS.map((opt) => (
-                <button
+                <SelectableCard
                   key={opt.type}
-                  type="button"
+                  tone="accent"
+                  selected={triggerType === opt.type}
                   onClick={() => setTriggerType(opt.type)}
-                  className="flex w-full items-center gap-3 rounded-[var(--radius)] border px-3 py-2.5 text-left transition-colors"
-                  style={{
-                    borderColor:
-                      triggerType === opt.type
-                        ? 'var(--color-primary)'
-                        : 'var(--color-divider)',
-                    background:
-                      triggerType === opt.type
-                        ? 'var(--color-primary-soft, oklch(0.95 0.03 250))'
-                        : 'var(--color-bg)',
-                    boxShadow:
-                      triggerType === opt.type
-                        ? '0 0 0 1px var(--color-primary)'
-                        : 'none',
-                  }}
+                  className="flex items-center gap-3 rounded-[var(--radius)] px-3 py-2.5"
                 >
                   <span
                     className="grid h-[24px] w-[24px] shrink-0 place-items-center rounded-[5px]"
                     style={{
                       background:
-                        triggerType === opt.type
-                          ? 'var(--color-primary)'
-                          : 'var(--color-text-3)',
+                        triggerType === opt.type ? 'var(--color-primary)' : 'var(--color-text-muted)',
                     }}
                   >
                     {opt.icon}
                   </span>
                   <span className="min-w-0">
-                    <span className="block text-[12px] font-medium text-[var(--color-text)]">
+                    <span className="block text-small font-medium text-[var(--color-text)]">
                       {opt.label}
                     </span>
-                    <span className="block font-mono text-[11px] text-[var(--color-text-3)]">
+                    <span className="block font-mono text-small text-[var(--color-text-muted)]">
                       {opt.description}
                     </span>
                   </span>
-                </button>
+                </SelectableCard>
               ))}
             </div>
           </div>
 
           {triggerType && repoConnections.length > 0 && (
             <div className="mt-4">
-              <span className="font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-3)]">
+              <span className="font-mono text-caption uppercase tracking-wider text-[var(--color-text-muted)]">
                 Connection <span className="normal-case tracking-normal">(optional)</span>
               </span>
               <div className="mt-1.5">
@@ -174,25 +164,21 @@ export function CreateWorkflowDialog({
                   }))}
                 />
               </div>
-              <p className="mt-1 font-mono text-[10.5px] text-[var(--color-text-3)]">
+              <p className="mt-1 font-mono text-caption text-[var(--color-text-muted)]">
                 Pre-wires the trigger to this repo. You can change it on the canvas.
               </p>
             </div>
           )}
         </div>
 
-        <footer className="flex items-center justify-end border-t border-[var(--color-line)] px-5 py-3">
+        <footer className="flex items-center justify-end border-t border-[var(--color-divider)] px-5 py-3">
           <div className="flex items-center gap-2">
-            <button className="btn" onClick={onClose} disabled={isPending}>
+            <Button onClick={onClose} disabled={isPending}>
               Cancel
-            </button>
-            <button
-              className="btn primary"
-              onClick={handleCreate}
-              disabled={!canCreate || isPending}
-            >
+            </Button>
+            <Button variant="primary" onClick={handleCreate} disabled={!canCreate || isPending}>
               {isPending ? 'Creating…' : 'Create'}
-            </button>
+            </Button>
           </div>
         </footer>
       </DialogContent>

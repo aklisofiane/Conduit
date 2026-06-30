@@ -21,6 +21,8 @@ import { cn } from '../../lib/cn.js';
 import { relativeFromNow } from '../../lib/time.js';
 import { InlineRename } from '../common/InlineRename.js';
 import { CreateWorkflowDialog } from '../workflow-list/CreateWorkflowDialog.js';
+import { Button } from '../ui/button.js';
+import { Input } from '../ui/input.js';
 import type { PaletteTriggerType } from './NodePalette.js';
 import { ChevronDown, Plus } from 'lucide-react';
 
@@ -71,7 +73,7 @@ export function WorkflowHeaderPill({ workflowId }: WorkflowHeaderPillProps) {
       <div
         ref={anchorRef}
         className={cn(
-          'pointer-events-auto inline-flex items-center rounded-[var(--radius-sm)] border border-[var(--color-divider)] bg-[var(--color-bg-panel)] font-mono text-[11px]',
+          'pointer-events-auto inline-flex items-center rounded-[var(--radius-sm)] border border-[var(--color-divider)] bg-[var(--color-bg-panel)] font-mono text-small',
           renaming ? 'px-1' : '',
         )}
       >
@@ -82,29 +84,31 @@ export function WorkflowHeaderPill({ workflowId }: WorkflowHeaderPillProps) {
             onCommit={handleRenameCommit}
             onCancel={handleRenameCancel}
             maxLength={NAME_MAX_LENGTH}
-            className="w-[200px] min-w-[120px] bg-transparent px-1 py-[3px] font-mono text-[11px] text-[var(--color-text)] outline-none"
+            className="w-[200px] min-w-[120px] bg-transparent px-1 py-[3px] font-mono text-small text-[var(--color-text)] outline-none"
           />
         ) : (
           <>
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="inline"
               title={name}
               onClick={() => setRenaming(true)}
-              className="max-w-[260px] truncate px-2 py-[3px] text-left text-[var(--color-text-2)] hover:text-[var(--color-text)]"
+              className="max-w-[260px] justify-start truncate rounded-none px-2 py-[3px] text-left font-normal text-[var(--color-text-2)] hover:bg-transparent hover:text-[var(--color-text)]"
             >
               {name}
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
               aria-label="Switch workflow"
               onClick={togglePopover}
               className={cn(
-                'flex h-full items-center border-l border-[var(--color-divider)] px-1.5 py-[3px] text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text)]',
+                'h-full w-auto rounded-none border-l-[var(--color-divider)] px-1.5 py-[3px] text-[var(--color-text-muted)] hover:bg-transparent',
                 popoverOpen && 'text-[var(--color-text)]',
               )}
             >
               <ChevronDown size={12} strokeWidth={1.5} />
-            </button>
+            </Button>
           </>
         )}
       </div>
@@ -231,7 +235,7 @@ function SwitcherPopover({ anchorEl, currentId, onClose }: SwitcherPopoverProps)
       onWheel={stop}
     >
       <div className="border-b border-[var(--color-divider)] p-2">
-        <input
+        <Input
           ref={filterRef}
           value={query}
           onChange={(e) => {
@@ -239,7 +243,7 @@ function SwitcherPopover({ anchorEl, currentId, onClose }: SwitcherPopoverProps)
             setCursor(0);
           }}
           placeholder="Filter workflows…"
-          className="w-full rounded-[var(--radius-sm)] border border-[var(--color-divider)] bg-[var(--color-bg)] px-2 py-1 font-mono text-[11px] text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-text-muted)]"
+          variant="compact"
         />
       </div>
 
@@ -262,14 +266,14 @@ function SwitcherPopover({ anchorEl, currentId, onClose }: SwitcherPopoverProps)
       </div>
 
       <div className="border-t border-[var(--color-divider)]">
-        <button
-          type="button"
+        <Button
+          variant="ghost"
           onClick={() => setShowCreateDialog(true)}
-          className="flex w-full items-center gap-2 px-3 py-2 font-mono text-[11px] text-[var(--color-text-2)] transition-colors hover:bg-[var(--color-pill-bg)] hover:text-[var(--color-text)]"
+          className="w-full justify-start gap-2 h-auto rounded-none px-3 py-2 font-mono text-small text-[var(--color-text-2)] hover:bg-[var(--color-pill-bg)] hover:text-[var(--color-text)]"
         >
           <Plus size={12} strokeWidth={1.5} />
           New workflow
-        </button>
+        </Button>
       </div>
       {showCreateDialog && (
         <CreateWorkflowDialog
@@ -295,15 +299,15 @@ function SwitcherRow({
   onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
       onMouseEnter={onMouseEnter}
       onClick={onClick}
       className={cn(
-        'flex w-full items-center justify-between gap-3 px-3 py-1.5 text-left font-mono text-[11px] transition-colors',
+        'w-full justify-between gap-3 h-auto rounded-none px-3 py-1.5 text-left font-mono text-small',
         highlighted
           ? 'bg-[var(--color-pill-bg)] text-[var(--color-text)]'
-          : 'text-[var(--color-text-2)] hover:text-[var(--color-text)]',
+          : 'text-[var(--color-text-2)] hover:bg-transparent hover:text-[var(--color-text)]',
       )}
     >
       <span className="min-w-0 flex-1 truncate" title={row.name}>
@@ -312,13 +316,13 @@ function SwitcherRow({
       <span className="shrink-0 text-[var(--color-text-muted)]">
         {relativeFromNow(row.updatedAt)}
       </span>
-    </button>
+    </Button>
   );
 }
 
 function EmptyRow({ text }: { text: string }) {
   return (
-    <div className="px-3 py-3 font-mono text-[11px] text-[var(--color-text-muted)]">
+    <div className="px-3 py-3 font-mono text-small text-[var(--color-text-muted)]">
       {text}
     </div>
   );

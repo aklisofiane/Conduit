@@ -5,7 +5,9 @@ import { apiErrorMessage } from '../../api/client.js';
 import { useImportTemplate, useMarkAnalysisImported } from '../../api/hooks.js';
 import type { DroppedComponent, TemplateBinding } from '../../api/types.js';
 import { formatCadence } from '../../lib/cron.js';
-import { Dialog, DialogContent, DialogTitle } from '../common/Dialog.js';
+import { Dialog, DialogContent, DialogTitle } from '../ui/dialog.js';
+import { Button } from '../ui/button.js';
+import { Checkbox } from '../ui/checkbox.js';
 
 // The analyzer's bundle binds exactly one connection placeholder — the repo it
 // analyzed — under this alias (the `<github-repo>` placeholder without its
@@ -103,29 +105,29 @@ export function SuggestionsGalleryDialog({
         if (!o) onClose();
       }}
     >
-      <DialogContent className="flex max-h-[85vh] w-[680px] max-w-[94vw] flex-col overflow-hidden rounded-xl border border-[var(--color-line)] bg-[var(--color-bg-1)] p-0 shadow-none">
-        <header className="flex items-center justify-between border-b border-[var(--color-line)] px-5 py-4">
+      <DialogContent className="flex max-h-[85vh] w-[680px] max-w-[94vw] flex-col overflow-hidden rounded-xl border border-[var(--color-divider)] bg-[var(--color-bg-panel)] p-0 shadow-none">
+        <header className="flex items-center justify-between border-b border-[var(--color-divider)] px-5 py-4">
           <div>
             <DialogTitle
-              className="text-[22px] font-semibold tracking-tight text-[var(--color-text)]"
+              className="text-lead font-semibold tracking-tight text-[var(--color-text)]"
               style={{ fontFamily: 'var(--font-serif)' }}
             >
               Suggested reviews
             </DialogTitle>
-            <p className="mt-0.5 font-mono text-[11px] text-[var(--color-text-3)]">
+            <p className="mt-0.5 font-mono text-small text-[var(--color-text-muted)]">
               {imported
                 ? 'Imported — new workflows are created paused.'
                 : `${bundle.workflows.length} review${bundle.workflows.length === 1 ? '' : 's'} suggested for this repository.`}
             </p>
           </div>
-          <button className="btn" onClick={onClose} aria-label="Close">
+          <Button onClick={onClose} aria-label="Close">
             ✕
-          </button>
+          </Button>
         </header>
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {imported ? (
-            <div className="rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-2)] px-4 py-3 font-mono text-[12px] text-[var(--color-text-2)]">
+            <div className="rounded-lg border border-[var(--color-divider)] bg-[var(--color-pill-bg)] px-4 py-3 font-mono text-small text-[var(--color-text-2)]">
               {importTemplate.isSuccess ? (
                 <>
                   Imported {selectedCount} review{selectedCount === 1 ? '' : 's'}. Find them in
@@ -151,12 +153,12 @@ export function SuggestionsGalleryDialog({
               ))}
 
               {droppedComponents.length > 0 && (
-                <div className="mt-1 flex flex-col gap-1.5 rounded-lg border border-dashed border-[var(--color-line)] bg-[var(--color-bg-2)] px-4 py-3">
-                  <div className="font-mono text-[11px] uppercase tracking-wider text-[var(--color-text-3)]">
+                <div className="mt-1 flex flex-col gap-1.5 rounded-lg border border-dashed border-[var(--color-divider)] bg-[var(--color-pill-bg)] px-4 py-3">
+                  <div className="font-mono text-small uppercase tracking-wider text-[var(--color-text-muted)]">
                     Couldn't analyze
                   </div>
                   {droppedComponents.map((d, i) => (
-                    <div key={i} className="font-mono text-[11.5px] text-[var(--color-text-2)]">
+                    <div key={i} className="font-mono text-caption text-[var(--color-text-2)]">
                       <code className="text-[var(--color-text)]">{d.component}</code> — {d.reason}
                     </div>
                   ))}
@@ -166,30 +168,30 @@ export function SuggestionsGalleryDialog({
           )}
         </div>
 
-        <footer className="flex items-center justify-between border-t border-[var(--color-line)] px-5 py-3">
+        <footer className="flex items-center justify-between border-t border-[var(--color-divider)] px-5 py-3">
           {error ? (
-            <div className="font-mono text-[11px] text-[var(--color-danger)]">{error}</div>
+            <div className="font-mono text-small text-[var(--color-danger)]">{error}</div>
           ) : (
-            <div className="font-mono text-[11px] text-[var(--color-text-3)]">
+            <div className="font-mono text-small text-[var(--color-text-muted)]">
               {imported
                 ? 'Workflows are created paused — review + activate on the canvas.'
                 : `${selectedCount} of ${bundle.workflows.length} selected`}
             </div>
           )}
           {imported ? (
-            <button className="btn primary" onClick={onClose}>
+            <Button variant="primary" onClick={onClose}>
               Done
-            </button>
+            </Button>
           ) : (
-            <button
-              className="btn primary"
+            <Button
+              variant="primary"
               onClick={importSelected}
               disabled={selectedCount === 0 || importTemplate.isPending}
             >
               {importTemplate.isPending
                 ? 'Importing…'
                 : `Import ${selectedCount === 1 ? 'review' : `${selectedCount} reviews`}`}
-            </button>
+            </Button>
           )}
         </footer>
       </DialogContent>
@@ -210,32 +212,31 @@ function SuggestionCard({
   const cadence = cadenceOf(workflow);
 
   return (
-    <label className="flex cursor-pointer gap-3 rounded-lg border border-[var(--color-line)] bg-[var(--color-bg-2)] px-4 py-3">
-      <input
-        type="checkbox"
+    <label className="flex cursor-pointer gap-3 rounded-lg border border-[var(--color-divider)] bg-[var(--color-pill-bg)] px-4 py-3">
+      <Checkbox
         checked={selected}
-        onChange={onToggle}
+        onCheckedChange={onToggle}
         className="mt-0.5"
       />
       <div className="flex flex-1 flex-col gap-1.5">
         <div className="flex w-full items-center justify-between gap-3">
-          <span className="font-mono text-[13px] font-semibold text-[var(--color-text)]">
+          <span className="font-mono text-base font-semibold text-[var(--color-text)]">
             {workflow.name}
           </span>
           {cadence && (
-            <span className="flex shrink-0 items-center gap-1 font-mono text-[10.5px] uppercase tracking-wider text-[var(--color-text-3)]">
+            <span className="flex shrink-0 items-center gap-1 font-mono text-caption uppercase tracking-wider text-[var(--color-text-muted)]">
               <CalendarClock size={12} strokeWidth={1.5} />
               {cadence}
             </span>
           )}
         </div>
         {what && (
-          <span className="font-mono text-[11.5px] leading-relaxed text-[var(--color-text-2)]">
+          <span className="font-mono text-caption leading-relaxed text-[var(--color-text-2)]">
             {what}
           </span>
         )}
         {why && (
-          <span className="font-mono text-[11px] leading-relaxed text-[var(--color-text-3)]">
+          <span className="font-mono text-small leading-relaxed text-[var(--color-text-muted)]">
             <span className="text-[var(--color-text-2)]">Why:</span> {why}
           </span>
         )}
