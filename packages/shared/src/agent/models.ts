@@ -69,8 +69,7 @@ export const MODEL_PRICING: Record<string, ModelPrice> = {
   'gpt-5.5': { inputPerM: 5, outputPerM: 30 },
   'gpt-5.4': { inputPerM: 2.5, outputPerM: 15 },
   'gpt-5.3-codex': { inputPerM: 1.75, outputPerM: 14 },
-  // gpt-5.2 is no longer on the pricing page; keep the prior GPT-5 default
-  'gpt-5.2': { inputPerM: 1.25, outputPerM: 10 },
+  'gpt-5.2': { inputPerM: 1.75, outputPerM: 14 },
 };
 
 /**
