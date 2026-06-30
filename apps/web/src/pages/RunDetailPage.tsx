@@ -9,6 +9,7 @@ import { RunTimeline } from '../components/run/RunTimeline.js';
 import { useRunUpdates } from '../hooks/use-run-updates.js';
 import { duration, relativeFromNow } from '../lib/time.js';
 import { cn } from '../lib/cn.js';
+import { workflowNodeRank } from '../lib/node-order.js';
 import { statusClass } from '../lib/status.js';
 import { Button } from '../components/ui/button.js';
 import { SelectableCard } from '../components/ui/selectable-card.js';
@@ -46,10 +47,21 @@ export function RunDetailPage() {
     }
   }
 
+  // Order the rail by the workflow graph (scope first, publish last) rather
+  // than the alphabetical order Postgres returns from the unique constraint.
+  const orderedNodes = useMemo(() => {
+    const rank = workflowNodeRank(run?.workflow.definition);
+    return [...(run?.nodes ?? [])].sort(
+      (a, b) =>
+        (rank.get(a.nodeName) ?? Number.MAX_SAFE_INTEGER) -
+        (rank.get(b.nodeName) ?? Number.MAX_SAFE_INTEGER),
+    );
+  }, [run?.nodes, run?.workflow.definition]);
+
   useEffect(() => {
-    const first = run?.nodes?.[0]?.nodeName;
+    const first = orderedNodes[0]?.nodeName;
     if (first) setSelectedNode((prev) => prev ?? first);
-  }, [run]);
+  }, [orderedNodes]);
 
   const selected = run?.nodes.find((n) => n.nodeName === selectedNode);
   const autoSwitchedNodes = useRef<Set<string>>(new Set());
@@ -187,7 +199,7 @@ export function RunDetailPage() {
             Execution · {run.nodes.length} node{run.nodes.length === 1 ? '' : 's'}
           </h4>
           <div className="space-y-1">
-            {run.nodes.map((node) => (
+            {orderedNodes.map((node) => (
               <NodeRailItem
                 key={node.id}
                 node={node}
