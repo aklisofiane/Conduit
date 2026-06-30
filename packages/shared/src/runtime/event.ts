@@ -41,8 +41,9 @@ export const agentEventSchema = z.discriminatedUnion('type', [
      */
     reasoningOutputTokens: z.number().int().nonnegative().optional(),
     /**
-     * Provider-reported dollar cost for this turn, when the provider gives an
-     * authoritative figure (Claude's `total_cost_usd`). Absent for Codex, whose
+     * Provider-reported dollar cost (Claude's `total_cost_usd`). A running
+     * session total — each turn already includes the prior turns — so the
+     * consumer keeps the latest rather than summing. Absent for Codex, whose
      * cost is computed downstream from the per-model price table.
      */
     costUsd: z.number().nonnegative().optional(),

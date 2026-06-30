@@ -369,8 +369,9 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
       toolCalls: 0,
       turns: 0,
     };
-    // Provider-reported cost (Claude's `total_cost_usd`), summed across turns.
-    // When no turn reports a cost (Codex), we fall back to per-model pricing.
+    // Provider-reported cost (Claude's `total_cost_usd`) — kept as the latest
+    // turn's value, not summed (see onAgentEvent). When no turn reports a cost
+    // (Codex), we fall back to per-model pricing.
     const reportedCost = { usd: 0, present: false };
     // Independent of the runner's event flow so a long-blocking tool call
     // doesn't trip Temporal's liveness check.
@@ -518,10 +519,8 @@ async function onAgentEvent(
     // thread total on every turn.completed (turn 2 already includes turn 1),
     // so the latest event supersedes the previous — replace, don't sum, or a
     // node's multiple turns (main / writeback / summary on one thread) get
-    // counted 2-3×. Claude emits an independent per-turn rollup from each
-    // `result` message (the SDK's own dedup-by-id accumulation — "prefer the
-    // result message" per the Agent SDK cost-tracking docs), so those are
-    // summed across the node's turns.
+    // counted 2-3×. Claude's `result` message reports the token buckets as
+    // per-turn deltas, so those are summed across the node's turns.
     if (cumulativeUsage) {
       usage.inputTokens = event.inputTokens;
       usage.outputTokens = event.outputTokens;
@@ -537,7 +536,9 @@ async function onAgentEvent(
     }
     usage.turns += 1;
     if (typeof event.costUsd === 'number') {
-      reportedCost.usd += event.costUsd;
+      // Claude's `total_cost_usd` is a running session total (turn 2 already
+      // includes turn 1), so keep the latest — summing over-charges by turn count.
+      reportedCost.usd = event.costUsd;
       reportedCost.present = true;
     }
   }
