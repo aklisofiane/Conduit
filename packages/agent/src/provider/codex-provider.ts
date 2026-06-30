@@ -53,7 +53,7 @@ export class CodexProvider implements AgentProvider {
     const plan = planCodexConfig(req.mcpServers);
     let thread: CodexThread | undefined;
     let firstTurn = true;
-    const constraintState = createConstraintState();
+    const constraintState = createConstraintState({ cumulativeUsage: true });
 
     const ensureThread = async (): Promise<CodexThread> => {
       if (thread) return thread;

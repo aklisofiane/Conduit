@@ -730,6 +730,48 @@ describe('CodexProvider', () => {
     });
   });
 
+  it('multi-turn cumulative usage does not trip maxTokens', async () => {
+    // Each turn.completed carries the cumulative thread total, not a per-turn delta.
+    // Turn 1 total: 6000 (5000 input + 1000 output).
+    // Turn 2 total: 10000 (8000 input + 2000 output) — cumulative, already includes turn 1.
+    // maxTokens: 15000. Additive counting would sum 6000+10000=16000 and throw; replacement keeps 10000.
+    let callIdx = 0;
+    const perCallEvents: unknown[][] = [
+      [{ type: 'turn.completed', usage: { input_tokens: 5000, output_tokens: 1000 } }],
+      [{ type: 'turn.completed', usage: { input_tokens: 8000, output_tokens: 2000 } }],
+    ];
+    __setCodexSdkLoaderForTests(async () => ({
+      Codex: class {
+        startThread() {
+          return {
+            async runStreamed() {
+              const evs = perCallEvents[callIdx++] ?? [];
+              return {
+                events: (async function* () {
+                  for (const ev of evs) yield ev;
+                })(),
+              };
+            },
+          };
+        }
+      } as never,
+    }));
+
+    const session = new CodexProvider().startSession(
+      {
+        model: 'gpt-5-codex',
+        systemPrompt: '',
+        mcpServers: [],
+        workspacePath: '/tmp',
+        constraints: { maxTokens: 15000 },
+      } as never,
+      new AbortController().signal,
+    );
+
+    for await (const _ of session.run('hello')) void _;
+    for await (const _ of session.run('continue')) void _;
+  });
+
   it('forwards modelReasoningEffort to startThread when set, omits it when unset', async () => {
     const drive = async (effort?: string): Promise<Record<string, unknown> | undefined> => {
       let threadOptions: Record<string, unknown> | undefined;

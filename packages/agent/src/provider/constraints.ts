@@ -11,12 +11,14 @@ interface ProviderCounters {
 export interface ConstraintState {
   counters: ProviderCounters;
   startedAt: number;
+  cumulativeUsage?: boolean;
 }
 
-export function createConstraintState(): ConstraintState {
+export function createConstraintState(opts: { cumulativeUsage?: boolean } = {}): ConstraintState {
   return {
     counters: { turns: 0, toolCalls: 0, inputTokens: 0, outputTokens: 0 },
     startedAt: Date.now(),
+    cumulativeUsage: opts.cumulativeUsage ?? false,
   };
 }
 
@@ -32,10 +34,11 @@ export async function* enforceConstraints(
   state: ConstraintState,
 ): AsyncIterable<AgentEvent> {
   const { counters, startedAt } = state;
+  const cumulativeUsage = state.cumulativeUsage ?? false;
   for await (const event of source) {
     // `text` / `tool_result` events (the bulk of a stream) never move a
     // counter, so only re-check the count limits when one actually changed.
-    if (applyCounters(event, counters)) checkCountLimits(req, counters);
+    if (applyCounters(event, counters, cumulativeUsage)) checkCountLimits(req, counters);
     checkTimeout(req, startedAt);
     yield event;
     if (event.type === 'done') return;
@@ -43,7 +46,11 @@ export async function* enforceConstraints(
 }
 
 /** Mutate counters for the event; returns true when a counter changed. */
-function applyCounters(event: AgentEvent, counters: ProviderCounters): boolean {
+function applyCounters(
+  event: AgentEvent,
+  counters: ProviderCounters,
+  cumulativeUsage: boolean,
+): boolean {
   if (event.type === 'tool_call') {
     counters.toolCalls += 1;
     return true;
@@ -51,9 +58,15 @@ function applyCounters(event: AgentEvent, counters: ProviderCounters): boolean {
   if (event.type === 'usage') {
     // Count *all* input the model processed (full-rate + cache) so the
     // maxTokens backstop reflects true consumption, not just the uncached slice.
-    counters.inputTokens +=
+    const inputTokens =
       event.inputTokens + (event.cachedInputTokens ?? 0) + (event.cacheCreationInputTokens ?? 0);
-    counters.outputTokens += event.outputTokens;
+    if (cumulativeUsage) {
+      counters.inputTokens = inputTokens;
+      counters.outputTokens = event.outputTokens;
+    } else {
+      counters.inputTokens += inputTokens;
+      counters.outputTokens += event.outputTokens;
+    }
     counters.turns += 1;
     return true;
   }
