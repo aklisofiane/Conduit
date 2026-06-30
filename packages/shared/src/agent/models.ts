@@ -52,10 +52,12 @@ export interface ResolvedModelPrice extends ModelPrice {
  * this table entirely — these rates only bite for Codex.)
  *
  * Values track current public list prices by tier: Claude Opus 4.x $5/$25,
- * Sonnet 4.6 $3/$15, Haiku 4.5 $1/$5; the GPT-5 / Codex family at the published
- * GPT-5 rate of $1.25/$10. These are the "default value right now" — orgs
- * override per-model in settings, and runs snapshot the resolved price at write
- * time.
+ * Sonnet 4.6 $3/$15, Haiku 4.5 $1/$5; the GPT-5 family at OpenAI's published
+ * per-model rates (https://developers.openai.com/api/docs/pricing). These are
+ * the "default value right now" — orgs override per-model in settings, and runs
+ * snapshot the resolved price at write time. Cached-input on the page is
+ * input × 0.1, which `cacheReadPerM` already defaults to at the call site, so
+ * only input/output rates are listed here.
  */
 export const MODEL_PRICING: Record<string, ModelPrice> = {
   // Claude (Opus 4.x is $5/$25 — the older $15/$75 was Claude 3 Opus)
@@ -63,10 +65,11 @@ export const MODEL_PRICING: Record<string, ModelPrice> = {
   'claude-opus-4-6': { inputPerM: 5, outputPerM: 25 },
   'claude-sonnet-4-6': { inputPerM: 3, outputPerM: 15 },
   'claude-haiku-4-5': { inputPerM: 1, outputPerM: 5 },
-  // Codex (GPT-5 family)
-  'gpt-5.5': { inputPerM: 1.25, outputPerM: 10 },
-  'gpt-5.4': { inputPerM: 1.25, outputPerM: 10 },
-  'gpt-5.3-codex': { inputPerM: 1.25, outputPerM: 10 },
+  // Codex (GPT-5 family) — per-model OpenAI list prices
+  'gpt-5.5': { inputPerM: 5, outputPerM: 30 },
+  'gpt-5.4': { inputPerM: 2.5, outputPerM: 15 },
+  'gpt-5.3-codex': { inputPerM: 1.75, outputPerM: 14 },
+  // gpt-5.2 is no longer on the pricing page; keep the prior GPT-5 default
   'gpt-5.2': { inputPerM: 1.25, outputPerM: 10 },
 };
 
