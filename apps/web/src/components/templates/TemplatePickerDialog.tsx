@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { ConnectionScope } from '@conduit/shared';
 import { summarizeTemplate, templateFileSchema, type TemplateFile } from '@conduit/shared/template';
@@ -101,19 +101,6 @@ function defaultBindingForRepo(
   return newBindingForRepo(alias, credentials[0]?.id ?? '', undefined);
 }
 
-function defaultBindingForBoard(
-  alias: string,
-  credentials: CredentialRow[],
-  connections: ConnectionRow[],
-): TemplateBinding {
-  const eligible = connections.filter((c) => c.scope.kind === 'github_projects_v2');
-  const only = eligible.length === 1 ? eligible[0] : undefined;
-  if (eligible.length > 0) {
-    return { mode: 'existing', connectionId: only?.id ?? '' };
-  }
-  return newBindingForBoard(alias, credentials[0]?.id ?? '');
-}
-
 export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
   const { data: templates = [], isLoading } = useTemplates();
   const { data: credentials = [] } = useCredentials();
@@ -152,14 +139,8 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
   }, [repoAliases, bindings, credentials, connections]);
   const showBoard = boardAlias != null && repoPlatform === 'GITHUB';
 
-  useEffect(() => {
-    if (showBoard && boardAlias && !bindings[boardAlias]) {
-      setBindings((prev) => ({
-        ...prev,
-        [boardAlias]: defaultBindingForBoard(boardAlias, credentials, connections),
-      }));
-    }
-  }, [showBoard, boardAlias, bindings, credentials, connections]);
+  // Board bindings default to "None" — the board field stays unset unless the
+  // user explicitly picks New/Existing, so we never force a project on them.
 
   const canCreate =
     !!selected &&
@@ -172,7 +153,8 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
     (!showBoard ||
       (() => {
         const b = bindings[boardAlias!];
-        if (!b) return false;
+        // No binding = "None"; a board is optional, so that's a valid state.
+        if (!b) return true;
         if (b.mode === 'existing') return Boolean(b.connectionId);
         return Boolean(b.name && b.credentialId && b.scope);
       })());
@@ -352,6 +334,13 @@ export function TemplatePickerDialog({ onClose }: { onClose: () => void }) {
                       credentials={credentials}
                       connections={connections}
                       onChange={(b) => setBindings((prev) => ({ ...prev, [alias]: b }))}
+                      onClear={() =>
+                        setBindings((prev) => {
+                          const next = { ...prev };
+                          delete next[alias];
+                          return next;
+                        })
+                      }
                     />
                   ))}
                 </div>
@@ -420,6 +409,7 @@ function BindingRow({
   credentials,
   connections,
   onChange,
+  onClear,
 }: {
   alias: string;
   isBoard: boolean;
@@ -427,8 +417,11 @@ function BindingRow({
   credentials: CredentialRow[];
   connections: ConnectionRow[];
   onChange: (b: TemplateBinding) => void;
+  onClear: () => void;
 }) {
-  const mode = binding?.mode ?? 'new';
+  // Board bindings are optional, so an unset board reads as "None". Repo
+  // bindings always have a default, so they fall back to "new".
+  const mode = binding?.mode ?? (isBoard ? 'none' : 'new');
   const eligibleConnections = isBoard
     ? connections.filter((c) => c.scope.kind === 'github_projects_v2')
     : repoScopedConnections(connections);
@@ -457,7 +450,8 @@ function BindingRow({
           type="single"
           value={mode}
           onValueChange={(v) => {
-            if (v === 'new') handleNewClick();
+            if (v === 'none') onClear();
+            else if (v === 'new') handleNewClick();
             else if (v === 'existing')
               onChange({
                 mode: 'existing',
@@ -468,6 +462,14 @@ function BindingRow({
           size="sm"
           className="rounded-md border border-[var(--color-divider)] p-0.5"
         >
+          {isBoard && (
+            <ToggleGroupItem
+              value="none"
+              className="uppercase tracking-wider data-[state=on]:bg-[var(--color-claude-mark)] data-[state=on]:text-black"
+            >
+              None
+            </ToggleGroupItem>
+          )}
           <ToggleGroupItem
             value="new"
             className="uppercase tracking-wider data-[state=on]:bg-[var(--color-claude-mark)] data-[state=on]:text-black"
@@ -508,6 +510,12 @@ function BindingRow({
               label: connectionLabel(c),
             }))}
           />
+        </div>
+      )}
+
+      {isBoard && mode === 'none' && (
+        <div className="mt-3 font-mono text-caption text-[var(--color-text-muted)]">
+          No board — workflows won't be linked to a project.
         </div>
       )}
     </div>
