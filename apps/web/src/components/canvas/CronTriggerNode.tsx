@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import type { NodeProps } from '@xyflow/react';
 import { Clock } from 'lucide-react';
-import cronstrue from 'cronstrue';
 import type { TriggerConfig } from '@conduit/shared';
+import { formatCadence } from '../../lib/cron.js';
 import { TriggerNodeShell } from './trigger-node-common.js';
 
 export interface CronTriggerNodeData extends Record<string, unknown> {
@@ -10,17 +10,9 @@ export interface CronTriggerNodeData extends Record<string, unknown> {
   host?: string;
 }
 
-function describeCron(cron: string): string {
-  try {
-    return cronstrue.toString(cron, { use24HourTimeFormat: true });
-  } catch {
-    return cron;
-  }
-}
-
 export function CronTriggerNode({ data, selected }: NodeProps) {
   const { trigger, host } = data as CronTriggerNodeData;
-  const detail = useMemo(() => describeCron(trigger.cron), [trigger.cron]);
+  const detail = useMemo(() => formatCadence(trigger.cron), [trigger.cron]);
   return (
     <TriggerNodeShell
       selected={selected}

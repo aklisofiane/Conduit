@@ -192,13 +192,18 @@ export function HomePage() {
                   <div className="flex items-baseline gap-2 font-mono text-small">
                     {group.ref ? (
                       <>
+                        <span className="font-semibold uppercase text-[var(--color-text)]">
+                          {group.ref.platform}
+                        </span>
+                        <span className="text-[var(--color-text-muted)]">·</span>
                         <span className="font-semibold text-[var(--color-text)]">
                           {group.ref.label}
                         </span>
-                        <span className="text-[var(--color-text-muted)]">
-                          · {group.ref.platform}
-                          {group.ref.hostUrl ? ` · ${group.ref.hostUrl}` : ''}
-                        </span>
+                        {group.ref.hostUrl && (
+                          <span className="text-[var(--color-text-muted)]">
+                            · {group.ref.hostUrl}
+                          </span>
+                        )}
                       </>
                     ) : (
                       <>
