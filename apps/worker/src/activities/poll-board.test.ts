@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ProjectBoardItem } from '@conduit/shared/platform';
-import { itemPassesFilters, toTriggerEvent } from './poll-board-helpers';
+import { itemInRepo, itemPassesFilters, toTriggerEvent } from './poll-board-helpers';
 
 const ISSUE_ITEM: ProjectBoardItem = {
   itemNodeId: 'PVTI_ISSUE_1',
@@ -70,6 +70,24 @@ describe('itemPassesFilters', () => {
         { field: 'label', value: 'chore' },
       ]),
     ).toBe(false);
+  });
+});
+
+describe('itemInRepo', () => {
+  it('keeps an item whose repo matches the source scope', () => {
+    expect(itemInRepo(ISSUE_ITEM, { owner: 'acme', repo: 'shop' })).toBe(true);
+  });
+
+  it('rejects an item from a sibling repo on a shared multi-repo board', () => {
+    // Same board, same label — different repo. This is the bug guarded here:
+    // a board-triggered workflow must not fan out onto a sibling repo.
+    expect(itemInRepo(ISSUE_ITEM, { owner: 'acme', repo: 'other' })).toBe(false);
+    expect(itemInRepo(ISSUE_ITEM, { owner: 'someone-else', repo: 'shop' })).toBe(false);
+  });
+
+  it('rejects an item with no repo (draft) — no issue identity to act on', () => {
+    const draft: ProjectBoardItem = { ...ISSUE_ITEM, repo: undefined };
+    expect(itemInRepo(draft, { owner: 'acme', repo: 'shop' })).toBe(false);
   });
 });
 

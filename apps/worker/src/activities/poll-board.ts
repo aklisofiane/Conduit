@@ -21,7 +21,7 @@ import {
   fetchGitlabProjectIssues,
   fetchGitlabProjectMergeRequests,
 } from '@conduit/shared/platform';
-import { itemPassesFilters, toTriggerEvent } from './poll-board-helpers';
+import { itemInRepo, itemPassesFilters, toTriggerEvent } from './poll-board-helpers';
 import { startAgentRun } from './start-agent-run';
 
 /**
@@ -124,8 +124,13 @@ export async function pollBoardActivity(input: PollWorkflowInput): Promise<PollC
         projectNumber: boardScope.number,
         token,
       });
-      // Drop PRs and DraftIssues so issue triggers only see real issues.
-      items = boardItems.filter((item) => item.contentType === 'Issue');
+      // Drop PRs and DraftIssues so issue triggers only see real issues, and
+      // scope to the trigger's source repo — a shared multi-repo board must
+      // not fan a run out onto a sibling repo (see `itemInRepo`).
+      const repoScope = expectScopeKind(sourceScope, 'github_repo');
+      items = boardItems.filter(
+        (item) => item.contentType === 'Issue' && itemInRepo(item, repoScope),
+      );
     } else {
       const repoScope = expectScopeKind(sourceScope, 'github_repo');
       items = await fetchRepositoryIssues({

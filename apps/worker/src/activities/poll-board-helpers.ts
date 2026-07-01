@@ -17,6 +17,20 @@ export function itemPassesFilters(item: ProjectBoardItem, filters: TriggerFilter
 }
 
 /**
+ * A user/org-level GitHub Projects v2 board can aggregate issues from many
+ * repos. A board-triggered workflow is still scoped to a single repo — its
+ * source connection (`connectionId`) is the repo identity for the run (see
+ * design-docs/connections.md). Keep only board items whose content lives in
+ * that repo so a shared board never fans a run out onto a sibling repo (which
+ * would also collide on `conduit/*` branch state with that repo's own
+ * workflow). Draft items carry no `repo` and are dropped — they have no issue
+ * identity to act on.
+ */
+export function itemInRepo(item: ProjectBoardItem, repo: { owner: string; repo: string }): boolean {
+  return item.repo?.owner === repo.owner && item.repo?.name === repo.repo;
+}
+
+/**
  * Convert a project board item into the normalized `TriggerEvent` shape that
  * the matcher and downstream nodes consume. The `event` name and the
  * presence of `TriggerEvent.pr` are scope-driven:
