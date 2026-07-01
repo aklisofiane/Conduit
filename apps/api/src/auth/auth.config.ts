@@ -12,6 +12,7 @@ import { createBetterAuthRedisStorage } from '../redis/redis.service';
 import { AbuseSignalsService } from './abuse-signals';
 import { AuditLogService } from './audit-log.service';
 import { createAuditAfterMiddleware, createOrganizationAuditHooks } from './audit-hooks';
+import { createOrganizationGuardHooks } from './org-guard-hooks';
 import { rateLimitConfig } from './rate-limit-config';
 
 const githubOAuth = config.betterAuth.githubOAuth;
@@ -111,6 +112,9 @@ export const abuseSignalsService = new AbuseSignalsService(prisma);
 const auditHookDeps = { auditLog: auditLogService, abuseSignals: abuseSignalsService };
 const auditAfterMiddleware = createAuditAfterMiddleware(auditHookDeps);
 const organizationAuditHooks = createOrganizationAuditHooks(auditHookDeps);
+// Refuses deletion of a user's only org (disjoint keys from the audit hooks —
+// audit owns the `after*` events, the guard owns `beforeDeleteOrganization`).
+const organizationGuardHooks = createOrganizationGuardHooks(prisma);
 
 // Module-level singleton, mirrors the auditLogService pattern: Better Auth's
 // `databaseHooks` fire from the Express middleware before Nest DI is available,
@@ -342,7 +346,11 @@ export const auth = betterAuth({
   // Enabled here so the schema lands in one db:push. The signup-time shim
   // that auto-creates a personal org + sets activeOrganizationId is owned
   // by the data-model-partitioning sub-feature and lands separately.
-  plugins: [organization({ organizationHooks: organizationAuditHooks })],
+  plugins: [
+    organization({
+      organizationHooks: { ...organizationAuditHooks, ...organizationGuardHooks },
+    }),
+  ],
 });
 
 export type Auth = typeof auth;

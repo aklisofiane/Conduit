@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  canDeleteOrganization,
   canManageMember,
   isSoleOwner,
   submitInvite,
@@ -83,6 +84,26 @@ describe('isSoleOwner', () => {
   it('returns false when userId is undefined', () => {
     const members = [member({ id: 'm1', userId: 'u-1', role: 'owner' })];
     expect(isSoleOwner({ members, userId: undefined })).toBe(false);
+  });
+});
+
+describe('canDeleteOrganization', () => {
+  it('lets an owner delete when they have another org to fall back to', () => {
+    expect(canDeleteOrganization({ myRole: 'owner', orgCount: 2 })).toBe(true);
+  });
+
+  it('blocks deleting the only org (would leave the user org-less)', () => {
+    expect(canDeleteOrganization({ myRole: 'owner', orgCount: 1 })).toBe(false);
+  });
+
+  it('is false while the org list is still loading (count 0)', () => {
+    expect(canDeleteOrganization({ myRole: 'owner', orgCount: 0 })).toBe(false);
+  });
+
+  it('is false for non-owners regardless of org count', () => {
+    expect(canDeleteOrganization({ myRole: 'admin', orgCount: 3 })).toBe(false);
+    expect(canDeleteOrganization({ myRole: 'member', orgCount: 3 })).toBe(false);
+    expect(canDeleteOrganization({ myRole: undefined, orgCount: 3 })).toBe(false);
   });
 });
 

@@ -201,11 +201,34 @@ export function useUpdateOrganization(organizationId: string | undefined) {
   });
 }
 
+/**
+ * Choose which surviving organization to switch into after `deletedId` is
+ * removed. Returns the first remaining org's id, or `null` when none remain
+ * (shouldn't happen — deleting your last org is blocked in the UI and on the
+ * server — but we degrade gracefully instead of wedging the session).
+ */
+export function pickNextActiveOrg(
+  orgs: readonly OrganizationSummary[],
+  deletedId: string,
+): string | null {
+  return orgs.find((o) => o.id !== deletedId)?.id ?? null;
+}
+
 export function useDeleteOrganization() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (organizationId: string) => {
+    mutationFn: async (organizationId: string): Promise<string | null> => {
       unwrapVoid(await authClient.organization.delete({ organizationId }), 'Could not delete');
+      // Deleting the session's active org leaves `activeOrganizationId` pointing
+      // at a now-missing row, which 403s every org-scoped request until the
+      // session is re-pointed. Switch into a surviving org so the user lands
+      // somewhere valid instead of in limbo.
+      const remaining = unwrap(await authClient.organization.list()) as OrganizationSummary[];
+      const nextId = pickNextActiveOrg(remaining, organizationId);
+      if (nextId) {
+        unwrap(await authClient.organization.setActive({ organizationId: nextId }));
+      }
+      return nextId;
     },
     onSuccess: async () => {
       await invalidateOrgScopedQueries(qc);
