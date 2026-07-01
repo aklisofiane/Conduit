@@ -127,13 +127,9 @@ export function WorkflowRowItem({
         </div>
       </div>
       <div className="truncate font-mono text-small text-[var(--color-text-2)]">
-        {trigger?.platform ? (
-          <>
-            <b className="text-[var(--color-text)]">
-              {trigger.platform.toUpperCase()}
-            </b>{' '}
-            · {triggerSummary(trigger)}
-          </>
+        {/* Platform lives on the repo group header — no need to repeat it per row. */}
+        {trigger ? (
+          triggerSummary(trigger)
         ) : (
           <span className="text-[var(--color-text-muted)]">— trigger not configured</span>
         )}

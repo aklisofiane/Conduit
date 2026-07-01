@@ -36,7 +36,7 @@ describe('ClaudeProvider', () => {
   it('reports capabilities', () => {
     const p = new ClaudeProvider();
     const caps = p.getCapabilities();
-    expect(caps.models).toContain('claude-sonnet-4-6');
+    expect(caps.models).toContain('claude-sonnet-5');
     expect(caps.supportsMcp).toBe(true);
   });
 
@@ -45,7 +45,7 @@ describe('ClaudeProvider', () => {
     const p = new ClaudeProvider();
     const session = p.startSession(
       {
-        model: 'claude-sonnet-4-6',
+        model: 'claude-sonnet-5',
         systemPrompt: 'sys',
         mcpServers: [
           {
@@ -105,7 +105,7 @@ describe('ClaudeProvider', () => {
     const p = new ClaudeProvider();
     const session = p.startSession(
       {
-        model: 'claude-sonnet-4-6',
+        model: 'claude-sonnet-5',
         systemPrompt: 'sys',
         mcpServers: [],
         workspacePath: '/tmp/x',
@@ -124,7 +124,7 @@ describe('ClaudeProvider', () => {
     const p = new ClaudeProvider();
     const session = p.startSession(
       {
-        model: 'claude-sonnet-4-6',
+        model: 'claude-sonnet-5',
         systemPrompt: 'sys',
         mcpServers: [],
         workspacePath: '/tmp/x',
@@ -142,7 +142,7 @@ describe('ClaudeProvider', () => {
     const captured = installStub();
     const session = new ClaudeProvider().startSession(
       {
-        model: 'claude-sonnet-4-6',
+        model: 'claude-sonnet-5',
         systemPrompt: 'sys',
         mcpServers: [],
         workspacePath: '/tmp/x',
@@ -161,7 +161,7 @@ describe('ClaudeProvider', () => {
     const captured = installStub();
     const session = new ClaudeProvider().startSession(
       {
-        model: 'claude-sonnet-4-6',
+        model: 'claude-sonnet-5',
         systemPrompt: 'sys',
         mcpServers: [],
         workspacePath: '/tmp/x',
@@ -188,7 +188,7 @@ describe('ClaudeProvider', () => {
     const p = new ClaudeProvider();
     const session = p.startSession(
       {
-        model: 'claude-sonnet-4-6',
+        model: 'claude-sonnet-5',
         systemPrompt: 'sys',
         mcpServers: [],
         workspacePath: '/tmp/x',
@@ -203,5 +203,59 @@ describe('ClaudeProvider', () => {
     }).rejects.toThrow(
       'Claude Code failed: API 401: Failed to authenticate. API Error: 401 Invalid bearer token',
     );
+  });
+
+  it('emits one cumulative usage event from the result message, not per assistant message', async () => {
+    installStub([
+      // An assistant message carrying usage must NOT produce a usage event —
+      // summing per-message input over-counts the re-sent context every turn.
+      {
+        type: 'assistant',
+        message: {
+          content: [{ type: 'tool_use', id: 't1', name: 'Bash', input: {} }],
+          usage: { input_tokens: 5000, output_tokens: 40 },
+        },
+      },
+      // The result carries the SDK's cumulative-per-turn rollup + cost.
+      {
+        type: 'result',
+        subtype: 'success',
+        total_cost_usd: 0.1234,
+        usage: {
+          input_tokens: 1200,
+          output_tokens: 800,
+          cache_creation_input_tokens: 3000,
+          cache_read_input_tokens: 240000,
+        },
+      },
+    ]);
+    const session = new ClaudeProvider().startSession(
+      {
+        model: 'claude-sonnet-5',
+        systemPrompt: 'sys',
+        mcpServers: [],
+        workspacePath: '/tmp/x',
+        webSearch: false,
+        constraints: {},
+      },
+      new AbortController().signal,
+    );
+
+    const events = [];
+    for await (const e of session.run('hi')) events.push(e);
+
+    const usageEvents = events.filter((e) => e.type === 'usage');
+    expect(usageEvents).toEqual([
+      {
+        type: 'usage',
+        inputTokens: 1200,
+        outputTokens: 800,
+        cachedInputTokens: 240000,
+        cacheCreationInputTokens: 3000,
+        costUsd: 0.1234,
+      },
+    ]);
+    // The tool_use block still surfaces as a tool_call.
+    expect(events.some((e) => e.type === 'tool_call' && e.id === 't1')).toBe(true);
   });
 });

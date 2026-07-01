@@ -35,9 +35,9 @@ interface MockBehavior {
 }
 
 const PRESETS: AssemblyPresets = {
-  scope: { provider: 'claude', model: 'claude-sonnet-4-6', instructions: 's' },
+  scope: { provider: 'claude', model: 'claude-sonnet-5', instructions: 's' },
   codeAnalyst: { provider: 'codex', model: 'gpt-5.5', instructions: 'c' },
-  issuePublisher: { provider: 'claude', model: 'claude-sonnet-4-6', instructions: 'p' },
+  issuePublisher: { provider: 'claude', model: 'claude-sonnet-5', instructions: 'p' },
 };
 
 function manifest(componentNames: string[]): ComponentManifest {

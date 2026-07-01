@@ -58,14 +58,68 @@ export async function cleanupRunActivity(input: {
       await writeSystemLog(runId, orgId, null, `cleanupRun failed: ${errorMessage(err)}`, 'WARN');
     }
   }
+
+  // Run-level rollup: sum the per-node tokens (from each NodeRun.usage JSON,
+  // the single source of truth — no duplication) and the snapshot-at-write
+  // `costUsd` into the WorkflowRun aggregate columns. Stays null when no agent
+  // node recorded usage. The cost sum runs in SQL to keep Decimal precision.
+  const totals = await rollupRunTotals(runId);
+
   await prisma().workflowRun.update({
     where: { id: runId },
     data: {
       status,
       error: error ?? undefined,
       finishedAt: new Date(),
+      ...totals,
     },
   });
+}
+
+/** Aggregate the run's NodeRun token usage + cost into WorkflowRun column
+ *  updates. Returns `undefined`-valued fields (left as null) when nothing ran. */
+async function rollupRunTotals(runId: string): Promise<{
+  totalInputTokens?: number;
+  totalOutputTokens?: number;
+  totalCostUsd?: import('@conduit/database').Prisma.Decimal;
+}> {
+  const nodes = await prisma().nodeRun.findMany({
+    where: { runId },
+    select: { usage: true },
+  });
+
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
+  let hasUsage = false;
+  for (const node of nodes) {
+    const usage = node.usage as {
+      inputTokens?: number;
+      outputTokens?: number;
+      cachedInputTokens?: number;
+      cacheCreationInputTokens?: number;
+    } | null;
+    if (!usage) continue;
+    hasUsage = true;
+    // Headline "input" is everything the model read — full-rate plus the cache
+    // buckets — so the run total reflects true consumption, not just the
+    // uncached slice. Cost is rolled up separately (snapshot costUsd per node).
+    totalInputTokens +=
+      (usage.inputTokens ?? 0) +
+      (usage.cachedInputTokens ?? 0) +
+      (usage.cacheCreationInputTokens ?? 0);
+    totalOutputTokens += usage.outputTokens ?? 0;
+  }
+
+  const costAgg = await prisma().nodeRun.aggregate({
+    where: { runId },
+    _sum: { costUsd: true },
+  });
+
+  return {
+    totalInputTokens: hasUsage ? totalInputTokens : undefined,
+    totalOutputTokens: hasUsage ? totalOutputTokens : undefined,
+    totalCostUsd: costAgg._sum.costUsd ?? undefined,
+  };
 }
 
 /**

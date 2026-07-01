@@ -3,6 +3,8 @@ import {
   ORG_SCOPED_QUERY_KEYS,
   buildInviteUrl,
   invalidateOrgScopedQueries,
+  pickNextActiveOrg,
+  type OrganizationSummary,
 } from './organization.js';
 
 describe('buildInviteUrl', () => {
@@ -40,6 +42,28 @@ describe('ORG_SCOPED_QUERY_KEYS', () => {
         'triggers',
       ]),
     );
+  });
+});
+
+describe('pickNextActiveOrg', () => {
+  const org = (id: string): OrganizationSummary => ({
+    id,
+    name: id,
+    slug: id,
+    createdAt: '2026-05-01T00:00:00Z',
+  });
+
+  it('returns the first surviving org after the deleted one is removed', () => {
+    expect(pickNextActiveOrg([org('a'), org('b'), org('c')], 'a')).toBe('b');
+  });
+
+  it('skips the deleted org even if it is not first', () => {
+    expect(pickNextActiveOrg([org('a'), org('b')], 'b')).toBe('a');
+  });
+
+  it('returns null when no other org remains', () => {
+    expect(pickNextActiveOrg([org('a')], 'a')).toBeNull();
+    expect(pickNextActiveOrg([], 'a')).toBeNull();
   });
 });
 

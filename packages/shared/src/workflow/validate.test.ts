@@ -33,7 +33,7 @@ function agentNode(name = 'Worker') {
     id: `agent-${name.toLowerCase()}`,
     name,
     provider: 'claude' as const,
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     instructions: 'do work',
     mcpServers: [],
     skills: [],

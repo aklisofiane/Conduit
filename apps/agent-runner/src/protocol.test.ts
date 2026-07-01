@@ -18,7 +18,7 @@ describe('runner protocol', () => {
       },
       provider: { id: 'claude' },
       agent: {
-        model: 'claude-sonnet-4-6',
+        model: 'claude-sonnet-5',
         systemPrompt: 'You are a worker.',
         mcpServers: [],
         workspacePath: '/tmp/ws',

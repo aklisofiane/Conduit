@@ -20,6 +20,7 @@ import {
   useLeaveOrganization,
   useOrganizationInvitations,
   useOrganizationMembers,
+  useOrganizations,
   useRemoveMember,
   useUpdateMemberRole,
   useUpdateOrganization,
@@ -74,6 +75,18 @@ export function canManageMember(actorRole: OrgRole | undefined, targetRole: OrgR
   if (actorRole === 'owner') return true;
   if (actorRole === 'admin' && targetRole !== 'owner') return true;
   return false;
+}
+
+/**
+ * Owners may delete an org only when the user still belongs to at least one
+ * other org to fall back to. Deleting your only org would leave you with no
+ * active organization (the server enforces the same rule as a backstop).
+ */
+export function canDeleteOrganization(args: {
+  myRole: OrgRole | undefined;
+  orgCount: number;
+}): boolean {
+  return args.myRole === 'owner' && args.orgCount > 1;
 }
 
 export function OrganizationSettingsPage() {
@@ -572,6 +585,7 @@ function DangerZoneSection({
   const navigate = useNavigate();
   const leave = useLeaveOrganization();
   const remove = useDeleteOrganization();
+  const { data: orgs = [] } = useOrganizations();
 
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [confirmName, setConfirmName] = useState('');
@@ -582,7 +596,12 @@ function DangerZoneSection({
     () => isSoleOwner({ members, userId: myUserId }),
     [members, myUserId],
   );
-  const canDelete = myRole === 'owner';
+  const orgCount = orgs.length;
+  const canDelete = canDeleteOrganization({ myRole, orgCount });
+  // Owner of their only org: show the delete affordance disabled with a reason
+  // rather than hiding it, so the constraint is discoverable. `orgCount` is 0
+  // only while the org list is still loading, so this stays false until then.
+  const isOnlyOrg = myRole === 'owner' && orgCount === 1;
 
   const handleLeave = async () => {
     if (!window.confirm(`Leave ${organizationName}?`)) return;
@@ -671,6 +690,22 @@ function DangerZoneSection({
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {isOnlyOrg && (
+          <div className="flex flex-col gap-2 border-t border-[var(--color-divider)] pt-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="font-mono text-caption text-[var(--color-text-2)]">
+                Permanently delete this organization and everything inside it.
+              </div>
+              <Button disabled title="You can't delete your only organization">
+                Delete organization
+              </Button>
+            </div>
+            <div className="font-mono text-caption text-[var(--color-text-muted)]">
+              This is your only organization. Create another before you can delete this one.
+            </div>
           </div>
         )}
       </div>

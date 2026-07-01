@@ -1,4 +1,5 @@
 import type { TriggerConfig } from '@conduit/shared';
+import { formatCadence } from './cron.js';
 
 /**
  * Pure (component-free) trigger defaults, shared by the canvas trigger
@@ -57,8 +58,14 @@ export function triggerSummary(trigger: TriggerConfig): string {
       return `polling · every ${trigger.intervalSec}s`;
     case 'pull_requests':
       return `polling · every ${trigger.intervalSec}s · prs`;
-    case 'cron':
-      return `schedule · ${trigger.cron} · ${trigger.timezone}`;
+    case 'cron': {
+      const cadence = formatCadence(trigger.cron);
+      // Timezone only matters when it's not the UTC default — hide it otherwise
+      // so common schedules read as a clean "Every 2 hours" / "Weekly on Fri…".
+      return trigger.timezone && trigger.timezone !== 'UTC'
+        ? `${cadence} · ${trigger.timezone}`
+        : cadence;
+    }
     case 'webhook':
       return trigger.event;
   }

@@ -6,11 +6,11 @@ import { assembleSuggestionBundle, type AssembleContext } from './assemble';
 import type { WorkflowDraft } from './workflow-draft';
 
 const presets = {
-  scope: { provider: 'claude' as const, model: 'claude-sonnet-4-6', instructions: 'scope base' },
+  scope: { provider: 'claude' as const, model: 'claude-sonnet-5', instructions: 'scope base' },
   codeAnalyst: { provider: 'codex' as const, model: 'gpt-5.5', instructions: 'analyst base' },
   issuePublisher: {
     provider: 'claude' as const,
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     instructions: 'publisher base',
   },
 };
@@ -75,7 +75,7 @@ describe('assembleSuggestionBundle', () => {
 
     const scope = def.nodes.find((n) => n.name === 'Scope')!;
     expect(scope.provider).toBe('claude');
-    expect(scope.model).toBe('claude-sonnet-4-6');
+    expect(scope.model).toBe('claude-sonnet-5');
     // Authored prose leads; base preset prose is NOT used as a foundation.
     expect(scope.instructions.startsWith(SCOPE_PROSE)).toBe(true);
     expect(scope.instructions).not.toContain('scope base');

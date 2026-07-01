@@ -24,6 +24,7 @@ export const sharedVitestConfig = defineConfig({
       '@conduit/shared/webhook': path.resolve(__dirname, 'packages/shared/src/webhook/index.ts'),
       '@conduit/shared/workflow': path.resolve(__dirname, 'packages/shared/src/workflow/index.ts'),
       '@conduit/shared/label': path.resolve(__dirname, 'packages/shared/src/label/index.ts'),
+      '@conduit/shared/agent': path.resolve(__dirname, 'packages/shared/src/agent/index.ts'),
       '@conduit/shared': path.resolve(__dirname, 'packages/shared/src/index.ts'),
       '@conduit/agent': path.resolve(__dirname, 'packages/agent/src/index.ts'),
       '@conduit/database': path.resolve(__dirname, 'packages/database/src/index.ts'),

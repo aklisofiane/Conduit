@@ -202,7 +202,10 @@ Zod schemas + cross-process contracts. Domain directories line up with subpath e
 ```
 src/
   agent/      AgentEvent, provider contract types, `issue-writeback.ts`
-              (per-agent allowlist for end-of-run GitHub issue updates)
+              (per-agent allowlist for end-of-run GitHub issue updates),
+              `decimal.ts` (`decimalToNumber` / `toModelPrice` — shared
+              Prisma Decimal → number helpers imported by both the API model-pricing
+              service and the worker pricing loader)
   analysis/   Repo-analysis contracts (see design-docs/repo-analysis.md):
               ComponentManifest + WorkflowDraft schemas (agent authors
               `scopeInstructions` + `reviewers[]`), the analysis adapter

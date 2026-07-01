@@ -1,4 +1,5 @@
 import { ApiKeysSection } from '../components/settings/ApiKeysSection.js';
+import { ModelPricingSection } from '../components/settings/ModelPricingSection.js';
 
 /**
  * `/settings/api-keys` — per-org provider API keys (Anthropic, OpenAI). The
@@ -19,6 +20,7 @@ export function ApiKeysPage() {
       </p>
 
       <ApiKeysSection />
+      <ModelPricingSection />
     </div>
   );
 }

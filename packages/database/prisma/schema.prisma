@@ -213,6 +213,31 @@ model ProviderConfig {
 }
 
 // -----------------------------------------------------------------------------
+// Model pricing overrides
+// -----------------------------------------------------------------------------
+
+// Per-org per-model USD price override (per 1M tokens). Sparse — only models a
+// user has overridden get a row; everything else falls back to the shipped
+// `MODEL_PRICING` defaults in @conduit/shared. Drives snapshot-at-write cost on
+// NodeRun. Decoupled from ProviderConfig (which is unique-per-provider and may
+// not exist when a provider runs off an env API key).
+model ModelPrice {
+  id         String   @id @default(cuid())
+  orgId      String
+  // e.g. "claude-opus-4-8". Matches AgentConfig.model / PROVIDER_MODELS.
+  model      String
+  inputPerM  Decimal  @db.Decimal(12, 6)
+  outputPerM Decimal  @db.Decimal(12, 6)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, model])
+  @@index([orgId])
+}
+
+// -----------------------------------------------------------------------------
 // Polling dedup
 // -----------------------------------------------------------------------------
 
@@ -288,6 +313,14 @@ model WorkflowRun {
   // Populated when the run is started.
   temporalWorkflowId String?
   temporalRunId      String?
+  // Run-level rollups, summed from this run's NodeRun rows at finalization
+  // (cleanup-run.ts). Tokens come from each NodeRun.usage JSON; cost is the
+  // sum of the per-node snapshot-at-write `costUsd`. SQL-aggregatable record
+  // powering tokens/cost per run and future spend dashboards. Null until the
+  // run finalizes (or for runs with no completed agent nodes).
+  totalInputTokens   Int?
+  totalOutputTokens  Int?
+  totalCostUsd       Decimal?  @db.Decimal(12, 6)
 
   workflow     Workflow       @relation(fields: [workflowId], references: [id], onDelete: Cascade)
   organization Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
@@ -325,6 +358,13 @@ model NodeRun {
   error          String?
   // { inputTokens, outputTokens, toolCalls, turns } — agent nodes only.
   usage          Json?
+  // Snapshot-at-write dollar cost of this node, frozen at completion so later
+  // price edits never rewrite history. Computed from the accumulated usage and
+  // the price resolved for `node.model`. Agent nodes only; null otherwise.
+  costUsd        Decimal?  @db.Decimal(12, 6)
+  // The exact price used: { inputPerM, outputPerM, source: 'default' | 'override' }.
+  // Makes each row self-explaining and auditable.
+  priceSnapshot  Json?
   // Populated if inherited downstream.
   workspacePath  String?
   // Snapshot of `.conduit/<nodeName>.md` captured at the end of the node run.
@@ -477,6 +517,7 @@ model Organization {
   executionLogs   ExecutionLog[]
   ticketBranches  TicketBranch[]
   providerConfigs ProviderConfig[]
+  modelPrices     ModelPrice[]
   repoAnalyses    RepoAnalysis[]
 
   @@unique([slug])

@@ -45,7 +45,18 @@ export interface RunTrigger {
   repo?: { owner: string; name: string };
 }
 
-export interface WorkflowRunListItem extends WorkflowRunSummary {
+/**
+ * Run-level token/cost rollup, summed from the run's node runs at
+ * finalization. Null on runs that predate this feature or finished without a
+ * completed agent node. `totalCostUsd` is serialized from a Decimal to a number.
+ */
+export interface RunCostRollup {
+  totalInputTokens: number | null;
+  totalOutputTokens: number | null;
+  totalCostUsd: number | null;
+}
+
+export interface WorkflowRunListItem extends WorkflowRunSummary, RunCostRollup {
   workflowId: string;
   trigger: RunTrigger;
   nodes: {
@@ -57,13 +68,23 @@ export interface WorkflowRunListItem extends WorkflowRunSummary {
   }[];
 }
 
-export interface RunDetail extends WorkflowRunSummary {
+export interface RunDetail extends WorkflowRunSummary, RunCostRollup {
   workflowId: string;
   workflow: { id: string; name: string; definition: WorkflowDefinition };
   trigger: RunTrigger;
   temporalWorkflowId: string | null;
   temporalRunId: string | null;
   nodes: NodeRunRow[];
+}
+
+/**
+ * The exact price snapshotted onto a node run at completion, so the cost is
+ * self-explaining and immune to later price edits. USD per 1M tokens.
+ */
+export interface PriceSnapshot {
+  inputPerM: number;
+  outputPerM: number;
+  source: 'default' | 'override';
 }
 
 export interface NodeRunRow {
@@ -82,7 +103,24 @@ export interface NodeRunRow {
     isBranchedWorktree?: boolean;
     branchName?: string;
   } | null;
-  usage: { inputTokens?: number; outputTokens?: number; toolCalls?: number; turns?: number } | null;
+  /**
+   * Per-node token usage. `inputTokens` is the full-rate (non-cached) portion;
+   * `cachedInputTokens` and `cacheCreationInputTokens` are the cache buckets.
+   * Display "input" totals should sum all three. `reasoningOutputTokens` is a
+   * subset of `outputTokens` (display only — never add it to a total).
+   */
+  usage: {
+    inputTokens?: number;
+    outputTokens?: number;
+    cachedInputTokens?: number;
+    cacheCreationInputTokens?: number;
+    reasoningOutputTokens?: number;
+    toolCalls?: number;
+    turns?: number;
+  } | null;
+  /** Snapshot-at-write dollar cost of this node (Decimal → number). Null on non-agent / pre-feature nodes. */
+  costUsd: number | null;
+  priceSnapshot: PriceSnapshot | null;
   workspacePath: string | null;
   conduitSummary: string | null;
   error: string | null;
@@ -119,6 +157,18 @@ export interface ProviderConfig {
   providerId: AgentProviderId;
   baseUrl: string | null;
   suffix: string;
+  updatedAt: string;
+}
+
+/**
+ * A per-org per-model price override returned by `GET /model-pricing`. Only
+ * overridden models have a row; models without one fall back to the shipped
+ * `MODEL_PRICING` default. Rates are USD per 1M tokens.
+ */
+export interface ModelPriceRow {
+  model: string;
+  inputPerM: number;
+  outputPerM: number;
   updatedAt: string;
 }
 
