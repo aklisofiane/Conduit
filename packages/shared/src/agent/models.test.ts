@@ -27,7 +27,7 @@ describe('resolveModelPrice', () => {
   });
 
   it('falls back to the default when the override map lacks the model', () => {
-    const resolved = resolveModelPrice('claude-sonnet-4-6', {
+    const resolved = resolveModelPrice('claude-sonnet-5', {
       'claude-opus-4-8': { inputPerM: 1, outputPerM: 2 },
     });
     expect(resolved).toEqual({ inputPerM: 3, outputPerM: 15, source: 'default' });

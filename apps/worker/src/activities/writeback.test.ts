@@ -24,7 +24,7 @@ function makeAgent(overrides: Partial<AgentConfig> = {}): AgentConfig {
     id: 'agent-1',
     name: 'Publisher',
     provider: 'claude',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     instructions: '',
     mcpServers: [],
     skills: [],

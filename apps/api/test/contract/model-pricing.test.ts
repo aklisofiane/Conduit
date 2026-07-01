@@ -84,15 +84,15 @@ describe('ModelPricingService upsert + delete + list', () => {
 
   it('upsert for a new model stamps caller-org orgId and adds a row', async () => {
     const created = await svc.upsert(fixture.orgA.id, {
-      model: 'claude-sonnet-4-6',
+      model: 'claude-sonnet-5',
       inputPerM: 3,
       outputPerM: 15,
     });
-    expect(created.model).toBe('claude-sonnet-4-6');
+    expect(created.model).toBe('claude-sonnet-5');
 
     const rows = await prisma.modelPrice.findMany({ where: { orgId: fixture.orgA.id } });
-    expect(rows.map((r) => r.model).sort()).toEqual(['claude-opus-4-8', 'claude-sonnet-4-6']);
-    const sonnet = rows.find((r) => r.model === 'claude-sonnet-4-6');
+    expect(rows.map((r) => r.model).sort()).toEqual(['claude-opus-4-8', 'claude-sonnet-5']);
+    const sonnet = rows.find((r) => r.model === 'claude-sonnet-5');
     expect(sonnet?.orgId).toBe(fixture.orgA.id);
   });
 

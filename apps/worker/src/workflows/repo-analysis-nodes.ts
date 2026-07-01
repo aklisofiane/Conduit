@@ -15,7 +15,7 @@ import {
 
 /** Both analyzer agents run on Claude — they inspect, they don't write code. */
 const ANALYZER_PROVIDER = 'claude' as const;
-const ANALYZER_MODEL = 'claude-sonnet-4-6';
+const ANALYZER_MODEL = 'claude-sonnet-5';
 
 const DISCOVER_INSTRUCTIONS = `You are the Discover agent for Conduit's repo analyzer. Map this repository into its distinct **components** so each can get its own tailored review workflow.
 

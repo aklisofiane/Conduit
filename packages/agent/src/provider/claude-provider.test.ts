@@ -36,7 +36,7 @@ describe('ClaudeProvider', () => {
   it('reports capabilities', () => {
     const p = new ClaudeProvider();
     const caps = p.getCapabilities();
-    expect(caps.models).toContain('claude-sonnet-4-6');
+    expect(caps.models).toContain('claude-sonnet-5');
     expect(caps.supportsMcp).toBe(true);
   });
 
@@ -45,7 +45,7 @@ describe('ClaudeProvider', () => {
     const p = new ClaudeProvider();
     const session = p.startSession(
       {
-        model: 'claude-sonnet-4-6',
+        model: 'claude-sonnet-5',
         systemPrompt: 'sys',
         mcpServers: [
           {
@@ -105,7 +105,7 @@ describe('ClaudeProvider', () => {
     const p = new ClaudeProvider();
     const session = p.startSession(
       {
-        model: 'claude-sonnet-4-6',
+        model: 'claude-sonnet-5',
         systemPrompt: 'sys',
         mcpServers: [],
         workspacePath: '/tmp/x',
@@ -124,7 +124,7 @@ describe('ClaudeProvider', () => {
     const p = new ClaudeProvider();
     const session = p.startSession(
       {
-        model: 'claude-sonnet-4-6',
+        model: 'claude-sonnet-5',
         systemPrompt: 'sys',
         mcpServers: [],
         workspacePath: '/tmp/x',
@@ -142,7 +142,7 @@ describe('ClaudeProvider', () => {
     const captured = installStub();
     const session = new ClaudeProvider().startSession(
       {
-        model: 'claude-sonnet-4-6',
+        model: 'claude-sonnet-5',
         systemPrompt: 'sys',
         mcpServers: [],
         workspacePath: '/tmp/x',
@@ -161,7 +161,7 @@ describe('ClaudeProvider', () => {
     const captured = installStub();
     const session = new ClaudeProvider().startSession(
       {
-        model: 'claude-sonnet-4-6',
+        model: 'claude-sonnet-5',
         systemPrompt: 'sys',
         mcpServers: [],
         workspacePath: '/tmp/x',
@@ -188,7 +188,7 @@ describe('ClaudeProvider', () => {
     const p = new ClaudeProvider();
     const session = p.startSession(
       {
-        model: 'claude-sonnet-4-6',
+        model: 'claude-sonnet-5',
         systemPrompt: 'sys',
         mcpServers: [],
         workspacePath: '/tmp/x',
@@ -231,7 +231,7 @@ describe('ClaudeProvider', () => {
     ]);
     const session = new ClaudeProvider().startSession(
       {
-        model: 'claude-sonnet-4-6',
+        model: 'claude-sonnet-5',
         systemPrompt: 'sys',
         mcpServers: [],
         workspacePath: '/tmp/x',
