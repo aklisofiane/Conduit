@@ -80,6 +80,20 @@ function resolveOne(
     }
     slot.set(connId);
   }
+  // A Projects-v2 Status can only be written when a board connection survives
+  // resolution. If none does — no board slot at all, or the optional board
+  // placeholder was left unbound and `clear()`ed above — strip
+  // `allowedStatuses` from every agent's writeback. Otherwise the writeback
+  // prompt still emits a "set the project Status" directive (gated only on
+  // `allowedStatuses.length > 0`, see agent/context.ts) and sends the agent
+  // hunting for a board that isn't there. Labels / PR-states are board-free and
+  // pass through untouched.
+  const hasBoard = definition.triggers.some((t) => t.boardConnectionId != null);
+  if (!hasBoard) {
+    for (const node of definition.nodes) {
+      if (node.issueWriteback) node.issueWriteback.allowedStatuses = [];
+    }
+  }
   return { name: wf.name, description: wf.description, definition };
 }
 

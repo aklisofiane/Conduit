@@ -164,6 +164,56 @@ describe('resolveTemplate', () => {
   it('throws when a placeholder has no binding', () => {
     expect(() => resolveTemplate(TEMPLATE, {})).toThrow(/<github-repo>/);
   });
+
+  // A node's issueWriteback.allowedStatuses only makes sense with a Projects-v2
+  // board to write to. Resolution ties the two together so an unbound board
+  // doesn't leave a "set the project Status" directive pointing at nothing.
+  const writebackBoardTemplate = (): TemplateFile =>
+    structuredClone({
+      ...BOARD_TEMPLATE,
+      workflows: [
+        {
+          ...BOARD_TEMPLATE.workflows[0]!,
+          definition: {
+            ...BOARD_TEMPLATE.workflows[0]!.definition,
+            nodes: [
+              {
+                ...BOARD_TEMPLATE.workflows[0]!.definition.nodes[0]!,
+                issueWriteback: {
+                  allowedStatuses: ['Review'],
+                  allowedLabels: ['conduit-dev'],
+                  allowedPrStates: [],
+                },
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+  it('keeps allowedStatuses when a board connection is bound', () => {
+    const resolved = resolveTemplate(writebackBoardTemplate(), {
+      'github-repo': 'conn_repo',
+      'github-board': 'conn_board',
+    })[0]!;
+    expect(resolved.definition.nodes[0]!.issueWriteback).toEqual({
+      allowedStatuses: ['Review'],
+      allowedLabels: ['conduit-dev'],
+      allowedPrStates: [],
+    });
+  });
+
+  it('strips allowedStatuses (but keeps labels) when no board is bound', () => {
+    const resolved = resolveTemplate(writebackBoardTemplate(), {
+      'github-repo': 'conn_repo',
+    })[0]!;
+    expect(resolved.definition.triggers[0]!.boardConnectionId).toBeUndefined();
+    expect(resolved.definition.nodes[0]!.issueWriteback).toEqual({
+      allowedStatuses: [],
+      allowedLabels: ['conduit-dev'],
+      allowedPrStates: [],
+    });
+  });
 });
 
 describe('templateFileSchema', () => {
