@@ -61,11 +61,22 @@ function groupWorkflowsByRepo(
     }
   }
 
-  // Repo groups stay in first-appearance order (= most-recent updatedAt first,
-  // since the API delivers workflows by updatedAt desc). "No repo" is always
-  // last regardless of when it first appeared.
-  const repoKeys = order.filter((k) => k !== NO_REPO_KEY);
-  const result = repoKeys.map((k) => map.get(k)!);
+  // Repo groups are ordered alphabetically by repo label so each repo keeps a
+  // fixed slot on the page — toggling a workflow active/inactive must never
+  // move its group. "No repo" is always last. Rows within a group stay in the
+  // API's name-asc order (a subset of a sorted list is still sorted).
+  const result = order
+    .filter((k) => k !== NO_REPO_KEY)
+    .map((k) => map.get(k)!)
+    .sort((a, b) => {
+      const byLabel = a.ref!.label.localeCompare(b.ref!.label, undefined, {
+        sensitivity: 'base',
+      });
+      if (byLabel !== 0) return byLabel;
+      const byPlatform = a.ref!.platform.localeCompare(b.ref!.platform);
+      if (byPlatform !== 0) return byPlatform;
+      return (a.ref!.hostUrl ?? '').localeCompare(b.ref!.hostUrl ?? '');
+    });
   if (map.has(NO_REPO_KEY)) result.push(map.get(NO_REPO_KEY)!);
   return result;
 }

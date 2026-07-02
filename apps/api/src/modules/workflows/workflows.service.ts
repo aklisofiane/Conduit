@@ -64,7 +64,9 @@ export class WorkflowsService implements OnModuleInit {
       // SYSTEM workflows (hidden per-org host for internal analysis runs) never
       // surface to the user.
       where: { orgId, kind: 'STANDARD' },
-      orderBy: { updatedAt: 'desc' },
+      // Alphabetical by name so the list stays stable — toggling active/inactive
+      // (which bumps updatedAt) must not reorder the page under the user.
+      orderBy: { name: 'asc' },
       include: {
         runs: {
           orderBy: { startedAt: 'desc' },
