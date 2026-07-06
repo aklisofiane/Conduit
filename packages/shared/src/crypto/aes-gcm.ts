@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import type { EncryptionKeys } from './key';
 
 /**
  * AES-256-GCM helpers used by both the API (which encrypts at credential
@@ -30,6 +31,26 @@ export function decryptSecret(payload: string, key: Buffer): string {
     decipher.final(),
   ]);
   return plaintext.toString('utf8');
+}
+
+/**
+ * Decrypt with the primary key, falling back to the legacy pre-scrypt
+ * passphrase key when one exists. All decrypt paths should use this instead
+ * of raw `decryptSecret` so credentials written before the KDF upgrade keep
+ * working; encryption always uses `keys.primary`, so legacy payloads
+ * converge on the scrypt key as they are rewritten.
+ */
+export function decryptSecretWithFallback(payload: string, keys: EncryptionKeys): string {
+  try {
+    return decryptSecret(payload, keys.primary);
+  } catch (err) {
+    if (!keys.legacy) throw err;
+    try {
+      return decryptSecret(payload, keys.legacy);
+    } catch {
+      throw err;
+    }
+  }
 }
 
 /** Last 4 characters of the plaintext — for UI displays like `sk-ant-…4f2a`. */

@@ -6,16 +6,38 @@ import { git, GitError } from './git';
 import { dropConflictingWorktrees } from './worktree-cleanup';
 import type { ConnectionContext } from './types';
 
-function withTokenUrl(connection: ConnectionContext): string {
-  if (!connection.token) return connection.cloneUrl;
-  try {
-    const u = new URL(connection.cloneUrl);
-    u.username = 'x-access-token';
-    u.password = connection.token;
-    return u.toString();
-  } catch {
-    return connection.cloneUrl;
-  }
+/**
+ * Inline git credential helper for worker-side clone/fetch. The token rides
+ * the child process env (`CONDUIT_GIT_TOKEN`) and is expanded by the shell
+ * git spawns for `!`-helpers, so the argv carries only this fixed string —
+ * a tokenized URL or an inline password would show up in `ps` output for
+ * every same-user process. The agent-facing push path solves the same
+ * problem with an on-disk script (see push-auth.ts) because the *agent's*
+ * git needs it; here the token never needs to touch disk.
+ */
+const INLINE_CREDENTIAL_HELPER =
+  '!f() { echo username=x-access-token; echo "password=$CONDUIT_GIT_TOKEN"; }; f';
+
+/**
+ * `-c` flags + child env for an authenticated clone/fetch. Exported for
+ * unit tests (asserting the token stays out of argv). The leading empty
+ * `credential.helper=` clears system/global helpers so ours is the only one
+ * consulted; `GIT_TERMINAL_PROMPT=0` makes a rejected token fail fast
+ * instead of waiting on a prompt that can never be answered.
+ */
+export function cloneFetchAuthArgs(connection: ConnectionContext): {
+  flags: string[];
+  env?: NodeJS.ProcessEnv;
+} {
+  if (!connection.token) return { flags: [] };
+  return {
+    flags: ['-c', 'credential.helper=', '-c', `credential.helper=${INLINE_CREDENTIAL_HELPER}`],
+    env: {
+      ...process.env,
+      CONDUIT_GIT_TOKEN: connection.token,
+      GIT_TERMINAL_PROMPT: '0',
+    },
+  };
 }
 
 export async function ensureBaseClone(bare: string, connection: ConnectionContext): Promise<void> {
@@ -27,9 +49,10 @@ export async function ensureBaseClone(bare: string, connection: ConnectionContex
     // fall through to clone
   }
   await fs.mkdir(path.dirname(bare), { recursive: true });
-  const url = withTokenUrl(connection);
-  await git(['clone', '--bare', url, bare]);
-  await git(['remote', 'set-url', 'origin', connection.cloneUrl], { cwd: bare }).catch(() => undefined);
+  // Clone the clean URL — auth comes from the credential helper, so the
+  // stored remote URL never carries the token.
+  const { flags, env } = cloneFetchAuthArgs(connection);
+  await git([...flags, 'clone', '--bare', connection.cloneUrl, bare], { env });
 }
 
 export async function fetchWithAuth(bare: string, connection: ConnectionContext): Promise<void> {
@@ -40,11 +63,13 @@ export async function fetchWithAuth(bare: string, connection: ConnectionContext)
   // `refs/heads/*` and the whole fetch aborts. `refs/remotes/origin/*` is
   // never checked out, so the fetch always advances.
   //
-  // The base clone's stored remote URL is cleaned, so we inject a tokenized
-  // URL at fetch time. Falls back to `origin` (the clean URL) for public
-  // repos with no token.
-  const remote = connection.token ? withTokenUrl(connection) : 'origin';
-  await git(['fetch', '--prune', remote, '+refs/heads/*:refs/remotes/origin/*'], { cwd: bare });
+  // `origin` is the clean URL; the credential helper supplies the token for
+  // private repos without it ever appearing in argv or git config.
+  const { flags, env } = cloneFetchAuthArgs(connection);
+  await git([...flags, 'fetch', '--prune', 'origin', '+refs/heads/*:refs/remotes/origin/*'], {
+    cwd: bare,
+    env,
+  });
 }
 
 export async function remoteBranchExists(bare: string, branchName: string): Promise<boolean> {

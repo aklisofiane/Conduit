@@ -10,7 +10,7 @@ import {
   type WorkflowDefinition,
   workflowDefinitionSchema,
 } from '@conduit/shared';
-import { decryptSecret, loadEncryptionKey } from '@conduit/shared/crypto';
+import { decryptSecretWithFallback, loadEncryptionKeys } from '@conduit/shared/crypto';
 import { errorMessage } from '@conduit/shared/runtime';
 import { prisma } from '../runtime/prisma';
 import {
@@ -78,7 +78,7 @@ export async function pollBoardActivity(input: PollWorkflowInput): Promise<PollC
     );
   }
   const sourceScope = connectionScopeSchema.parse(sourceConn.scope);
-  const token = decryptSecret(sourceConn.credential.secret, loadEncryptionKey());
+  const token = decryptSecretWithFallback(sourceConn.credential.secret, loadEncryptionKeys());
   const hostUrl = sourceConn.credential.hostUrl;
 
   const platform = trigger.platform;

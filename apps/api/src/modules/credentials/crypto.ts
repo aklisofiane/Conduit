@@ -1,17 +1,21 @@
 import {
-  decryptSecret,
+  decryptSecretWithFallback,
   encryptSecret,
-  loadEncryptionKey,
+  loadEncryptionKeys,
   redactedSuffix,
 } from '@conduit/shared/crypto';
+import { config } from '../../config';
 
 /**
  * API-side credential crypto. The shared `@conduit/shared/crypto` module
- * owns the AES-256-GCM format and key resolution; this thin wrapper just
- * binds the API's "auto-generate the key file on first use" policy.
+ * owns the AES-256-GCM format and key resolution; this thin wrapper binds
+ * the API's key policy: auto-generate the key file on first use in local
+ * deployments only. Hosted requires an explicit key — multiple replicas
+ * would otherwise each mint their own random key and silently corrupt every
+ * stored credential (`assertHostedSafety` enforces this at boot).
  */
 export function encryptionKey(): Buffer {
-  return loadEncryptionKey({ autoGenerate: true });
+  return loadEncryptionKeys({ autoGenerate: config.deployment === 'local' }).primary;
 }
 
 export function encrypt(plaintext: string): string {
@@ -19,7 +23,10 @@ export function encrypt(plaintext: string): string {
 }
 
 export function decrypt(payload: string): string {
-  return decryptSecret(payload, encryptionKey());
+  return decryptSecretWithFallback(
+    payload,
+    loadEncryptionKeys({ autoGenerate: config.deployment === 'local' }),
+  );
 }
 
 /**

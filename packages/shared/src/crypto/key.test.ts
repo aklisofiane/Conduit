@@ -1,72 +1,97 @@
 import crypto from 'node:crypto';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
  * Each case isolates module state with `vi.resetModules()` + a dynamic import
- * so the module-level `cached` buffer does not leak between tests. The env var
- * is restored after every test.
+ * so the module-level `cached` keys do not leak between tests. Passphrase
+ * cases point `CONDUIT_HOME` at a tmpdir so the scrypt salt lands there, not
+ * in the real `~/.conduit`. Env vars are restored after every test.
  */
 async function freshLoad(): Promise<typeof import('./key.js')> {
   vi.resetModules();
   return import('./key.js');
 }
 
-describe('loadEncryptionKey', () => {
-  const original = process.env.CONDUIT_ENCRYPTION_KEY;
+const SCRYPT_COST = { N: 16384, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };
 
-  beforeEach(() => {
+describe('loadEncryptionKeys', () => {
+  const originalKey = process.env.CONDUIT_ENCRYPTION_KEY;
+  const originalHome = process.env.CONDUIT_HOME;
+  let conduitHome: string;
+
+  beforeEach(async () => {
     delete process.env.CONDUIT_ENCRYPTION_KEY;
+    conduitHome = await fs.mkdtemp(path.join(os.tmpdir(), 'conduit-key-'));
+    process.env.CONDUIT_HOME = conduitHome;
   });
 
-  afterEach(() => {
-    if (original === undefined) delete process.env.CONDUIT_ENCRYPTION_KEY;
-    else process.env.CONDUIT_ENCRYPTION_KEY = original;
+  afterEach(async () => {
+    if (originalKey === undefined) delete process.env.CONDUIT_ENCRYPTION_KEY;
+    else process.env.CONDUIT_ENCRYPTION_KEY = originalKey;
+    if (originalHome === undefined) delete process.env.CONDUIT_HOME;
+    else process.env.CONDUIT_HOME = originalHome;
+    await fs.rm(conduitHome, { recursive: true, force: true });
   });
 
-  it('uses a 64-char hex env value verbatim as a 32-byte key', async () => {
+  async function saltAt(file = 'key.salt'): Promise<Buffer> {
+    const text = (await fs.readFile(path.join(conduitHome, file), 'utf8')).trim();
+    return Buffer.from(text, 'hex');
+  }
+
+  it('uses a 64-char hex env value verbatim as a 32-byte key, with no legacy fallback', async () => {
     const hex = 'a'.repeat(64);
     process.env.CONDUIT_ENCRYPTION_KEY = hex;
-    const { loadEncryptionKey } = await freshLoad();
+    const { loadEncryptionKeys, loadEncryptionKey } = await freshLoad();
 
-    const key = loadEncryptionKey();
-    expect(key).toBeInstanceOf(Buffer);
-    expect(key.length).toBe(32);
-    expect(key.equals(Buffer.from(hex, 'hex'))).toBe(true);
+    const keys = loadEncryptionKeys();
+    expect(keys.primary.equals(Buffer.from(hex, 'hex'))).toBe(true);
+    expect(keys.legacy).toBeUndefined();
+    expect(loadEncryptionKey().equals(keys.primary)).toBe(true);
   });
 
-  it('SHA-256 derives a non-hex passphrase to a 32-byte key', async () => {
+  it('scrypt-derives a passphrase against a persisted per-install salt', async () => {
     const passphrase = 'not-a-hex-string-just-a-passphrase';
     process.env.CONDUIT_ENCRYPTION_KEY = passphrase;
-    const { loadEncryptionKey } = await freshLoad();
+    const { loadEncryptionKeys } = await freshLoad();
 
-    const key = loadEncryptionKey();
-    const expected = crypto.createHash('sha256').update(passphrase).digest();
-    expect(key.length).toBe(32);
-    expect(key.equals(expected)).toBe(true);
+    const keys = loadEncryptionKeys();
+    const salt = await saltAt();
+    expect(salt.length).toBe(16);
+    const expected = crypto.scryptSync(passphrase, salt, 32, SCRYPT_COST);
+    expect(keys.primary.equals(expected)).toBe(true);
+    // No longer the weak single-pass digest…
+    const sha = crypto.createHash('sha256').update(passphrase).digest();
+    expect(keys.primary.equals(sha)).toBe(false);
+    // …which survives only as the decrypt-only legacy fallback.
+    expect(keys.legacy?.equals(sha)).toBe(true);
   });
 
-  it('treats a 63-char hex string as a passphrase (wrong length, not hex-decoded)', async () => {
-    const material = 'a'.repeat(63);
-    process.env.CONDUIT_ENCRYPTION_KEY = material;
-    const { loadEncryptionKey } = await freshLoad();
-
-    const key = loadEncryptionKey();
-    const expected = crypto.createHash('sha256').update(material).digest();
-    expect(key.length).toBe(32);
-    expect(key.equals(expected)).toBe(true);
-    // Not the hex decode of the (odd-length) material.
-    expect(key.equals(Buffer.from(material, 'hex'))).toBe(false);
+  it('derives the same key across process restarts (salt is stable)', async () => {
+    process.env.CONDUIT_ENCRYPTION_KEY = 'self-host-passphrase';
+    const first = (await freshLoad()).loadEncryptionKeys();
+    const second = (await freshLoad()).loadEncryptionKeys();
+    expect(second.primary.equals(first.primary)).toBe(true);
   });
 
-  it('treats a 65-char hex string as a passphrase (wrong length, not hex-decoded)', async () => {
-    const material = 'a'.repeat(65);
-    process.env.CONDUIT_ENCRYPTION_KEY = material;
-    const { loadEncryptionKey } = await freshLoad();
+  it('treats 63- and 65-char hex strings as passphrases (wrong length, not hex-decoded)', async () => {
+    for (const material of ['a'.repeat(63), 'a'.repeat(65)]) {
+      process.env.CONDUIT_ENCRYPTION_KEY = material;
+      const { loadEncryptionKeys } = await freshLoad();
+      const keys = loadEncryptionKeys();
+      expect(keys.primary.length).toBe(32);
+      expect(keys.legacy).toBeDefined();
+      expect(keys.primary.equals(Buffer.from(material, 'hex'))).toBe(false);
+    }
+  });
 
-    const key = loadEncryptionKey();
-    const expected = crypto.createHash('sha256').update(material).digest();
-    expect(key.length).toBe(32);
-    expect(key.equals(expected)).toBe(true);
+  it('refuses a corrupt salt file instead of silently deriving a divergent key', async () => {
+    await fs.writeFile(path.join(conduitHome, 'key.salt'), 'not-hex-at-all');
+    process.env.CONDUIT_ENCRYPTION_KEY = 'some passphrase';
+    const { loadEncryptionKeys } = await freshLoad();
+    expect(() => loadEncryptionKeys()).toThrow(/Corrupt scrypt salt/);
   });
 
   it('produces a key that roundtrips through encryptSecret/decryptSecret', async () => {
@@ -78,6 +103,19 @@ describe('loadEncryptionKey', () => {
     const secret = 'sk-ant-super-secret-value-4f2a';
     const payload = encryptSecret(secret, key);
     expect(decryptSecret(payload, key)).toBe(secret);
+  });
+
+  it('decrypts pre-scrypt payloads via the legacy fallback', async () => {
+    const passphrase = 'self-host-passphrase';
+    process.env.CONDUIT_ENCRYPTION_KEY = passphrase;
+    const { loadEncryptionKeys } = await freshLoad();
+    const { encryptSecret, decryptSecretWithFallback } = await import('./aes-gcm.js');
+
+    // Simulate a credential written before the KDF upgrade: encrypted under
+    // the old single-pass SHA-256 key.
+    const oldKey = crypto.createHash('sha256').update(passphrase).digest();
+    const payload = encryptSecret('legacy-secret', oldKey);
+    expect(decryptSecretWithFallback(payload, loadEncryptionKeys())).toBe('legacy-secret');
   });
 
   it('caches the first key and ignores later env changes within the same module instance', async () => {

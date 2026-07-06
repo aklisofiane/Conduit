@@ -59,8 +59,8 @@ vi.mock('../runtime/temporal-client', () => ({ getTemporalClient }));
 vi.mock('../runtime/log-writer', () => ({ writeSystemLog: vi.fn() }));
 
 vi.mock('@conduit/shared/crypto', () => ({
-  decryptSecret: () => 'gh-token',
-  loadEncryptionKey: () => Buffer.alloc(32),
+  decryptSecretWithFallback: () => 'gh-token',
+  loadEncryptionKeys: () => ({ primary: Buffer.alloc(32) }),
 }));
 
 vi.mock('@conduit/shared/platform', async (importOriginal) => ({

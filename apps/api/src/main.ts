@@ -14,9 +14,10 @@ import { IoAdapter } from '@nestjs/platform-socket.io';
 import express, { type Request } from 'express';
 import { AppModule } from './app.module';
 import { betterAuthMiddleware } from './auth/better-auth.middleware';
-import { config } from './config';
+import { assertHostedSafety, config } from './config';
 
 async function bootstrap(): Promise<void> {
+  assertHostedSafety();
   if (process.env.NODE_ENV === 'production' && process.env.WEBHOOK_DEV_SECRET) {
     throw new Error(
       'WEBHOOK_DEV_SECRET must not be set in production — it bypasses HMAC verification.',

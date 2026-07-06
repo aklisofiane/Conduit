@@ -33,9 +33,13 @@ const HOME_IN_CONTAINER = '/home/runner';
  *   - container UID = host worker UID (never root)
  *   - default bridge networking (no `--privileged`, no docker.sock,
  *     no `--network=host`)
+ *   - all capabilities dropped, `no-new-privileges` set (no setuid
+ *     re-escalation), pids capped (no fork bombs)
  *
- * No env-var or caller-supplied option can widen the mount surface or
- * change the network mode.
+ * No env-var or caller-supplied option can widen the mount surface, change
+ * the network mode, or restore capabilities. Memory/CPU ceilings are the
+ * only operator-tunable knobs (`CONDUIT_RUNNER_MEMORY` /
+ * `CONDUIT_RUNNER_CPUS`) — tunable in size, not removable.
  */
 export interface LocalDockerSpawnerOptions {
   /** Image tag to run, e.g. `agent-runner:dev` or `agent-runner:<git-sha>`. */
@@ -48,6 +52,39 @@ export interface LocalDockerSpawnerOptions {
 }
 
 const DEFAULT_LIVENESS_TIMEOUT_MS = 60_000;
+
+/**
+ * Process-count ceiling for the container. Generous for real work — npm
+ * installs, native builds, and provider CLIs fan out dozens of processes,
+ * not hundreds — while making a fork bomb die inside the container instead
+ * of taking down the host. Deliberately not env-tunable: an operator who
+ * needs >512 concurrent pids in one agent run has a different problem.
+ */
+const PIDS_LIMIT = 512;
+
+const DEFAULT_MEMORY = '4g';
+const DEFAULT_CPUS = '2';
+
+export interface RunnerResourceLimits {
+  /** Docker `--memory` value, e.g. `4g`. */
+  memory: string;
+  /** Docker `--cpus` value, e.g. `2`. */
+  cpus: string;
+}
+
+/**
+ * Memory/CPU ceilings for the runner container. Defaults are sized for a
+ * typical agent run (deps install + native build headroom); operators with
+ * heavier workloads raise them via env. Exported for unit tests.
+ */
+export function resolveResourceLimits(
+  env: NodeJS.ProcessEnv = process.env,
+): RunnerResourceLimits {
+  return {
+    memory: env.CONDUIT_RUNNER_MEMORY?.trim() || DEFAULT_MEMORY,
+    cpus: env.CONDUIT_RUNNER_CPUS?.trim() || DEFAULT_CPUS,
+  };
+}
 
 export class LocalDockerSpawner implements RunnerSpawner {
   constructor(private readonly opts: LocalDockerSpawnerOptions) {}
@@ -79,6 +116,7 @@ export class LocalDockerSpawner implements RunnerSpawner {
       // the e2e harness can drive scripted runs against the real image
       // without a protocol-level test field.
       forwardedEnv: testMounts.length > 0 ? testModeForwardedEnv() : {},
+      limits: resolveResourceLimits(),
     });
 
     const child = spawn('docker', args, { stdio: ['pipe', 'pipe', 'pipe'] });
@@ -151,6 +189,8 @@ export interface BuildArgsInput {
    * "test mode is on" signal. Empty in production runs.
    */
   forwardedEnv: Record<string, string>;
+  /** Memory/CPU ceilings — see `resolveResourceLimits`. */
+  limits: RunnerResourceLimits;
 }
 
 export interface AuthMount {
@@ -175,6 +215,23 @@ export function buildDockerArgs(input: BuildArgsInput): string[] {
     input.containerName,
     '--user',
     `${input.uid}:${input.gid}`,
+    // Hardening — same non-configurable tier as the mount/network
+    // invariants: the container exists to run untrusted agent code. The UID
+    // is already non-root; dropping the capability bounding set and blocking
+    // setuid re-escalation closes the "root-owned setuid binary in the
+    // image" path, and the pids cap contains fork bombs.
+    '--cap-drop',
+    'ALL',
+    '--security-opt',
+    'no-new-privileges',
+    '--pids-limit',
+    String(PIDS_LIMIT),
+    // Resource ceilings so a runaway agent degrades its own run, not the
+    // host (and not sibling runs).
+    '--memory',
+    input.limits.memory,
+    '--cpus',
+    input.limits.cpus,
     '--label',
     `conduit.runId=${input.runId}`,
     '--label',

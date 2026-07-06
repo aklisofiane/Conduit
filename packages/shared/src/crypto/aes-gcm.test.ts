@@ -1,8 +1,37 @@
 import crypto from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { decryptSecret, encryptSecret, redactedSuffix } from './aes-gcm';
+import {
+  decryptSecret,
+  decryptSecretWithFallback,
+  encryptSecret,
+  redactedSuffix,
+} from './aes-gcm';
 
 const key = crypto.randomBytes(32);
+
+describe('decryptSecretWithFallback', () => {
+  const legacy = crypto.randomBytes(32);
+
+  it('decrypts primary-encrypted payloads', () => {
+    const payload = encryptSecret('current', key);
+    expect(decryptSecretWithFallback(payload, { primary: key, legacy })).toBe('current');
+  });
+
+  it('falls back to the legacy key for pre-upgrade payloads', () => {
+    const payload = encryptSecret('old', legacy);
+    expect(decryptSecretWithFallback(payload, { primary: key, legacy })).toBe('old');
+  });
+
+  it('throws when no legacy key exists and the primary fails', () => {
+    const payload = encryptSecret('old', legacy);
+    expect(() => decryptSecretWithFallback(payload, { primary: key })).toThrow();
+  });
+
+  it('throws when neither key decrypts the payload', () => {
+    const payload = encryptSecret('other', crypto.randomBytes(32));
+    expect(() => decryptSecretWithFallback(payload, { primary: key, legacy })).toThrow();
+  });
+});
 
 describe('encryptSecret / decryptSecret', () => {
   it('roundtrips a plaintext back to the original', () => {

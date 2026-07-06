@@ -296,6 +296,9 @@ function makeFakeStore(): TicketBranchStore {
       rows.set(k, row);
       return row;
     },
+    async find(input) {
+      return rows.get(key(input.platform, input.owner, input.repo, input.ticketId)) ?? null;
+    },
     async markRunStart() {
       /* no-op */
     },

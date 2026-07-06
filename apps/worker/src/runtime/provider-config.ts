@@ -1,5 +1,5 @@
 import type { AgentProviderId } from '@conduit/shared';
-import { decryptSecret, loadEncryptionKey } from '@conduit/shared/crypto';
+import { decryptSecretWithFallback, loadEncryptionKeys } from '@conduit/shared/crypto';
 import { prisma } from './prisma';
 
 export interface ResolvedProviderConfig {
@@ -25,7 +25,7 @@ export async function loadProviderConfig(
     where: { orgId_providerId: { orgId, providerId } },
   });
   if (!row) return undefined;
-  const apiKey = decryptSecret(row.encryptedApiKey, loadEncryptionKey());
+  const apiKey = decryptSecretWithFallback(row.encryptedApiKey, loadEncryptionKeys());
   return {
     apiKey,
     baseUrl: row.baseUrl ?? undefined,

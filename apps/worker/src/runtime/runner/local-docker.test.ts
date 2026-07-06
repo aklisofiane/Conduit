@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildDockerArgs } from './local-docker';
+import { buildDockerArgs, resolveResourceLimits } from './local-docker';
 
 /**
  * Asserts the security-critical invariants from `.specs/docker-runner.md`
@@ -8,6 +8,7 @@ import { buildDockerArgs } from './local-docker';
  *   - bare-clone mount, when present, also uses the same absolute path
  *   - container UID is the host worker UID (never root)
  *   - no `--privileged`, no host networking, no docker.sock
+ *   - all capabilities dropped, no-new-privileges, pids/memory/cpu caps
  *   - container is labelled for orphan sweep
  */
 describe('buildDockerArgs', () => {
@@ -23,6 +24,7 @@ describe('buildDockerArgs', () => {
     authMounts: [],
     testMounts: [],
     forwardedEnv: {},
+    limits: { memory: '4g', cpus: '2' },
   };
 
   it('mounts the run dir at the same absolute path inside the container', () => {
@@ -44,6 +46,29 @@ describe('buildDockerArgs', () => {
     expect(args).not.toContain('--privileged');
     expect(args).not.toContain('--network=host');
     expect(args).not.toContain('/var/run/docker.sock');
+  });
+
+  it('drops all capabilities and blocks privilege re-escalation', () => {
+    const args = buildDockerArgs(base);
+    const capIdx = args.indexOf('--cap-drop');
+    expect(capIdx).toBeGreaterThan(-1);
+    expect(args[capIdx + 1]).toBe('ALL');
+    const secIdx = args.indexOf('--security-opt');
+    expect(secIdx).toBeGreaterThan(-1);
+    expect(args[secIdx + 1]).toBe('no-new-privileges');
+  });
+
+  it('caps pids, memory, and cpus', () => {
+    const args = buildDockerArgs(base);
+    expect(args[args.indexOf('--pids-limit') + 1]).toBe('512');
+    expect(args[args.indexOf('--memory') + 1]).toBe('4g');
+    expect(args[args.indexOf('--cpus') + 1]).toBe('2');
+  });
+
+  it('threads caller-supplied resource limits through verbatim', () => {
+    const args = buildDockerArgs({ ...base, limits: { memory: '8g', cpus: '4' } });
+    expect(args[args.indexOf('--memory') + 1]).toBe('8g');
+    expect(args[args.indexOf('--cpus') + 1]).toBe('4');
   });
 
   it('labels containers for orphan sweep', () => {
@@ -124,5 +149,20 @@ describe('buildDockerArgs', () => {
     expect(mounts.some((m) => m.includes('.claude'))).toBe(false);
     const envs = args.flatMap((a, i) => (args[i - 1] === '-e' ? [a] : []));
     expect(envs).toContain('HOME=/home/runner');
+  });
+});
+
+describe('resolveResourceLimits', () => {
+  it('defaults when the env vars are unset or blank', () => {
+    expect(resolveResourceLimits({})).toEqual({ memory: '4g', cpus: '2' });
+    expect(
+      resolveResourceLimits({ CONDUIT_RUNNER_MEMORY: '  ', CONDUIT_RUNNER_CPUS: '' }),
+    ).toEqual({ memory: '4g', cpus: '2' });
+  });
+
+  it('honors operator overrides', () => {
+    expect(
+      resolveResourceLimits({ CONDUIT_RUNNER_MEMORY: '8g', CONDUIT_RUNNER_CPUS: '4' }),
+    ).toEqual({ memory: '8g', cpus: '4' });
   });
 });

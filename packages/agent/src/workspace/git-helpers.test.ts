@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { git } from './git';
 import {
   addTrackingWorktree,
+  cloneFetchAuthArgs,
   createTrackingWorktree,
   defaultBranch,
   ensureBaseClone,
@@ -92,6 +93,26 @@ describe('git-helpers', () => {
       const remoteUrl = (await git(['remote', 'get-url', 'origin'], { cwd: bare })).trim();
       expect(remoteUrl).toBe(`file://${remote}`);
       expect(remoteUrl).not.toContain('ghs_secret123');
+    });
+  });
+
+  describe('cloneFetchAuthArgs', () => {
+    it('keeps the token out of the git argv — env only', () => {
+      const { flags, env } = cloneFetchAuthArgs({ ...connection, token: 'ghs_secret123' });
+      expect(flags.join(' ')).not.toContain('ghs_secret123');
+      expect(env?.CONDUIT_GIT_TOKEN).toBe('ghs_secret123');
+      expect(env?.GIT_TERMINAL_PROMPT).toBe('0');
+    });
+
+    it('clears inherited helpers before installing its own', () => {
+      const { flags } = cloneFetchAuthArgs({ ...connection, token: 't' });
+      expect(flags[0]).toBe('-c');
+      expect(flags[1]).toBe('credential.helper=');
+      expect(flags[3]).toMatch(/^credential\.helper=!f\(\)/);
+    });
+
+    it('is a no-op without a token', () => {
+      expect(cloneFetchAuthArgs(connection)).toEqual({ flags: [] });
     });
   });
 

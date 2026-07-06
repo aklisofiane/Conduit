@@ -1,5 +1,5 @@
 import type { CredentialLookup } from '@conduit/agent';
-import { decryptSecret, loadEncryptionKey } from '@conduit/shared/crypto';
+import { decryptSecretWithFallback, loadEncryptionKeys } from '@conduit/shared/crypto';
 import { prisma } from './prisma';
 
 /**
@@ -16,6 +16,6 @@ export function makeCredentialLookup(): CredentialLookup {
       include: { credential: true },
     });
     if (!conn) return undefined;
-    return decryptSecret(conn.credential.secret, loadEncryptionKey());
+    return decryptSecretWithFallback(conn.credential.secret, loadEncryptionKeys());
   };
 }

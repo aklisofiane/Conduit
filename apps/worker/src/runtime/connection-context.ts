@@ -2,7 +2,7 @@ import path from 'node:path';
 import type { ConnectionContext } from '@conduit/agent';
 import { connectionScopeSchema } from '@conduit/shared';
 import { normalizeHostUrl } from '@conduit/shared/platform';
-import { decryptSecret, loadEncryptionKey } from '@conduit/shared/crypto';
+import { decryptSecretWithFallback, loadEncryptionKeys } from '@conduit/shared/crypto';
 import { prisma } from './prisma';
 
 /**
@@ -45,7 +45,7 @@ export async function loadConnectionContext(
     return undefined;
   }
 
-  const token = decryptSecret(conn.credential.secret, loadEncryptionKey());
+  const token = decryptSecretWithFallback(conn.credential.secret, loadEncryptionKeys());
   const platform = conn.credential.platform === 'GITLAB' ? 'gitlab' : 'github';
   const host = normalizeHostUrl(conn.credential.hostUrl, conn.credential.platform);
   if (!host) return undefined;
