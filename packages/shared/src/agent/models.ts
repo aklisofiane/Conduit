@@ -16,7 +16,15 @@ export const PROVIDER_MODELS: Record<AgentProviderId, readonly string[]> = {
     'claude-sonnet-4-6',
     'claude-haiku-4-5',
   ],
-  codex: ['gpt-5.5', 'gpt-5.4', 'gpt-5.3-codex', 'gpt-5.2'],
+  codex: [
+    'gpt-5.6-sol',
+    'gpt-5.6-terra',
+    'gpt-5.6-luna',
+    'gpt-5.5',
+    'gpt-5.4',
+    'gpt-5.3-codex',
+    'gpt-5.2',
+  ],
 };
 
 export const DEFAULT_MODEL: Record<AgentProviderId, string> = {
@@ -78,6 +86,9 @@ export const MODEL_PRICING: Record<string, ModelPrice> = {
   'claude-sonnet-4-6': { inputPerM: 3, outputPerM: 15 },
   'claude-haiku-4-5': { inputPerM: 1, outputPerM: 5 },
   // Codex (GPT-5 family) — per-model OpenAI list prices
+  'gpt-5.6-sol': { inputPerM: 5, outputPerM: 30 },
+  'gpt-5.6-terra': { inputPerM: 2.5, outputPerM: 15 },
+  'gpt-5.6-luna': { inputPerM: 1, outputPerM: 6 },
   'gpt-5.5': { inputPerM: 5, outputPerM: 30 },
   'gpt-5.4': { inputPerM: 2.5, outputPerM: 15 },
   'gpt-5.3-codex': { inputPerM: 1.75, outputPerM: 14 },
