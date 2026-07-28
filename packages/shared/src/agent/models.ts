@@ -9,6 +9,7 @@ import type { AgentProviderId } from './provider';
 export const PROVIDER_MODELS: Record<AgentProviderId, readonly string[]> = {
   claude: [
     'claude-fable-5',
+    'claude-opus-5',
     'claude-opus-4-8',
     'claude-opus-4-7',
     'claude-opus-4-6',
@@ -28,7 +29,7 @@ export const PROVIDER_MODELS: Record<AgentProviderId, readonly string[]> = {
 };
 
 export const DEFAULT_MODEL: Record<AgentProviderId, string> = {
-  claude: 'claude-opus-4-8',
+  claude: 'claude-opus-5',
   codex: 'gpt-5.3-codex',
 };
 
@@ -68,7 +69,7 @@ export interface ResolvedModelPrice extends ModelPrice {
  * this table entirely — these rates only bite for Codex.)
  *
  * Values track current public list prices by tier: Claude Fable 5 $10/$50,
- * Opus 4.x $5/$25, Sonnet 5 / Sonnet 4.6 $3/$15, Haiku 4.5 $1/$5; the GPT-5
+ * Opus 5 / Opus 4.x $5/$25, Sonnet 5 / Sonnet 4.6 $3/$15, Haiku 4.5 $1/$5; the GPT-5
  * family at OpenAI's published
  * per-model rates (https://developers.openai.com/api/docs/pricing). These are
  * the "default value right now" — orgs override per-model in settings, and runs
@@ -77,8 +78,9 @@ export interface ResolvedModelPrice extends ModelPrice {
  * only input/output rates are listed here.
  */
 export const MODEL_PRICING: Record<string, ModelPrice> = {
-  // Claude (Opus 4.x is $5/$25 — the older $15/$75 was Claude 3 Opus)
+  // Claude (Opus 5 and Opus 4.x are $5/$25 — the older $15/$75 was Claude 3 Opus)
   'claude-fable-5': { inputPerM: 10, outputPerM: 50 },
+  'claude-opus-5': { inputPerM: 5, outputPerM: 25 },
   'claude-opus-4-8': { inputPerM: 5, outputPerM: 25 },
   'claude-opus-4-7': { inputPerM: 5, outputPerM: 25 },
   'claude-opus-4-6': { inputPerM: 5, outputPerM: 25 },
