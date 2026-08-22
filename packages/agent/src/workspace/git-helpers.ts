@@ -3,6 +3,7 @@ import path from 'node:path';
 import { errorMessage } from '@conduit/shared/runtime';
 import { BranchBusyError, WorkspaceError } from '../errors/index';
 import { git, GitError } from './git';
+import { gitAuthUsername } from './git-username';
 import { dropConflictingWorktrees } from './worktree-cleanup';
 import type { ConnectionContext } from './types';
 
@@ -14,9 +15,13 @@ import type { ConnectionContext } from './types';
  * every same-user process. The agent-facing push path solves the same
  * problem with an on-disk script (see push-auth.ts) because the *agent's*
  * git needs it; here the token never needs to touch disk.
+ *
+ * The username is platform-dependent (see `gitAuthUsername`) and is safe to
+ * keep in argv — it's a fixed literal, never secret.
  */
-const INLINE_CREDENTIAL_HELPER =
-  '!f() { echo username=x-access-token; echo "password=$CONDUIT_GIT_TOKEN"; }; f';
+function inlineCredentialHelper(platform: ConnectionContext['platform']): string {
+  return `!f() { echo username=${gitAuthUsername(platform)}; echo "password=$CONDUIT_GIT_TOKEN"; }; f`;
+}
 
 /**
  * `-c` flags + child env for an authenticated clone/fetch. Exported for
@@ -31,7 +36,12 @@ export function cloneFetchAuthArgs(connection: ConnectionContext): {
 } {
   if (!connection.token) return { flags: [] };
   return {
-    flags: ['-c', 'credential.helper=', '-c', `credential.helper=${INLINE_CREDENTIAL_HELPER}`],
+    flags: [
+      '-c',
+      'credential.helper=',
+      '-c',
+      `credential.helper=${inlineCredentialHelper(connection.platform)}`,
+    ],
     env: {
       ...process.env,
       CONDUIT_GIT_TOKEN: connection.token,

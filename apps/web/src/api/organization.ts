@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { authClient } from '../lib/auth-client.js';
+import { unwrapAuthResult, unwrapAuthVoid } from './auth-result.js';
 
 export const ORG_ROLES = ['owner', 'admin', 'member'] as const;
 export type OrgRole = (typeof ORG_ROLES)[number];
@@ -86,27 +87,10 @@ export function invalidateOrgScopedQueries(qc: QueryClient): Promise<unknown> {
   ]);
 }
 
-type AuthRes<T> = { data: T | null; error: { message?: string; status?: number } | null };
-
-function unwrap<T>(res: AuthRes<T>): T {
-  if (res.error) {
-    const err = new Error(res.error.message ?? 'Request failed') as Error & { status?: number };
-    err.status = res.error.status;
-    throw err;
-  }
-  if (res.data === null || res.data === undefined) {
-    throw new Error('Empty response');
-  }
-  return res.data;
-}
-
-function unwrapVoid(res: { error: { message?: string; status?: number } | null }, fallback: string): void {
-  if (res.error) {
-    const err = new Error(res.error.message ?? fallback) as Error & { status?: number };
-    err.status = res.error.status;
-    throw err;
-  }
-}
+// Shared with `api/linked-accounts.ts` — both wrap Better Auth client calls,
+// which return `{ data, error }` instead of throwing.
+const unwrap = unwrapAuthResult;
+const unwrapVoid = unwrapAuthVoid;
 
 export function useOrganizations() {
   return useQuery({

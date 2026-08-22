@@ -1,3 +1,4 @@
+import { spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -113,6 +114,18 @@ describe('git-helpers', () => {
 
     it('is a no-op without a token', () => {
       expect(cloneFetchAuthArgs(connection)).toEqual({ flags: [] });
+    });
+
+    it('emits username=x-access-token for github', () => {
+      const { flags } = cloneFetchAuthArgs({ ...connection, platform: 'github', token: 't' });
+      expect(flags[3]).toContain('echo username=x-access-token;');
+      expect(flags[3]).not.toContain('oauth2');
+    });
+
+    it('emits username=oauth2 for gitlab — GitLab rejects OAuth tokens otherwise', () => {
+      const { flags } = cloneFetchAuthArgs({ ...connection, platform: 'gitlab', token: 't' });
+      expect(flags[3]).toContain('echo username=oauth2;');
+      expect(flags[3]).not.toContain('x-access-token');
     });
   });
 
@@ -267,4 +280,63 @@ describe('git-helpers', () => {
       expect(branch).toBe('conduit/99-stale');
     });
   });
+
+  // The inline helper is a shell function expanded by the shell git spawns for
+  // `!`-helpers — a flags assertion alone wouldn't catch a broken literal.
+  // Running the real thing proves both platform variants parse and answer.
+  describe('inline credential helper (executed)', () => {
+    it.each([
+      { platform: 'github' as const, username: 'x-access-token' },
+      { platform: 'gitlab' as const, username: 'oauth2' },
+    ])('answers with username=$username for $platform', async ({ platform, username }) => {
+      const { flags, env } = cloneFetchAuthArgs({
+        ...connection,
+        platform,
+        token: 'tok_secret123',
+      });
+
+      const out = await gitCredentialFill(flags, env, 'https://example.test/acme/shop.git');
+      expect(out).toContain(`username=${username}`);
+      expect(out).toContain('password=tok_secret123');
+    });
+  });
 });
+
+/**
+ * `git credential fill` reads a URL on stdin and asks the configured helpers
+ * for a matching credential. The leading empty `credential.helper=` in `flags`
+ * clears any developer/system helper, so only ours is consulted.
+ */
+async function gitCredentialFill(
+  flags: string[],
+  env: NodeJS.ProcessEnv | undefined,
+  url: string,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = spawn('git', [...flags, 'credential', 'fill'], {
+      env,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    const out: Buffer[] = [];
+    const err: Buffer[] = [];
+    child.stdout.on('data', (c: Buffer) => out.push(c));
+    child.stderr.on('data', (c: Buffer) => err.push(c));
+    child.on('error', reject);
+    child.on('close', (code) => {
+      if (code !== 0) {
+        reject(
+          new Error(`git credential fill exited ${code}: ${Buffer.concat(err).toString().trim()}`),
+        );
+        return;
+      }
+      resolve(Buffer.concat(out).toString());
+    });
+    const parsed = new URL(url);
+    child.stdin.write(
+      `protocol=${parsed.protocol.replace(':', '')}\n` +
+        `host=${parsed.host}\n` +
+        `path=${parsed.pathname.replace(/^\//, '')}\n\n`,
+    );
+    child.stdin.end();
+  });
+}

@@ -12,6 +12,8 @@ import { ApiError } from '../../api/client.js';
 import { relativeFromNow } from '../../lib/time.js';
 import { Select } from '../ui/select.js';
 import { SettingsSection } from '../common/SettingsSection.js';
+import { ConnectOAuthButtons } from './ConnectOAuthButtons.js';
+import { OAuthCredentialStatus } from './OAuthCredentialStatus.js';
 import { Button } from '../ui/button.js';
 import { Input } from '../ui/input.js';
 import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group.js';
@@ -103,6 +105,8 @@ export function CredentialsSection() {
       creating={creating}
       onToggleCreate={() => setCreating((v) => !v)}
     >
+      <ConnectOAuthButtons />
+
       {creating && (
         <>
           <div className="grid grid-cols-[120px_1fr_1fr_auto] items-end gap-3 border-b border-[var(--color-divider)] px-4 py-3">
@@ -247,7 +251,7 @@ function CredentialRowView({ cred, onDelete }: { cred: CredentialRow; onDelete: 
       </span>
       <div>
         <div className="font-mono text-base font-medium">{cred.name}</div>
-        <div className="flex items-center gap-1.5 font-mono text-small text-[var(--color-text-muted)]">
+        <div className="flex flex-wrap items-center gap-1.5 font-mono text-small text-[var(--color-text-muted)]">
           <span>{cred.platform.toLowerCase()}</span>
           {cred.hostUrl && !isCloudHost(cred.platform as Platform, cred.hostUrl) && (
             <span
@@ -267,6 +271,7 @@ function CredentialRowView({ cred, onDelete }: { cred: CredentialRow; onDelete: 
           )}
           <span>· ••••{cred.suffix} · {cred.connectionCount} connection
           {cred.connectionCount === 1 ? '' : 's'} · rotated {relativeFromNow(cred.updatedAt)}</span>
+          <OAuthCredentialStatus cred={cred} />
         </div>
         {rotating && (
           <div className="mt-2 flex items-center gap-2">

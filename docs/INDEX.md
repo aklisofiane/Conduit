@@ -26,12 +26,13 @@ Agent-first workflow automation for dev teams. Board-driven orchestration, atomi
 20. [design-docs/web-auth-ui.md](./design-docs/web-auth-ui.md) — auth route shell, `RequireAuth` boundary, `UserMenuPill`, Better Auth client API surface
 21. [design-docs/org-switching.md](./design-docs/org-switching.md) — org switching UI, members + invitations management, copyable invite-URL fallback
 22. [design-docs/operational-hardening.md](./design-docs/operational-hardening.md) — Better Auth rate limits, AuditLog model, failed-login spike signal
-23. [DESIGN.md](./DESIGN.md) — design tokens, palette, provider styling, the @theme bridge
-24. [SECURITY.md](./SECURITY.md) — auth, credentials, sandboxing
-25. [RELIABILITY.md](./RELIABILITY.md) — retries, crash recovery, cancellation
-26. [VALIDATION.md](./VALIDATION.md) — testing strategy, E2E harness, `StubProvider`
-27. [PLANS.md](./PLANS.md) — phased rollout
+23. [design-docs/oauth-account-linking.md](./design-docs/oauth-account-linking.md) — link/unlink GitHub + GitLab in-app, refuse-while-referenced unlink, token refresh sweep, `oauth2` git username
+24. [DESIGN.md](./DESIGN.md) — design tokens, palette, provider styling, the @theme bridge
+25. [SECURITY.md](./SECURITY.md) — auth, credentials, sandboxing
+26. [RELIABILITY.md](./RELIABILITY.md) — retries, crash recovery, cancellation
+27. [VALIDATION.md](./VALIDATION.md) — testing strategy, E2E harness, `StubProvider`
+28. [PLANS.md](./PLANS.md) — phased rollout
 
 ## Setup recipes
 
-- [setup-oauth.md](./setup-oauth.md) — register an OAuth app with GitHub (or future providers) and wire it into Conduit
+- [setup-oauth.md](./setup-oauth.md) — register an OAuth app with GitHub or GitLab and wire it into Conduit (scopes, callback URLs, token refresh, PAT alternative)

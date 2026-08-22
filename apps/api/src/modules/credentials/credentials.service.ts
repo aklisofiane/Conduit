@@ -47,8 +47,10 @@ export class CredentialsService {
 
   async update(orgId: string, id: string, dto: UpdateCredentialDto) {
     // PAT-rotation of an OAuth-derived row converts it to a manual credential.
-    // Strip `source` and `scopes` from existing metadata so the UI badge stops
-    // claiming OAuth provenance once the secret is no longer the OAuth token.
+    // Strip `source`, `scopes`, and `tokenExpiresAt` from existing metadata so
+    // the UI badge stops claiming OAuth provenance — and stops showing an
+    // expiry the pasted PAT doesn't have — once the secret is no longer the
+    // OAuth token.
     // Skipped if the caller already supplied `metadata` — caller intent wins.
     let metadataPatch: object | undefined = dto.metadata as unknown as object | undefined;
     if (dto.secret !== undefined && metadataPatch === undefined) {
@@ -58,7 +60,7 @@ export class CredentialsService {
       });
       const existingMeta = (existing?.metadata ?? null) as Record<string, unknown> | null;
       if (existingMeta && existingMeta.source === 'oauth') {
-        const { source: _s, scopes: _sc, ...rest } = existingMeta;
+        const { source: _s, scopes: _sc, tokenExpiresAt: _te, ...rest } = existingMeta;
         metadataPatch = rest;
       }
     }
@@ -85,10 +87,16 @@ export class CredentialsService {
   /**
    * Mirror a Better Auth OAuth account into a Conduit `Credential`.
    * Server-trusted: caller (Better Auth `account.*.after` hook) has already
-   * resolved `orgId` from the user id. Idempotent on `accountRowId` — the
-   * Better Auth `account.id` is unique across providers, so re-sign-in
-   * updates `secret` + `metadata.scopes` in place rather than creating
-   * duplicates.
+   * resolved `orgId` from the user's session (or their personal org).
+   * Idempotent on `accountRowId` — the Better Auth `account.id` is unique
+   * across providers, so re-sign-in updates `secret` + `metadata.scopes` in
+   * place rather than creating duplicates.
+   *
+   * The existing-row lookup is deliberately *not* scoped by `orgId`: the
+   * caller's active org can differ between the first mirror and a later
+   * re-mirror (link from one org, refresh while another is active). `orgId`
+   * only decides where a *new* row lands — an existing row keeps the org it
+   * was created in, so re-mirroring never moves or duplicates a credential.
    */
   async upsertOAuthDerived(params: {
     orgId: string;
@@ -99,19 +107,29 @@ export class CredentialsService {
     scopes: string[];
     platform: Platform;
     hostUrl: string;
+    /**
+     * When the mirrored access token expires, if the provider says. Recorded
+     * as `metadata.tokenExpiresAt` (ISO) so the UI can show a staleness hint
+     * and prompt a re-link once the refresher can no longer keep it alive.
+     * Absent for non-expiring tokens (GitHub with "Token Expiration: Off").
+     */
+    tokenExpiresAt?: Date | string | null;
   }): Promise<{ id: string; created: boolean }> {
     const { orgId, accountRowId, providerAccountId, providerLogin, accessToken, scopes, platform, hostUrl } = params;
     const encryptedSecret = encrypt(accessToken);
+    // `metadata` is written whole on both branches below, so an account that
+    // stops reporting an expiry simply drops the key on the next mirror.
+    const tokenExpiresAt = toIsoOrNull(params.tokenExpiresAt);
     const metadata = {
       source: 'oauth' as const,
       accountRowId,
       providerAccountId,
       providerLogin,
       scopes,
+      ...(tokenExpiresAt ? { tokenExpiresAt } : {}),
     };
     const existing = await this.prisma.credential.findFirst({
       where: {
-        orgId,
         platform,
         metadata: { path: ['accountRowId'], equals: accountRowId },
       },
@@ -135,6 +153,62 @@ export class CredentialsService {
       },
     });
     return { id: created.id, created: true };
+  }
+
+  /**
+   * The credential mirrored from a Better Auth `account` row, plus the names
+   * of the connections that depend on it. Server-trusted: the caller is the
+   * `account.delete` database hook, which acts on behalf of the account's
+   * owner and has no org of its own — `accountRowId` is unique across
+   * providers and orgs, so no `orgId` filter is possible or needed.
+   */
+  async findOAuthDerivedByAccountRow(accountRowId: string): Promise<{
+    id: string;
+    orgId: string;
+    name: string;
+    dependentConnections: string[];
+  } | null> {
+    const cred = await this.prisma.credential.findFirst({
+      where: { metadata: { path: ['accountRowId'], equals: accountRowId } },
+      select: {
+        id: true,
+        orgId: true,
+        name: true,
+        connections: { select: { name: true }, orderBy: { createdAt: 'asc' } },
+      },
+    });
+    if (!cred) return null;
+    return {
+      id: cred.id,
+      orgId: cred.orgId,
+      name: cred.name,
+      dependentConnections: cred.connections.map((c) => c.name),
+    };
+  }
+
+  /**
+   * Drop the mirrored credential once its OAuth account row is gone (unlink).
+   * Refuses while a Connection still references it — same posture as
+   * `delete()`, and the FK would reject the write anyway. Reports what
+   * happened rather than throwing: the caller is an after-commit hook where a
+   * throw can no longer undo the unlink.
+   */
+  async deleteOAuthDerivedByAccountRow(accountRowId: string): Promise<{
+    status: 'deleted' | 'not-found' | 'referenced';
+    name?: string;
+    dependentConnections: string[];
+  }> {
+    const mirrored = await this.findOAuthDerivedByAccountRow(accountRowId);
+    if (!mirrored) return { status: 'not-found', dependentConnections: [] };
+    if (mirrored.dependentConnections.length > 0) {
+      return {
+        status: 'referenced',
+        name: mirrored.name,
+        dependentConnections: mirrored.dependentConnections,
+      };
+    }
+    await this.prisma.credential.delete({ where: { id: mirrored.id } });
+    return { status: 'deleted', name: mirrored.name, dependentConnections: [] };
   }
 
   async delete(orgId: string, id: string) {
@@ -213,4 +287,15 @@ export class CredentialsService {
     const cred = await this.prisma.credential.findFirst({ where: { id, orgId } });
     return orNotFound(cred, 'Credential', id);
   }
+}
+
+/**
+ * Normalize a provider-reported expiry into the ISO string stored in
+ * `Credential.metadata`. Anything unparseable is treated as "no expiry"
+ * rather than poisoning the metadata with `Invalid Date`.
+ */
+function toIsoOrNull(value: Date | string | null | undefined): string | null {
+  if (value === null || value === undefined) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }

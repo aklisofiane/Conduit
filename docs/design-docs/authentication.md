@@ -1,10 +1,10 @@
 # Authentication
 
-Multi-tenant authentication for Conduit. Built on [Better Auth](https://better-auth.com/) with the `organization` plugin, configured in two modes — `local` (indie dev on `localhost`, lenient rate limits, no email transport required) and `hosted` (invitation-gated registration, every signup gets their own org, conservative rate limits, GitHub OAuth available). Every business row is partitioned by `orgId`; every API surface (REST, WebSocket, webhook) refuses cross-org access; member management is delegated end-to-end to Better Auth. This doc is the umbrella entry point — start here, then drill into the sub-feature docs below.
+Multi-tenant authentication for Conduit. Built on [Better Auth](https://better-auth.com/) with the `organization` plugin, configured in two modes — `local` (indie dev on `localhost`, lenient rate limits, no email transport required) and `hosted` (invitation-gated registration, every signup gets their own org, conservative rate limits, GitHub + GitLab OAuth available). Every business row is partitioned by `orgId`; every API surface (REST, WebSocket, webhook) refuses cross-org access; member management is delegated end-to-end to Better Auth. This doc is the umbrella entry point — start here, then drill into the sub-feature docs below.
 
 ## Sub-feature docs
 
-The auth umbrella ships as seven focused subsystems. Each owns a thin slice; this doc documents the **cross-cutting** rules that span multiple sub-features.
+The auth umbrella ships as eight focused subsystems. Each owns a thin slice; this doc documents the **cross-cutting** rules that span multiple sub-features.
 
 | # | Sub-feature | Owns |
 |---|---|---|
@@ -15,6 +15,7 @@ The auth umbrella ships as seven focused subsystems. Each owns a thin slice; thi
 | 5 | [web-auth-ui.md](./web-auth-ui.md) | `AuthLayout` / `RequireAuth` shell, sign-in / sign-up / forgot / reset / account pages, `UserMenuPill`, web `auth-client`. |
 | 6 | [org-switching.md](./org-switching.md) | Organizations section in `UserMenuPill`, members + invitations management, `/accept-invitation/:id` deep link, copyable invite URL fallback. |
 | 7 | [operational-hardening.md](./operational-hardening.md) | Better Auth rate limits (mode-aware, Redis-backed), `AuditLog` model, failed-login-spike abuse signal. |
+| 8 | [oauth-account-linking.md](./oauth-account-linking.md) | In-app link/unlink of GitHub + GitLab identities, refuse-while-referenced unlink, OAuth token refresh sweep, platform-aware git username. |
 
 [SECURITY.md § API auth & tenant isolation](../SECURITY.md#api-auth--tenant-isolation-operator-summary) is the operator-facing summary; this doc is the developer-facing umbrella.
 
@@ -26,7 +27,7 @@ The auth umbrella ships as seven focused subsystems. Each owns a thin slice; thi
 |---|---|---|
 | Registration | Open — any email can sign up | **Invitation-gated** — only seeded or invited emails may register (see below) |
 | Rate limits on `/api/auth/*` | 100/hr (lenient) | 5–10/hr per endpoint (see [operational-hardening.md](./operational-hardening.md)) |
-| GitHub OAuth | Available iff `GITHUB_CLIENT_ID` + `GITHUB_CLIENT_SECRET` are set | Same — env-gated, not mode-gated |
+| GitHub / GitLab OAuth | Each available iff that provider's `_CLIENT_ID` + `_CLIENT_SECRET` are set | Same — env-gated, not mode-gated |
 | Email verification | `requireEmailVerification: false` (no email transport yet) | Same; flips to `true` when transport ships |
 | Personal-org auto-create on signup | Yes | Yes |
 
@@ -104,6 +105,8 @@ apps/api/src/auth/
 ├── audit-hooks.ts           ← Better Auth hooks.after + organizationHooks
 ├── abuse-signals.ts         ← failed-login-spike threshold check
 ├── rate-limit-config.ts     ← mode-aware rate-limit numbers
+├── oauth-mirror-hooks.ts    ← account.{create,update}.after mirror + delete.{before,after} unlink
+├── token-refresh*.ts        ← OAuth token refresh sweep + Nest interval + per-account Redis lock
 └── types.ts                 ← Express.Request augmentation
 
 apps/api/src/redis/redis.service.ts

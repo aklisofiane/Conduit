@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { authClient, signOut, useSession } from '../lib/auth-client.js';
 import { FormField } from '../components/common/FormField.js';
+import { LinkedAccountsSection } from '../components/settings/LinkedAccountsSection.js';
 import { Button } from '../components/ui/button.js';
 import { ToggleGroup, ToggleGroupItem } from '../components/ui/toggle-group.js';
 import { useTheme } from '../hooks/use-theme.js';
@@ -48,7 +49,8 @@ export async function submitChangePassword(
 }
 
 /**
- * `/account` — basic identity readout + change-password + sign-out. The
+ * `/settings/account` (aliased from `/account`) — identity readout, linked
+ * OAuth accounts, appearance, change-password and sign-out. The
  * `org-on-signup-and-switching` sub-feature extends this with members and
  * invitations management; for now the page is intentionally minimal so it
  * renders cleanly the moment the route lands.
@@ -86,6 +88,8 @@ export function AccountSettingsPage() {
           <dd className="font-mono text-small text-[var(--color-text)]">{user?.email ?? '—'}</dd>
         </dl>
       </section>
+
+      <LinkedAccountsSection />
 
       <AppearanceSection />
 

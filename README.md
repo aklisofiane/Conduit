@@ -97,7 +97,7 @@ npm run db:push                 # apply Prisma schema
 npm run build                   # builds TS dist + the agent-runner Docker image
 ```
 
-Sign-in works with email and password out of the box. To enable OAuth sign-in providers (GitHub today, others later), see [docs/setup-oauth.md](docs/setup-oauth.md).
+Sign-in works with email and password out of the box. To enable OAuth sign-in providers (GitHub and GitLab), see [docs/setup-oauth.md](docs/setup-oauth.md).
 
 ### Board credentials
 

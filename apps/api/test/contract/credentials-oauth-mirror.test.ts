@@ -173,6 +173,197 @@ describe('CredentialsService OAuth mirror', () => {
     expect(decrypt(row.secret)).toBe('ghp_manual_pat');
   });
 
+  it('re-mirroring under a different active org keeps the credential in its original org', async () => {
+    // First mirror lands in orgA (the org that was active when the account
+    // was linked). A later re-mirror — refresh, or re-auth while another org
+    // is active — must update in place, not move or duplicate the row.
+    const first = await svc.upsertOAuthDerived({
+      orgId: fixture.orgA.id,
+      accountRowId: 'acct_row_org_move',
+      providerAccountId: '777',
+      providerLogin: 'octocat',
+      accessToken: 'gho_token_v1',
+      scopes: ['repo'],
+      platform: 'GITHUB',
+      hostUrl: 'github.com',
+    });
+    const second = await svc.upsertOAuthDerived({
+      orgId: fixture.orgB.id,
+      accountRowId: 'acct_row_org_move',
+      providerAccountId: '777',
+      providerLogin: 'octocat',
+      accessToken: 'gho_token_v2',
+      scopes: ['repo'],
+      platform: 'GITHUB',
+      hostUrl: 'github.com',
+    });
+    expect(second.created).toBe(false);
+    expect(second.id).toBe(first.id);
+
+    const row = await prisma.credential.findUniqueOrThrow({ where: { id: first.id } });
+    expect(row.orgId).toBe(fixture.orgA.id);
+    expect(decrypt(row.secret)).toBe('gho_token_v2');
+
+    const all = await prisma.credential.findMany({
+      where: { metadata: { path: ['accountRowId'], equals: 'acct_row_org_move' } },
+    });
+    expect(all).toHaveLength(1);
+  });
+
+  it('records metadata.tokenExpiresAt as an ISO string when the provider expires the token', async () => {
+    const expiresAt = new Date('2026-03-04T05:06:07.000Z');
+    const { id } = await svc.upsertOAuthDerived({
+      orgId: fixture.orgA.id,
+      accountRowId: 'acct_row_expiry',
+      providerAccountId: '4242',
+      providerLogin: 'gl-user',
+      accessToken: 'gl_access_v1',
+      scopes: ['api', 'read_user'],
+      platform: 'GITLAB',
+      hostUrl: 'gitlab.com',
+      tokenExpiresAt: expiresAt,
+    });
+
+    const row = await prisma.credential.findUniqueOrThrow({ where: { id } });
+    expect((row.metadata as Record<string, unknown>).tokenExpiresAt).toBe(expiresAt.toISOString());
+
+    // A refresh moves the expiry forward in place.
+    const later = new Date('2026-03-04T07:06:07.000Z');
+    await svc.upsertOAuthDerived({
+      orgId: fixture.orgA.id,
+      accountRowId: 'acct_row_expiry',
+      providerAccountId: '4242',
+      providerLogin: 'gl-user',
+      accessToken: 'gl_access_v2',
+      scopes: ['api', 'read_user'],
+      platform: 'GITLAB',
+      hostUrl: 'gitlab.com',
+      tokenExpiresAt: later.toISOString(),
+    });
+    const refreshed = await prisma.credential.findUniqueOrThrow({ where: { id } });
+    expect((refreshed.metadata as Record<string, unknown>).tokenExpiresAt).toBe(
+      later.toISOString(),
+    );
+    expect(decrypt(refreshed.secret)).toBe('gl_access_v2');
+  });
+
+  it('omits metadata.tokenExpiresAt for a non-expiring token (GitHub, expiration off)', async () => {
+    const { id } = await svc.upsertOAuthDerived({
+      orgId: fixture.orgA.id,
+      accountRowId: 'acct_row_no_expiry',
+      providerAccountId: '4243',
+      providerLogin: 'octocat',
+      accessToken: 'gho_forever',
+      scopes: ['repo'],
+      platform: 'GITHUB',
+      hostUrl: 'github.com',
+      tokenExpiresAt: null,
+    });
+
+    const row = await prisma.credential.findUniqueOrThrow({ where: { id } });
+    expect((row.metadata as Record<string, unknown>).tokenExpiresAt).toBeUndefined();
+  });
+
+  it('PAT-rotation drops metadata.tokenExpiresAt along with the oauth provenance', async () => {
+    const { id } = await svc.upsertOAuthDerived({
+      orgId: fixture.orgA.id,
+      accountRowId: 'acct_row_expiry_rotate',
+      providerAccountId: '4244',
+      providerLogin: 'gl-user',
+      accessToken: 'gl_access_v1',
+      scopes: ['api'],
+      platform: 'GITLAB',
+      hostUrl: 'gitlab.com',
+      tokenExpiresAt: new Date('2026-03-04T05:06:07.000Z'),
+    });
+
+    await svc.update(fixture.orgA.id, id, { secret: 'glpat_manual' });
+
+    const meta = (await prisma.credential.findUniqueOrThrow({ where: { id } }))
+      .metadata as Record<string, unknown>;
+    expect(meta.tokenExpiresAt).toBeUndefined();
+    expect(meta.source).toBeUndefined();
+    expect(meta.accountRowId).toBe('acct_row_expiry_rotate');
+  });
+
+  it('findOAuthDerivedByAccountRow resolves the mirrored row and its dependent connections', async () => {
+    const { id } = await svc.upsertOAuthDerived({
+      orgId: fixture.orgA.id,
+      accountRowId: 'acct_row_lookup',
+      providerAccountId: '555',
+      providerLogin: 'octocat',
+      accessToken: 'gho_lookup',
+      scopes: ['repo'],
+      platform: 'GITHUB',
+      hostUrl: 'github.com',
+    });
+    await prisma.connection.create({
+      data: {
+        orgId: fixture.orgA.id,
+        credentialId: id,
+        name: 'linked repo',
+        scope: { kind: 'github_repo', owner: 'orga', repo: 'linked' },
+      },
+    });
+
+    const found = await svc.findOAuthDerivedByAccountRow('acct_row_lookup');
+    expect(found).toEqual({
+      id,
+      orgId: fixture.orgA.id,
+      name: 'octocat (oauth)',
+      dependentConnections: ['linked repo'],
+    });
+    expect(await svc.findOAuthDerivedByAccountRow('acct_row_unknown')).toBeNull();
+  });
+
+  it('deleteOAuthDerivedByAccountRow removes an unreferenced mirrored credential (unlink cleanup)', async () => {
+    const { id } = await svc.upsertOAuthDerived({
+      orgId: fixture.orgA.id,
+      accountRowId: 'acct_row_unlink',
+      providerAccountId: '888',
+      providerLogin: 'octocat',
+      accessToken: 'gho_unlink',
+      scopes: ['repo'],
+      platform: 'GITHUB',
+      hostUrl: 'github.com',
+    });
+
+    const result = await svc.deleteOAuthDerivedByAccountRow('acct_row_unlink');
+    expect(result.status).toBe('deleted');
+    expect(await prisma.credential.findUnique({ where: { id } })).toBeNull();
+  });
+
+  it('deleteOAuthDerivedByAccountRow refuses while a connection references the credential', async () => {
+    const { id } = await svc.upsertOAuthDerived({
+      orgId: fixture.orgA.id,
+      accountRowId: 'acct_row_unlink_blocked',
+      providerAccountId: '999',
+      providerLogin: 'octocat',
+      accessToken: 'gho_blocked',
+      scopes: ['repo'],
+      platform: 'GITHUB',
+      hostUrl: 'github.com',
+    });
+    await prisma.connection.create({
+      data: {
+        orgId: fixture.orgA.id,
+        credentialId: id,
+        name: 'blocking repo',
+        scope: { kind: 'github_repo', owner: 'orga', repo: 'blocking' },
+      },
+    });
+
+    const result = await svc.deleteOAuthDerivedByAccountRow('acct_row_unlink_blocked');
+    expect(result.status).toBe('referenced');
+    expect(result.dependentConnections).toEqual(['blocking repo']);
+    expect(await prisma.credential.findUnique({ where: { id } })).not.toBeNull();
+  });
+
+  it('deleteOAuthDerivedByAccountRow reports not-found for an account that was never mirrored', async () => {
+    const result = await svc.deleteOAuthDerivedByAccountRow('acct_row_never_mirrored');
+    expect(result.status).toBe('not-found');
+  });
+
   it('update without a new secret leaves oauth metadata untouched', async () => {
     const { id } = await svc.upsertOAuthDerived({
       orgId: fixture.orgA.id,

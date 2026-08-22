@@ -6,17 +6,17 @@ Browser-side authentication surface for Conduit. Owns the unauthenticated route 
 
 | File | Role |
 |---|---|
-| `apps/web/src/lib/auth-client.ts` | Single Better Auth React client (`createAuthClient({ baseURL: apiBaseUrl })`); exports `signIn`, `signUp`, `signOut`, `useSession`, `requestPasswordReset`, `resetPassword`. The full client (`authClient`) is also exported for non-destructured methods like `authClient.changePassword`. |
-| `apps/web/src/api/auth-config.ts` | TanStack Query hook (`useAuthConfig`) over `GET /api/auth-config` — `{ deployment: 'local' \| 'hosted', oauthProviders: ['github'] \| [] }`. `staleTime: Infinity` — config doesn't change for the page lifetime. |
+| `apps/web/src/lib/auth-client.ts` | Single Better Auth React client (`createAuthClient({ baseURL: apiBaseUrl })`); exports `signIn`, `signUp`, `signOut`, `useSession`, `requestPasswordReset`, `resetPassword`, plus the account-linking trio `linkSocial`, `listAccounts`, `unlinkAccount` (see [oauth-account-linking.md](./oauth-account-linking.md)). The full client (`authClient`) is also exported for non-destructured methods like `authClient.changePassword`. |
+| `apps/web/src/api/auth-config.ts` | TanStack Query hook (`useAuthConfig`) over `GET /api/auth-config` — `{ deployment: 'local' \| 'hosted', oauthProviders: string[] }` — `'github'` and/or `'gitlab'`, each present only when its env pair is set. `staleTime: Infinity` — config doesn't change for the page lifetime. |
 | `apps/web/src/components/layout/AuthLayout.tsx` | Unauthenticated shell. Centered card surface, brand mark, no `TopChrome`. Pages render via `<Outlet />`. |
 | `apps/web/src/components/layout/RequireAuth.tsx` | Wraps `AppLayout`. Loader while `useSession()` resolves; redirects to `/sign-in?next=<encoded-current-path>` when `data === null`. |
 | `apps/web/src/components/layout/RedirectIfAuthed.tsx` | Wraps the auth-route branch. Sends a logged-in user to `?next` (path-prefixed) or `/` instead of letting them see the form. Renders children while pending so already-cookied users still see the form transiently — never blocks. |
 | `apps/web/src/components/layout/UserMenuPill.tsx` | Default `actionsSlot` content for `TopChrome`. Pill (status dot + name/email truncated to 180px + chevron) anchors a portal-rendered popover with the name + email header, an Account-settings item, and a Sign-out item. Click-outside + Escape close it. |
-| `apps/web/src/pages/SignInPage.tsx` | Email + password + "Forgot password?" link + (when `oauthProviders.includes('github')`) GitHub OAuth button. Honors `?next`. |
-| `apps/web/src/pages/SignUpPage.tsx` | Name + email + password + GitHub OAuth button (same gate). Always navigates to `/` on success — `?next` is not honored on signup by design. |
+| `apps/web/src/pages/SignInPage.tsx` | Email + password + "Forgot password?" link + an OAuth button per advertised provider. Honors `?next`. |
+| `apps/web/src/pages/SignUpPage.tsx` | Name + email + password + the same OAuth buttons (same gate). Always navigates to `/` on success — `?next` is not honored on signup by design. |
 | `apps/web/src/pages/ForgotPasswordPage.tsx` | Email field calls `requestPasswordReset({ email, redirectTo: '/reset-password' })`. End-to-end no-op until email transport ships — page exists so the route works the day email lands. |
 | `apps/web/src/pages/ResetPasswordPage.tsx` | Reads `?token=<x>`. Functional today given a valid token. Renders an "invalid link" state when no token is present. |
-| `apps/web/src/pages/AccountSettingsPage.tsx` | `/account`, inside `AppLayout`. Profile readout (name, email), change-password form (current + new + confirm with `refine`-based confirm match), and a Sign-out section. Visual shape mirrors `CredentialsPage` (centered `max-w-[900px]`, serif heading with the `--color-claude-mark` accent dot, mono helper text). |
+| `apps/web/src/pages/AccountSettingsPage.tsx` | `/account`, inside `AppLayout`. Profile readout (name, email), a **Linked accounts** panel (link/unlink per OAuth provider — see [oauth-account-linking.md](./oauth-account-linking.md)), change-password form (current + new + confirm with `refine`-based confirm match), and a Sign-out section. Visual shape mirrors `CredentialsPage` (centered `max-w-[900px]`, serif heading with the `--color-claude-mark` accent dot, mono helper text). |
 
 ## Routing
 
@@ -75,9 +75,9 @@ Server errors arrive as `{ data: null, error: { status, message } }` — not as 
 
 ## OAuth availability
 
-`useAuthConfig()` fetches `/api/auth-config` once at first use and caches forever (per page lifetime). `oauthProviders.includes('github')` is the gate for the GitHub button on SignIn / SignUp. Server-side, that array is non-empty iff `GITHUB_CLIENT_ID` + `GITHUB_CLIENT_SECRET` are set — see [auth.config.ts](../../apps/api/src/auth/auth.config.ts). Runtime over build-time so a config flip doesn't require rebuilding the web bundle.
+`useAuthConfig()` fetches `/api/auth-config` once at first use and caches forever (per page lifetime). `oauthProviders.includes(<provider>)` is the gate for that provider's button — on SignIn / SignUp, and equally on the linking surfaces described in [oauth-account-linking.md](./oauth-account-linking.md). Server-side, a provider appears iff its `_CLIENT_ID` + `_CLIENT_SECRET` pair is set — see [auth.config.ts](../../apps/api/src/auth/auth.config.ts). Runtime over build-time so a config flip doesn't require rebuilding the web bundle.
 
-The GitHub button calls `signIn.social({ provider: 'github', callbackURL })`. `callbackURL` is the resolved `?next` value (path-prefixed only — bare `/` if `next` doesn't start with `/`).
+Each provider button calls `signIn.social({ provider, callbackURL })`. `callbackURL` is the resolved `?next` value (path-prefixed only — bare `/` if `next` doesn't start with `/`).
 
 ## Better Auth client API delta (1.6.9)
 

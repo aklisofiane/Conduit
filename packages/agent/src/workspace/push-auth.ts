@@ -1,7 +1,9 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { git } from './git';
+import { gitAuthUsername } from './git-username';
 import { runDir } from './paths';
+import type { ConnectionContext } from './types';
 
 /**
  * Install a `ticket-branch`-scoped git credential helper so the agent can
@@ -10,7 +12,9 @@ import { runDir } from './paths';
  *
  * Shape:
  *   - A tiny POSIX shell script under `<runDir>/.credential-helpers/<node>.sh`
- *     (chmod 700) prints `username=x-access-token\npassword=<token>` on `get`.
+ *     (chmod 700) prints `username=<platform username>\npassword=<token>` on
+ *     `get` — `x-access-token` for GitHub, `oauth2` for GitLab (see
+ *     `gitAuthUsername`).
  *   - `git config --local credential.helper '!<script>'` points the worktree
  *     at it. `--local` stores in the shared `.git/config`, so inherit-chain
  *     worktrees off the same base clone automatically pick it up — matches
@@ -31,9 +35,11 @@ export async function installPushCredentials(args: {
   runId: string;
   nodeName: string;
   worktreePath: string;
+  /** Decides the basic-auth username the helper prints — see `gitAuthUsername`. */
+  platform: ConnectionContext['platform'];
   token: string;
 }): Promise<void> {
-  const { runId, nodeName, worktreePath, token } = args;
+  const { runId, nodeName, worktreePath, platform, token } = args;
   const helperDir = path.join(runDir(runId), '.credential-helpers');
   await fs.mkdir(helperDir, { recursive: true, mode: 0o700 });
   const helperPath = path.join(helperDir, `${nodeName}.sh`);
@@ -48,7 +54,7 @@ export async function installPushCredentials(args: {
     `# Auto-deleted when the run's workspace dir is cleaned up.\n` +
     `case "$1" in\n` +
     `  get)\n` +
-    `    printf 'username=x-access-token\\npassword=%s\\n' ${quoted}\n` +
+    `    printf 'username=${gitAuthUsername(platform)}\\npassword=%s\\n' ${quoted}\n` +
     `    ;;\n` +
     `esac\n`;
   await fs.writeFile(helperPath, script, { mode: 0o700 });

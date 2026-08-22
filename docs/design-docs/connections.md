@@ -77,13 +77,15 @@ The error response lists the blocking workflows by name so the user can detach o
 
 ## OAuth-derived credentials
 
-A `Credential` can be created manually (user pastes a PAT) or automatically when the user signs in with GitHub OAuth. Both produce the same row shape; the OAuth case stamps `metadata.source = 'oauth'` for provenance, with the Better Auth `account.id` carried as the upsert key. The OAuth mirror itself is driven from `auth.config.ts` — see [auth-integration.md > GitHub OAuth → Credential mirror](./auth-integration.md#github-oauth--credential-mirror).
+A `Credential` can be created manually (user pastes a PAT) or automatically when the user signs in with — or links — a GitHub or GitLab identity. Both produce the same row shape; the OAuth case stamps `metadata.source = 'oauth'` for provenance, with the Better Auth `account.id` carried as the upsert key. The OAuth mirror is driven from `oauth-mirror-hooks.ts` — see [auth-integration.md > OAuth → Credential mirror](./auth-integration.md#oauth--credential-mirror).
 
 `CredentialsService.upsertOAuthDerived` is idempotent on the carried account id, so re-sign-in updates `secret` + scopes in place rather than spawning duplicates. The credential id is stable across re-auths, so existing Connection rows keep working.
 
 **PAT-rotation converts oauth → manual.** `CredentialsService.update` strips `source` (and the OAuth-only scope record) from `metadata` when the caller rotates the secret on an OAuth-derived row without supplying their own `metadata` patch — claiming OAuth provenance would be misleading once the token is no longer the OAuth access token. Caller-supplied `metadata` always wins. There is no reverse path.
 
 The Settings Credentials list renders an `oauth` badge when `metadata.source === 'oauth'`. Contract tests: `apps/api/test/contract/credentials-oauth-mirror.test.ts`.
+
+**Lifecycle beyond first sign-in.** An OAuth-derived row also carries its token's expiry in `metadata`, which drives a freshness hint (and a stale badge once refresh has been failing) in the credentials list. Unlinking the identity deletes the mirrored row — unless a `Connection` still references it, in which case the unlink is refused, matching this doc's refuse-while-referenced rule for manual deletion. The org a mirrored credential lands in is resolved at creation from the linking user's active org and never migrates afterwards. All three are owned by [oauth-account-linking.md](./oauth-account-linking.md).
 
 ## Inline creation from the canvas
 

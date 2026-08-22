@@ -43,14 +43,15 @@ The webhook controller (`POST /api/hooks/:workflowId`) still receives the raw by
 | `betterAuth.secret` | `BETTER_AUTH_SECRET` | dev fallback | Signs session cookies. Required in prod; rotate to invalidate every session. |
 | `betterAuth.baseURL` | `BETTER_AUTH_URL` | `http://localhost:${port}` | Public origin used for OAuth redirect URIs. |
 | `betterAuth.githubOAuth` | `GITHUB_CLIENT_ID` + `GITHUB_CLIENT_SECRET` | undefined | GitHub OAuth surfaces only when **both** halves are set, in either deployment mode. |
+| `betterAuth.gitlabOAuth` | `GITLAB_CLIENT_ID` + `GITLAB_CLIENT_SECRET` | undefined | Same contract for GitLab (gitlab.com only — self-managed instances stay PAT-only). |
 
-When GitHub OAuth is enabled the provider requests `scope: ['repo', 'project', 'read:org']` — the same surface Conduit's workflows need from a manual PAT. Pre-existing OAuth users see GitHub's consent screen again on next sign-in.
+Each provider requests the scope set its workflows need from an equivalent PAT — GitHub `repo, project, read:org`; GitLab `api, read_user`. Pre-existing OAuth users see the provider's consent screen again on next sign-in after a scope change. Operator-facing registration steps are in [setup-oauth.md](../setup-oauth.md).
 
 `auth.config.ts` wires those into Better Auth with the Prisma adapter, `emailAndPassword: { enabled: true, requireEmailVerification: false }`, `emailVerification.sendOnSignUp: false` (no email transport yet — tracked as a cross-cutting TODO), and the `organization()` plugin. The signup-time shim — `databaseHooks.session.create.before` calls `ensurePersonalOrgFor(userId)` and stamps the returned `activeOrganizationId` onto each new session before the cookie is issued — is **owned by tenant-partitioning** but lives in this same file because it's part of Better Auth config. See [tenant-partitioning.md](./tenant-partitioning.md#signup-time-shim).
 
 In `hosted` mode a second hook, `databaseHooks.user.create.before`, gates registration: a signup whose email is neither seeded (`config.seedEmails`) nor backed by a pending `Invitation` throws `403 'Registration is by invitation only'`. No-op in `local`. See [authentication.md § Invitation gate](./authentication.md#invitation-gate-hosted-only).
 
-`oauthProviders` is computed once at module load: `['github']` when `githubOAuth` is set, `[]` otherwise. The auth controller returns it verbatim so the web client doesn't re-read env.
+`oauthProviders` is computed once at module load — one entry per provider whose client id + secret pair is set, `[]` when neither is. The auth controller returns it verbatim so the web client doesn't re-read env.
 
 ## Guarded routes
 
@@ -72,7 +73,7 @@ trigger • mcp • agent-presets • skills
 
 ## Public `GET /api/auth-config`
 
-Returns `{ deployment: 'local' | 'hosted', oauthProviders: string[] }`. Not session-guarded — by definition, callers haven't authenticated yet. `web-auth-ui` will read this once at app start to decide whether to render the GitHub button.
+Returns `{ deployment: 'local' | 'hosted', oauthProviders: string[] }`. Not session-guarded — by definition, callers haven't authenticated yet. `web-auth-ui` reads this once at app start to decide which provider buttons to render.
 
 ## Auth surface (Better Auth)
 
@@ -107,11 +108,13 @@ Because each harness owns its own DB (via `TEST_STACK_ENV` → `docker-compose.t
 
 The Better Auth tables (`user`, `session`, `account`, `verification`, `organization`, `member`, `invitation`) are generated into `packages/database/prisma/schema.prisma` by `npx @better-auth/cli generate` and pasted in. Better Auth populates them itself; **Conduit business code never reads or writes them directly** — go through the `auth` instance exposed via `AuthModule`. Full schema text and per-column notes: [data-model.md § Better Auth tables](../data-model.md#better-auth-tables).
 
-## GitHub OAuth → Credential mirror
+## OAuth → Credential mirror
 
-Better Auth owns the `account` table; Conduit's runtime resolves tokens through `Connection → Credential` and never reads `account` directly. To avoid prompting for a PAT the user just signed in with, `auth.config.ts` mirrors the OAuth `account` row into a Conduit `Credential` via `databaseHooks.account.{create,update}.after`. The hook resolves the user's personal org, looks up the GitHub login for the credential name, and delegates the write to `CredentialsService.upsertOAuthDerived`. Failures are logged and swallowed — sign-in succeeding without a mirror is recoverable (re-sign-in or paste a PAT manually).
+Better Auth owns the `account` table; Conduit's runtime resolves tokens through `Connection → Credential` and never reads `account` directly. To avoid prompting for a PAT the user just signed in with, the OAuth `account` row is mirrored into a Conduit `Credential` via `databaseHooks.account.{create,update}.after`. The hook resolves the target org, looks up the provider login for the credential name, and delegates the write to `CredentialsService.upsertOAuthDerived`. Failures are logged and swallowed — sign-in succeeding without a mirror is recoverable (re-sign-in or paste a PAT manually).
 
-The hooks run inside Better Auth's Express middleware, before Nest DI is wired, so `auth.config.ts` constructs a module-level `CredentialsService` against the singleton Prisma client — the same pattern used for `auditLogService` in the same file.
+The hooks live in `oauth-mirror-hooks.ts` (dispatching per provider, GitHub and GitLab today) and are assembled into the Better Auth options by `auth.config.ts`. They run inside Better Auth's Express middleware, before Nest DI is wired, so the module constructs its `CredentialsService` against the singleton Prisma client — the same pattern used for `auditLogService`.
+
+The same hook set owns the `delete.{before,after}` pair that cleans up on unlink, and the org the credential lands in is no longer unconditionally the personal org. Both — plus the token refresh sweep that keeps a mirrored token alive — are documented in [oauth-account-linking.md](./oauth-account-linking.md).
 
 The Credential side of this contract (provenance metadata, idempotency, PAT-rotation conversion) is documented in [connections.md > OAuth-derived credentials](./connections.md#oauth-derived-credentials).
 

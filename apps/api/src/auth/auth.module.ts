@@ -4,6 +4,7 @@ import { AuthController } from './auth.controller';
 import { AbuseSignalsService } from './abuse-signals';
 import { AuditLogService } from './audit-log.service';
 import { SessionGuard } from './session.guard';
+import { TokenRefreshService } from './token-refresh.service';
 // Side-effect import: declares Express.Request augmentation for `user`/`session`.
 import './types';
 
@@ -18,6 +19,9 @@ import './types';
  * The production write path runs from Express middleware before any Nest
  * controller — DI isn't available at write time, so we share instances
  * rather than letting Nest construct a second copy.
+ *
+ * `TokenRefreshService` is the one piece of *scheduled* auth work: it keeps
+ * linked OAuth access tokens (and the credentials mirrored from them) alive.
  */
 export const AUTH = Symbol.for('conduit.auth');
 
@@ -26,6 +30,7 @@ export const AUTH = Symbol.for('conduit.auth');
   controllers: [AuthController],
   providers: [
     SessionGuard,
+    TokenRefreshService,
     { provide: AuditLogService, useValue: auditLogService },
     { provide: AbuseSignalsService, useValue: abuseSignalsService },
     { provide: AUTH, useValue: auth },

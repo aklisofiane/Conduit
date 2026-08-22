@@ -4,7 +4,6 @@ import { organization } from 'better-auth/plugins';
 import { Redis } from 'ioredis';
 import { Logger } from '@nestjs/common';
 import { prisma } from '@conduit/database';
-import type { Platform } from '@conduit/shared/platform';
 import { config } from '../config';
 import type { PrismaService } from '../common/prisma.service';
 import { CredentialsService } from '../modules/credentials/credentials.service';
@@ -12,6 +11,7 @@ import { createBetterAuthRedisStorage } from '../redis/redis.service';
 import { AbuseSignalsService } from './abuse-signals';
 import { AuditLogService } from './audit-log.service';
 import { createAuditAfterMiddleware, createOrganizationAuditHooks } from './audit-hooks';
+import { createOAuthMirrorHooks } from './oauth-mirror-hooks';
 import { createOrganizationGuardHooks } from './org-guard-hooks';
 import { rateLimitConfig } from './rate-limit-config';
 
@@ -97,7 +97,11 @@ async function ensurePersonalOrgFor(userId: string): Promise<string> {
 // instance, which is what "shared rate-limit counters" actually requires.
 // `RedisService.betterAuthSecondaryStorage()` exists for parity (and tests),
 // using the same `createBetterAuthRedisStorage` adapter.
-const betterAuthRedis = new Redis(config.redis.url, {
+//
+// Exported so the OAuth token refresher (`token-refresh.service.ts`) takes its
+// per-account locks on this connection instead of opening a third client for a
+// handful of `SET NX` calls every ten minutes.
+export const betterAuthRedis = new Redis(config.redis.url, {
   lazyConnect: false,
   maxRetriesPerRequest: null,
 });
@@ -122,98 +126,35 @@ const organizationGuardHooks = createOrganizationGuardHooks(prisma);
 // `CredentialsService`'s constructor is typed against `PrismaService`, but it
 // uses the structural `PrismaClient` shape only — the singleton satisfies it.
 const credentialsService = new CredentialsService(prisma as unknown as PrismaService);
-const oauthMirrorLogger = new Logger('OAuthMirror');
 
-// ---------------------------------------------------------------------------
-// Per-provider adapter table for the OAuth → Credential mirror
-// ---------------------------------------------------------------------------
-
-interface OAuthProviderAdapter {
-  platform: Platform;
-  hostUrl: string;
-  profileUrl: string;
-  parseLogin: (json: Record<string, unknown>) => string | null;
-}
-
-const OAUTH_PROVIDER_ADAPTERS: Record<string, OAuthProviderAdapter> = {
-  github: {
-    platform: 'GITHUB',
-    hostUrl: 'github.com',
-    profileUrl: 'https://api.github.com/user',
-    parseLogin: (json) => (typeof json.login === 'string' ? json.login : null),
+// OAuth → Credential mirror + unlink lifecycle. Lives in its own module
+// (`oauth-mirror-hooks.ts`) alongside `audit-hooks` / `org-guard-hooks`; the
+// deps below are the only things it needs from this file's singletons.
+const oauthMirrorHooks = createOAuthMirrorHooks({
+  credentials: credentialsService,
+  membership: prisma,
+  ensurePersonalOrgFor: (userId) => ensurePersonalOrgFor(userId),
+  sessionFromHeaders: async (headers) => {
+    // The link/callback endpoints don't run Better Auth's session middleware,
+    // so `context.context.session` is null there — but the callback is a
+    // top-level same-site navigation and still carries the session cookie.
+    const res = await auth.api.getSession({ headers });
+    const session = res?.session as
+      | { userId?: unknown; activeOrganizationId?: unknown }
+      | undefined;
+    if (typeof session?.userId !== 'string') return null;
+    return {
+      userId: session.userId,
+      activeOrganizationId:
+        typeof session.activeOrganizationId === 'string' ? session.activeOrganizationId : null,
+    };
   },
-  gitlab: {
-    platform: 'GITLAB',
-    hostUrl: 'gitlab.com',
-    profileUrl: 'https://gitlab.com/api/v4/user',
-    parseLogin: (json) => (typeof json.username === 'string' ? json.username : null),
-  },
-};
+});
 
 const bootLogger = new Logger('AuthConfig');
 bootLogger.log(
   `Better Auth rate-limit mode=${config.deployment} storage=secondary-storage(redis)`,
 );
-
-/**
- * Mirror a fresh OAuth `account` row into a Conduit `Credential` so
- * downstream code (workers, MCP resolver, polling) keeps using the existing
- * Connection → Credential resolution path. Dispatches on `account.providerId`
- * via the `OAUTH_PROVIDER_ADAPTERS` table — unknown providers are a no-op.
- * Failures are logged but never propagate — a sign-in succeeding without a
- * mirror is recoverable (re-sign-in or manual PAT entry both work).
- */
-async function mirrorOAuthAccountToCredential(
-  account: { id?: unknown; userId?: unknown; accountId?: unknown; accessToken?: unknown; scope?: unknown; providerId?: unknown },
-): Promise<void> {
-  try {
-    const providerId = typeof account.providerId === 'string' ? account.providerId : null;
-    if (!providerId) return;
-    const adapter = OAUTH_PROVIDER_ADAPTERS[providerId];
-    if (!adapter) return; // Unknown provider — no-op.
-
-    const accessToken = typeof account.accessToken === 'string' ? account.accessToken : null;
-    const accountRowId = typeof account.id === 'string' ? account.id : null;
-    const userId = typeof account.userId === 'string' ? account.userId : null;
-    const providerAccountId = typeof account.accountId === 'string' ? account.accountId : null;
-    if (!accessToken || !accountRowId || !userId || !providerAccountId) return;
-    const scopes =
-      typeof account.scope === 'string' && account.scope.length > 0
-        ? account.scope.split(',').map((s) => s.trim()).filter(Boolean)
-        : [];
-    const orgId = await ensurePersonalOrgFor(userId);
-    const res = await fetch(adapter.profileUrl, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        Accept: 'application/json',
-        'User-Agent': 'conduit',
-      },
-    });
-    if (!res.ok) {
-      oauthMirrorLogger.warn(
-        `${providerId} profile lookup failed (status=${res.status}); skipping mirror for account=${accountRowId}`,
-      );
-      return;
-    }
-    const profile = (await res.json()) as Record<string, unknown>;
-    const providerLogin = adapter.parseLogin(profile) ?? providerAccountId;
-    await credentialsService.upsertOAuthDerived({
-      orgId,
-      accountRowId,
-      providerAccountId,
-      providerLogin,
-      accessToken,
-      scopes,
-      platform: adapter.platform,
-      hostUrl: adapter.hostUrl,
-    });
-  } catch (err) {
-    oauthMirrorLogger.error(
-      `Failed to mirror OAuth account to credential: ${(err as Error).message}`,
-      (err as Error).stack,
-    );
-  }
-}
 
 export const auth = betterAuth({
   database: prismaAdapter(prisma, { provider: 'postgresql' }),
@@ -326,22 +267,14 @@ export const auth = betterAuth({
       },
     },
     // Mirror Better Auth OAuth `account` rows into Conduit `Credential` rows.
-    // `create` fires on first sign-in; `update` fires on re-authorization
-    // (e.g. consent re-prompt after a scope change), at which point we
-    // refresh the encrypted secret + recorded scopes in place. The adapter
-    // table handles unknown providers (no-op), so no providerId filter needed.
-    account: {
-      create: {
-        async after(account) {
-          await mirrorOAuthAccountToCredential(account);
-        },
-      },
-      update: {
-        async after(account) {
-          await mirrorOAuthAccountToCredential(account);
-        },
-      },
-    },
+    // `create` fires on first sign-in and on an in-app link; `update` fires on
+    // re-authorization (e.g. consent re-prompt after a scope change) *and* on
+    // every token refresh (`internalAdapter.updateAccount`, driven by
+    // `token-refresh.service.ts`), at which point we refresh the encrypted
+    // secret + recorded scopes + expiry in place;
+    // `delete` is the unlink lifecycle (refuse while referenced, then clean
+    // up the mirrored credential). See `oauth-mirror-hooks.ts`.
+    account: oauthMirrorHooks,
   },
   // Enabled here so the schema lands in one db:push. The signup-time shim
   // that auto-creates a personal org + sets activeOrganizationId is owned

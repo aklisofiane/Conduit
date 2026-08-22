@@ -145,6 +145,22 @@ export interface CredentialRow {
     source?: 'oauth' | 'manual';
     githubLogin?: string;
     scopes?: string[];
+    /**
+     * Written by the API's OAuth→Credential mirror (`upsertOAuthDerived`).
+     * `accountRowId` is the Better Auth `account` row this credential mirrors —
+     * how the Linked accounts panel pairs a credential with a linked account.
+     */
+    accountRowId?: string;
+    providerAccountId?: string;
+    providerLogin?: string;
+    /**
+     * ISO expiry of the mirrored OAuth access token, written by
+     * `upsertOAuthDerived` on every (re)mirror — so it moves forward each time
+     * the API's refresher rotates the token. Absent on rows mirrored before
+     * that key existed and on providers whose tokens don't expire (GitHub with
+     * token expiration off), which the staleness hint treats as "unknown".
+     */
+    tokenExpiresAt?: string;
   } | null;
   createdAt: string;
   updatedAt: string;

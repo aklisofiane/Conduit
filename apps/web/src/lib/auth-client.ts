@@ -22,4 +22,11 @@ export const {
   useSession,
   requestPasswordReset,
   resetPassword,
+  // Account linking (`/settings/account` → Linked accounts, plus the Connect
+  // shortcuts on `/settings/integrations`). `linkSocial` mirrors `signIn.social`
+  // for an already-signed-in user: it returns `{ url, redirect }` and the
+  // client's redirect fetch-plugin navigates the browser to the provider.
+  linkSocial,
+  listAccounts,
+  unlinkAccount,
 } = authClient;

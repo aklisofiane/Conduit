@@ -198,6 +198,7 @@ export async function runAgentNode(input: RunAgentNodeInput): Promise<NodeOutput
         runId,
         nodeName: node.name,
         worktreePath: workspace.path,
+        platform: entryInputs.connection.platform,
         token: entryInputs.connection.token,
       });
     }

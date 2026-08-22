@@ -52,12 +52,40 @@ describe('installPushCredentials', () => {
       runId: 'run_1',
       nodeName: 'Worker',
       worktreePath: worktree,
+      platform: 'github',
       token: 'ghp_abc123!',
     });
 
-    const out = await runGitCredentialFill(worktree, 'https://github.com/acme/shop.git', gitSandboxEnv);
+    const out = await runGitCredentialFill(
+      worktree,
+      'https://github.com/acme/shop.git',
+      gitSandboxEnv,
+    );
     expect(out).toContain('username=x-access-token');
     expect(out).toContain('password=ghp_abc123!');
+  });
+
+  // GitLab authenticates an OAuth access token only when the basic-auth
+  // username is exactly `oauth2`; `x-access-token` comes back as
+  // "HTTP Basic: Access denied". PATs ignore the username, so `oauth2` is
+  // correct for every GitLab credential.
+  it('uses username=oauth2 for gitlab', async () => {
+    await installPushCredentials({
+      runId: 'run_1',
+      nodeName: 'Worker',
+      worktreePath: worktree,
+      platform: 'gitlab',
+      token: 'glpat_abc123!',
+    });
+
+    const out = await runGitCredentialFill(
+      worktree,
+      'https://gitlab.com/acme/shop.git',
+      gitSandboxEnv,
+    );
+    expect(out).toContain('username=oauth2');
+    expect(out).not.toContain('x-access-token');
+    expect(out).toContain('password=glpat_abc123!');
   });
 
   it('survives single-quoted tokens without breaking the helper', async () => {
@@ -65,10 +93,15 @@ describe('installPushCredentials', () => {
       runId: 'run_1',
       nodeName: 'Worker',
       worktreePath: worktree,
+      platform: 'github',
       token: "tok'en-with-'quotes",
     });
 
-    const out = await runGitCredentialFill(worktree, 'https://github.com/acme/shop.git', gitSandboxEnv);
+    const out = await runGitCredentialFill(
+      worktree,
+      'https://github.com/acme/shop.git',
+      gitSandboxEnv,
+    );
     expect(out).toContain("password=tok'en-with-'quotes");
   });
 });
@@ -98,9 +131,7 @@ async function runGitCredentialFill(
     child.on('close', (code) => {
       if (code !== 0) {
         return reject(
-          new Error(
-            `git credential fill exited ${code}: ${Buffer.concat(err).toString().trim()}`,
-          ),
+          new Error(`git credential fill exited ${code}: ${Buffer.concat(err).toString().trim()}`),
         );
       }
       resolve(Buffer.concat(out).toString());
