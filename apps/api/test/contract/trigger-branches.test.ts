@@ -113,11 +113,12 @@ describe('TriggerService.listBranches', () => {
 
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () =>
-        new Response(
-          'rate limit exceeded — token: ghp_secret123, internal: https://api.internal.github.net',
-          { status: 403 },
-        ),
+      vi.fn(
+        async () =>
+          new Response(
+            'rate limit exceeded — token: ghp_secret123, internal: https://api.internal.github.net',
+            { status: 403 },
+          ),
       ),
     );
 
@@ -145,8 +146,8 @@ describe('TriggerService.listBranches', () => {
 
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () =>
-        new Response('rate limit exceeded — token: ghp_secret123', { status: 429 }),
+      vi.fn(
+        async () => new Response('rate limit exceeded — token: ghp_secret123', { status: 429 }),
       ),
     );
 
@@ -187,8 +188,8 @@ describe('TriggerService.listBranches', () => {
 
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () =>
-        new Response('oauth token invalid — token: glpat-secret456', { status: 401 }),
+      vi.fn(
+        async () => new Response('oauth token invalid — token: glpat-secret456', { status: 401 }),
       ),
     );
 
@@ -227,8 +228,8 @@ describe('TriggerService.listBranches', () => {
 
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () =>
-        new Response('oauth token invalid — token: glpat-secret456', { status: 401 }),
+      vi.fn(
+        async () => new Response('oauth token invalid — token: glpat-secret456', { status: 401 }),
       ),
     );
 

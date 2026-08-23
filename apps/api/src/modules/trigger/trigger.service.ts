@@ -65,9 +65,7 @@ export class TriggerService {
       });
     } catch (e: unknown) {
       const message = errMessage(e);
-      this.logger.warn(
-        `List Projects v2 failed (${dto.ownerType}/${dto.owner}): ${message}`,
-      );
+      this.logger.warn(`List Projects v2 failed (${dto.ownerType}/${dto.owner}): ${message}`);
       throw new BadRequestException({ message });
     }
   }
@@ -76,10 +74,7 @@ export class TriggerService {
     orgId: string,
     dto: ListViewerReposDto,
   ): Promise<RepositorySummary[] | GitlabProjectSummary[]> {
-    const { token, platform, hostUrl } = await this.resolveCredentialInfo(
-      orgId,
-      dto.credentialId,
-    );
+    const { token, platform, hostUrl } = await this.resolveCredentialInfo(orgId, dto.credentialId);
 
     try {
       if (platform === 'GITLAB') {
@@ -96,14 +91,8 @@ export class TriggerService {
     }
   }
 
-  async listViewerOrgs(
-    orgId: string,
-    dto: ListViewerOrgsDto,
-  ): Promise<ViewerOrgEntry[]> {
-    const { token, platform } = await this.resolveCredentialInfo(
-      orgId,
-      dto.credentialId,
-    );
+  async listViewerOrgs(orgId: string, dto: ListViewerOrgsDto): Promise<ViewerOrgEntry[]> {
+    const { token, platform } = await this.resolveCredentialInfo(orgId, dto.credentialId);
 
     if (platform === 'GITLAB') return [];
 
@@ -161,9 +150,7 @@ export class TriggerService {
         });
       } catch (e: unknown) {
         const message = errMessage(e);
-        this.logger.warn(
-          `List GitLab labels failed (${glScope.projectPath}): ${message}`,
-        );
+        this.logger.warn(`List GitLab labels failed (${glScope.projectPath}): ${message}`);
         throw new BadRequestException({ message });
       }
     }
@@ -183,9 +170,7 @@ export class TriggerService {
       });
     } catch (e: unknown) {
       const message = errMessage(e);
-      this.logger.warn(
-        `List labels failed (${repoScope.owner}/${repoScope.repo}): ${message}`,
-      );
+      this.logger.warn(`List labels failed (${repoScope.owner}/${repoScope.repo}): ${message}`);
       throw new BadRequestException({ message });
     }
   }
@@ -258,10 +243,7 @@ export class TriggerService {
    * they surface as `{ status: 'failed', error }` so callers can show partial
    * success.
    */
-  async ensureLabels(
-    orgId: string,
-    dto: EnsureLabelsDto,
-  ): Promise<EnsureLabelResult[]> {
+  async ensureLabels(orgId: string, dto: EnsureLabelsDto): Promise<EnsureLabelResult[]> {
     const [, binding] = await Promise.all([
       this.connections.assertInOrg(orgId, dto.connectionId),
       this.credentials.getConnectionBinding(dto.connectionId),
@@ -353,7 +335,5 @@ export class TriggerService {
 /** Registry color/description for a name, falling back to neutral gray. */
 function labelSpec(name: string): { color: string; description?: string } {
   const entry = getConduitLabel(name);
-  return entry
-    ? { color: entry.color, description: entry.description }
-    : { color: FALLBACK_COLOR };
+  return entry ? { color: entry.color, description: entry.description } : { color: FALLBACK_COLOR };
 }

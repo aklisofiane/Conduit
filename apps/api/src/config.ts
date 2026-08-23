@@ -5,8 +5,7 @@ const githubClientSecret = process.env.GITHUB_CLIENT_SECRET ?? '';
 const gitlabClientId = process.env.GITLAB_CLIENT_ID ?? '';
 const gitlabClientSecret = process.env.GITLAB_CLIENT_SECRET ?? '';
 export type Deployment = 'local' | 'hosted';
-const deployment: Deployment =
-  process.env.CONDUIT_DEPLOYMENT === 'hosted' ? 'hosted' : 'local';
+const deployment: Deployment = process.env.CONDUIT_DEPLOYMENT === 'hosted' ? 'hosted' : 'local';
 
 const seedEmails: string[] = (process.env.CONDUIT_SEED_EMAILS ?? '')
   .split(',')
@@ -45,8 +44,7 @@ export const config = {
     // Better Auth signs cookies + tokens with this. Required in production;
     // in dev we default to a stable string so a fresh checkout boots.
     secret: process.env.BETTER_AUTH_SECRET ?? DEV_BETTER_AUTH_SECRET,
-    baseURL:
-      process.env.BETTER_AUTH_URL ?? `http://localhost:${apiPort}`,
+    baseURL: process.env.BETTER_AUTH_URL ?? `http://localhost:${apiPort}`,
     // GitHub OAuth surfaces only when both halves are set, in either deployment.
     githubOAuth:
       githubClientId && githubClientSecret

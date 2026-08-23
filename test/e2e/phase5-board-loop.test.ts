@@ -86,10 +86,7 @@ interface RunDetail extends RunRow {
   nodes: Array<{ nodeName: string; output: NodeRunOutput | null }>;
 }
 
-async function waitFor<T>(
-  check: () => Promise<T | null | false>,
-  timeoutMs: number,
-): Promise<T> {
+async function waitFor<T>(check: () => Promise<T | null | false>, timeoutMs: number): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const result = await check();
@@ -110,16 +107,17 @@ function sleep(ms: number): Promise<void> {
  * the commit. The push exercises the credential helper wired up by
  * `installPushCredentials`.
  */
-function workerTurn(
-  iterationFile: string,
-  commitMessage: string,
-): StubSessionScript {
+function workerTurn(iterationFile: string, commitMessage: string): StubSessionScript {
   return {
     turns: [
       {
         steps: [
           { kind: 'text', delta: `iteration: write ${iterationFile}` },
-          { kind: 'write-file', path: iterationFile, content: `export const marker = '${iterationFile}';\n` },
+          {
+            kind: 'write-file',
+            path: iterationFile,
+            content: `export const marker = '${iterationFile}';\n`,
+          },
           // Single shell invocation for add → commit → push. `git status`
           // between `add` and `commit` is a no-op semantically but happens
           // to flush git's index cache — without it, `commit` intermittently
@@ -187,9 +185,7 @@ describe('Phase 5 — board loop (Worker ↔ Critic) over ticket-branch', () => 
   // frozen slug back rather than recomputing it — the freeze captures the
   // connection as it was at create time, before this test patches it in.
   const slugScheduleId = async (workflowId: string): Promise<string> => {
-    const row = await harness.http.get<{ temporalSlug: string | null }>(
-      `/workflows/${workflowId}`,
-    );
+    const row = await harness.http.get<{ temporalSlug: string | null }>(`/workflows/${workflowId}`);
     return workflowScheduleId(workflowId, row.temporalSlug ?? undefined);
   };
 
@@ -277,8 +273,22 @@ describe('Phase 5 — board loop (Worker ↔ Critic) over ticket-branch', () => 
 
     const workerSchedule = scheduleClient.getHandle(await slugScheduleId(worker.id));
     const criticSchedule = scheduleClient.getHandle(await slugScheduleId(critic.id));
-    await waitFor(() => workerSchedule.describe().then(() => true).catch(() => false), 15_000);
-    await waitFor(() => criticSchedule.describe().then(() => true).catch(() => false), 15_000);
+    await waitFor(
+      () =>
+        workerSchedule
+          .describe()
+          .then(() => true)
+          .catch(() => false),
+      15_000,
+    );
+    await waitFor(
+      () =>
+        criticSchedule
+          .describe()
+          .then(() => true)
+          .catch(() => false),
+      15_000,
+    );
 
     // Route sessions by prompt tag — the Worker and Critic have distinct
     // instruction strings, so StubProvider's `byPrompt` dispatch handles
@@ -373,7 +383,8 @@ describe('Phase 5 — board loop (Worker ↔ Critic) over ticket-branch', () => 
     await workerSchedule.trigger();
     const workerRuns2 = await waitFor(async () => {
       const rows = await harness.http.get<RunRow[]>(`/workflows/${worker.id}/runs`);
-      return rows.length >= 2 && rows.every((r) => r.status === 'COMPLETED' || r.status === 'FAILED')
+      return rows.length >= 2 &&
+        rows.every((r) => r.status === 'COMPLETED' || r.status === 'FAILED')
         ? rows
         : null;
     }, 30_000);

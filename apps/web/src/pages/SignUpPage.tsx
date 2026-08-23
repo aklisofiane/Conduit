@@ -140,8 +140,22 @@ export function SignUpPage() {
       {(showGithub || showGitlab) && (
         <>
           <Divider />
-          {showGithub && <OAuthButton provider="github" label="Continue with GitHub" callbackURL={safeNext} errorCallbackURL="/sign-in" />}
-          {showGitlab && <OAuthButton provider="gitlab" label="Continue with GitLab" callbackURL={safeNext} errorCallbackURL="/sign-in" />}
+          {showGithub && (
+            <OAuthButton
+              provider="github"
+              label="Continue with GitHub"
+              callbackURL={safeNext}
+              errorCallbackURL="/sign-in"
+            />
+          )}
+          {showGitlab && (
+            <OAuthButton
+              provider="gitlab"
+              label="Continue with GitLab"
+              callbackURL={safeNext}
+              errorCallbackURL="/sign-in"
+            />
+          )}
         </>
       )}
     </div>

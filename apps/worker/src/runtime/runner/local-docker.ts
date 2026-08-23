@@ -77,9 +77,7 @@ export interface RunnerResourceLimits {
  * typical agent run (deps install + native build headroom); operators with
  * heavier workloads raise them via env. Exported for unit tests.
  */
-export function resolveResourceLimits(
-  env: NodeJS.ProcessEnv = process.env,
-): RunnerResourceLimits {
+export function resolveResourceLimits(env: NodeJS.ProcessEnv = process.env): RunnerResourceLimits {
   return {
     memory: env.CONDUIT_RUNNER_MEMORY?.trim() || DEFAULT_MEMORY,
     cpus: env.CONDUIT_RUNNER_CPUS?.trim() || DEFAULT_CPUS,

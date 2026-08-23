@@ -94,7 +94,9 @@ export function SearchSelect({
         disabled={disabled}
         className={cn(selectTriggerClass, open && searchSelectOpenClass, className)}
       >
-        <span className={cn(searchSelectValueClass, !selectedLabel && searchSelectPlaceholderClass)}>
+        <span
+          className={cn(searchSelectValueClass, !selectedLabel && searchSelectPlaceholderClass)}
+        >
           {selectedLabel ?? placeholder}
         </span>
         <span className={cn(selectChevronClass, open && 'rotate-180')}>
@@ -124,14 +126,15 @@ export function SearchSelect({
           </div>
 
           <div className={searchSelectListClass}>
-            {filtered.length === 0 && (
-              <div className={searchSelectEmptyClass}>No results</div>
-            )}
+            {filtered.length === 0 && <div className={searchSelectEmptyClass}>No results</div>}
             {filtered.map((opt) => (
               <button
                 key={opt.value}
                 type="button"
-                className={cn(selectItemClass, opt.value === value && searchSelectItemSelectedClass)}
+                className={cn(
+                  selectItemClass,
+                  opt.value === value && searchSelectItemSelectedClass,
+                )}
                 onClick={() => {
                   onValueChange(opt.value);
                   setOpen(false);

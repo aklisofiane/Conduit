@@ -11,7 +11,9 @@ export function ChangedFiles({ node }: { node: NodeRunRow }) {
   if (!files.length) {
     return (
       <div className="flex h-full items-center justify-center font-mono text-small text-[var(--color-text-muted)]">
-        {node.status === 'COMPLETED' ? 'No files changed in this workspace.' : 'File list appears after the node completes.'}
+        {node.status === 'COMPLETED'
+          ? 'No files changed in this workspace.'
+          : 'File list appears after the node completes.'}
       </div>
     );
   }

@@ -59,8 +59,7 @@ const badgeVariants = cva('inline-flex items-center', {
 });
 
 export interface BadgeProps
-  extends React.HTMLAttributes<HTMLSpanElement>,
-    VariantProps<typeof badgeVariants> {
+  extends React.HTMLAttributes<HTMLSpanElement>, VariantProps<typeof badgeVariants> {
   /** Render as the child element (e.g. a `<button>`) instead of a `<span>`. */
   asChild?: boolean;
 }
@@ -99,8 +98,7 @@ const badgeDotVariants = cva('inline-block shrink-0 rounded-full', {
 });
 
 export interface BadgeDotProps
-  extends React.HTMLAttributes<HTMLSpanElement>,
-    VariantProps<typeof badgeDotVariants> {}
+  extends React.HTMLAttributes<HTMLSpanElement>, VariantProps<typeof badgeDotVariants> {}
 
 export const BadgeDot = forwardRef<HTMLSpanElement, BadgeDotProps>(
   ({ className, size, tone, ...props }, ref) => (

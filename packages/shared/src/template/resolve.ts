@@ -26,9 +26,7 @@ export function collectTemplatePlaceholders(template: TemplateFile): string[] {
   return collectTemplatePlaceholderDetails(template).map((p) => p.alias);
 }
 
-export function collectTemplatePlaceholderDetails(
-  template: TemplateFile,
-): TemplatePlaceholder[] {
+export function collectTemplatePlaceholderDetails(template: TemplateFile): TemplatePlaceholder[] {
   const byAlias = new Map<string, Set<ExpectedSlotKind>>();
   for (const wf of template.workflows) {
     for (const slot of enumerateConnectionSlots(wf.definition)) {
@@ -133,9 +131,7 @@ export interface ConnectionSlot {
  * it to write placeholders over real ids. Keeping a single enumerator means
  * the two directions can never drift apart.
  */
-export function* enumerateConnectionSlots(
-  def: WorkflowDefinition,
-): Generator<ConnectionSlot> {
+export function* enumerateConnectionSlots(def: WorkflowDefinition): Generator<ConnectionSlot> {
   for (const trigger of def.triggers) {
     yield {
       value: trigger.connectionId,

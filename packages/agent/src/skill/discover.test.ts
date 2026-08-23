@@ -59,7 +59,12 @@ describe('discoverSkills', () => {
   });
 
   it('defaults id and name to the directory name and description to "" when front-matter is empty', async () => {
-    const skillDir = await writeSkill(repo, '.claude/skills', 'lint', '# just a body, no front-matter');
+    const skillDir = await writeSkill(
+      repo,
+      '.claude/skills',
+      'lint',
+      '# just a body, no front-matter',
+    );
 
     const skills = await discoverSkills({ cwd: repo });
 
@@ -105,11 +110,21 @@ describe('discoverSkills', () => {
     const skills = await discoverSkills({ cwd: repo });
 
     expect(skills).toHaveLength(1);
-    expect(skills[0]).toMatchObject({ id: 'shared', name: 'shared', provider: 'both', source: 'repo' });
+    expect(skills[0]).toMatchObject({
+      id: 'shared',
+      name: 'shared',
+      provider: 'both',
+      source: 'repo',
+    });
   });
 
   it('with HOME at an empty temp dir, returns only repo skills (no worker/plugin roots)', async () => {
-    await writeSkill(repo, '.claude/skills', 'only-repo', ['---', 'name: OnlyRepo', '---'].join('\n'));
+    await writeSkill(
+      repo,
+      '.claude/skills',
+      'only-repo',
+      ['---', 'name: OnlyRepo', '---'].join('\n'),
+    );
 
     const skills = await discoverSkills({ cwd: repo });
 
@@ -121,8 +136,18 @@ describe('discoverSkills', () => {
   it('scans extra repoRoots passed via opts in addition to cwd', async () => {
     const otherRepo = await fs.mkdtemp(path.join(os.tmpdir(), 'conduit-discover-other-'));
     try {
-      await writeSkill(repo, '.claude/skills', 'from-cwd', ['---', 'name: FromCwd', '---'].join('\n'));
-      await writeSkill(otherRepo, '.claude/skills', 'from-extra', ['---', 'name: FromExtra', '---'].join('\n'));
+      await writeSkill(
+        repo,
+        '.claude/skills',
+        'from-cwd',
+        ['---', 'name: FromCwd', '---'].join('\n'),
+      );
+      await writeSkill(
+        otherRepo,
+        '.claude/skills',
+        'from-extra',
+        ['---', 'name: FromExtra', '---'].join('\n'),
+      );
 
       const skills = await discoverSkills({ cwd: repo, repoRoots: [otherRepo] });
 

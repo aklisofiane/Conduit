@@ -1,8 +1,4 @@
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import {
   connectionScopeSchema,
   type ConnectionScope,
@@ -155,13 +151,9 @@ export class ConnectionsService {
       if (!def) continue;
       const triggers = def.triggers ?? [];
       const triggerHit = triggers.some(
-        (t) =>
-          t?.connectionId === connectionId ||
-          t?.boardConnectionId === connectionId,
+        (t) => t?.connectionId === connectionId || t?.boardConnectionId === connectionId,
       );
-      const mcpHit = (def.mcpServers ?? []).some(
-        (s) => s?.connectionId === connectionId,
-      );
+      const mcpHit = (def.mcpServers ?? []).some((s) => s?.connectionId === connectionId);
       if (triggerHit || mcpHit) {
         blockers.push({ id: wf.id, name: wf.name });
       }

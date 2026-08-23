@@ -26,10 +26,7 @@ export function decryptSecret(payload: string, key: Buffer): string {
   }
   const decipher = crypto.createDecipheriv(ALGO, key, Buffer.from(ivHex, 'hex'));
   decipher.setAuthTag(Buffer.from(tagHex, 'hex'));
-  const plaintext = Buffer.concat([
-    decipher.update(Buffer.from(ctHex, 'hex')),
-    decipher.final(),
-  ]);
+  const plaintext = Buffer.concat([decipher.update(Buffer.from(ctHex, 'hex')), decipher.final()]);
   return plaintext.toString('utf8');
 }
 

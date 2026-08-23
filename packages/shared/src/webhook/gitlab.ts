@@ -20,10 +20,7 @@ import type { TriggerEvent } from '../trigger/event';
  * notes are dropped (return `null`) — matching the GitHub normalizer's
  * `issue.pull_request` presence gate for `issue_comment`.
  */
-export function normalizeGitlabWebhook(
-  eventName: string,
-  payload: unknown,
-): TriggerEvent | null {
+export function normalizeGitlabWebhook(eventName: string, payload: unknown): TriggerEvent | null {
   const p = payload as GitlabWebhookPayload | null | undefined;
   if (!p || typeof p !== 'object') return null;
 
@@ -129,9 +126,7 @@ interface GitlabWebhookPayload {
  * `splitProjectPath` helper, so the webhook and polling paths produce the same
  * shape. Returns undefined for paths without a namespace (single-segment).
  */
-function extractRepo(
-  project: GitlabWebhookPayload['project'],
-): TriggerEvent['repo'] {
+function extractRepo(project: GitlabWebhookPayload['project']): TriggerEvent['repo'] {
   const full = project?.path_with_namespace;
   if (!full) return undefined;
   const { owner, name } = splitProjectPath(full);
@@ -144,9 +139,7 @@ function extractRepo(
  * Fork head-repo resolution is deferred — GitLab carries numeric project IDs,
  * not paths, for the source project. Revisit when a workflow needs it.
  */
-function extractPr(
-  oa: NonNullable<GitlabWebhookPayload['object_attributes']>,
-): TriggerEvent['pr'] {
+function extractPr(oa: NonNullable<GitlabWebhookPayload['object_attributes']>): TriggerEvent['pr'] {
   const headRef = oa.source_branch;
   const baseRef = oa.target_branch;
   if (!headRef || !baseRef) return undefined;

@@ -26,7 +26,9 @@ export class RunsService {
       orderBy: { startedAt: 'desc' },
       take: limit,
       include: {
-        nodes: { select: { id: true, nodeName: true, status: true, startedAt: true, finishedAt: true } },
+        nodes: {
+          select: { id: true, nodeName: true, status: true, startedAt: true, finishedAt: true },
+        },
       },
     });
     // `totalCostUsd` is a Prisma Decimal — surface it as a plain number so the

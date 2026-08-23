@@ -34,8 +34,7 @@ const USAGE_OUTPUT_TOKENS = 41;
 
 // Expected snapshot-at-write cost from the defaults above.
 const EXPECTED_COST =
-  (USAGE_INPUT_TOKENS / 1_000_000) * INPUT_PER_M +
-  (USAGE_OUTPUT_TOKENS / 1_000_000) * OUTPUT_PER_M;
+  (USAGE_INPUT_TOKENS / 1_000_000) * INPUT_PER_M + (USAGE_OUTPUT_TOKENS / 1_000_000) * OUTPUT_PER_M;
 
 interface CreateWorkflowResponse {
   id: string;

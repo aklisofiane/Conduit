@@ -11,10 +11,7 @@ function makeDefinition(triggerCount: number, nodeCount: number): WorkflowDefini
       { length: triggerCount },
       () => ({}),
     ) as unknown as WorkflowDefinition['triggers'],
-    nodes: Array.from(
-      { length: nodeCount },
-      () => ({}),
-    ) as unknown as WorkflowDefinition['nodes'],
+    nodes: Array.from({ length: nodeCount }, () => ({})) as unknown as WorkflowDefinition['nodes'],
     edges: [],
     mcpServers: [],
     ui: {} as WorkflowDefinition['ui'],

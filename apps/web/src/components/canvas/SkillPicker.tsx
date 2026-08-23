@@ -1,10 +1,7 @@
 import { useMemo } from 'react';
 import type { SkillRef } from '@conduit/shared';
 import type { DiscoveredSkill } from '../../api/types.js';
-import {
-  CheckboxListPopover,
-  type CheckboxListGroup,
-} from '../ui/checkbox-list-popover.js';
+import { CheckboxListPopover, type CheckboxListGroup } from '../ui/checkbox-list-popover.js';
 
 interface Props {
   /** Skills already filtered to the agent's provider. */

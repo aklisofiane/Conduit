@@ -271,10 +271,7 @@ function CanvasInner() {
   const onConnect = useCallback(
     (conn: Connection) => {
       setFlowEdges((current) => {
-        const next = addEdge(
-          { ...conn, type: WORKFLOW_EDGE_TYPE },
-          current,
-        );
+        const next = addEdge({ ...conn, type: WORKFLOW_EDGE_TYPE }, current);
         if (draft) setDraft({ ...draft, edges: flowEdgesToDomain(next, draft, nameById) });
         return next;
       });
@@ -424,9 +421,7 @@ function CanvasInner() {
 
   const selectedAgent = draft.nodes.find((n) => n.id === selectedNodeId);
   const selectedTrigger = draft.triggers.find((t) => t.id === selectedNodeId);
-  const lastRunLabel = wf?.updatedAt
-    ? `saved · ${relativeFromNow(wf.updatedAt)}`
-    : 'unsaved';
+  const lastRunLabel = wf?.updatedAt ? `saved · ${relativeFromNow(wf.updatedAt)}` : 'unsaved';
 
   if (activeTab === 'runs') {
     return (
@@ -444,11 +439,7 @@ function CanvasInner() {
         triggerSlotFilled={draft.triggers.length > 0}
       />
       <div className="flex min-w-0 flex-1 flex-col">
-        <div
-          className="relative flex-1"
-          onDragOver={handleDragOver}
-          onDrop={handleDrop}
-        >
+        <div className="relative flex-1" onDragOver={handleDragOver} onDrop={handleDrop}>
           <div className="pointer-events-none absolute left-[14px] top-3 z-[2] flex gap-[6px]">
             <WorkflowHeaderPill workflowId={id} />
             <span className="pointer-events-auto rounded-[var(--radius-sm)] border border-[var(--color-divider)] bg-[var(--color-bg-panel)] px-2 py-[3px] font-mono text-small text-[var(--color-text-muted)]">
@@ -543,8 +534,8 @@ function TriggerPanelByType({ trigger, onChange, ...rest }: TriggerPanelByTypePr
       </div>
       <div>event: {trigger.type === 'webhook' ? trigger.event : ''}</div>
       <div>
-        No editor yet — delete this trigger and re-add an Issues, Pull requests, or Schedule
-        trigger from the palette.
+        No editor yet — delete this trigger and re-add an Issues, Pull requests, or Schedule trigger
+        from the palette.
       </div>
       <Button className="mt-2" onClick={rest.onClose}>
         Close
@@ -578,10 +569,7 @@ function buildNameIdMaps(def: WorkflowDefinition | undefined): {
 }
 
 function uniqueNodeName(def: WorkflowDefinition, prefix: string): string {
-  const names = new Set([
-    ...def.nodes.map((n) => n.name),
-    ...def.triggers.map((t) => t.name),
-  ]);
+  const names = new Set([...def.nodes.map((n) => n.name), ...def.triggers.map((t) => t.name)]);
   let i = 1;
   while (names.has(`${prefix}${i}`)) i++;
   return `${prefix}${i}`;
@@ -613,8 +601,7 @@ function buildFlowNodes(
   const connById = new Map(connections.map((c) => [c.id, c]));
   const triggerNodes: FlowNode[] = draft.triggers.map((trigger, i) => {
     const p = prevById.get(trigger.id);
-    const position =
-      draft.ui.nodePositions[trigger.name] ??
+    const position = draft.ui.nodePositions[trigger.name] ??
       draft.ui.nodePositions[trigger.id] ??
       p?.position ?? { x: 80, y: 120 + i * 160 };
     const conn = connById.get(trigger.connectionId);
@@ -633,8 +620,7 @@ function buildFlowNodes(
   });
   const agents: FlowNode[] = draft.nodes.map((agent, i) => {
     const p = prevById.get(agent.id);
-    const position =
-      draft.ui.nodePositions[agent.name] ??
+    const position = draft.ui.nodePositions[agent.name] ??
       draft.ui.nodePositions[agent.id] ??
       p?.position ?? { x: 440 + i * 360, y: 120 };
     return {

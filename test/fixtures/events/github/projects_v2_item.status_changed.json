@@ -18,7 +18,7 @@
       "field_name": "Status",
       "project_number": 5,
       "from": { "id": "abc123", "name": "Todo", "color": "GRAY" },
-      "to":   { "id": "def456", "name": "Dev",  "color": "BLUE" }
+      "to": { "id": "def456", "name": "Dev", "color": "BLUE" }
     }
   },
   "organization": {

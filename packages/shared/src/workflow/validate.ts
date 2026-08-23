@@ -82,8 +82,7 @@ export function validateWorkflowDefinition(
     ) {
       issues.push({
         code: 'trigger-board-connection-required',
-        message:
-          `Trigger "${trigger.name}" listens for board.column.changed but is missing a boardConnectionId.`,
+        message: `Trigger "${trigger.name}" listens for board.column.changed but is missing a boardConnectionId.`,
         nodeName: trigger.name,
       });
     }
@@ -119,9 +118,7 @@ export function validateWorkflowDefinition(
   // the same pair. Triggers without a board contribute `undefined` and are
   // ignored.
   const distinctBoardConnectionIds = new Set(
-    triggers
-      .map((t) => t.boardConnectionId)
-      .filter((id): id is string => Boolean(id)),
+    triggers.map((t) => t.boardConnectionId).filter((id): id is string => Boolean(id)),
   );
   if (distinctBoardConnectionIds.size > 1) {
     issues.push({
@@ -135,9 +132,7 @@ export function validateWorkflowDefinition(
   // `deriveWorkspaces` fixes this for fresh definitions; this catches
   // legacy or hand-edited JSON where the workspace was authored by hand.
   const triggerNames = new Set(triggers.map((t) => t.name));
-  const cronTriggerNames = new Set(
-    triggers.filter((t) => t.type === 'cron').map((t) => t.name),
-  );
+  const cronTriggerNames = new Set(triggers.filter((t) => t.type === 'cron').map((t) => t.name));
   if (cronTriggerNames.size > 0) {
     const derived = deriveWorkspaces(definition);
     // Index each node's upstream trigger names once, so the per-node checks
@@ -158,9 +153,7 @@ export function validateWorkflowDefinition(
       // setups are rejected elsewhere (shared-connection rule), and the
       // workspace shape they pick is unsupported anyway.
       const upstreamTriggerNames = upstreamTriggersByNode.get(node.name) ?? [];
-      const hasNonCronTrigger = upstreamTriggerNames.some(
-        (name) => !cronTriggerNames.has(name),
-      );
+      const hasNonCronTrigger = upstreamTriggerNames.some((name) => !cronTriggerNames.has(name));
       if (hasNonCronTrigger) continue;
       // The legacy/hand-edited check: stored workspace is ticket-branch
       // despite a cron upstream.

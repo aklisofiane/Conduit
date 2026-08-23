@@ -6,9 +6,9 @@ import type { ZodType, ZodTypeDef } from 'zod';
  * match UI form shapes without duplication.
  */
 @Injectable()
-export class ZodBodyPipe<TSchema extends ZodType<unknown, ZodTypeDef, unknown>>
-  implements PipeTransform<unknown, unknown>
-{
+export class ZodBodyPipe<
+  TSchema extends ZodType<unknown, ZodTypeDef, unknown>,
+> implements PipeTransform<unknown, unknown> {
   constructor(private readonly schema: TSchema) {}
 
   transform(value: unknown): unknown {

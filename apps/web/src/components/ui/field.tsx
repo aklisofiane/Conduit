@@ -30,7 +30,10 @@ Label.displayName = 'Label';
 export function Hint({ className, ...props }: React.HTMLAttributes<HTMLSpanElement>) {
   return (
     <span
-      className={cn('font-normal normal-case tracking-normal text-caption text-[var(--color-text-muted)]', className)}
+      className={cn(
+        'font-normal normal-case tracking-normal text-caption text-[var(--color-text-muted)]',
+        className,
+      )}
       {...props}
     />
   );

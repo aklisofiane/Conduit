@@ -91,10 +91,7 @@ describe('credentialTokenStatus', () => {
   });
 
   it('heals back to active when a re-link pushes the expiry forward', () => {
-    const stale = credentialTokenStatus(
-      oauth({ tokenExpiresAt: '2026-08-22T11:00:00.000Z' }),
-      NOW,
-    );
+    const stale = credentialTokenStatus(oauth({ tokenExpiresAt: '2026-08-22T11:00:00.000Z' }), NOW);
     const refreshed = credentialTokenStatus(
       oauth({ tokenExpiresAt: '2026-08-22T14:00:00.000Z' }),
       NOW,

@@ -27,9 +27,7 @@ export async function cloneAnalysisWorkspaceActivity(
 ): Promise<CloneAnalysisWorkspaceResult> {
   const connection = await loadConnectionContext(input.connectionId);
   if (!connection) {
-    throw new Error(
-      `analysis connection ${input.connectionId} is missing or not repo-scoped`,
-    );
+    throw new Error(`analysis connection ${input.connectionId} is missing or not repo-scoped`);
   }
   const bare = baseClonePath(
     connection.platform,

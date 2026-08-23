@@ -24,7 +24,5 @@ export function resolveAgentAuthMode(): AgentAuthMode {
   const v = process.env.CONDUIT_AGENT_AUTH;
   if (v === undefined || v === 'api-key') return 'api-key';
   if (v === 'oauth-mount') return 'oauth-mount';
-  throw new Error(
-    `CONDUIT_AGENT_AUTH must be 'oauth-mount' or 'api-key' (got "${v}")`,
-  );
+  throw new Error(`CONDUIT_AGENT_AUTH must be 'oauth-mount' or 'api-key' (got "${v}")`);
 }

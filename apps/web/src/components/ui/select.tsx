@@ -96,10 +96,7 @@ export function Select({
       onValueChange={onValueChange}
       disabled={disabled}
     >
-      <RxSelect.Trigger
-        aria-label={ariaLabel}
-        className={cn(selectTriggerClass, className)}
-      >
+      <RxSelect.Trigger aria-label={ariaLabel} className={cn(selectTriggerClass, className)}>
         <span className={selectValueClass}>
           <RxSelect.Value placeholder={placeholder} />
         </span>
@@ -108,18 +105,12 @@ export function Select({
         </RxSelect.Icon>
       </RxSelect.Trigger>
       <RxSelect.Portal>
-        <RxSelect.Content
-          position="popper"
-          sideOffset={4}
-          className={selectContentClass}
-        >
+        <RxSelect.Content position="popper" sideOffset={4} className={selectContentClass}>
           <RxSelect.Viewport className="p-1">
             {options.map((item, i) =>
               isGroup(item) ? (
                 <RxSelect.Group key={`g-${i}-${item.label}`}>
-                  <RxSelect.Label className={dropdownLabelClass}>
-                    {item.label}
-                  </RxSelect.Label>
+                  <RxSelect.Label className={dropdownLabelClass}>{item.label}</RxSelect.Label>
                   {item.options.map((opt) => (
                     <SelectItemRow key={opt.value} option={opt} />
                   ))}
@@ -137,11 +128,7 @@ export function Select({
 
 function SelectItemRow({ option }: { option: SelectOption }) {
   return (
-    <RxSelect.Item
-      value={option.value}
-      disabled={option.disabled}
-      className={selectItemClass}
-    >
+    <RxSelect.Item value={option.value} disabled={option.disabled} className={selectItemClass}>
       <RxSelect.ItemText>{option.label}</RxSelect.ItemText>
       <RxSelect.ItemIndicator className={selectItemIndicatorClass}>
         <Check size={12} color="var(--color-accent)" strokeWidth={1.5} />

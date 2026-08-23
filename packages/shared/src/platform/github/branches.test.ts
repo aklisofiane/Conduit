@@ -4,28 +4,19 @@ import { listRepoBranches } from './branches';
 describe('listRepoBranches', () => {
   it('maps branch names and hits the repo branches endpoint', async () => {
     const calls: string[] = [];
-    const fakeFetch = makeFetch(
-      [[{ name: 'main' }, { name: 'release/2.0' }]],
-      (url) => calls.push(url),
+    const fakeFetch = makeFetch([[{ name: 'main' }, { name: 'release/2.0' }]], (url) =>
+      calls.push(url),
     );
 
-    const branches = await listRepoBranches(
-      { owner: 'acme', repo: 'api', token: 't' },
-      fakeFetch,
-    );
+    const branches = await listRepoBranches({ owner: 'acme', repo: 'api', token: 't' }, fakeFetch);
 
     expect(branches).toEqual(['main', 'release/2.0']);
-    expect(calls[0]).toBe(
-      'https://api.github.com/repos/acme/api/branches?per_page=100&page=1',
-    );
+    expect(calls[0]).toBe('https://api.github.com/repos/acme/api/branches?per_page=100&page=1');
   });
 
   it('skips entries with a missing name', async () => {
     const fakeFetch = makeFetch([[{ name: 'main' }, {}, { name: 'dev' }]]);
-    const branches = await listRepoBranches(
-      { owner: 'acme', repo: 'api', token: 't' },
-      fakeFetch,
-    );
+    const branches = await listRepoBranches({ owner: 'acme', repo: 'api', token: 't' }, fakeFetch);
     expect(branches).toEqual(['main', 'dev']);
   });
 
@@ -35,10 +26,7 @@ describe('listRepoBranches', () => {
     const calls: string[] = [];
     const fakeFetch = makeFetch([page1, page2], (url) => calls.push(url));
 
-    const branches = await listRepoBranches(
-      { owner: 'acme', repo: 'api', token: 't' },
-      fakeFetch,
-    );
+    const branches = await listRepoBranches({ owner: 'acme', repo: 'api', token: 't' }, fakeFetch);
 
     expect(branches).toHaveLength(101);
     expect(calls).toHaveLength(2);
@@ -59,10 +47,9 @@ describe('listRepoBranches', () => {
     const fakeFetch: typeof fetch = (async () =>
       new Response('Forbidden', { status: 403 })) as typeof fetch;
 
-    const err = await listRepoBranches(
-      { owner: 'acme', repo: 'api', token: 't' },
-      fakeFetch,
-    ).catch((e: Error) => e);
+    const err = await listRepoBranches({ owner: 'acme', repo: 'api', token: 't' }, fakeFetch).catch(
+      (e: Error) => e,
+    );
 
     expect(err).toBeInstanceOf(Error);
     expect((err as Error).message).not.toContain('Forbidden');
@@ -70,18 +57,12 @@ describe('listRepoBranches', () => {
 
   it('returns an empty array when the repo has no branches', async () => {
     const fakeFetch = makeFetch([[]]);
-    const branches = await listRepoBranches(
-      { owner: 'acme', repo: 'api', token: 't' },
-      fakeFetch,
-    );
+    const branches = await listRepoBranches({ owner: 'acme', repo: 'api', token: 't' }, fakeFetch);
     expect(branches).toEqual([]);
   });
 });
 
-function makeFetch(
-  pages: unknown[],
-  onCall?: (url: string) => void,
-): typeof fetch {
+function makeFetch(pages: unknown[], onCall?: (url: string) => void): typeof fetch {
   let call = 0;
   return (async (url: string) => {
     onCall?.(url);

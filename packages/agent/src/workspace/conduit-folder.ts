@@ -99,6 +99,9 @@ export async function cloneConduitFolder(
 
 export function isNotFound(err: unknown): boolean {
   return (
-    typeof err === 'object' && err !== null && 'code' in err && (err as { code?: string }).code === 'ENOENT'
+    typeof err === 'object' &&
+    err !== null &&
+    'code' in err &&
+    (err as { code?: string }).code === 'ENOENT'
   );
 }

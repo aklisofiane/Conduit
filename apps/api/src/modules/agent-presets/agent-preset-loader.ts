@@ -1,10 +1,7 @@
 import path from 'node:path';
 import { Logger } from '@nestjs/common';
 import matter from 'gray-matter';
-import {
-  agentPresetFileSchema,
-  type AgentPresetFile,
-} from '@conduit/shared';
+import { agentPresetFileSchema, type AgentPresetFile } from '@conduit/shared';
 import { formatZodIssues, loadDir } from '../../common/load-dir';
 
 function resolvePresetsDir(): string {

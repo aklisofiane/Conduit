@@ -279,8 +279,10 @@ describe('CredentialsService OAuth mirror', () => {
 
     await svc.update(fixture.orgA.id, id, { secret: 'glpat_manual' });
 
-    const meta = (await prisma.credential.findUniqueOrThrow({ where: { id } }))
-      .metadata as Record<string, unknown>;
+    const meta = (await prisma.credential.findUniqueOrThrow({ where: { id } })).metadata as Record<
+      string,
+      unknown
+    >;
     expect(meta.tokenExpiresAt).toBeUndefined();
     expect(meta.source).toBeUndefined();
     expect(meta.accountRowId).toBe('acct_row_expiry_rotate');

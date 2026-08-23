@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { WorkflowDefinition } from '../workflow/definition';
-import {
-  resolveTemplate,
-  slugifyTemplateId,
-  summarizeTemplate,
-  workflowToTemplate,
-} from './index';
+import { resolveTemplate, slugifyTemplateId, summarizeTemplate, workflowToTemplate } from './index';
 
 function liveDefinition(): WorkflowDefinition {
   return {

@@ -17,7 +17,8 @@ export function IntegrationsPage() {
         Integrations
       </h1>
       <p className="font-mono text-small text-[var(--color-text-2)]">
-        Platform credentials and the connections built on top of them. Workflows reference connections directly.
+        Platform credentials and the connections built on top of them. Workflows reference
+        connections directly.
       </p>
 
       <CredentialsSection />

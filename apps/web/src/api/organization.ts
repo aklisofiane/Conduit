@@ -96,8 +96,7 @@ export function useOrganizations() {
   return useQuery({
     queryKey: ORGANIZATIONS_KEY,
     staleTime: FIVE_MINUTES,
-    queryFn: async () =>
-      unwrap(await authClient.organization.list()) as OrganizationSummary[],
+    queryFn: async () => unwrap(await authClient.organization.list()) as OrganizationSummary[],
   });
 }
 
@@ -157,7 +156,8 @@ export function useCreateOrganization() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (args: { name: string; slug?: string }) => {
-      const slug = (args.slug ?? slugify(args.name)) || `org-${Math.random().toString(36).slice(2, 8)}`;
+      const slug =
+        (args.slug ?? slugify(args.name)) || `org-${Math.random().toString(36).slice(2, 8)}`;
       return unwrap(
         await authClient.organization.create({ name: args.name, slug }),
       ) as OrganizationSummary;
@@ -285,10 +285,7 @@ export function useLeaveOrganization() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (organizationId: string) => {
-      unwrapVoid(
-        await authClient.organization.leave({ organizationId }),
-        'Could not leave',
-      );
+      unwrapVoid(await authClient.organization.leave({ organizationId }), 'Could not leave');
     },
     onSuccess: async () => {
       await invalidateOrgScopedQueries(qc);
@@ -321,7 +318,8 @@ export async function fetchInvitation(invitationId: string): Promise<InvitationD
     organizationSlug: (raw.organizationSlug as string | undefined) ?? undefined,
     inviterEmail:
       (raw.inviterEmail as string | undefined) ??
-      ((raw.inviter as { email?: string } | undefined)?.email ?? undefined),
+      (raw.inviter as { email?: string } | undefined)?.email ??
+      undefined,
   };
 }
 
@@ -384,8 +382,7 @@ export async function performInvitationAction(deps: InvitationActionDeps): Promi
 }
 
 export function buildInviteUrl(invitationId: string, origin?: string): string {
-  const base =
-    origin ?? (typeof window !== 'undefined' ? window.location.origin : '');
+  const base = origin ?? (typeof window !== 'undefined' ? window.location.origin : '');
   return `${base}/accept-invitation/${invitationId}`;
 }
 

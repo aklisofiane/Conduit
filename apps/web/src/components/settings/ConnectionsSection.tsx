@@ -14,11 +14,7 @@ import {
 } from '../../api/hooks.js';
 import type { AnalysisPhase } from '@conduit/shared/analysis';
 import type { ConnectionAnalysis, ConnectionRow } from '../../api/types.js';
-import {
-  ensureLabelTarget,
-  scopeSummary,
-  type EnsureLabelTarget,
-} from '../../lib/connection.js';
+import { ensureLabelTarget, scopeSummary, type EnsureLabelTarget } from '../../lib/connection.js';
 import { InfoPopover } from '../ui/info-popover.js';
 import { SettingsSection } from '../common/SettingsSection.js';
 import { Badge, BadgeDot } from '../ui/badge.js';
@@ -66,12 +62,7 @@ export function ConnectionsSection() {
         />
       )}
 
-      {labelPrompt && (
-        <LabelPrompt
-          target={labelPrompt}
-          onDismiss={() => setLabelPrompt(null)}
-        />
-      )}
+      {labelPrompt && <LabelPrompt target={labelPrompt} onDismiss={() => setLabelPrompt(null)} />}
 
       {isLoading && (
         <div className="flex h-16 items-center justify-center font-mono text-small text-[var(--color-text-muted)]">
@@ -108,13 +99,7 @@ export function ConnectionsSection() {
  * calls. `conduit-human-review` is included even though it's never a trigger
  * value — it's a writeback target that must exist on the repo/project.
  */
-function LabelPrompt({
-  target,
-  onDismiss,
-}: {
-  target: EnsureLabelTarget;
-  onDismiss: () => void;
-}) {
+function LabelPrompt({ target, onDismiss }: { target: EnsureLabelTarget; onDismiss: () => void }) {
   const ensure = useEnsureRepoLabels();
   const [selected, setSelected] = useState<Set<string>>(
     () => new Set(CONDUIT_LABELS.map((l) => l.name)),
@@ -149,9 +134,7 @@ function LabelPrompt({
     <div className="border-b border-[var(--color-divider)] px-4 py-4">
       <div className="flex flex-col gap-3 rounded-lg border border-[var(--color-divider)] bg-[var(--color-pill-bg,var(--color-bg-panel))] p-3">
         <div className="font-mono text-small">
-          Connected{' '}
-          <code className="text-[var(--color-text)]">{target.scopeLabel}</code>{' '}
-          ✓
+          Connected <code className="text-[var(--color-text)]">{target.scopeLabel}</code> ✓
         </div>
         <div className="font-mono text-small text-[var(--color-text-muted)]">
           Add Conduit's workflow labels to this repo/project?
@@ -161,10 +144,7 @@ function LabelPrompt({
           {CONDUIT_LABELS.map((l) => {
             const r = resultByName.get(l.name);
             return (
-              <label
-                key={l.name}
-                className="flex items-center gap-2 font-mono text-small"
-              >
+              <label key={l.name} className="flex items-center gap-2 font-mono text-small">
                 <Checkbox
                   checked={selected.has(l.name)}
                   disabled={ensure.isPending || done}
@@ -177,9 +157,7 @@ function LabelPrompt({
                       ✗ {r.error ?? 'failed'}
                     </span>
                   ) : (
-                    <span className="text-[var(--color-success,#2da44e)]">
-                      ✓ {r.status}
-                    </span>
+                    <span className="text-[var(--color-success,#2da44e)]">✓ {r.status}</span>
                   ))}
               </label>
             );
@@ -194,23 +172,12 @@ function LabelPrompt({
 
         <div className="flex justify-end gap-2">
           {done ? (
-            <Button onClick={onDismiss}>
-              Done
-            </Button>
+            <Button onClick={onDismiss}>Done</Button>
           ) : (
             <>
-              <Button onClick={onDismiss}>
-                Skip
-              </Button>
-              <Button
-                disabled={ensure.isPending || selected.size === 0}
-                onClick={add}
-              >
-                {ensure.isPending
-                  ? 'Adding…'
-                  : hasFailures
-                    ? 'Retry'
-                    : 'Add labels'}
+              <Button onClick={onDismiss}>Skip</Button>
+              <Button disabled={ensure.isPending || selected.size === 0} onClick={add}>
+                {ensure.isPending ? 'Adding…' : hasFailures ? 'Retry' : 'Add labels'}
               </Button>
             </>
           )}
@@ -231,8 +198,7 @@ function ConnectionRowView({ conn, onDelete }: { conn: ConnectionRow; onDelete: 
   const summary = scopeSummary(conn.scope);
   // Only repo/project-scoped connections can be analyzed — board and unscoped
   // connections have no repo to map components from.
-  const isRepoScoped =
-    conn.scope.kind === 'github_repo' || conn.scope.kind === 'gitlab_project';
+  const isRepoScoped = conn.scope.kind === 'github_repo' || conn.scope.kind === 'gitlab_project';
 
   const { data: analysis } = useConnectionAnalysis(conn.id, isRepoScoped);
   const startAnalysis = useStartAnalysis();
@@ -279,10 +245,7 @@ function ConnectionRowView({ conn, onDelete }: { conn: ConnectionRow; onDelete: 
           {isRepoScoped &&
             (() => {
               const analyzeButton = (
-                <Button
-                  disabled={running || startAnalysis.isPending}
-                  onClick={onAnalyze}
-                >
+                <Button disabled={running || startAnalysis.isPending} onClick={onAnalyze}>
                   {running ? 'Analyzing…' : ready ? 'Re-analyze' : 'Analyze repo'}
                 </Button>
               );
@@ -297,9 +260,7 @@ function ConnectionRowView({ conn, onDelete }: { conn: ConnectionRow; onDelete: 
                 analyzeButton
               );
             })()}
-          <Button onClick={onDelete}>
-            Delete
-          </Button>
+          <Button onClick={onDelete}>Delete</Button>
         </div>
       </div>
 

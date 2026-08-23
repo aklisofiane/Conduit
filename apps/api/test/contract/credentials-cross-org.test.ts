@@ -44,9 +44,9 @@ describe('CredentialsService cross-org isolation', () => {
   });
 
   it('delete on a sibling-org credential throws NotFound and leaves the row', async () => {
-    await expect(
-      svc.delete(fixture.orgA.id, fixture.orgB.credentialId),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(svc.delete(fixture.orgA.id, fixture.orgB.credentialId)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
 
     const stillThere = await prisma.credential.findUnique({
       where: { id: fixture.orgB.credentialId },

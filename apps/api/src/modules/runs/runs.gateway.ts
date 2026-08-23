@@ -22,9 +22,7 @@ import { resolveWsSession } from '../../auth/ws-session';
   namespace: '/runs',
   cors: { origin: config.corsOrigin, credentials: true },
 })
-export class RunsGateway
-  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
-{
+export class RunsGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   private server!: Server;
 

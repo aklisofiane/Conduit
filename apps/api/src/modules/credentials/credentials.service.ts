@@ -115,7 +115,16 @@ export class CredentialsService {
      */
     tokenExpiresAt?: Date | string | null;
   }): Promise<{ id: string; created: boolean }> {
-    const { orgId, accountRowId, providerAccountId, providerLogin, accessToken, scopes, platform, hostUrl } = params;
+    const {
+      orgId,
+      accountRowId,
+      providerAccountId,
+      providerLogin,
+      accessToken,
+      scopes,
+      platform,
+      hostUrl,
+    } = params;
     const encryptedSecret = encrypt(accessToken);
     // `metadata` is written whole on both branches below, so an account that
     // stops reporting an expiry simply drops the key on the next mirror.
@@ -253,9 +262,7 @@ export class CredentialsService {
    * Server-trusted (called from worker / config-time helpers that already
    * authorized against the workflow row); not `orgId`-scoped.
    */
-  async getConnectionBinding(
-    connectionId: string,
-  ): Promise<{
+  async getConnectionBinding(connectionId: string): Promise<{
     scope: ConnectionScope;
     token: string;
     platform: string;

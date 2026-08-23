@@ -15,13 +15,7 @@
 
 /** Minimal ioredis slice this lock needs — keeps the unit test client-free. */
 export interface LockRedis {
-  set(
-    key: string,
-    value: string,
-    mode: 'PX',
-    ttl: number,
-    nx: 'NX',
-  ): Promise<'OK' | null>;
+  set(key: string, value: string, mode: 'PX', ttl: number, nx: 'NX'): Promise<'OK' | null>;
   eval(script: string, numKeys: number, ...args: string[]): Promise<unknown>;
 }
 

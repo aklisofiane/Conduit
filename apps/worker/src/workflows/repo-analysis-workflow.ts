@@ -68,8 +68,15 @@ interface RunContext {
  * activities.
  */
 export async function repoAnalysisWorkflow(input: RepoAnalysisWorkflowInput): Promise<void> {
-  const { analysisId, internalRunId, systemWorkflowId, orgId, connectionId, triggerEvent, presets } =
-    input;
+  const {
+    analysisId,
+    internalRunId,
+    systemWorkflowId,
+    orgId,
+    connectionId,
+    triggerEvent,
+    presets,
+  } = input;
   const runCtx: RunContext = {
     workflowId: systemWorkflowId,
     workflowName: ANALYSIS_WORKFLOW_NAME,
@@ -162,9 +169,7 @@ export async function repoAnalysisWorkflow(input: RepoAnalysisWorkflowInput): Pr
   }
 }
 
-type DesignOutcome =
-  | { ok: true; draft: WorkflowDraft }
-  | { ok: false; dropped: DroppedComponent };
+type DesignOutcome = { ok: true; draft: WorkflowDraft } | { ok: false; dropped: DroppedComponent };
 
 /**
  * Run an analyzer step (agent run + artifact read) up to `ANALYZER_MAX_ATTEMPTS`

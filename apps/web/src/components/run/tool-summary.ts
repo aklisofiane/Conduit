@@ -20,8 +20,7 @@ export function summarizeToolCall(
 ): ToolSummary {
   const name = call.name;
   const input = (call.input ?? {}) as Record<string, unknown>;
-  const status: ToolStatus =
-    result === undefined ? 'pending' : result.error ? 'error' : 'ok';
+  const status: ToolStatus = result === undefined ? 'pending' : result.error ? 'error' : 'ok';
 
   switch (name) {
     case 'Read':

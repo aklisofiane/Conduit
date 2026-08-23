@@ -81,17 +81,11 @@ export function CronTriggerPanel({
     if (TIMEZONE_OPTIONS.some((o) => o.value === trigger.timezone)) {
       return TIMEZONE_OPTIONS;
     }
-    return [
-      { value: trigger.timezone, label: trigger.timezone },
-      ...TIMEZONE_OPTIONS,
-    ];
+    return [{ value: trigger.timezone, label: trigger.timezone }, ...TIMEZONE_OPTIONS];
   }, [trigger.timezone]);
 
   const { data: allConnections = [] } = useConnections();
-  const repoConnections = useMemo(
-    () => repoScopedConnections(allConnections),
-    [allConnections],
-  );
+  const repoConnections = useMemo(() => repoScopedConnections(allConnections), [allConnections]);
 
   const branchesQuery = useRepoBranches(trigger.connectionId);
   const branchOptions = useMemo(
@@ -114,13 +108,17 @@ export function CronTriggerPanel({
 
       <div className="flex-1 overflow-y-auto px-5 py-4">
         <div className="space-y-5">
-          <Field label={trigger.platform === 'gitlab' ? 'Project' : 'Repo'} hint="branch lives on this connection">
+          <Field
+            label={trigger.platform === 'gitlab' ? 'Project' : 'Repo'}
+            hint="branch lives on this connection"
+          >
             <ConnectionSelect
               connections={repoConnections}
               value={trigger.connectionId}
               onChange={(id) => {
                 const conn = allConnections.find((c) => c.id === id);
-                const derived = conn?.scope.kind === 'gitlab_project' ? 'gitlab' as const : 'github' as const;
+                const derived =
+                  conn?.scope.kind === 'gitlab_project' ? ('gitlab' as const) : ('github' as const);
                 onChange({ connectionId: id, platform: derived });
               }}
               emptyHint="No repo connections yet — create one on the Connections page."
@@ -143,10 +141,7 @@ export function CronTriggerPanel({
             )}
           </Field>
 
-          <CronScheduleBuilder
-            value={trigger.cron}
-            onChange={(cron) => onChange({ cron })}
-          />
+          <CronScheduleBuilder value={trigger.cron} onChange={(cron) => onChange({ cron })} />
 
           <Field label="Timezone">
             <Select
@@ -161,7 +156,13 @@ export function CronTriggerPanel({
         </div>
       </div>
 
-      <PanelFooter saving={saving} dirty={dirty} valid={cronValid} onSave={onSave} onDiscard={onDiscard} />
+      <PanelFooter
+        saving={saving}
+        dirty={dirty}
+        valid={cronValid}
+        onSave={onSave}
+        onDiscard={onDiscard}
+      />
     </>
   );
 }

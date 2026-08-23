@@ -197,7 +197,9 @@ export function issueWritebackPrompt(args: {
   }
   const prDraftReady = allowedPrStates.filter((s) => s === 'draft' || s === 'ready');
   if (prShaped && prDraftReady.length > 0) {
-    const values = prDraftReady.map((s) => (s === 'ready' ? '"ready for review"' : `"${s}"`)).join(', ');
+    const values = prDraftReady
+      .map((s) => (s === 'ready' ? '"ready for review"' : `"${s}"`))
+      .join(', ');
     axes.push({
       directives: [
         `- Set the pull request's draft / ready-for-review state to whichever of these fits: ${values}. This is the PR's draft flag (mark a draft ready for review, or convert it back to a draft) — not a label, and not the open/closed field.`,
@@ -214,10 +216,14 @@ export function issueWritebackPrompt(args: {
   if (applyLabels || removeLabels) {
     const directives: string[] = [];
     if (applyLabels) {
-      directives.push(`- Apply exactly one of these labels — the single best fit: ${quoted(allowedLabels)}.`);
+      directives.push(
+        `- Apply exactly one of these labels — the single best fit: ${quoted(allowedLabels)}.`,
+      );
     }
     if (removeLabels) {
-      directives.push(`- Remove the label that gated this run, now consumed: ${quoted(consumedLabels)}.`);
+      directives.push(
+        `- Remove the label that gated this run, now consumed: ${quoted(consumedLabels)}.`,
+      );
     }
     const noop =
       applyLabels && removeLabels

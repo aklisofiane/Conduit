@@ -1,9 +1,5 @@
 import { Controller, HttpCode, Param, Post, Req } from '@nestjs/common';
-import {
-  type RawBodyRequest,
-  type WebhookResult,
-  WebhooksService,
-} from './webhooks.service';
+import { type RawBodyRequest, type WebhookResult, WebhooksService } from './webhooks.service';
 
 /**
  * Inbound webhooks. Deliberately NOT guarded by SessionGuard — the platform

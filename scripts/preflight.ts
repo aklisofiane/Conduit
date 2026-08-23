@@ -23,31 +23,31 @@
  * Self-contained: no third-party imports — keeps `npm install` and CI lean.
  */
 
-import * as net from 'node:net'
-import * as fs from 'node:fs'
-import * as path from 'node:path'
-import * as process from 'node:process'
-import * as crypto from 'node:crypto'
-import { execFileSync } from 'node:child_process'
+import * as net from 'node:net';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import * as process from 'node:process';
+import * as crypto from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 
 // ---------- Service registry ----------
 
-type ProtocolKind = 'postgres' | 'redis' | 'http' | 'host-port'
+type ProtocolKind = 'postgres' | 'redis' | 'http' | 'host-port';
 
 type UrlBinding = {
-  envVar: string
-  protocol: ProtocolKind
-}
+  envVar: string;
+  protocol: ProtocolKind;
+};
 
 type ServiceEntry = {
-  name: string
-  defaultPort: number
-  containerPort?: number
-  portEnvVar: string
-  urls: UrlBinding[]
-}
+  name: string;
+  defaultPort: number;
+  containerPort?: number;
+  portEnvVar: string;
+  urls: UrlBinding[];
+};
 
-type Mode = 'infra' | 'dev' | 'test-infra'
+type Mode = 'infra' | 'dev' | 'test-infra';
 
 const POSTGRES: ServiceEntry = {
   name: 'postgres',
@@ -55,7 +55,7 @@ const POSTGRES: ServiceEntry = {
   containerPort: 5432,
   portEnvVar: 'POSTGRES_PORT',
   urls: [{ envVar: 'DATABASE_URL', protocol: 'postgres' }],
-}
+};
 
 const TEMPORAL: ServiceEntry = {
   name: 'temporal',
@@ -63,7 +63,7 @@ const TEMPORAL: ServiceEntry = {
   containerPort: 7233,
   portEnvVar: 'TEMPORAL_PORT',
   urls: [{ envVar: 'TEMPORAL_ADDRESS', protocol: 'host-port' }],
-}
+};
 
 const TEMPORAL_UI: ServiceEntry = {
   name: 'temporal-ui',
@@ -71,7 +71,7 @@ const TEMPORAL_UI: ServiceEntry = {
   containerPort: 8080,
   portEnvVar: 'TEMPORAL_UI_PORT',
   urls: [],
-}
+};
 
 const REDIS: ServiceEntry = {
   name: 'redis',
@@ -79,7 +79,7 @@ const REDIS: ServiceEntry = {
   containerPort: 6379,
   portEnvVar: 'REDIS_PORT',
   urls: [{ envVar: 'REDIS_URL', protocol: 'redis' }],
-}
+};
 
 const API: ServiceEntry = {
   name: 'api',
@@ -89,14 +89,14 @@ const API: ServiceEntry = {
     { envVar: 'BETTER_AUTH_URL', protocol: 'http' },
     { envVar: 'VITE_API_URL', protocol: 'http' },
   ],
-}
+};
 
 const WEB: ServiceEntry = {
   name: 'web',
   defaultPort: 5173,
   portEnvVar: 'WEB_PORT',
   urls: [{ envVar: 'CONDUIT_CORS_ORIGIN', protocol: 'http' }],
-}
+};
 
 const TEST_POSTGRES: ServiceEntry = {
   name: 'postgres',
@@ -104,7 +104,7 @@ const TEST_POSTGRES: ServiceEntry = {
   containerPort: 5432,
   portEnvVar: 'POSTGRES_TEST_PORT',
   urls: [],
-}
+};
 
 const TEST_TEMPORAL: ServiceEntry = {
   name: 'temporal',
@@ -112,7 +112,7 @@ const TEST_TEMPORAL: ServiceEntry = {
   containerPort: 7233,
   portEnvVar: 'TEMPORAL_TEST_PORT',
   urls: [],
-}
+};
 
 const TEST_REDIS: ServiceEntry = {
   name: 'redis',
@@ -120,13 +120,13 @@ const TEST_REDIS: ServiceEntry = {
   containerPort: 6379,
   portEnvVar: 'REDIS_TEST_PORT',
   urls: [],
-}
+};
 
 const REGISTRY: Record<Mode, ServiceEntry[]> = {
   infra: [POSTGRES, TEMPORAL, TEMPORAL_UI, REDIS],
   dev: [POSTGRES, TEMPORAL, TEMPORAL_UI, REDIS, API, WEB],
   'test-infra': [TEST_POSTGRES, TEST_TEMPORAL, TEST_REDIS],
-}
+};
 
 /**
  * Container names per mode for the docker-compose-ps stickiness probe. Order
@@ -154,7 +154,7 @@ const STICKINESS_CONTAINERS: Record<Mode, string[]> = {
     'conduit-test-temporal-postgres',
     'conduit-test-redis',
   ],
-}
+};
 
 /**
  * Port-bearing keys whose values feed the staleness hash. Order is fixed
@@ -170,16 +170,16 @@ const HASH_KEYS: string[] = [
   'REDIS_URL',
   'TEMPORAL_ADDRESS',
   'VITE_API_URL',
-]
+];
 
-const HASH_HEADER_PREFIX = '# CONDUIT_PREFLIGHT_HASH='
+const HASH_HEADER_PREFIX = '# CONDUIT_PREFLIGHT_HASH=';
 
 // ---------- Paths ----------
 
-const REPO_ROOT = path.resolve(__dirname, '..')
-const ENV_FILE = path.join(REPO_ROOT, '.env')
-const ENV_LOCAL_FILE = path.join(REPO_ROOT, '.env.local')
-const COMPOSE_TEST_FILE = 'docker-compose.test.yml'
+const REPO_ROOT = path.resolve(__dirname, '..');
+const ENV_FILE = path.join(REPO_ROOT, '.env');
+const ENV_LOCAL_FILE = path.join(REPO_ROOT, '.env.local');
+const COMPOSE_TEST_FILE = 'docker-compose.test.yml';
 
 // ---------- .env loader ----------
 
@@ -190,25 +190,25 @@ const COMPOSE_TEST_FILE = 'docker-compose.test.yml'
  * paths).
  */
 function loadEnvFile(file: string): Record<string, string> {
-  if (!fs.existsSync(file)) return {}
-  const raw = fs.readFileSync(file, 'utf8')
-  const out: Record<string, string> = {}
+  if (!fs.existsSync(file)) return {};
+  const raw = fs.readFileSync(file, 'utf8');
+  const out: Record<string, string> = {};
   for (const line of raw.split(/\r?\n/)) {
-    const trimmed = line.trim()
-    if (!trimmed || trimmed.startsWith('#')) continue
-    const eq = trimmed.indexOf('=')
-    if (eq === -1) continue
-    const key = trimmed.slice(0, eq).trim()
-    let value = trimmed.slice(eq + 1).trim()
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eq = trimmed.indexOf('=');
+    if (eq === -1) continue;
+    const key = trimmed.slice(0, eq).trim();
+    let value = trimmed.slice(eq + 1).trim();
     if (
       (value.startsWith('"') && value.endsWith('"')) ||
       (value.startsWith("'") && value.endsWith("'"))
     ) {
-      value = value.slice(1, -1)
+      value = value.slice(1, -1);
     }
-    out[key] = value
+    out[key] = value;
   }
-  return out
+  return out;
 }
 
 // ---------- Staleness hash ----------
@@ -219,12 +219,12 @@ function loadEnvFile(file: string): Record<string, string> {
  * empty value so the hash flips on add/remove just like on edit.
  */
 function computeEnvHash(env: Record<string, string>): string {
-  const hasher = crypto.createHash('sha256')
+  const hasher = crypto.createHash('sha256');
   for (const key of HASH_KEYS) {
-    const value = env[key] ?? ''
-    hasher.update(`${key}=${value}\n`)
+    const value = env[key] ?? '';
+    hasher.update(`${key}=${value}\n`);
   }
-  return hasher.digest('hex')
+  return hasher.digest('hex');
 }
 
 /**
@@ -232,20 +232,20 @@ function computeEnvHash(env: Record<string, string>): string {
  * Returns null on any failure — caller treats null as "regenerate".
  */
 function readExistingHash(): string | null {
-  if (!fs.existsSync(ENV_LOCAL_FILE)) return null
+  if (!fs.existsSync(ENV_LOCAL_FILE)) return null;
   try {
-    const raw = fs.readFileSync(ENV_LOCAL_FILE, 'utf8')
-    const firstLine = raw.split(/\r?\n/, 1)[0] ?? ''
-    if (!firstLine.startsWith(HASH_HEADER_PREFIX)) return null
-    return firstLine.slice(HASH_HEADER_PREFIX.length).trim() || null
+    const raw = fs.readFileSync(ENV_LOCAL_FILE, 'utf8');
+    const firstLine = raw.split(/\r?\n/, 1)[0] ?? '';
+    if (!firstLine.startsWith(HASH_HEADER_PREFIX)) return null;
+    return firstLine.slice(HASH_HEADER_PREFIX.length).trim() || null;
   } catch {
-    return null
+    return null;
   }
 }
 
 // ---------- Docker-compose-ps stickiness probe ----------
 
-type ComposePsEntry = { Name?: string; State?: string }
+type ComposePsEntry = { Name?: string; State?: string };
 
 /**
  * Returns the names of conduit containers (from the mode's expected set) that
@@ -254,49 +254,49 @@ type ComposePsEntry = { Name?: string; State?: string }
  * active, can't be sticky".
  */
 function getRunningConduitContainers(mode: Mode): string[] {
-  const expected = new Set(STICKINESS_CONTAINERS[mode])
-  const args = ['compose']
-  if (mode === 'test-infra') args.push('-f', COMPOSE_TEST_FILE)
-  args.push('ps', '--format', 'json')
-  let stdout: string
+  const expected = new Set(STICKINESS_CONTAINERS[mode]);
+  const args = ['compose'];
+  if (mode === 'test-infra') args.push('-f', COMPOSE_TEST_FILE);
+  args.push('ps', '--format', 'json');
+  let stdout: string;
   try {
     stdout = execFileSync('docker', args, {
       cwd: REPO_ROOT,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
-    })
+    });
   } catch {
-    return []
+    return [];
   }
-  const entries: ComposePsEntry[] = []
-  const trimmed = stdout.trim()
-  if (!trimmed) return []
+  const entries: ComposePsEntry[] = [];
+  const trimmed = stdout.trim();
+  if (!trimmed) return [];
   try {
-    const parsed = JSON.parse(trimmed)
+    const parsed = JSON.parse(trimmed);
     if (Array.isArray(parsed)) {
-      entries.push(...(parsed as ComposePsEntry[]))
+      entries.push(...(parsed as ComposePsEntry[]));
     } else if (parsed && typeof parsed === 'object') {
-      entries.push(parsed as ComposePsEntry)
+      entries.push(parsed as ComposePsEntry);
     }
   } catch {
     // NDJSON: one JSON object per line.
     for (const line of trimmed.split(/\r?\n/)) {
-      const l = line.trim()
-      if (!l) continue
+      const l = line.trim();
+      if (!l) continue;
       try {
-        entries.push(JSON.parse(l) as ComposePsEntry)
+        entries.push(JSON.parse(l) as ComposePsEntry);
       } catch {
         // ignore malformed line
       }
     }
   }
-  const running: string[] = []
+  const running: string[] = [];
   for (const e of entries) {
-    if (!e || typeof e.Name !== 'string') continue
-    if (e.State !== 'running') continue
-    if (expected.has(e.Name)) running.push(e.Name)
+    if (!e || typeof e.Name !== 'string') continue;
+    if (e.State !== 'running') continue;
+    if (expected.has(e.Name)) running.push(e.Name);
   }
-  return running
+  return running;
 }
 
 // ---------- Port probing ----------
@@ -309,32 +309,32 @@ function getRunningConduitContainers(mode: Mode): string[] {
  */
 function isPortFree(port: number): Promise<boolean> {
   return new Promise((resolve) => {
-    const server = net.createServer()
-    let settled = false
+    const server = net.createServer();
+    let settled = false;
     const done = (result: boolean) => {
-      if (settled) return
-      settled = true
+      if (settled) return;
+      settled = true;
       try {
-        server.close()
+        server.close();
       } catch {
         // ignore — server may not have bound
       }
-      resolve(result)
-    }
+      resolve(result);
+    };
     server.once('error', (err: NodeJS.ErrnoException) => {
       if (err.code === 'EADDRINUSE' || err.code === 'EACCES') {
-        done(false)
-        return
+        done(false);
+        return;
       }
       // Any other error: treat as taken so we pick a different port rather
       // than crashing preflight on an obscure bind failure.
-      done(false)
-    })
+      done(false);
+    });
     server.once('listening', () => {
-      done(true)
-    })
-    server.listen(port, '127.0.0.1')
-  })
+      done(true);
+    });
+    server.listen(port, '127.0.0.1');
+  });
 }
 
 /**
@@ -344,19 +344,19 @@ function isPortFree(port: number): Promise<boolean> {
  */
 function pickFreePort(): Promise<number> {
   return new Promise((resolve, reject) => {
-    const server = net.createServer()
-    server.once('error', reject)
+    const server = net.createServer();
+    server.once('error', reject);
     server.listen(0, '127.0.0.1', () => {
-      const addr = server.address()
+      const addr = server.address();
       if (!addr || typeof addr === 'string') {
-        server.close()
-        reject(new Error('failed to read ephemeral port from server.address()'))
-        return
+        server.close();
+        reject(new Error('failed to read ephemeral port from server.address()'));
+        return;
       }
-      const port = addr.port
-      server.close(() => resolve(port))
-    })
-  })
+      const port = addr.port;
+      server.close(() => resolve(port));
+    });
+  });
 }
 
 // ---------- Conflict-holder lookup ----------
@@ -368,33 +368,32 @@ function pickFreePort(): Promise<number> {
  * auto-pick branch where we already know the port is taken.
  */
 function findHolder(port: number): string | null {
-  let pid: string
+  let pid: string;
   try {
-    const out = execFileSync(
-      'lsof',
-      ['-nP', '-iTCP:' + port, '-sTCP:LISTEN', '-t'],
-      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
-    )
-    pid = out.trim().split(/\r?\n/)[0]?.trim() ?? ''
-    if (!pid) return null
+    const out = execFileSync('lsof', ['-nP', '-iTCP:' + port, '-sTCP:LISTEN', '-t'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    pid = out.trim().split(/\r?\n/)[0]?.trim() ?? '';
+    if (!pid) return null;
   } catch {
-    return null
+    return null;
   }
-  let name: string
+  let name: string;
   try {
     const out = execFileSync('ps', ['-p', pid, '-o', 'comm='], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
-    })
-    name = out.trim()
-    if (!name) return null
+    });
+    name = out.trim();
+    if (!name) return null;
   } catch {
-    return null
+    return null;
   }
   // `ps comm=` may return an absolute path on Linux; show just the basename
   // so the table stays compact and matches the spec's example format.
-  const base = name.split('/').pop() ?? name
-  return `PID ${pid} '${base}'`
+  const base = name.split('/').pop() ?? name;
+  return `PID ${pid} '${base}'`;
 }
 
 // ---------- URL rebuild ----------
@@ -406,58 +405,55 @@ function findHolder(port: number): string | null {
  * so IPv6 wouldn't be silently mangled if it ever appears.
  */
 function rebuildUrl(original: string, newPort: number, protocol: ProtocolKind): string {
-  if (!original) return original
+  if (!original) return original;
   if (protocol === 'host-port') {
-    const lastColon = original.lastIndexOf(':')
-    if (lastColon === -1) return `${original}:${newPort}`
-    return `${original.slice(0, lastColon)}:${newPort}`
+    const lastColon = original.lastIndexOf(':');
+    if (lastColon === -1) return `${original}:${newPort}`;
+    return `${original.slice(0, lastColon)}:${newPort}`;
   }
-  const u = new URL(original)
-  u.port = String(newPort)
-  return u.toString()
+  const u = new URL(original);
+  u.port = String(newPort);
+  return u.toString();
 }
 
 // ---------- Resolve loop ----------
 
-type ResolveSource = 'default' | 'env' | 'resolved' | 'reused'
+type ResolveSource = 'default' | 'env' | 'resolved' | 'reused';
 
 type ResolvedEntry = {
-  service: ServiceEntry
-  port: number
-  source: ResolveSource
-  from?: number
-  to?: number
-  holder?: string | null
-  rebuiltUrls: { envVar: string; value: string }[]
-}
+  service: ServiceEntry;
+  port: number;
+  source: ResolveSource;
+  from?: number;
+  to?: number;
+  holder?: string | null;
+  rebuiltUrls: { envVar: string; value: string }[];
+};
 
-async function resolveServices(
-  mode: Mode,
-  env: Record<string, string>,
-): Promise<ResolvedEntry[]> {
-  const results: ResolvedEntry[] = []
+async function resolveServices(mode: Mode, env: Record<string, string>): Promise<ResolvedEntry[]> {
+  const results: ResolvedEntry[] = [];
   for (const service of REGISTRY[mode]) {
-    const fromEnv = env[service.portEnvVar]
-    const parsed = fromEnv ? Number(fromEnv) : NaN
-    const fromEnvOk = Number.isInteger(parsed) && parsed > 0 && parsed < 65536
-    const desired = fromEnvOk ? parsed : service.defaultPort
-    const sourceIfFree: 'default' | 'env' = fromEnvOk ? 'env' : 'default'
+    const fromEnv = env[service.portEnvVar];
+    const parsed = fromEnv ? Number(fromEnv) : NaN;
+    const fromEnvOk = Number.isInteger(parsed) && parsed > 0 && parsed < 65536;
+    const desired = fromEnvOk ? parsed : service.defaultPort;
+    const sourceIfFree: 'default' | 'env' = fromEnvOk ? 'env' : 'default';
 
-    const free = await isPortFree(desired)
+    const free = await isPortFree(desired);
     if (free) {
-      results.push({ service, port: desired, source: sourceIfFree, rebuiltUrls: [] })
-      continue
+      results.push({ service, port: desired, source: sourceIfFree, rebuiltUrls: [] });
+      continue;
     }
 
-    const picked = await pickFreePort()
-    const rebuiltUrls: { envVar: string; value: string }[] = []
+    const picked = await pickFreePort();
+    const rebuiltUrls: { envVar: string; value: string }[] = [];
     for (const binding of service.urls) {
-      const original = env[binding.envVar]
-      if (!original) continue
+      const original = env[binding.envVar];
+      if (!original) continue;
       rebuiltUrls.push({
         envVar: binding.envVar,
         value: rebuildUrl(original, picked, binding.protocol),
-      })
+      });
     }
     results.push({
       service,
@@ -467,9 +463,9 @@ async function resolveServices(
       to: picked,
       holder: findHolder(desired),
       rebuiltUrls,
-    })
+    });
   }
-  return results
+  return results;
 }
 
 /**
@@ -483,28 +479,28 @@ function reuseFromEnvLocal(
   envBase: Record<string, string>,
   envLocal: Record<string, string>,
 ): ResolvedEntry[] {
-  const results: ResolvedEntry[] = []
+  const results: ResolvedEntry[] = [];
   for (const service of REGISTRY[mode]) {
-    const overridePort = envLocal[service.portEnvVar]
-    const parsed = overridePort ? Number(overridePort) : NaN
-    const hasOverride = Number.isInteger(parsed) && parsed > 0 && parsed < 65536
-    let port: number
-    const rebuiltUrls: { envVar: string; value: string }[] = []
+    const overridePort = envLocal[service.portEnvVar];
+    const parsed = overridePort ? Number(overridePort) : NaN;
+    const hasOverride = Number.isInteger(parsed) && parsed > 0 && parsed < 65536;
+    let port: number;
+    const rebuiltUrls: { envVar: string; value: string }[] = [];
     if (hasOverride) {
-      port = parsed
+      port = parsed;
       for (const binding of service.urls) {
-        const overrideValue = envLocal[binding.envVar]
-        if (overrideValue) rebuiltUrls.push({ envVar: binding.envVar, value: overrideValue })
+        const overrideValue = envLocal[binding.envVar];
+        if (overrideValue) rebuiltUrls.push({ envVar: binding.envVar, value: overrideValue });
       }
     } else {
-      const fromBase = envBase[service.portEnvVar]
-      const parsedBase = fromBase ? Number(fromBase) : NaN
-      const baseOk = Number.isInteger(parsedBase) && parsedBase > 0 && parsedBase < 65536
-      port = baseOk ? parsedBase : service.defaultPort
+      const fromBase = envBase[service.portEnvVar];
+      const parsedBase = fromBase ? Number(fromBase) : NaN;
+      const baseOk = Number.isInteger(parsedBase) && parsedBase > 0 && parsedBase < 65536;
+      port = baseOk ? parsedBase : service.defaultPort;
     }
-    results.push({ service, port, source: 'reused', rebuiltUrls })
+    results.push({ service, port, source: 'reused', rebuiltUrls });
   }
-  return results
+  return results;
 }
 
 // ---------- .env.local writer ----------
@@ -515,7 +511,7 @@ function reuseFromEnvLocal(
  * round-tripping wrong through docker-compose's env_file parser.
  */
 function quoteValue(value: string): string {
-  return `"${value.replace(/"/g, '\\"')}"`
+  return `"${value.replace(/"/g, '\\"')}"`;
 }
 
 /**
@@ -530,117 +526,117 @@ function buildEnvLocal(mode: Mode, hash: string, resolved: ResolvedEntry[]): str
     '# Treat like node_modules/.cache: rm if confused, regenerate with `npm run infra:up`.',
     `# mode=${mode}  generated=${new Date().toISOString()}`,
     '',
-  ].join('\n')
-  const overrideLines: string[] = []
+  ].join('\n');
+  const overrideLines: string[] = [];
   for (const r of resolved) {
-    if (r.source !== 'resolved') continue
-    overrideLines.push(`${r.service.portEnvVar}=${quoteValue(String(r.port))}`)
+    if (r.source !== 'resolved') continue;
+    overrideLines.push(`${r.service.portEnvVar}=${quoteValue(String(r.port))}`);
     for (const u of r.rebuiltUrls) {
-      overrideLines.push(`${u.envVar}=${quoteValue(u.value)}`)
+      overrideLines.push(`${u.envVar}=${quoteValue(u.value)}`);
     }
   }
-  if (overrideLines.length === 0) return header
-  return header + overrideLines.join('\n') + '\n'
+  if (overrideLines.length === 0) return header;
+  return header + overrideLines.join('\n') + '\n';
 }
 
 function writeEnvLocal(content: string): void {
-  fs.writeFileSync(ENV_LOCAL_FILE, content, { mode: 0o600 })
+  fs.writeFileSync(ENV_LOCAL_FILE, content, { mode: 0o600 });
 }
 
 // ---------- Resolved-port table ----------
 
 function formatSource(r: ResolvedEntry): string {
-  if (r.source === 'reused') return 'reused'
-  if (r.source === 'env') return 'env'
-  if (r.source === 'default') return 'default'
+  if (r.source === 'reused') return 'reused';
+  if (r.source === 'env') return 'env';
+  if (r.source === 'default') return 'default';
   // resolved
-  const tail = r.holder ? `, conflict with ${r.holder}` : ''
-  return `resolved (${r.from} → ${r.to}${tail})`
+  const tail = r.holder ? `, conflict with ${r.holder}` : '';
+  return `resolved (${r.from} → ${r.to}${tail})`;
 }
 
 function renderTable(resolved: ResolvedEntry[]): string {
-  const headers = ['service', 'port', 'source']
-  const rows = resolved.map((r) => [r.service.name, String(r.port), formatSource(r)])
-  const widths = headers.map((h, i) =>
-    Math.max(h.length, ...rows.map((row) => row[i].length)),
-  )
-  const pad = (cell: string, w: number) => cell + ' '.repeat(w - cell.length)
+  const headers = ['service', 'port', 'source'];
+  const rows = resolved.map((r) => [r.service.name, String(r.port), formatSource(r)]);
+  const widths = headers.map((h, i) => Math.max(h.length, ...rows.map((row) => row[i].length)));
+  const pad = (cell: string, w: number) => cell + ' '.repeat(w - cell.length);
   const sep = (l: string, m: string, r: string) =>
-    l + widths.map((w) => '─'.repeat(w + 2)).join(m) + r
+    l + widths.map((w) => '─'.repeat(w + 2)).join(m) + r;
   const fmtRow = (cells: string[]) =>
-    '│ ' + cells.map((c, i) => pad(c, widths[i])).join(' │ ') + ' │'
+    '│ ' + cells.map((c, i) => pad(c, widths[i])).join(' │ ') + ' │';
   return [
     sep('┌', '┬', '┐'),
     fmtRow(headers),
     sep('├', '┼', '┤'),
     ...rows.map(fmtRow),
     sep('└', '┴', '┘'),
-  ].join('\n')
+  ].join('\n');
 }
 
 // ---------- CLI ----------
 
 function parseMode(arg: string | undefined): Mode {
-  if (arg === 'infra' || arg === 'dev' || arg === 'test-infra') return arg
+  if (arg === 'infra' || arg === 'dev' || arg === 'test-infra') return arg;
   process.stderr.write(
     `preflight: missing or unknown mode (got ${JSON.stringify(arg)}). Expected: infra | dev | test-infra\n`,
-  )
-  process.exit(2)
+  );
+  process.exit(2);
 }
 
 async function main(): Promise<void> {
-  const mode = parseMode(process.argv[2])
+  const mode = parseMode(process.argv[2]);
 
   if (process.env.CONDUIT_PREFLIGHT === 'skip') {
-    process.stderr.write('preflight: CONDUIT_PREFLIGHT=skip — bypassing port resolution\n')
-    process.exit(0)
+    process.stderr.write('preflight: CONDUIT_PREFLIGHT=skip — bypassing port resolution\n');
+    process.exit(0);
   }
 
-  const env = loadEnvFile(ENV_FILE)
-  const freshHash = computeEnvHash(env)
-  const existingHash = readExistingHash()
-  const hashMatches = existingHash !== null && existingHash === freshHash
+  const env = loadEnvFile(ENV_FILE);
+  const freshHash = computeEnvHash(env);
+  const existingHash = readExistingHash();
+  const hashMatches = existingHash !== null && existingHash === freshHash;
 
   // Stickiness: hash matches AND at least one mode container is running.
   // Either condition false → full regeneration.
-  let resolved: ResolvedEntry[]
-  let reused = false
+  let resolved: ResolvedEntry[];
+  let reused = false;
   if (hashMatches) {
-    const running = getRunningConduitContainers(mode)
+    const running = getRunningConduitContainers(mode);
     if (running.length > 0) {
-      const envLocal = loadEnvFile(ENV_LOCAL_FILE)
-      resolved = reuseFromEnvLocal(mode, env, envLocal)
-      reused = true
+      const envLocal = loadEnvFile(ENV_LOCAL_FILE);
+      resolved = reuseFromEnvLocal(mode, env, envLocal);
+      reused = true;
     } else {
-      resolved = await resolveServices(mode, env)
+      resolved = await resolveServices(mode, env);
     }
   } else {
-    resolved = await resolveServices(mode, env)
+    resolved = await resolveServices(mode, env);
   }
 
-  process.stdout.write(`preflight: mode=${mode}\n`)
-  process.stdout.write(renderTable(resolved) + '\n')
+  process.stdout.write(`preflight: mode=${mode}\n`);
+  process.stdout.write(renderTable(resolved) + '\n');
 
   if (reused) {
     process.stdout.write(
       `preflight: reused ${path.relative(REPO_ROOT, ENV_LOCAL_FILE)} (hash match, stack active)\n`,
-    )
-    return
+    );
+    return;
   }
 
-  const content = buildEnvLocal(mode, freshHash, resolved)
-  writeEnvLocal(content)
-  const hasOverrides = resolved.some((r) => r.source === 'resolved')
+  const content = buildEnvLocal(mode, freshHash, resolved);
+  writeEnvLocal(content);
+  const hasOverrides = resolved.some((r) => r.source === 'resolved');
   if (hasOverrides) {
-    process.stdout.write(`preflight: wrote ${path.relative(REPO_ROOT, ENV_LOCAL_FILE)}\n`)
+    process.stdout.write(`preflight: wrote ${path.relative(REPO_ROOT, ENV_LOCAL_FILE)}\n`);
   } else {
     process.stdout.write(
       `preflight: wrote ${path.relative(REPO_ROOT, ENV_LOCAL_FILE)} (header only, no overrides needed)\n`,
-    )
+    );
   }
 }
 
 main().catch((err) => {
-  process.stderr.write(`preflight: ${err instanceof Error ? err.stack ?? err.message : String(err)}\n`)
-  process.exit(1)
-})
+  process.stderr.write(
+    `preflight: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}\n`,
+  );
+  process.exit(1);
+});

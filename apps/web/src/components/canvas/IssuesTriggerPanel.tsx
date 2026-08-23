@@ -1,11 +1,7 @@
 import { useMemo } from 'react';
 import { offeredFilterFields } from '@conduit/shared';
 import type { TriggerConfig } from '@conduit/shared';
-import {
-  useConnections,
-  useListLabels,
-  useListProjectBoards,
-} from '../../api/hooks.js';
+import { useConnections, useListLabels, useListProjectBoards } from '../../api/hooks.js';
 import {
   ActiveToggleField,
   BoardPickerHint,
@@ -45,10 +41,7 @@ export function IssuesTriggerPanel({
   dirty,
 }: IssuesTriggerPanelProps) {
   const { data: allConnections = [] } = useConnections();
-  const repoConnections = useMemo(
-    () => repoScopedConnections(allConnections),
-    [allConnections],
-  );
+  const repoConnections = useMemo(() => repoScopedConnections(allConnections), [allConnections]);
   const boardConnections = useMemo(
     () => allConnections.filter((c) => c.scope.kind === 'github_projects_v2'),
     [allConnections],
@@ -90,13 +83,17 @@ export function IssuesTriggerPanel({
 
       <div className="flex-1 overflow-y-auto px-5 py-4">
         <div className="space-y-5">
-          <Field label={trigger.platform === 'gitlab' ? 'Project' : 'Repo'} hint="source connection for events">
+          <Field
+            label={trigger.platform === 'gitlab' ? 'Project' : 'Repo'}
+            hint="source connection for events"
+          >
             <ConnectionSelect
               connections={repoConnections}
               value={trigger.connectionId}
               onChange={(id) => {
                 const conn = allConnections.find((c) => c.id === id);
-                const derived = conn?.scope.kind === 'gitlab_project' ? 'gitlab' as const : 'github' as const;
+                const derived =
+                  conn?.scope.kind === 'gitlab_project' ? ('gitlab' as const) : ('github' as const);
                 onChange({
                   connectionId: id,
                   platform: derived,
@@ -118,9 +115,7 @@ export function IssuesTriggerPanel({
                     <ConnectionSelect
                       connections={boardConnections}
                       value={trigger.boardConnectionId ?? ''}
-                      onChange={(id) =>
-                        onChange({ boardConnectionId: id || undefined })
-                      }
+                      onChange={(id) => onChange({ boardConnectionId: id || undefined })}
                       emptyHint="No Projects v2 connections yet — create one on the Connections page."
                     />
                   </div>
@@ -171,9 +166,7 @@ export function IssuesTriggerPanel({
                   })
                 }
               />
-              <span className="font-mono text-small text-[var(--color-text-muted)]">
-                sec
-              </span>
+              <span className="font-mono text-small text-[var(--color-text-muted)]">sec</span>
             </div>
           </Field>
 

@@ -7,7 +7,7 @@ description: How to author component-specific reviewer prompts for a generated r
 
 Each generated review workflow fans out from Scope to one or more **reviewer**
 agents. You author the set: for each reviewer you choose a `name` and write its
-`instructions` — the *substance* of what it reviews, tailored to this component.
+`instructions` — the _substance_ of what it reviews, tailored to this component.
 
 ```
 Scope → reviewer₁ … reviewerₙ → Publisher
@@ -36,7 +36,7 @@ so steer reviewers toward real, consequential issues rather than nitpicks.
 
 ## A menu of common review lenses
 
-These are *inspiration, not a fixed set*. Draw from them, adapt the wording to
+These are _inspiration, not a fixed set_. Draw from them, adapt the wording to
 the component, combine them, or **invent new ones** the menu doesn't cover — a
 CLI component might warrant an `ArgParsing` reviewer; a data pipeline a
 `SchemaEvolution` reviewer; an infra component a `Secrets` or `Idempotency`
@@ -44,18 +44,21 @@ reviewer. The reviewer `name` is free-form (within the charset rule in the
 `draft-format` skill); the instructions are yours to write.
 
 ### Security
+
 Authentication / authorization bypasses; input-validation gaps (injection, XSS,
 path traversal); secrets or credentials in code; insecure cryptographic usage;
 dependency additions with known vulnerabilities; race conditions with security
 implications; unsafe deserialization.
 
 ### Quality
+
 Logic errors and bugs; dead code or unreachable branches; missing error handling
 (unhandled promises, uncaught exceptions); race conditions; missing or
 inadequate test coverage for new code paths; incorrect type usage or unsafe
 casts; resource leaks (unclosed handles, missing cleanup).
 
 ### Refactor
+
 Code duplication (same logic in multiple places); high cyclomatic complexity
 (deeply nested conditionals, long functions); violations of project conventions
 (check CLAUDE.md and nearby siblings); outdated abstractions the new code works
@@ -64,6 +67,7 @@ missing extraction opportunities (repeated patterns that should be shared
 utilities).
 
 ### Performance
+
 N+1 query patterns or missing batch operations; unnecessary memory allocations
 in hot paths; missing caching opportunities (repeated expensive computations);
 expensive operations inside loops; bundle-size regressions (large imports that
@@ -71,6 +75,7 @@ could be lazy-loaded); missing pagination on unbounded queries; synchronous
 blocking in async contexts.
 
 ### Accessibility (a11y)
+
 Missing or incorrect ARIA roles, states, and labels; interactive elements that
 are not keyboard-operable or lack focus management; insufficient color contrast
 or meaning carried by color alone; images/icons without text alternatives; form
@@ -78,6 +83,7 @@ inputs without associated labels or error messaging; dynamic content updates not
 announced to assistive technology.
 
 ### Bundle size
+
 Heavy dependencies pulled into client bundles that could be lazy-loaded or
 replaced; barrel-file imports that defeat tree-shaking; large assets (images,
 fonts) shipped without optimization; duplicated dependencies across chunks;
@@ -85,6 +91,7 @@ eagerly-imported code paths that belong behind a dynamic import; polyfills
 shipped to environments that do not need them.
 
 ### API contract
+
 Request/response shapes that drift from their schema or documentation; missing
 input validation at the API boundary; inconsistent error shapes or status codes
 across endpoints; backward-incompatible changes to public request/response
@@ -92,6 +99,7 @@ fields; pagination, filtering, or auth conventions that diverge from sibling
 endpoints; undocumented or untyped fields crossing the boundary.
 
 ### Breaking change
+
 Renamed/removed exported symbols, function signatures, or public types; changed
 default behavior callers silently depend on; database schema or migration
 changes that are not backward-compatible; config/env-var renames or removals
@@ -113,6 +121,6 @@ stability, and an invented `ArgParsing` reviewer:
 
 - [ ] One to four reviewers, each with a clear non-overlapping remit.
 - [ ] Names fit the charset rule (see `draft-format`) and are unique.
-- [ ] Each `instructions` says *what to look for*, tailored to this component.
+- [ ] Each `instructions` says _what to look for_, tailored to this component.
 - [ ] No restating of file paths / manifest-read / findings format (code appends those).
 - [ ] Lenses chosen/composed/invented to fit the component, not copied wholesale.

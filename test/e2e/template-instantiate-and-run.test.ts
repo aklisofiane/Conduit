@@ -72,10 +72,7 @@ interface RunDetail {
   }>;
 }
 
-async function waitFor<T>(
-  check: () => Promise<T | null | false>,
-  timeoutMs: number,
-): Promise<T> {
+async function waitFor<T>(check: () => Promise<T | null | false>, timeoutMs: number): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const result = await check();
@@ -183,7 +180,11 @@ describe('Template — instantiate `analyze` then run the bound 3-node chain', (
     const scheduleId = workflowScheduleId(workflowId, wf.temporalSlug ?? undefined);
     const scheduleHandle = scheduleClient.getHandle(scheduleId);
     await waitFor(
-      () => scheduleHandle.describe().then(() => true).catch(() => false),
+      () =>
+        scheduleHandle
+          .describe()
+          .then(() => true)
+          .catch(() => false),
       15_000,
     );
 
@@ -247,7 +248,10 @@ describe('Template — instantiate `analyze` then run the bound 3-node chain', (
                   {
                     kind: 'shell',
                     command: 'sh',
-                    args: ['-c', 'cat .conduit/Research.md .conduit/Review.md > .conduit/Publish.md'],
+                    args: [
+                      '-c',
+                      'cat .conduit/Research.md .conduit/Review.md > .conduit/Publish.md',
+                    ],
                   },
                   { kind: 'done' },
                 ],

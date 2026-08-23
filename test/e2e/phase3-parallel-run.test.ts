@@ -118,7 +118,11 @@ describe('Phase 3 — parallel fan-out, merge-back, .conduit/ propagation', () =
               {
                 steps: [
                   { kind: 'text', delta: 'Writing the patch…' },
-                  { kind: 'write-file', path: 'src/fix.ts', content: 'export const fixed = true;\n' },
+                  {
+                    kind: 'write-file',
+                    path: 'src/fix.ts',
+                    content: 'export const fixed = true;\n',
+                  },
                   { kind: 'done' },
                 ],
               },

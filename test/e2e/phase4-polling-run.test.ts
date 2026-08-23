@@ -15,10 +15,7 @@ import { TEST_STACK_ENV } from './stack';
  * deadline elapses. Lets helpers return `null`/`false` to mean "not ready
  * yet" without throwing.
  */
-async function waitFor<T>(
-  check: () => Promise<T | null | false>,
-  timeoutMs: number,
-): Promise<T> {
+async function waitFor<T>(check: () => Promise<T | null | false>, timeoutMs: number): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const result = await check();
@@ -89,9 +86,7 @@ describe('Phase 4 — polling trigger fires runs on board set-diff', () => {
   // deterministic handle is `poll-<slug>-<id>`. Read the frozen slug back
   // rather than recomputing it (the connection is patched in after create).
   const slugScheduleId = async (workflowId: string): Promise<string> => {
-    const row = await harness.http.get<{ temporalSlug: string | null }>(
-      `/workflows/${workflowId}`,
-    );
+    const row = await harness.http.get<{ temporalSlug: string | null }>(`/workflows/${workflowId}`);
     return workflowScheduleId(workflowId, row.temporalSlug ?? undefined);
   };
 
@@ -248,9 +243,7 @@ describe('Phase 4 — polling trigger fires runs on board set-diff', () => {
     const startedIds = afterCycle3.map((r) => r.trigger.payload?.projectItemNodeId).sort();
     expect(startedIds).toEqual(['PVTI_A', 'PVTI_B', 'PVTI_D']);
     // The newest run — sort by startedAt — should be the one for D.
-    const newest = [...afterCycle3].sort((a, b) =>
-      a.startedAt < b.startedAt ? 1 : -1,
-    )[0];
+    const newest = [...afterCycle3].sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1))[0];
     expect(newest?.trigger.payload?.projectItemNodeId).toBe('PVTI_D');
 
     // ------------------------------------------------------------------
@@ -311,4 +304,3 @@ describe('Phase 4 — polling trigger fires runs on board set-diff', () => {
     );
   }, 60_000);
 });
-

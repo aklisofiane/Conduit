@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { runnerEventSchema } from '@conduit/shared/runner';
 import type { AgentEvent } from '@conduit/shared';
-import { capAgentEvent, capPayload, MAX_EVENT_PAYLOAD_BYTES, type TruncatedPayload } from './payload-cap';
+import {
+  capAgentEvent,
+  capPayload,
+  MAX_EVENT_PAYLOAD_BYTES,
+  type TruncatedPayload,
+} from './payload-cap';
 import { createSecretRedactor } from './secret-redactor';
 
 const isTruncated = (v: unknown): v is TruncatedPayload =>
@@ -24,7 +29,11 @@ describe('payload cap', () => {
   });
 
   it('caps tool_result.output but leaves the envelope intact', () => {
-    const event: AgentEvent = { type: 'tool_result', id: 't1', output: 'y'.repeat(MAX_EVENT_PAYLOAD_BYTES + 1) };
+    const event: AgentEvent = {
+      type: 'tool_result',
+      id: 't1',
+      output: 'y'.repeat(MAX_EVENT_PAYLOAD_BYTES + 1),
+    };
     const capped = capAgentEvent(event);
     if (capped.type !== 'tool_result') throw new Error('type changed');
     expect(capped.id).toBe('t1');
@@ -61,7 +70,12 @@ describe('payload cap', () => {
   });
 
   it('caps oversized tool_call.input too', () => {
-    const event: AgentEvent = { type: 'tool_call', id: 'c1', name: 'Bash', input: { script: 'z'.repeat(MAX_EVENT_PAYLOAD_BYTES + 1) } };
+    const event: AgentEvent = {
+      type: 'tool_call',
+      id: 'c1',
+      name: 'Bash',
+      input: { script: 'z'.repeat(MAX_EVENT_PAYLOAD_BYTES + 1) },
+    };
     const capped = capAgentEvent(event);
     if (capped.type !== 'tool_call') throw new Error('type changed');
     expect(isTruncated(capped.input)).toBe(true);
@@ -75,8 +89,14 @@ describe('payload cap', () => {
   });
 
   it('a capped event still validates against the wire schema', () => {
-    const event: AgentEvent = { type: 'tool_result', id: 't1', output: 'q'.repeat(MAX_EVENT_PAYLOAD_BYTES + 1) };
-    expect(() => runnerEventSchema.parse({ kind: 'agent', event: capAgentEvent(event) })).not.toThrow();
+    const event: AgentEvent = {
+      type: 'tool_result',
+      id: 't1',
+      output: 'q'.repeat(MAX_EVENT_PAYLOAD_BYTES + 1),
+    };
+    expect(() =>
+      runnerEventSchema.parse({ kind: 'agent', event: capAgentEvent(event) }),
+    ).not.toThrow();
   });
 });
 

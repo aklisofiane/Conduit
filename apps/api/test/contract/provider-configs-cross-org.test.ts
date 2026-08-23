@@ -121,9 +121,7 @@ describe('ProviderConfigsService cross-org isolation', () => {
   });
 
   it('delete on a sibling-org row throws NotFound and leaves the row', async () => {
-    await expect(
-      svc.delete(fixture.orgA.id, orgBRowId),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(svc.delete(fixture.orgA.id, orgBRowId)).rejects.toBeInstanceOf(NotFoundException);
     const stillThere = await prisma.providerConfig.findUnique({
       where: { id: orgBRowId },
     });

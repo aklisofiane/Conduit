@@ -26,9 +26,7 @@ export class UnknownPresetError extends Error {
     public readonly templateId: string,
     public readonly nodeName: string,
   ) {
-    super(
-      `Template "${templateId}" agent "${nodeName}" references unknown preset "${presetId}"`,
-    );
+    super(`Template "${templateId}" agent "${nodeName}" references unknown preset "${presetId}"`);
     this.name = 'UnknownPresetError';
   }
 }
@@ -73,13 +71,9 @@ function expandWorkflow(
   const definition: WorkflowDefinition = {
     triggers: wf.definition.triggers,
     edges: wf.definition.edges,
-    mcpServers: wf.definition.mcpServers.map((s) =>
-      expandMcpServer(s, resolvers.mcp, templateId),
-    ),
+    mcpServers: wf.definition.mcpServers.map((s) => expandMcpServer(s, resolvers.mcp, templateId)),
     ui: wf.definition.ui,
-    nodes: wf.definition.nodes.map((n) =>
-      expandAgent(n, resolvers.agent, templateId),
-    ),
+    nodes: wf.definition.nodes.map((n) => expandAgent(n, resolvers.agent, templateId)),
   };
   return { name: wf.name, description: wf.description, definition };
 }

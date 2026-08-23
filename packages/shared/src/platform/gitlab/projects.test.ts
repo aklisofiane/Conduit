@@ -72,9 +72,7 @@ describe('fetchGitlabProjectIssues', () => {
   });
 
   it('handles empty labels array', async () => {
-    const canned = [
-      { id: 1, iid: 1, title: 't', web_url: 'https://x', labels: [] },
-    ];
+    const canned = [{ id: 1, iid: 1, title: 't', web_url: 'https://x', labels: [] }];
     const fakeFetch = makeFetch([canned]);
     const items = await fetchGitlabProjectIssues({
       hostUrl: 'gitlab.com',
@@ -95,9 +93,7 @@ describe('fetchGitlabProjectIssues', () => {
       web_url: `https://x/${i}`,
       labels: [],
     }));
-    const page2 = [
-      { id: 200, iid: 200, title: 'last', web_url: 'https://x/200', labels: [] },
-    ];
+    const page2 = [{ id: 200, iid: 200, title: 'last', web_url: 'https://x/200', labels: [] }];
 
     const calls: string[] = [];
     const fakeFetch = makeFetch([page1, page2], (url) => calls.push(url));
@@ -143,7 +139,9 @@ describe('fetchGitlabProjectIssues', () => {
 
   it('URL-encodes subgroup project paths', async () => {
     let seenUrl = '';
-    const fakeFetch = makeFetch([[]], (url) => { seenUrl = url; });
+    const fakeFetch = makeFetch([[]], (url) => {
+      seenUrl = url;
+    });
     await fetchGitlabProjectIssues({
       hostUrl: 'gitlab.com',
       projectPath: 'group/subgroup/api',
@@ -154,9 +152,7 @@ describe('fetchGitlabProjectIssues', () => {
   });
 
   it('derives owner/name from subgroup paths', async () => {
-    const canned = [
-      { id: 1, iid: 1, title: 't', web_url: 'https://x', labels: [] },
-    ];
+    const canned = [{ id: 1, iid: 1, title: 't', web_url: 'https://x', labels: [] }];
     const fakeFetch = makeFetch([canned]);
     const items = await fetchGitlabProjectIssues({
       hostUrl: 'gitlab.com',
@@ -168,8 +164,7 @@ describe('fetchGitlabProjectIssues', () => {
   });
 
   it('throws with error shape on non-2xx response', async () => {
-    const fakeFetch: typeof fetch = async () =>
-      new Response('Not Found', { status: 404 });
+    const fakeFetch: typeof fetch = async () => new Response('Not Found', { status: 404 });
     await expect(
       fetchGitlabProjectIssues({
         hostUrl: 'gitlab.com',
@@ -314,8 +309,7 @@ describe('fetchGitlabProjectMergeRequests', () => {
   });
 
   it('throws with error shape on non-2xx response', async () => {
-    const fakeFetch: typeof fetch = async () =>
-      new Response('Unauthorized', { status: 401 });
+    const fakeFetch: typeof fetch = async () => new Response('Unauthorized', { status: 401 });
     await expect(
       fetchGitlabProjectMergeRequests({
         hostUrl: 'gitlab.com',
@@ -328,7 +322,9 @@ describe('fetchGitlabProjectMergeRequests', () => {
 
   it('URL-encodes subgroup project paths', async () => {
     let seenUrl = '';
-    const fakeFetch = makeFetch([[]], (url) => { seenUrl = url; });
+    const fakeFetch = makeFetch([[]], (url) => {
+      seenUrl = url;
+    });
     await fetchGitlabProjectMergeRequests({
       hostUrl: 'gitlab.com',
       projectPath: 'group/subgroup/api',
@@ -341,10 +337,7 @@ describe('fetchGitlabProjectMergeRequests', () => {
 
 // ── Test helpers ─────────────────────────────────────────────────────────
 
-function makeFetch(
-  pages: unknown[],
-  onCall?: (url: string) => void,
-): typeof fetch {
+function makeFetch(pages: unknown[], onCall?: (url: string) => void): typeof fetch {
   let call = 0;
   return (async (url: string) => {
     onCall?.(url);

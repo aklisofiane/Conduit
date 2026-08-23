@@ -85,7 +85,9 @@ export function SignInPage() {
 
       {oauthError && (
         <div role="alert" className="font-mono text-small text-[var(--color-error)]">
-          {oauthError.includes('invitation') ? 'Registration is by invitation only.' : 'Authentication failed. Please try again.'}
+          {oauthError.includes('invitation')
+            ? 'Registration is by invitation only.'
+            : 'Authentication failed. Please try again.'}
         </div>
       )}
 
@@ -126,7 +128,10 @@ export function SignInPage() {
         </Button>
 
         <div className="flex items-center justify-between font-mono text-small">
-          <Link to="/forgot-password" className="text-[var(--color-text-2)] hover:text-[var(--color-text)]">
+          <Link
+            to="/forgot-password"
+            className="text-[var(--color-text-2)] hover:text-[var(--color-text)]"
+          >
             Forgot password?
           </Link>
           <Link
@@ -141,8 +146,22 @@ export function SignInPage() {
       {(showGithub || showGitlab) && (
         <>
           <Divider />
-          {showGithub && <OAuthButton provider="github" label="Continue with GitHub" callbackURL={safeNext} errorCallbackURL="/sign-in" />}
-          {showGitlab && <OAuthButton provider="gitlab" label="Continue with GitLab" callbackURL={safeNext} errorCallbackURL="/sign-in" />}
+          {showGithub && (
+            <OAuthButton
+              provider="github"
+              label="Continue with GitHub"
+              callbackURL={safeNext}
+              errorCallbackURL="/sign-in"
+            />
+          )}
+          {showGitlab && (
+            <OAuthButton
+              provider="gitlab"
+              label="Continue with GitLab"
+              callbackURL={safeNext}
+              errorCallbackURL="/sign-in"
+            />
+          )}
         </>
       )}
     </div>

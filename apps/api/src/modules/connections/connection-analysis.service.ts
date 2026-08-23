@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-} from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import {
   buildAnalysisTriggerEvent,
   errorMessage,
@@ -159,7 +155,10 @@ export class ConnectionAnalysisService {
         await this.prisma.workflowRun
           .update({
             where: { id: minted.internalRunId },
-            data: { temporalWorkflowId: live.temporalWorkflowId, temporalRunId: live.temporalRunId },
+            data: {
+              temporalWorkflowId: live.temporalWorkflowId,
+              temporalRunId: live.temporalRunId,
+            },
           })
           .catch(() => undefined);
         return { analysisId: minted.analysisId };
@@ -250,11 +249,7 @@ export class ConnectionAnalysisService {
    * connection + READY via `updateMany` so a cross-org or stale id is a no-op
    * (never a cross-tenant write), and idempotent on repeat calls.
    */
-  async markImported(
-    orgId: string,
-    connectionId: string,
-    analysisId: string,
-  ): Promise<void> {
+  async markImported(orgId: string, connectionId: string, analysisId: string): Promise<void> {
     await this.connections.assertInOrg(orgId, connectionId);
     await this.prisma.repoAnalysis.updateMany({
       where: { id: analysisId, orgId, connectionId, status: 'READY' },
@@ -273,7 +268,6 @@ export class ConnectionAnalysisService {
       issuePublisher: toPreset('issue-publisher'),
     };
   }
-
 }
 
 /**
@@ -283,10 +277,7 @@ export class ConnectionAnalysisService {
  * connection double-create is still harmless — both rows are SYSTEM-kind and
  * filtered out of every user-facing path, and internal runs FK to whichever.
  */
-async function ensureSystemWorkflow(
-  tx: Prisma.TransactionClient,
-  orgId: string,
-): Promise<string> {
+async function ensureSystemWorkflow(tx: Prisma.TransactionClient, orgId: string): Promise<string> {
   const existing = await tx.workflow.findFirst({
     where: { orgId, kind: 'SYSTEM' },
     select: { id: true },
@@ -306,9 +297,7 @@ async function ensureSystemWorkflow(
 }
 
 /** Extract `{ owner, name }` from a repo-scoped connection, or null otherwise. */
-function repoFromScope(
-  scope: ConnectionScope,
-): { owner: string; name: string } | null {
+function repoFromScope(scope: ConnectionScope): { owner: string; name: string } | null {
   if (scope.kind === 'github_repo') return { owner: scope.owner, name: scope.repo };
   if (scope.kind === 'gitlab_project') return splitProjectPath(scope.projectPath);
   return null;

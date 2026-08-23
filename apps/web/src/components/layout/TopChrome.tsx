@@ -16,17 +16,11 @@ export function TopChrome() {
         style={{ gridTemplateColumns: '1fr auto 1fr' }}
       >
         <div className="flex items-center gap-1 text-[var(--color-text)]">
-          <NavLink
-            to="/"
-            className="flex items-center gap-2 font-sans text-base font-semibold"
-          >
+          <NavLink to="/" className="flex items-center gap-2 font-sans text-base font-semibold">
             <Logo size={20} color="var(--color-accent)" />
             <span>Conduit</span>
           </NavLink>
-          <div
-            aria-hidden
-            className="mx-3 h-[18px] w-px bg-[var(--color-divider)]"
-          />
+          <div aria-hidden className="mx-3 h-[18px] w-px bg-[var(--color-divider)]" />
           <NavIconLink to="/" end label="Home — all workflows" icon={Home} />
           <NavIconLink to="/settings" label="Settings" icon={Settings} />
         </div>

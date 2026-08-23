@@ -78,7 +78,9 @@ export const triggerConfigSchema = z.discriminatedUnion('type', [
     // 5-field POSIX cron. Timezone is runtime-validated by Temporal's
     // schedule client when the schedule is upserted — IANA names ("UTC",
     // "America/Los_Angeles") are accepted.
-    cron: z.string().regex(CRON_EXPRESSION_RE, 'Invalid cron expression — expected 5 space-separated fields'),
+    cron: z
+      .string()
+      .regex(CRON_EXPRESSION_RE, 'Invalid cron expression — expected 5 space-separated fields'),
     timezone: z.string().min(1),
     branch: z.string().min(1),
   }),

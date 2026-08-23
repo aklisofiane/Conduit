@@ -38,11 +38,7 @@ interface ProviderGlyphProps {
   color?: string;
 }
 
-export function ProviderGlyph({
-  provider,
-  size = 12,
-  color = '#FFFFFF',
-}: ProviderGlyphProps) {
+export function ProviderGlyph({ provider, size = 12, color = '#FFFFFF' }: ProviderGlyphProps) {
   if (provider === 'codex') {
     return (
       <svg

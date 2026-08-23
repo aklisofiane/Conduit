@@ -71,9 +71,7 @@ function parseTemplate(
     } else if (err instanceof UnknownMcpPresetError) {
       logger.warn(`Template ${entry} skipped — ${err.message}`);
     } else {
-      logger.warn(
-        `Template ${entry} skipped — failed preset expansion (${String(err)})`,
-      );
+      logger.warn(`Template ${entry} skipped — failed preset expansion (${String(err)})`);
     }
     return null;
   }

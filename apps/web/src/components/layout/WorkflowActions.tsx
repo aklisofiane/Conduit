@@ -22,9 +22,7 @@ export function WorkflowActions({
       <Badge>
         <BadgeDot tone={isActive ? 'success' : 'muted'} />
         <span className="text-[var(--color-text-muted)]">workflow</span>
-        <span className="text-[var(--color-text)]">
-          {isActive ? 'active' : 'paused'}
-        </span>
+        <span className="text-[var(--color-text)]">{isActive ? 'active' : 'paused'}</span>
       </Badge>
       <Button
         type="button"
@@ -34,11 +32,7 @@ export function WorkflowActions({
         <Download size={12} strokeWidth={1.5} />
         Export
       </Button>
-      <Button
-        type="button"
-        onClick={onSave}
-        disabled={!dirty || saving}
-      >
+      <Button type="button" onClick={onSave} disabled={!dirty || saving}>
         {saving ? 'Saving…' : dirty ? 'Save' : 'Saved'}
       </Button>
     </div>

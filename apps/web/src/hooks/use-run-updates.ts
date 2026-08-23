@@ -45,15 +45,10 @@ export function useRunUpdates(runId: string | undefined): RunUpdateFrame | undef
 }
 
 function frameKind(frame: RunUpdateFrame): ExecutionLogRow['kind'] {
-  return frame.event.type === 'system'
-    ? 'SYSTEM'
-    : agentEventToLogKind(frame.event.type);
+  return frame.event.type === 'system' ? 'SYSTEM' : agentEventToLogKind(frame.event.type);
 }
 
-function appendFrameToCache(
-  qc: ReturnType<typeof useQueryClient>,
-  frame: RunUpdateFrame,
-): void {
+function appendFrameToCache(qc: ReturnType<typeof useQueryClient>, frame: RunUpdateFrame): void {
   const row: ExecutionLogRow = {
     id: `live-${frame.ts}-${Math.random().toString(36).slice(2, 8)}`,
     runId: frame.runId,

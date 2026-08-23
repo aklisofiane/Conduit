@@ -6,8 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 The spec in `docs/` is authoritative. **Don't pre-load these** — open them only when the task needs them. Use the hints below to pick the right one; `docs/INDEX.md` has the full ordered list.
 
-- `docs/STRUCTURE.md` — when you need to find *where something lives*.
-- `docs/ARCHITECTURE.md` — when you need to understand *how the pieces talk* (apps, data flow, API surface, conventions).
+- `docs/STRUCTURE.md` — when you need to find _where something lives_.
+- `docs/ARCHITECTURE.md` — when you need to understand _how the pieces talk_ (apps, data flow, API surface, conventions).
 - `docs/data-model.md` — when touching the Prisma schema or anything reading `Workflow.definition`.
 - `docs/VALIDATION.md` — when writing or debugging tests (layers, `StubProvider`, Playwright MCP).
 - `docs/PLANS.md` — when it's unclear whether something is in scope for the current phase.

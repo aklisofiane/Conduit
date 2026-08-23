@@ -1,11 +1,6 @@
 import crypto from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import {
-  decryptSecret,
-  decryptSecretWithFallback,
-  encryptSecret,
-  redactedSuffix,
-} from './aes-gcm';
+import { decryptSecret, decryptSecretWithFallback, encryptSecret, redactedSuffix } from './aes-gcm';
 
 const key = crypto.randomBytes(32);
 

@@ -10,10 +10,7 @@
  */
 const chains = new Map<string, Promise<unknown>>();
 
-export async function withPathLock<T>(
-  key: string,
-  fn: () => Promise<T>,
-): Promise<T> {
+export async function withPathLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
   const prev = chains.get(key) ?? Promise.resolve();
   let release!: () => void;
   const next = new Promise<void>((resolve) => {

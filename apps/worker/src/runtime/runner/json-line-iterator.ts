@@ -70,7 +70,10 @@ export async function* readRunnerEvents(
     }
     if (pendingSize > MAX_LINE_BYTES) {
       if (!dropping) {
-        onMalformed('', new Error(`line exceeded ${MAX_LINE_BYTES} bytes; dropping until next newline`));
+        onMalformed(
+          '',
+          new Error(`line exceeded ${MAX_LINE_BYTES} bytes; dropping until next newline`),
+        );
         dropping = true;
       }
       pending = [];

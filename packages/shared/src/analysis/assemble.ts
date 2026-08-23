@@ -1,17 +1,9 @@
 import type { Platform, TriggerSource } from '../platform/index';
 import { findMcpPresetByPlatform } from '../mcp/index';
-import {
-  templateFileSchema,
-  type TemplateFile,
-  type TemplateWorkflow,
-} from '../template/schema';
+import { templateFileSchema, type TemplateFile, type TemplateWorkflow } from '../template/schema';
 import { ANALYSIS_REPO_PLACEHOLDER } from './adapter';
 import { diffWindowFromCron } from './cadence';
-import {
-  type DroppedComponent,
-  type ReviewerDraft,
-  type WorkflowDraft,
-} from './workflow-draft';
+import { type DroppedComponent, type ReviewerDraft, type WorkflowDraft } from './workflow-draft';
 import type { AssemblyPresets } from './workflow-input';
 
 export interface AssembleContext {
@@ -65,7 +57,8 @@ export function assembleSuggestionBundle(
     if (reviewers.length === 0) {
       dropped.push({
         component: draft.component,
-        reason: 'every reviewer name collapsed to an empty or duplicate identifier after sanitization',
+        reason:
+          'every reviewer name collapsed to an empty or duplicate identifier after sanitization',
       });
       continue;
     }

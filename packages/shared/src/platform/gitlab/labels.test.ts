@@ -23,9 +23,7 @@ describe('listGitlabProjectLabels', () => {
   });
 
   it('handles color without leading #', async () => {
-    const canned = [
-      { name: 'test', color: 'aabbcc', description: null },
-    ];
+    const canned = [{ name: 'test', color: 'aabbcc', description: null }];
     const fakeFetch = makeFetch([canned]);
     const labels = await listGitlabProjectLabels({
       hostUrl: 'gitlab.com',
@@ -49,9 +47,7 @@ describe('listGitlabProjectLabels', () => {
   });
 
   it('handles null description', async () => {
-    const canned = [
-      { name: 'test', color: '#aabbcc', description: null },
-    ];
+    const canned = [{ name: 'test', color: '#aabbcc', description: null }];
     const fakeFetch = makeFetch([canned]);
     const labels = await listGitlabProjectLabels({
       hostUrl: 'gitlab.com',
@@ -137,8 +133,7 @@ describe('listGitlabProjectLabels', () => {
   });
 
   it('throws with error shape on non-2xx response', async () => {
-    const fakeFetch: typeof fetch = async () =>
-      new Response('Forbidden', { status: 403 });
+    const fakeFetch: typeof fetch = async () => new Response('Forbidden', { status: 403 });
     await expect(
       listGitlabProjectLabels({
         hostUrl: 'gitlab.com',
@@ -180,9 +175,7 @@ describe('createGitlabProjectLabel', () => {
     });
 
     expect(status).toBe('created');
-    expect(captured!.url).toBe(
-      'https://gitlab.com/api/v4/projects/acme%2Fapi/labels',
-    );
+    expect(captured!.url).toBe('https://gitlab.com/api/v4/projects/acme%2Fapi/labels');
     expect(captured!.init.method).toBe('POST');
     expect(JSON.parse(captured!.init.body as string)).toEqual({
       name: 'conduit-dev',
@@ -243,10 +236,7 @@ describe('createGitlabProjectLabel', () => {
 
 // ── Test helpers ─────────────────────────────────────────────────────────
 
-function makeFetch(
-  pages: unknown[],
-  onCall?: (url: string) => void,
-): typeof fetch {
+function makeFetch(pages: unknown[], onCall?: (url: string) => void): typeof fetch {
   let call = 0;
   return (async (url: string) => {
     onCall?.(url);

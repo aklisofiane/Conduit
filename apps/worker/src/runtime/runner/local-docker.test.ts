@@ -140,9 +140,7 @@ describe('buildDockerArgs', () => {
     // bind mount. Only Codex still needs its on-disk auth.json.
     const args = buildDockerArgs({
       ...base,
-      authMounts: [
-        { source: '/home/u/.codex/auth.json', target: '/home/runner/.codex/auth.json' },
-      ],
+      authMounts: [{ source: '/home/u/.codex/auth.json', target: '/home/runner/.codex/auth.json' }],
     });
     const mounts = args.flatMap((a, i) => (args[i - 1] === '-v' ? [a] : []));
     expect(mounts).toContain('/home/u/.codex/auth.json:/home/runner/.codex/auth.json:rw');
@@ -155,9 +153,9 @@ describe('buildDockerArgs', () => {
 describe('resolveResourceLimits', () => {
   it('defaults when the env vars are unset or blank', () => {
     expect(resolveResourceLimits({})).toEqual({ memory: '4g', cpus: '2' });
-    expect(
-      resolveResourceLimits({ CONDUIT_RUNNER_MEMORY: '  ', CONDUIT_RUNNER_CPUS: '' }),
-    ).toEqual({ memory: '4g', cpus: '2' });
+    expect(resolveResourceLimits({ CONDUIT_RUNNER_MEMORY: '  ', CONDUIT_RUNNER_CPUS: '' })).toEqual(
+      { memory: '4g', cpus: '2' },
+    );
   });
 
   it('honors operator overrides', () => {

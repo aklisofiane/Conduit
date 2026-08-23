@@ -59,9 +59,9 @@ describe('ConnectionsService cross-org isolation', () => {
   });
 
   it('delete on a sibling-org connection throws NotFound', async () => {
-    await expect(
-      svc.delete(fixture.orgA.id, fixture.orgB.connectionId),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(svc.delete(fixture.orgA.id, fixture.orgB.connectionId)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
     const stillThere = await prisma.connection.findUnique({
       where: { id: fixture.orgB.connectionId },
     });

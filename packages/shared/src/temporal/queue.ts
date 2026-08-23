@@ -109,11 +109,7 @@ export function cronWorkflowId(workflowId: string, slug?: string): string {
  * in-flight run only if both omit it; the freeze happens before any run
  * starts, so in practice every caller for a given workflow agrees.
  */
-export function agentWorkflowId(
-  runId: string,
-  ticketLock?: TicketLock,
-  slug?: string,
-): string {
+export function agentWorkflowId(runId: string, ticketLock?: TicketLock, slug?: string): string {
   if (ticketLock) {
     return `run-${withSlug(ticketLock.workflowId, slug)}-${ticketLock.ticketKey}`;
   }

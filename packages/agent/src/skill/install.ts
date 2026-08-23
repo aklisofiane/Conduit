@@ -24,12 +24,8 @@ export async function installSkillsIntoWorkspace(
   providerId: AgentProviderId,
 ): Promise<void> {
   const dest = path.join(workspacePath, DEST_BY_PROVIDER[providerId]);
-  const compatible = skills.filter(
-    (s) => s.provider === 'both' || s.provider === providerId,
-  );
+  const compatible = skills.filter((s) => s.provider === 'both' || s.provider === providerId);
   await Promise.all(
-    compatible.map((skill) =>
-      fs.cp(skill.path, path.join(dest, skill.id), { recursive: true }),
-    ),
+    compatible.map((skill) => fs.cp(skill.path, path.join(dest, skill.id), { recursive: true })),
   );
 }

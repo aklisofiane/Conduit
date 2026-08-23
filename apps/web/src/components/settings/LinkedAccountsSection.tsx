@@ -230,9 +230,9 @@ function UnlinkDialog({
           {credential ? (
             <p>
               This also deletes the mirrored credential{' '}
-              <span className="text-[var(--color-text)]">“{credential.name}”</span>. Workflows
-              that push or clone with it will stop working until you re-link or add a personal
-              access token.
+              <span className="text-[var(--color-text)]">“{credential.name}”</span>. Workflows that
+              push or clone with it will stop working until you re-link or add a personal access
+              token.
             </p>
           ) : (
             <p>

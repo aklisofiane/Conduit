@@ -41,7 +41,8 @@ export class DuplicateRunError extends Error {
     cause?: unknown,
   ) {
     super(`Temporal workflow ${temporalWorkflowId} is already running — duplicate trigger dropped`);
-    if (cause instanceof Error) this.stack = `${this.stack}\nCaused by: ${cause.stack ?? cause.message}`;
+    if (cause instanceof Error)
+      this.stack = `${this.stack}\nCaused by: ${cause.stack ?? cause.message}`;
   }
 }
 

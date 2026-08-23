@@ -121,7 +121,11 @@ describe('startAgentRun', () => {
 
   it('deletes the placeholder row and returns duplicate on an already-started collision', async () => {
     workflowStart.mockRejectedValue(
-      new WorkflowExecutionAlreadyStartedError('already started', 'run-wf_1-42', AGENT_WORKFLOW_TYPE),
+      new WorkflowExecutionAlreadyStartedError(
+        'already started',
+        'run-wf_1-42',
+        AGENT_WORKFLOW_TYPE,
+      ),
     );
 
     const result = await startAgentRun(BASE_PARAMS);
@@ -153,7 +157,9 @@ describe('startAgentRun', () => {
       'run_1',
       'org_1',
       null,
-      expect.stringContaining('pollBoardActivity: failed to start agentWorkflow: Temporal unreachable'),
+      expect.stringContaining(
+        'pollBoardActivity: failed to start agentWorkflow: Temporal unreachable',
+      ),
       'ERROR',
     );
 
@@ -162,7 +168,11 @@ describe('startAgentRun', () => {
 
   it('swallows a delete failure in the duplicate catch path and still resolves', async () => {
     workflowStart.mockRejectedValue(
-      new WorkflowExecutionAlreadyStartedError('already started', 'run-wf_1-42', AGENT_WORKFLOW_TYPE),
+      new WorkflowExecutionAlreadyStartedError(
+        'already started',
+        'run-wf_1-42',
+        AGENT_WORKFLOW_TYPE,
+      ),
     );
     runDelete.mockRejectedValue(new Error('row already gone'));
 

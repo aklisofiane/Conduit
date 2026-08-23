@@ -32,10 +32,7 @@ export function verifyGithubSignature(
  * header — no HMAC, no body involvement. Constant-time compare so the secret
  * can't be teased out byte-by-byte.
  */
-export function verifyGitlabToken(
-  secret: string,
-  header: string | undefined,
-): boolean {
+export function verifyGitlabToken(secret: string, header: string | undefined): boolean {
   if (!secret || !header) return false;
   const a = Buffer.from(secret, 'utf8');
   const b = Buffer.from(header, 'utf8');

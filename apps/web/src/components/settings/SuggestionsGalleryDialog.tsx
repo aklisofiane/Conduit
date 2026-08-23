@@ -130,14 +130,14 @@ export function SuggestionsGalleryDialog({
             <div className="rounded-lg border border-[var(--color-divider)] bg-[var(--color-pill-bg)] px-4 py-3 font-mono text-small text-[var(--color-text-2)]">
               {importTemplate.isSuccess ? (
                 <>
-                  Imported {selectedCount} review{selectedCount === 1 ? '' : 's'}. Find them in
-                  your workflow list — they're paused until you review and activate.
+                  Imported {selectedCount} review{selectedCount === 1 ? '' : 's'}. Find them in your
+                  workflow list — they're paused until you review and activate.
                 </>
               ) : (
                 <>
-                  These suggestions were already imported. Find the workflows in your list —
-                  they're paused until you review and activate. Re-analyze the repo to generate
-                  fresh suggestions.
+                  These suggestions were already imported. Find the workflows in your list — they're
+                  paused until you review and activate. Re-analyze the repo to generate fresh
+                  suggestions.
                 </>
               )}
             </div>
@@ -213,11 +213,7 @@ function SuggestionCard({
 
   return (
     <label className="flex cursor-pointer gap-3 rounded-lg border border-[var(--color-divider)] bg-[var(--color-pill-bg)] px-4 py-3">
-      <Checkbox
-        checked={selected}
-        onCheckedChange={onToggle}
-        className="mt-0.5"
-      />
+      <Checkbox checked={selected} onCheckedChange={onToggle} className="mt-0.5" />
       <div className="flex flex-1 flex-col gap-1.5">
         <div className="flex w-full items-center justify-between gap-3">
           <span className="font-mono text-base font-semibold text-[var(--color-text)]">

@@ -129,7 +129,9 @@ export function CreateWorkflowDialog({ onClose, onCreate, isPending }: CreateWor
                     className="grid h-[24px] w-[24px] shrink-0 place-items-center rounded-[5px]"
                     style={{
                       background:
-                        triggerType === opt.type ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                        triggerType === opt.type
+                          ? 'var(--color-primary)'
+                          : 'var(--color-text-muted)',
                     }}
                   >
                     {opt.icon}

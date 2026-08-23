@@ -59,9 +59,7 @@ export function ConnectOAuthButtons() {
             onClick={() => void handleConnect(provider)}
             disabled={pendingProvider !== null}
           >
-            {pendingProvider === provider.id
-              ? 'Redirecting…'
-              : `Connect ${provider.label}`}
+            {pendingProvider === provider.id ? 'Redirecting…' : `Connect ${provider.label}`}
           </Button>
         ))}
         <span className="font-mono text-small text-[var(--color-text-muted)]">

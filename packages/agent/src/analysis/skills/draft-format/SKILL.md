@@ -21,25 +21,25 @@ Design step re-runs.
 
 Every field is required. None may be empty.
 
-| Field | Type | Meaning |
-| --- | --- | --- |
-| `component` | string (non-empty) | Echo of the component name you were asked to design for. Must match the `Component.name` you were given. |
-| `workflowName` | string (non-empty) | Human-facing workflow title shown on the suggestion card (e.g. `"API review"`). |
-| `summary` | string (non-empty) | One line: *what this workflow reviews*. Shown on the gallery card. |
-| `rationale` | string (non-empty) | One or two sentences: *why these reviewers and this cadence*. Shown on the card. |
-| `scopeInstructions` | string (non-empty) | The prose body of the **Scope** agent's prompt. See the `scope-authoring` skill. |
-| `reviewers` | array, **min 1** | One entry per reviewer agent. See below. |
-| `cron` | string | 5-field POSIX cron cadence (e.g. `"0 6 * * 1"` = 06:00 every Monday). |
-| `paths` | array of strings, **min 1** | The component's path glob(s) the review is scoped to (e.g. `["apps/api/**"]`). |
+| Field               | Type                        | Meaning                                                                                                  |
+| ------------------- | --------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `component`         | string (non-empty)          | Echo of the component name you were asked to design for. Must match the `Component.name` you were given. |
+| `workflowName`      | string (non-empty)          | Human-facing workflow title shown on the suggestion card (e.g. `"API review"`).                          |
+| `summary`           | string (non-empty)          | One line: _what this workflow reviews_. Shown on the gallery card.                                       |
+| `rationale`         | string (non-empty)          | One or two sentences: _why these reviewers and this cadence_. Shown on the card.                         |
+| `scopeInstructions` | string (non-empty)          | The prose body of the **Scope** agent's prompt. See the `scope-authoring` skill.                         |
+| `reviewers`         | array, **min 1**            | One entry per reviewer agent. See below.                                                                 |
+| `cron`              | string                      | 5-field POSIX cron cadence (e.g. `"0 6 * * 1"` = 06:00 every Monday).                                    |
+| `paths`             | array of strings, **min 1** | The component's path glob(s) the review is scoped to (e.g. `["apps/api/**"]`).                           |
 
 ### `reviewers[]`
 
 Each reviewer is an object with exactly two fields:
 
-| Field | Type | Meaning |
-| --- | --- | --- |
-| `name` | string (constrained — see below) | The reviewer's identity. |
-| `instructions` | string (non-empty) | The prose body of that reviewer agent's prompt. See the `reviewer-authoring` skill. |
+| Field          | Type                             | Meaning                                                                             |
+| -------------- | -------------------------------- | ----------------------------------------------------------------------------------- |
+| `name`         | string (constrained — see below) | The reviewer's identity.                                                            |
+| `instructions` | string (non-empty)               | The prose body of that reviewer agent's prompt. See the `reviewer-authoring` skill. |
 
 You must provide **at least one** reviewer. Names must be **unique within the
 draft**.
@@ -70,13 +70,13 @@ PascalCase names.
 
 ## What you author vs. what code appends
 
-You author the *substance* — `scopeInstructions` and each reviewer's
+You author the _substance_ — `scopeInstructions` and each reviewer's
 `instructions`. You do **not** write the mechanical I/O contract (which file to
 read, which `## Heading` to look under, the findings/severity output format, the
 diff window). Assemble code appends that deterministic glue onto your prose
 after the draft is read, derived from the reviewer list you emit. Focus on
-*what to look for*, tailored to this component; let the code own *where to
-read/write and the exact format*.
+_what to look for_, tailored to this component; let the code own _where to
+read/write and the exact format_.
 
 ## Worked example
 

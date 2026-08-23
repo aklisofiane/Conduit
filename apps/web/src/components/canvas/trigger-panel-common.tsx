@@ -1,10 +1,6 @@
 import { useCallback } from 'react';
 import { X } from 'lucide-react';
-import type {
-  ConnectionScope,
-  TriggerConfig,
-  TriggerFilter,
-} from '@conduit/shared';
+import type { ConnectionScope, TriggerConfig, TriggerFilter } from '@conduit/shared';
 import { isConduitLabel } from '@conduit/shared/label';
 import type { ProjectBoardSummary } from '@conduit/shared/platform';
 import { ApiError, apiErrorMessage } from '../../api/client.js';
@@ -83,7 +79,12 @@ export function PanelFooter({ saving, dirty, valid = true, onSave, onDiscard }: 
       <Button className="flex-1" onClick={onDiscard} disabled={!dirty}>
         Discard
       </Button>
-      <Button variant="primary" className="flex-1" onClick={onSave} disabled={!dirty || saving || !valid}>
+      <Button
+        variant="primary"
+        className="flex-1"
+        onClick={onSave}
+        disabled={!dirty || saving || !valid}
+      >
         {saving ? 'Saving…' : 'Save changes'}
       </Button>
     </div>
@@ -123,9 +124,7 @@ export function Hint({
     <div
       className={cn(
         'font-mono text-small',
-        tone === 'danger'
-          ? 'text-[var(--color-danger,#d54c4c)]'
-          : 'text-[var(--color-text-muted)]',
+        tone === 'danger' ? 'text-[var(--color-danger,#d54c4c)]' : 'text-[var(--color-text-muted)]',
       )}
     >
       {children}
@@ -145,11 +144,7 @@ export function ConnectionSelect({
   emptyHint: string;
 }) {
   if (connections.length === 0) {
-    return (
-      <div className="font-mono text-small text-[var(--color-text-muted)]">
-        {emptyHint}
-      </div>
-    );
+    return <div className="font-mono text-small text-[var(--color-text-muted)]">{emptyHint}</div>;
   }
   return (
     <Select
@@ -215,8 +210,7 @@ export function FilterEditor({
   onChange: (filters: TriggerFilter[]) => void;
 }) {
   const replaceAt = useCallback(
-    (i: number, next: TriggerFilter) =>
-      onChange(filters.map((f, idx) => (idx === i ? next : f))),
+    (i: number, next: TriggerFilter) => onChange(filters.map((f, idx) => (idx === i ? next : f))),
     [filters, onChange],
   );
   const removeAt = useCallback(
@@ -325,11 +319,7 @@ function FilterRow({
           ]}
         />
       )}
-      <Button
-        onClick={onRemove}
-        aria-label="Remove filter"
-        title="Remove filter"
-      >
+      <Button onClick={onRemove} aria-label="Remove filter" title="Remove filter">
         ×
       </Button>
     </div>
@@ -351,11 +341,7 @@ function OptionsValueInput({
 }) {
   if (options.length === 0) {
     return (
-      <Input
-        placeholder={emptyHint}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      />
+      <Input placeholder={emptyHint} value={value} onChange={(e) => onChange(e.target.value)} />
     );
   }
   const items = options.map((opt) => ({ value: opt, label: opt }));
@@ -369,29 +355,13 @@ function OptionsValueInput({
   const showCreate = unmatched && !!ensureTarget && isConduitLabel(value);
   return (
     <div className="space-y-1.5">
-      <Select
-        placeholder="— select —"
-        value={value}
-        onValueChange={onChange}
-        options={items}
-      />
-      {showCreate && (
-        <CreateLabelAction
-          name={value}
-          target={ensureTarget}
-        />
-      )}
+      <Select placeholder="— select —" value={value} onValueChange={onChange} options={items} />
+      {showCreate && <CreateLabelAction name={value} target={ensureTarget} />}
     </div>
   );
 }
 
-function CreateLabelAction({
-  name,
-  target,
-}: {
-  name: string;
-  target: EnsureLabelTarget;
-}) {
+function CreateLabelAction({ name, target }: { name: string; target: EnsureLabelTarget }) {
   const ensure = useEnsureRepoLabels();
   // On success the hook invalidates the labels query; the dropdown re-resolves
   // and this whole affordance unmounts (the value is now a matched option).
@@ -406,21 +376,16 @@ function CreateLabelAction({
   return (
     <div className="rounded-[var(--radius)] border border-[var(--color-warning,#b58900)]/40 bg-[var(--color-warning,#b58900)]/10 px-2 py-1.5">
       <div className="font-mono text-small text-[var(--color-text-muted)]">
-        Label{' '}
-        <code className="text-[var(--color-text)]">{name}</code> isn't on{' '}
+        Label <code className="text-[var(--color-text)]">{name}</code> isn't on{' '}
         <code className="text-[var(--color-text)]">{target.scopeLabel}</code> yet.
       </div>
       <Button
         type="button"
         className="mt-1.5"
         disabled={ensure.isPending}
-        onClick={() =>
-          ensure.mutate({ connectionId: target.connectionId, names: [name] })
-        }
+        onClick={() => ensure.mutate({ connectionId: target.connectionId, names: [name] })}
       >
-        {ensure.isPending
-          ? 'Creating…'
-          : `+ Create "${name}" on ${target.scopeLabel}`}
+        {ensure.isPending ? 'Creating…' : `+ Create "${name}" on ${target.scopeLabel}`}
       </Button>
       {errorText && (
         <div className="mt-1 font-mono text-small text-[var(--color-danger,#dc322f)]">

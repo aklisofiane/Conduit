@@ -96,7 +96,13 @@ export async function discoverSkills(opts: DiscoverOptions = {}): Promise<Discov
   }
 
   for (const root of roots) {
-    const skills = await scanRoot(root.base, root.source, root.provider, root.group, root.marketplace);
+    const skills = await scanRoot(
+      root.base,
+      root.source,
+      root.provider,
+      root.group,
+      root.marketplace,
+    );
     for (const skill of skills) {
       const key = `${skill.source}:${skill.id}`;
       const existing = seen.get(key);

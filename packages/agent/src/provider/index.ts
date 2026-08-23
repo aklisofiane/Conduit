@@ -1,11 +1,6 @@
 export { ClaudeProvider } from './claude-provider';
 export { CodexProvider } from './codex-provider';
-export {
-  StubProvider,
-  queueStubScript,
-  queueStubSession,
-  clearStubScripts,
-} from './stub-provider';
+export { StubProvider, queueStubScript, queueStubSession, clearStubScripts } from './stub-provider';
 export type {
   StubScript,
   StubScriptStep,

@@ -31,7 +31,9 @@ describe('CredentialsService secret lifecycle', () => {
     await prisma.$disconnect();
   });
 
-  const oauthParams = (overrides: Partial<Parameters<CredentialsService['upsertOAuthDerived']>[0]> = {}) => ({
+  const oauthParams = (
+    overrides: Partial<Parameters<CredentialsService['upsertOAuthDerived']>[0]> = {},
+  ) => ({
     orgId: fixture.orgA.id,
     accountRowId: 'acct_row_1',
     providerAccountId: '12345',
@@ -81,7 +83,9 @@ describe('CredentialsService secret lifecycle', () => {
     expect(meta!.providerLogin).toBe('octocat');
 
     // The new secret is what now decrypts out.
-    expect(await svc.decryptForOrgCredential(fixture.orgA.id, id)).toBe('ghp_manual_pat_replacement');
+    expect(await svc.decryptForOrgCredential(fixture.orgA.id, id)).toBe(
+      'ghp_manual_pat_replacement',
+    );
   });
 
   it('rotating the secret WITH caller-supplied metadata keeps the caller metadata (no strip)', async () => {
@@ -104,7 +108,10 @@ describe('CredentialsService secret lifecycle', () => {
     expect(first.created).toBe(true);
 
     const second = await svc.upsertOAuthDerived(
-      oauthParams({ accessToken: 'gho_rotated_oauth_token', scopes: ['repo', 'read:org', 'workflow'] }),
+      oauthParams({
+        accessToken: 'gho_rotated_oauth_token',
+        scopes: ['repo', 'read:org', 'workflow'],
+      }),
     );
     expect(second.created).toBe(false);
     expect(second.id).toBe(first.id);
@@ -120,7 +127,9 @@ describe('CredentialsService secret lifecycle', () => {
     expect(rows).toHaveLength(1);
 
     // The in-place update carried the rotated token + scopes.
-    expect(await svc.decryptForOrgCredential(fixture.orgA.id, first.id)).toBe('gho_rotated_oauth_token');
+    expect(await svc.decryptForOrgCredential(fixture.orgA.id, first.id)).toBe(
+      'gho_rotated_oauth_token',
+    );
     const meta = rows[0].metadata as Record<string, unknown>;
     expect(meta.scopes).toEqual(['repo', 'read:org', 'workflow']);
   });

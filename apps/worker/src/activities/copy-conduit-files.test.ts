@@ -43,9 +43,7 @@ describe('copyConduitFilesActivity', () => {
   });
 
   it('short-circuits on empty sources: no heartbeat, no copy, no log', async () => {
-    await expect(
-      copyConduitFilesActivity({ ...baseInput, sources: [] }),
-    ).resolves.toBeUndefined();
+    await expect(copyConduitFilesActivity({ ...baseInput, sources: [] })).resolves.toBeUndefined();
 
     expect(touchWorktreeHeartbeat).not.toHaveBeenCalled();
     expect(copyConduitSummaries).not.toHaveBeenCalled();

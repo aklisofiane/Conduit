@@ -61,9 +61,7 @@ function serializeCron(s: StructuredSchedule): string {
       return `${s.minute} ${s.hour} * * *`;
     case 'weekly': {
       const dow =
-        s.daysOfWeek.length === 0
-          ? '*'
-          : s.daysOfWeek.toSorted((a, b) => a - b).join(',');
+        s.daysOfWeek.length === 0 ? '*' : s.daysOfWeek.toSorted((a, b) => a - b).join(',');
       return `${s.minute} ${s.hour} * * ${dow}`;
     }
     case 'monthly':
@@ -122,13 +120,7 @@ function parseCron(cron: string): StructuredSchedule | null {
   }
 
   const domNum = Number(dom);
-  if (
-    Number.isInteger(domNum) &&
-    domNum >= 1 &&
-    domNum <= 31 &&
-    month === '*' &&
-    dow === '*'
-  ) {
+  if (Number.isInteger(domNum) && domNum >= 1 && domNum <= 31 && month === '*' && dow === '*') {
     return { ...DEFAULTS, frequency: 'monthly', minute: minNum, hour: hourNum, dayOfMonth: domNum };
   }
 
@@ -150,9 +142,7 @@ interface CronScheduleBuilderProps {
 
 export function CronScheduleBuilder({ value, onChange }: CronScheduleBuilderProps) {
   const initialParsed = useMemo(() => parseCron(value), []);
-  const [schedule, setSchedule] = useState<StructuredSchedule>(
-    () => initialParsed ?? DEFAULTS,
-  );
+  const [schedule, setSchedule] = useState<StructuredSchedule>(() => initialParsed ?? DEFAULTS);
   const [isCustom, setIsCustom] = useState(() => !initialParsed && value !== '');
   const [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -245,29 +235,27 @@ export function CronScheduleBuilder({ value, onChange }: CronScheduleBuilderProp
             <Label asChild>
               <div>{schedule.frequency === 'hourly' ? 'At minute' : 'At'}</div>
             </Label>
-              <div className="flex items-center gap-1.5">
-                {schedule.frequency !== 'hourly' && (
-                  <>
-                    <Select
-                      ariaLabel="Hour"
-                      value={String(schedule.hour)}
-                      onValueChange={(v) => updateSchedule({ hour: Number(v) })}
-                      options={HOUR_OPTIONS}
-                      className="w-[72px]"
-                    />
-                    <span className="font-mono text-base text-[var(--color-text-muted)]">
-                      :
-                    </span>
-                  </>
-                )}
-                <Select
-                  ariaLabel="Minute"
-                  value={String(schedule.minute)}
-                  onValueChange={(v) => updateSchedule({ minute: Number(v) })}
-                  options={MINUTE_OPTIONS}
-                  className="w-[72px]"
-                />
-              </div>
+            <div className="flex items-center gap-1.5">
+              {schedule.frequency !== 'hourly' && (
+                <>
+                  <Select
+                    ariaLabel="Hour"
+                    value={String(schedule.hour)}
+                    onValueChange={(v) => updateSchedule({ hour: Number(v) })}
+                    options={HOUR_OPTIONS}
+                    className="w-[72px]"
+                  />
+                  <span className="font-mono text-base text-[var(--color-text-muted)]">:</span>
+                </>
+              )}
+              <Select
+                ariaLabel="Minute"
+                value={String(schedule.minute)}
+                onValueChange={(v) => updateSchedule({ minute: Number(v) })}
+                options={MINUTE_OPTIONS}
+                className="w-[72px]"
+              />
+            </div>
           </div>
         </>
       )}
@@ -312,10 +300,7 @@ export function CronScheduleBuilder({ value, onChange }: CronScheduleBuilderProp
             <ChevronDown
               size={12}
               strokeWidth={1.5}
-              className={cn(
-                'transition-transform',
-                showAdvanced && 'rotate-180',
-              )}
+              className={cn('transition-transform', showAdvanced && 'rotate-180')}
             />
             {showAdvanced ? 'Hide' : 'Show'} cron expression
           </Button>

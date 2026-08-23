@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  connectionScopeSchema,
-  expectScopeKind,
-  type ConnectionScope,
-} from './scope';
+import { connectionScopeSchema, expectScopeKind, type ConnectionScope } from './scope';
 
 describe('connectionScopeSchema', () => {
   it('accepts a github_repo scope', () => {
@@ -30,9 +26,7 @@ describe('connectionScopeSchema', () => {
   });
 
   it('rejects an unknown discriminator', () => {
-    expect(
-      connectionScopeSchema.safeParse({ kind: 'slack_workspace' }).success,
-    ).toBe(false);
+    expect(connectionScopeSchema.safeParse({ kind: 'slack_workspace' }).success).toBe(false);
   });
 
   it('rejects a github_repo scope missing repo', () => {

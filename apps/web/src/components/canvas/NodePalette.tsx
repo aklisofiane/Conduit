@@ -28,11 +28,7 @@ interface NodePaletteProps {
   triggerSlotFilled: boolean;
 }
 
-export function NodePalette({
-  onAddAgent,
-  onAddTrigger,
-  triggerSlotFilled,
-}: NodePaletteProps) {
+export function NodePalette({ onAddAgent, onAddTrigger, triggerSlotFilled }: NodePaletteProps) {
   return (
     <aside className="flex w-[240px] shrink-0 flex-col gap-4 border-r border-[var(--color-divider)] bg-[var(--color-bg-panel)] px-[14px] py-4 text-[var(--color-text)]">
       <PaletteSection title="Triggers">
@@ -72,13 +68,7 @@ export function NodePalette({
   );
 }
 
-function PaletteSection({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
+function PaletteSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
       <div className="mb-[6px] font-mono text-caption font-medium uppercase tracking-[0.06em] text-[var(--color-text-muted)]">

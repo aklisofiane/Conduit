@@ -27,11 +27,7 @@ describe('topoSortGroups', () => {
       { from: 'A', to: 'B' },
       { from: 'B', to: 'C' },
     ];
-    expect(topoSortGroups<N>(nodes, edges, ['A'])).toEqual([
-      [node('A')],
-      [node('B')],
-      [node('C')],
-    ]);
+    expect(topoSortGroups<N>(nodes, edges, ['A'])).toEqual([[node('A')], [node('B')], [node('C')]]);
   });
 
   it('groups parallel siblings into the same bucket', () => {
@@ -51,9 +47,7 @@ describe('topoSortGroups', () => {
   it('skips agents not reachable from any entry (orphans)', () => {
     const nodes = [node('Connected'), node('Orphan')];
     const edges: Edge[] = [];
-    expect(topoSortGroups<N>(nodes, edges, ['Connected'])).toEqual([
-      [node('Connected')],
-    ]);
+    expect(topoSortGroups<N>(nodes, edges, ['Connected'])).toEqual([[node('Connected')]]);
   });
 
   it('detects a cycle in the reachable subgraph', () => {

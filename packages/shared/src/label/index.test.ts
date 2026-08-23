@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  CONDUIT_LABELS,
-  getConduitLabel,
-  isConduitLabel,
-} from './index';
+import { CONDUIT_LABELS, getConduitLabel, isConduitLabel } from './index';
 
 describe('CONDUIT_LABELS registry', () => {
   it('contains the four canonical labels', () => {

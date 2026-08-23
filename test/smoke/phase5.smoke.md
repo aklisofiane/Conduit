@@ -23,14 +23,14 @@ Playwright via MCP.
    - Project board: Org, owner = acme, number = 1
    - Filters: `field = status`, `op = eq`, `value = Dev`
    - Active: checked
-   Click **Save changes**.
+     Click **Save changes**.
 4. Add an agent node. Open its config panel.
 5. In the **Workspace** select verify the `ticket-branch` option is present
    **without a "(coming soon)" suffix** — picking it should not crash.
 6. Select `ticket-branch`. The agent node renders `ticket-branch` in its
    footer chip.
 7. Fill in `Name = Worker`, `Instructions = Worker node — commit and push to
-   the conduit/<ticket> branch.` Save changes.
+the conduit/<ticket> branch.` Save changes.
 
 ## Validation (save-time)
 
@@ -47,7 +47,7 @@ Playwright via MCP.
 
 11. With the workflow saved and active, start a manual run from the
     workflows list. Provide an issue reference like `42 / Fix crash in
-    checkout` so the trigger event carries a ticket identifier.
+checkout` so the trigger event carries a ticket identifier.
 12. Open the new run in the run detail page.
 13. Top-bar assertion: a `branch · conduit/42-fix-crash-in-checkout` chip
     appears alongside the existing `trigger`, `started`, `elapsed`, and

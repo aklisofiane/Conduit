@@ -71,9 +71,7 @@ export function normalizeHostUrl(
 
   // Reject subpaths (anything with a slash remaining after scheme/trailing removal).
   if (host.includes('/')) {
-    throw new Error(
-      `Invalid host URL "${input}": subpath deployments are not supported`,
-    );
+    throw new Error(`Invalid host URL "${input}": subpath deployments are not supported`);
   }
 
   // Validate hostname + optional port regex.
@@ -86,9 +84,7 @@ export function normalizeHostUrl(
   if (colonIdx !== -1) {
     const port = Number(host.slice(colonIdx + 1));
     if (port < 1 || port > 65535) {
-      throw new Error(
-        `Invalid host URL "${input}": port ${port} out of range (1-65535)`,
-      );
+      throw new Error(`Invalid host URL "${input}": port ${port} out of range (1-65535)`);
     }
   }
 

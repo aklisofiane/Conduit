@@ -82,9 +82,7 @@ describe('loadGraphActivity', () => {
 
   it('throws when the workflow row is missing', async () => {
     findUnique.mockResolvedValue(null);
-    await expect(loadGraphActivity('wf_missing')).rejects.toThrow(
-      'Workflow wf_missing not found',
-    );
+    await expect(loadGraphActivity('wf_missing')).rejects.toThrow('Workflow wf_missing not found');
   });
 
   it('copies workflowId/workflowName/orgId straight from the Workflow row', async () => {

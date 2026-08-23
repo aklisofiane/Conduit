@@ -35,9 +35,9 @@ describe('assertHostedSafety', () => {
   });
 
   it('rejects a missing or non-hex encryption key', () => {
-    expect(() =>
-      assertHostedSafety(hostedEnv({ CONDUIT_ENCRYPTION_KEY: undefined })),
-    ).toThrow(/CONDUIT_ENCRYPTION_KEY/);
+    expect(() => assertHostedSafety(hostedEnv({ CONDUIT_ENCRYPTION_KEY: undefined }))).toThrow(
+      /CONDUIT_ENCRYPTION_KEY/,
+    );
     expect(() =>
       assertHostedSafety(hostedEnv({ CONDUIT_ENCRYPTION_KEY: 'some passphrase' })),
     ).toThrow(/CONDUIT_ENCRYPTION_KEY/);

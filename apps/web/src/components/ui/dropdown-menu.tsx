@@ -70,11 +70,7 @@ export const DropdownMenuSeparator = forwardRef<
   ComponentPropsWithoutRef<typeof RxMenu.Separator>
 >(function DropdownMenuSeparator({ className, ...props }, ref) {
   return (
-    <RxMenu.Separator
-      ref={ref}
-      className={cn(dropdownSeparatorClass, className)}
-      {...props}
-    />
+    <RxMenu.Separator ref={ref} className={cn(dropdownSeparatorClass, className)} {...props} />
   );
 });
 
@@ -82,11 +78,5 @@ export const DropdownMenuLabel = forwardRef<
   HTMLDivElement,
   ComponentPropsWithoutRef<typeof RxMenu.Label>
 >(function DropdownMenuLabel({ className, ...props }, ref) {
-  return (
-    <RxMenu.Label
-      ref={ref}
-      className={cn(dropdownLabelClass, className)}
-      {...props}
-    />
-  );
+  return <RxMenu.Label ref={ref} className={cn(dropdownLabelClass, className)} {...props} />;
 });

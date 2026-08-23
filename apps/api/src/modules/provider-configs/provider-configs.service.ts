@@ -1,10 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 import { encrypt, redactSafely } from '../credentials/crypto';
-import type {
-  CreateProviderConfigDto,
-  UpdateProviderConfigDto,
-} from './dto';
+import type { CreateProviderConfigDto, UpdateProviderConfigDto } from './dto';
 
 /**
  * Redacted row shape returned to the UI / API consumers. Never contains
@@ -36,10 +33,7 @@ export class ProviderConfigsService {
    * most one row per provider per org — re-POSTing the same `providerId`
    * atomically replaces the key + base URL.
    */
-  async create(
-    orgId: string,
-    dto: CreateProviderConfigDto,
-  ): Promise<ProviderConfigRow> {
+  async create(orgId: string, dto: CreateProviderConfigDto): Promise<ProviderConfigRow> {
     const row = await this.prisma.providerConfig.upsert({
       where: { orgId_providerId: { orgId, providerId: dto.providerId } },
       create: {
@@ -66,8 +60,7 @@ export class ProviderConfigsService {
     const result = await this.prisma.providerConfig.updateMany({
       where: { id, orgId },
       data: {
-        encryptedApiKey:
-          dto.apiKey !== undefined ? encrypt(dto.apiKey) : undefined,
+        encryptedApiKey: dto.apiKey !== undefined ? encrypt(dto.apiKey) : undefined,
         baseUrl: dto.baseUrl === undefined ? undefined : dto.baseUrl,
       },
     });

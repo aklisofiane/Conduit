@@ -28,9 +28,10 @@ export function workflowNodeRank(definition: WorkflowDefinition | undefined): Ma
 
   // Ready set processed in definition order so parallel branches keep their
   // canvas ordering rather than drifting by name.
-  const byDefinitionOrder = (a: string, b: string) =>
-    (order.get(a) ?? 0) - (order.get(b) ?? 0);
-  const ready = definition.nodes.filter((n) => (indegree.get(n.name) ?? 0) === 0).map((n) => n.name);
+  const byDefinitionOrder = (a: string, b: string) => (order.get(a) ?? 0) - (order.get(b) ?? 0);
+  const ready = definition.nodes
+    .filter((n) => (indegree.get(n.name) ?? 0) === 0)
+    .map((n) => n.name);
 
   let next = 0;
   while (ready.length > 0) {

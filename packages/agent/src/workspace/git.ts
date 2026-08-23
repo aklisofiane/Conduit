@@ -34,7 +34,13 @@ export async function git(
     child.on('close', (code) => {
       const stderr = Buffer.concat(err).toString('utf8');
       if (code !== 0) {
-        reject(new GitError(`git ${args[0] ?? ''} failed (${code}): ${stderr.trim()}`, code ?? -1, stderr));
+        reject(
+          new GitError(
+            `git ${args[0] ?? ''} failed (${code}): ${stderr.trim()}`,
+            code ?? -1,
+            stderr,
+          ),
+        );
         return;
       }
       resolve(Buffer.concat(out).toString('utf8'));

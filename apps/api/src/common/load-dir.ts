@@ -4,9 +4,7 @@ import { Logger } from '@nestjs/common';
 import type { ZodError } from 'zod';
 
 export function formatZodIssues(error: ZodError): string {
-  return error.issues
-    .map((i) => `${i.path.join('.')}: ${i.message}`)
-    .join('; ');
+  return error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
 }
 
 export interface LoadDirOpts<T> {
@@ -29,20 +27,12 @@ export interface LoadDirOpts<T> {
  * per-file failures (logged + skipped). The shared skeleton behind the
  * template and agent-preset loaders — each supplies its own `ext` + `parse`.
  */
-export async function loadDir<T>({
-  dir,
-  ext,
-  label,
-  logger,
-  parse,
-}: LoadDirOpts<T>): Promise<T[]> {
+export async function loadDir<T>({ dir, ext, label, logger, parse }: LoadDirOpts<T>): Promise<T[]> {
   let entries: string[];
   try {
     entries = await fs.readdir(dir);
   } catch (err) {
-    logger.warn(
-      `${label}s dir ${dir} not readable — nothing will be served (${String(err)})`,
-    );
+    logger.warn(`${label}s dir ${dir} not readable — nothing will be served (${String(err)})`);
     return [];
   }
 

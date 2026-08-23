@@ -178,7 +178,10 @@ function UserMenuBody({ name, email, onClose }: UserMenuBodyProps) {
     <div className="flex flex-col overflow-hidden rounded-[var(--radius)]">
       <div className="border-b border-[var(--color-divider)] px-3 py-2.5">
         {name && (
-          <div className="truncate font-sans text-small font-medium text-[var(--color-text)]" title={name}>
+          <div
+            className="truncate font-sans text-small font-medium text-[var(--color-text)]"
+            title={name}
+          >
             {name}
           </div>
         )}
@@ -296,9 +299,7 @@ function OrganizationSection({
         <span className="truncate align-middle" title={activeOrg?.name ?? ''}>
           {activeOrg?.name ?? '—'}
         </span>
-        {myRole && (
-          <span className="ml-1.5 text-[var(--color-text-muted)]">· {myRole}</span>
-        )}
+        {myRole && <span className="ml-1.5 text-[var(--color-text-muted)]">· {myRole}</span>}
       </div>
 
       {orgs.length > 1 && (
@@ -394,7 +395,11 @@ function SwitchOrgList({
           className="text-caption"
         />
       )}
-      <div className="max-h-[140px] overflow-y-auto" role="listbox" aria-label="Switch organization">
+      <div
+        className="max-h-[140px] overflow-y-auto"
+        role="listbox"
+        aria-label="Switch organization"
+      >
         {others.length === 0 ? (
           <div className="px-1 py-1 font-mono text-caption text-[var(--color-text-muted)]">
             {filter ? 'No matches' : 'No other organizations'}

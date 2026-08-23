@@ -203,9 +203,7 @@ function forwardCookies(signUpResponse: Response): Headers {
   const setCookies = signUpResponse.headers.getSetCookie?.() ?? [];
   // Better Auth's `set-cookie` header values are reformatted into the
   // request's `Cookie` header so the next call sees the auth session.
-  const cookiePairs = setCookies
-    .map((c) => c.split(';')[0]!.trim())
-    .filter((p) => p.length > 0);
+  const cookiePairs = setCookies.map((c) => c.split(';')[0]!.trim()).filter((p) => p.length > 0);
   if (cookiePairs.length > 0) headers.set('cookie', cookiePairs.join('; '));
   return headers;
 }

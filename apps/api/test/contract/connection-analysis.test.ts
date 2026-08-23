@@ -149,9 +149,9 @@ describe('ConnectionAnalysisService', () => {
     expect(run?.finishedAt).toBeInstanceOf(Date);
 
     // And a rerun is unblocked now the row is terminal.
-    await expect(
-      svc.analyze(fixture.orgA.id, fixture.orgA.connectionId),
-    ).resolves.toMatchObject({ analysisId: expect.any(String) });
+    await expect(svc.analyze(fixture.orgA.id, fixture.orgA.connectionId)).resolves.toMatchObject({
+      analysisId: expect.any(String),
+    });
   });
 
   it('leaves a freshly-minted non-terminal row alone (start-race grace window)', async () => {
@@ -231,9 +231,7 @@ describe('ConnectionAnalysisService', () => {
       presets,
     );
 
-    await expect(
-      failingSvc.analyze(fixture.orgA.id, fixture.orgA.connectionId),
-    ).rejects.toBe(boom);
+    await expect(failingSvc.analyze(fixture.orgA.id, fixture.orgA.connectionId)).rejects.toBe(boom);
 
     const analysis = await prisma.repoAnalysis.findFirst({
       where: { connectionId: fixture.orgA.connectionId },
@@ -262,10 +260,7 @@ describe('ConnectionAnalysisService', () => {
       presets,
     );
 
-    const { analysisId } = await recoveringSvc.analyze(
-      fixture.orgA.id,
-      fixture.orgA.connectionId,
-    );
+    const { analysisId } = await recoveringSvc.analyze(fixture.orgA.id, fixture.orgA.connectionId);
 
     const analysis = await prisma.repoAnalysis.findUnique({ where: { id: analysisId } });
     expect(analysis?.status).toBe('PENDING'); // not failed

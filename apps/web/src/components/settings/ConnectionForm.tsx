@@ -2,11 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { ConnectionScope, ConnectionScopeKind } from '@conduit/shared';
 import type { ViewerOrgEntry } from '@conduit/shared/platform';
 import { ApiError } from '../../api/client.js';
-import {
-  useListProjectBoards,
-  useListViewerRepos,
-  useListViewerOrgs,
-} from '../../api/hooks.js';
+import { useListProjectBoards, useListViewerRepos, useListViewerOrgs } from '../../api/hooks.js';
 import type { CredentialRow } from '../../api/types.js';
 import { SearchSelect } from '../ui/search-select.js';
 import { Select } from '../ui/select.js';
@@ -133,9 +129,7 @@ export function CreateConnectionForm({
             ariaLabel="Credential"
             value={credentialId}
             onValueChange={setCredentialId}
-            placeholder={
-              credentials.length === 0 ? 'No credentials — create one first' : undefined
-            }
+            placeholder={credentials.length === 0 ? 'No credentials — create one first' : undefined}
             options={credentials.map((c) => ({
               value: c.id,
               label: `${c.name} · ${c.platform.toLowerCase()}`,
@@ -162,7 +156,10 @@ export function CreateConnectionForm({
           platform={selectedCredential?.platform}
           owner={owner}
           repo={repo}
-          onSelect={(o, r) => { setOwner(o); setRepo(r); }}
+          onSelect={(o, r) => {
+            setOwner(o);
+            setRepo(r);
+          }}
         />
       )}
 
@@ -175,7 +172,10 @@ export function CreateConnectionForm({
           onOwnerType={setOwnerType}
           onOwner={setOwner}
           onBoardNumber={setBoardNumber}
-          onOwnerSelect={(login, type) => { setOwner(login); setOwnerType(type); }}
+          onOwnerSelect={(login, type) => {
+            setOwner(login);
+            setOwnerType(type);
+          }}
         />
       )}
 
@@ -188,9 +188,7 @@ export function CreateConnectionForm({
       )}
 
       <div className="flex justify-end gap-2">
-        <Button onClick={onCancel}>
-          Cancel
-        </Button>
+        <Button onClick={onCancel}>Cancel</Button>
         <Button
           variant="primary"
           disabled={!canSave || pending}
@@ -326,7 +324,10 @@ function GitlabProjectScopeRow({
           <SearchSelect
             ariaLabel="Project"
             value={selected}
-            onValueChange={(v) => { setSelected(v); onSelect(v); }}
+            onValueChange={(v) => {
+              setSelected(v);
+              onSelect(v);
+            }}
             placeholder="— pick a project —"
             options={projects.map((p) => ({
               value: p.path,
@@ -418,11 +419,7 @@ function BoardOwnerField({
         <span className="font-mono text-caption uppercase tracking-wide text-[var(--color-text-muted)]">
           Owner
         </span>
-        <Input
-          placeholder="acme"
-          value={owner}
-          onChange={(e) => onOwner(e.target.value)}
-        />
+        <Input placeholder="acme" value={owner} onChange={(e) => onOwner(e.target.value)} />
       </label>
     </>
   );
@@ -484,7 +481,13 @@ function BoardScopeRow({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className={showOwnerDropdown ? 'grid grid-cols-2 gap-3' : 'grid grid-cols-[110px_minmax(0,1fr)_minmax(0,1.4fr)] gap-3'}>
+      <div
+        className={
+          showOwnerDropdown
+            ? 'grid grid-cols-2 gap-3'
+            : 'grid grid-cols-[110px_minmax(0,1fr)_minmax(0,1.4fr)] gap-3'
+        }
+      >
         <BoardOwnerField
           orgs={orgs}
           showOwnerDropdown={showOwnerDropdown}

@@ -1,11 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AgentEvent, AgentRequest } from '@conduit/shared';
 import { ConstraintExceededError } from '../errors/index';
-import {
-  type ConstraintState,
-  createConstraintState,
-  enforceConstraints,
-} from './constraints';
+import { type ConstraintState, createConstraintState, enforceConstraints } from './constraints';
 
 function baseRequest(overrides: Partial<AgentRequest> = {}): AgentRequest {
   return {
@@ -36,10 +32,7 @@ describe('enforceConstraints with shared ConstraintState', () => {
 
     const first = await collect(
       enforceConstraints(
-        fakeSource([
-          { type: 'tool_call', id: 't1', name: 'Bash', input: {} },
-          { type: 'done' },
-        ]),
+        fakeSource([{ type: 'tool_call', id: 't1', name: 'Bash', input: {} }, { type: 'done' }]),
         req,
         state,
       ),
@@ -49,10 +42,7 @@ describe('enforceConstraints with shared ConstraintState', () => {
     await expect(
       collect(
         enforceConstraints(
-          fakeSource([
-            { type: 'tool_call', id: 't2', name: 'Bash', input: {} },
-            { type: 'done' },
-          ]),
+          fakeSource([{ type: 'tool_call', id: 't2', name: 'Bash', input: {} }, { type: 'done' }]),
           req,
           state,
         ),
@@ -66,10 +56,7 @@ describe('enforceConstraints with shared ConstraintState', () => {
 
     await collect(
       enforceConstraints(
-        fakeSource([
-          { type: 'usage', inputTokens: 50, outputTokens: 40 },
-          { type: 'done' },
-        ]),
+        fakeSource([{ type: 'usage', inputTokens: 50, outputTokens: 40 }, { type: 'done' }]),
         req,
         state,
       ),
@@ -78,10 +65,7 @@ describe('enforceConstraints with shared ConstraintState', () => {
     await expect(
       collect(
         enforceConstraints(
-          fakeSource([
-            { type: 'usage', inputTokens: 50, outputTokens: 40 },
-            { type: 'done' },
-          ]),
+          fakeSource([{ type: 'usage', inputTokens: 50, outputTokens: 40 }, { type: 'done' }]),
           req,
           state,
         ),
@@ -95,10 +79,7 @@ describe('enforceConstraints with shared ConstraintState', () => {
 
     await collect(
       enforceConstraints(
-        fakeSource([
-          { type: 'usage', inputTokens: 1, outputTokens: 1 },
-          { type: 'done' },
-        ]),
+        fakeSource([{ type: 'usage', inputTokens: 1, outputTokens: 1 }, { type: 'done' }]),
         req,
         state,
       ),
@@ -107,10 +88,7 @@ describe('enforceConstraints with shared ConstraintState', () => {
     await expect(
       collect(
         enforceConstraints(
-          fakeSource([
-            { type: 'usage', inputTokens: 1, outputTokens: 1 },
-            { type: 'done' },
-          ]),
+          fakeSource([{ type: 'usage', inputTokens: 1, outputTokens: 1 }, { type: 'done' }]),
           req,
           state,
         ),
@@ -161,10 +139,7 @@ describe('enforceConstraints with shared ConstraintState', () => {
 
     await collect(
       enforceConstraints(
-        fakeSource([
-          { type: 'usage', inputTokens: 100, outputTokens: 50 },
-          { type: 'done' },
-        ]),
+        fakeSource([{ type: 'usage', inputTokens: 100, outputTokens: 50 }, { type: 'done' }]),
         req,
         state,
       ),
@@ -172,10 +147,7 @@ describe('enforceConstraints with shared ConstraintState', () => {
 
     await collect(
       enforceConstraints(
-        fakeSource([
-          { type: 'usage', inputTokens: 200, outputTokens: 80 },
-          { type: 'done' },
-        ]),
+        fakeSource([{ type: 'usage', inputTokens: 200, outputTokens: 80 }, { type: 'done' }]),
         req,
         state,
       ),
@@ -191,10 +163,7 @@ describe('enforceConstraints with shared ConstraintState', () => {
 
     await collect(
       enforceConstraints(
-        fakeSource([
-          { type: 'usage', inputTokens: 100, outputTokens: 50 },
-          { type: 'done' },
-        ]),
+        fakeSource([{ type: 'usage', inputTokens: 100, outputTokens: 50 }, { type: 'done' }]),
         req,
         state,
       ),
@@ -202,10 +171,7 @@ describe('enforceConstraints with shared ConstraintState', () => {
 
     await collect(
       enforceConstraints(
-        fakeSource([
-          { type: 'usage', inputTokens: 200, outputTokens: 80 },
-          { type: 'done' },
-        ]),
+        fakeSource([{ type: 'usage', inputTokens: 200, outputTokens: 80 }, { type: 'done' }]),
         req,
         state,
       ),
@@ -242,10 +208,7 @@ describe('enforceConstraints with shared ConstraintState', () => {
 
     await collect(
       enforceConstraints(
-        fakeSource([
-          { type: 'usage', inputTokens: 150, outputTokens: 50 },
-          { type: 'done' },
-        ]),
+        fakeSource([{ type: 'usage', inputTokens: 150, outputTokens: 50 }, { type: 'done' }]),
         req,
         state,
       ),
@@ -254,10 +217,7 @@ describe('enforceConstraints with shared ConstraintState', () => {
     // Second turn reports the cumulative thread total (400), not a per-turn delta.
     await collect(
       enforceConstraints(
-        fakeSource([
-          { type: 'usage', inputTokens: 300, outputTokens: 100 },
-          { type: 'done' },
-        ]),
+        fakeSource([{ type: 'usage', inputTokens: 300, outputTokens: 100 }, { type: 'done' }]),
         req,
         state,
       ),

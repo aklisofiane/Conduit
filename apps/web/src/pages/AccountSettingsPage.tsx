@@ -203,17 +203,11 @@ function ChangePasswordSection() {
           </div>
         )}
         {done && (
-          <div className="font-mono text-small text-[var(--color-success)]">
-            Password updated.
-          </div>
+          <div className="font-mono text-small text-[var(--color-success)]">Password updated.</div>
         )}
 
         <div className="flex">
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={form.formState.isSubmitting}
-          >
+          <Button type="submit" variant="primary" disabled={form.formState.isSubmitting}>
             {form.formState.isSubmitting ? 'Updating…' : 'Update password'}
           </Button>
         </div>

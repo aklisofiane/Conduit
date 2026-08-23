@@ -388,9 +388,7 @@ function TemplateCard({ t, onPick }: { t: TemplateSummary; onPick: (t: TemplateS
       className="flex flex-col items-start gap-1 rounded-lg bg-[var(--color-pill-bg)] px-4 py-3 hover:border-[var(--color-claude-mark)]"
     >
       <div className="flex w-full items-center justify-between">
-        <span className="font-mono text-base font-semibold text-[var(--color-text)]">
-          {t.name}
-        </span>
+        <span className="font-mono text-base font-semibold text-[var(--color-text)]">{t.name}</span>
         <span className="font-mono text-caption uppercase tracking-wider text-[var(--color-text-muted)]">
           {t.category} · {t.workflowCount} wf
         </span>

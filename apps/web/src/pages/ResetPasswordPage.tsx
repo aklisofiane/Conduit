@@ -102,7 +102,9 @@ export function ResetPasswordPage() {
       ) : (
         <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
           <label className="flex flex-col">
-            <Label asChild><span>New password</span></Label>
+            <Label asChild>
+              <span>New password</span>
+            </Label>
             <Input
               type="password"
               autoComplete="new-password"

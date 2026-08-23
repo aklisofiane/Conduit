@@ -141,8 +141,7 @@ export async function startHarness(opts: HarnessOptions = {}): Promise<Harness> 
     CONDUIT_STUB_SCRIPT: stubScriptPath,
     CONDUIT_CORS_ORIGIN: 'http://localhost',
     BETTER_AUTH_SECRET:
-      process.env.BETTER_AUTH_SECRET ??
-      'test-better-auth-secret-0123456789abcdef',
+      process.env.BETTER_AUTH_SECRET ?? 'test-better-auth-secret-0123456789abcdef',
     API_PORT: String(apiPort),
     CONDUIT_HOME: path.join(workspaceRoot, 'conduit-home'),
     CONDUIT_TEST_REMOTE_BASE: remoteBase,
@@ -323,7 +322,11 @@ function makeCollector(wsUrl: string, runId: string, authCookie: string): WsColl
 
         const timer = setTimeout(() => {
           socket.off('node-update', onFrame);
-          reject(new Error(`Timed out after ${timeoutMs}ms waiting for done${nodeName ? `/${nodeName}` : ''}`));
+          reject(
+            new Error(
+              `Timed out after ${timeoutMs}ms waiting for done${nodeName ? `/${nodeName}` : ''}`,
+            ),
+          );
         }, timeoutMs);
 
         const onFrame = (m: RunUpdateMessage): void => {
@@ -347,11 +350,7 @@ function makeCollector(wsUrl: string, runId: string, authCookie: string): WsColl
  * and need explicit control over connect / disconnect / connect_error.
  * Pass `undefined` cookie for the anonymous case.
  */
-function makeSocketProbe(
-  wsUrl: string,
-  runId: string,
-  cookie: string | undefined,
-): SocketProbe {
+function makeSocketProbe(wsUrl: string, runId: string, cookie: string | undefined): SocketProbe {
   const frames: RunUpdateMessage[] = [];
   const socketOpts: Parameters<typeof ioClient>[1] = {
     transports: ['websocket'],
@@ -605,7 +604,12 @@ async function seedRemoteBranch(
 
   // Refresh the base-clone mirror so the worker's local clone sees the new
   // ref without a network fetch on first resolve.
-  await gitCmd(baseBareDir, ['fetch', '-q', 'origin', `+refs/heads/${branch}:refs/heads/${branch}`]);
+  await gitCmd(baseBareDir, [
+    'fetch',
+    '-q',
+    'origin',
+    `+refs/heads/${branch}:refs/heads/${branch}`,
+  ]);
 }
 
 function gitCmd(cwd: string, args: string[]): Promise<void> {
@@ -616,7 +620,11 @@ function gitCmd(cwd: string, args: string[]): Promise<void> {
     child.on('error', reject);
     child.on('close', (code) => {
       if (code === 0) return resolve();
-      reject(new Error(`git ${args.join(' ')} (cwd=${cwd}) exited ${code}: ${Buffer.concat(err).toString()}`));
+      reject(
+        new Error(
+          `git ${args.join(' ')} (cwd=${cwd}) exited ${code}: ${Buffer.concat(err).toString()}`,
+        ),
+      );
     });
   });
 }

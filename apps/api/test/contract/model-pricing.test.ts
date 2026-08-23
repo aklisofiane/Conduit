@@ -103,9 +103,7 @@ describe('ModelPricingService upsert + delete + list', () => {
   });
 
   it('delete on a model the caller-org has not overridden throws NotFound', async () => {
-    await expect(svc.delete(fixture.orgA.id, 'gpt-5.5')).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(svc.delete(fixture.orgA.id, 'gpt-5.5')).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('delete does not touch a sibling-org override of the same model', async () => {

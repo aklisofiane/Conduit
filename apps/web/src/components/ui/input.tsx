@@ -42,12 +42,17 @@ const inputVariants = cva(
 );
 
 export interface InputProps
-  extends React.InputHTMLAttributes<HTMLInputElement>,
+  extends
+    React.InputHTMLAttributes<HTMLInputElement>,
     Pick<VariantProps<typeof inputVariants>, 'variant'> {}
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ className, variant, ...props }, ref) => (
-    <input ref={ref} className={cn(inputVariants({ as: 'input', variant }), className)} {...props} />
+    <input
+      ref={ref}
+      className={cn(inputVariants({ as: 'input', variant }), className)}
+      {...props}
+    />
   ),
 );
 Input.displayName = 'Input';

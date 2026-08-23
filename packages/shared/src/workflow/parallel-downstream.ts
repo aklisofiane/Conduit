@@ -7,10 +7,7 @@ import type { Edge } from './edge';
  *
  * Pure JS — safe to call from the Temporal V8 workflow sandbox.
  */
-export function parallelDownstreamOf(
-  nodeName: string,
-  edges: readonly Edge[],
-): string[] {
+export function parallelDownstreamOf(nodeName: string, edges: readonly Edge[]): string[] {
   const out: string[] = [];
   for (const e of edges) {
     if (e.from === nodeName) out.push(e.to);

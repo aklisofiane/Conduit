@@ -37,7 +37,7 @@
             "mcpServers": [{ "serverId": "github-mcp" }],
             "skills": [],
             "issueWriteback": {
-              "allowedLabels": ["conduit-merge","conduit-dev","conduit-human-review"],
+              "allowedLabels": ["conduit-merge", "conduit-dev", "conduit-human-review"],
               "allowedPrStates": ["draft", "ready"],
               "allowedStatuses": []
             }

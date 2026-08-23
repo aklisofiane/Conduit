@@ -35,10 +35,7 @@ describe('introspectMcpServer', () => {
     // `sleep` holds the child process open without writing to stdout, so the
     // client's initialize request never gets a response.
     await expect(
-      introspectMcpServer(
-        { kind: 'stdio', command: 'sleep', args: ['30'] },
-        { timeoutMs: 150 },
-      ),
+      introspectMcpServer({ kind: 'stdio', command: 'sleep', args: ['30'] }, { timeoutMs: 150 }),
     ).rejects.toThrow(/timed out/i);
   });
 });

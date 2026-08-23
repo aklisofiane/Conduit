@@ -118,7 +118,9 @@ describe('cronFireActivity', () => {
   it('throws when the workflow is missing', async () => {
     workflowFindUnique.mockResolvedValue(null);
 
-    await expect(cronFireActivity({ workflowId: 'wf_1' })).rejects.toThrow('Workflow wf_1 not found');
+    await expect(cronFireActivity({ workflowId: 'wf_1' })).rejects.toThrow(
+      'Workflow wf_1 not found',
+    );
     expect(startAgentRun).not.toHaveBeenCalled();
   });
 

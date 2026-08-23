@@ -139,9 +139,7 @@ describe('resolveTemplate', () => {
     // workspace fields, so there's nothing to substitute on a node.
     expect(resolved.definition.nodes[0]!.workspace).toBeUndefined();
     // Input untouched.
-    expect(TEMPLATE.workflows[0]!.definition.triggers[0]!.connectionId).toBe(
-      '<github-repo>',
-    );
+    expect(TEMPLATE.workflows[0]!.definition.triggers[0]!.connectionId).toBe('<github-repo>');
   });
 
   it('substitutes both connectionId and boardConnectionId when present', () => {
@@ -236,9 +234,7 @@ const RESEARCH_PRESET: AgentPreset = {
   model: 'claude-opus-4-6',
   instructions: 'You are a Research agent. Read the trigger context.',
 };
-const PRESET_MAP = new Map<string, AgentPreset>([
-  [RESEARCH_PRESET.id, RESEARCH_PRESET],
-]);
+const PRESET_MAP = new Map<string, AgentPreset>([[RESEARCH_PRESET.id, RESEARCH_PRESET]]);
 const resolveFromMap = {
   agent: (id: string) => PRESET_MAP.get(id),
   mcp: () => undefined,
@@ -434,9 +430,7 @@ describe('mcp preset expansion', () => {
             },
           ],
           edges: [],
-          mcpServers: [
-            { id: 'github-mcp', presetId: 'github', connectionId: '<github-repo>' },
-          ],
+          mcpServers: [{ id: 'github-mcp', presetId: 'github', connectionId: '<github-repo>' }],
           ui: { nodePositions: {}, viewport: { x: 0, y: 0, zoom: 1 } },
         },
       },
@@ -497,9 +491,9 @@ describe('mcp preset expansion', () => {
       mcp: findMcpPreset,
     });
     const userDetails = collectTemplatePlaceholderDetails(expandedUser);
-    expect(
-      userDetails.find((d) => d.alias === 'custom-server')!.expectedScopeKinds,
-    ).toEqual(['any']);
+    expect(userDetails.find((d) => d.alias === 'custom-server')!.expectedScopeKinds).toEqual([
+      'any',
+    ]);
   });
 
   it('expandTemplate throws UnknownMcpPresetError when the mcp preset is missing', () => {

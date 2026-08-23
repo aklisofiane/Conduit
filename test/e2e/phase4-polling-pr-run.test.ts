@@ -10,10 +10,7 @@ import {
 } from './mock-github';
 import { TEST_STACK_ENV } from './stack';
 
-async function waitFor<T>(
-  check: () => Promise<T | null | false>,
-  timeoutMs: number,
-): Promise<T> {
+async function waitFor<T>(check: () => Promise<T | null | false>, timeoutMs: number): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const result = await check();
@@ -79,9 +76,7 @@ describe('Phase 4 PR scope — repo polling fires runs on PR set-diff', () => {
   // deterministic handle is `poll-<slug>-<id>`. Read the frozen slug back
   // rather than recomputing it (the connection is patched in after create).
   const slugScheduleId = async (workflowId: string): Promise<string> => {
-    const row = await harness.http.get<{ temporalSlug: string | null }>(
-      `/workflows/${workflowId}`,
-    );
+    const row = await harness.http.get<{ temporalSlug: string | null }>(`/workflows/${workflowId}`);
     return workflowScheduleId(workflowId, row.temporalSlug ?? undefined);
   };
 

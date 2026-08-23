@@ -69,12 +69,8 @@ describe('pickNextActiveOrg', () => {
 
 describe('invalidateOrgScopedQueries', () => {
   it('invalidates every scoped key plus the org-plugin caches', async () => {
-    const invalidateQueries = vi.fn((_args: { queryKey: readonly unknown[] }) =>
-      Promise.resolve(),
-    );
-    const qc = { invalidateQueries } as unknown as Parameters<
-      typeof invalidateOrgScopedQueries
-    >[0];
+    const invalidateQueries = vi.fn((_args: { queryKey: readonly unknown[] }) => Promise.resolve());
+    const qc = { invalidateQueries } as unknown as Parameters<typeof invalidateOrgScopedQueries>[0];
 
     await invalidateOrgScopedQueries(qc);
 

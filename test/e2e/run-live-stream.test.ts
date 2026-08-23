@@ -152,14 +152,10 @@ describe('Live run stream — ordered AgentEvent frames survive Redis → gatewa
       // the terminal. A late content frame here would be a cross-run leak or
       // a late publish.
       const contentTypes = new Set(['text', 'usage', 'tool_call', 'tool_result']);
-      const contentAtDone = collector
-        .frames()
-        .filter((f) => contentTypes.has(f.event.type)).length;
+      const contentAtDone = collector.frames().filter((f) => contentTypes.has(f.event.type)).length;
       await sleep(1_000);
       const framesAfterWait = collector.frames();
-      const contentAfterWait = framesAfterWait.filter((f) =>
-        contentTypes.has(f.event.type),
-      ).length;
+      const contentAfterWait = framesAfterWait.filter((f) => contentTypes.has(f.event.type)).length;
       expect(contentAfterWait).toBe(contentAtDone);
 
       // The last frame received for this run must be terminal (`done`).

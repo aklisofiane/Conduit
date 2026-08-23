@@ -19,9 +19,7 @@ export const agentPresetCategorySchema = z.enum([
 export type AgentPresetCategory = z.infer<typeof agentPresetCategorySchema>;
 
 export const agentPresetFileSchema = z.object({
-  id: z
-    .string()
-    .regex(/^[a-z][a-z0-9-]*$/, 'preset id must be kebab-case'),
+  id: z.string().regex(/^[a-z][a-z0-9-]*$/, 'preset id must be kebab-case'),
   name: z.string().min(1),
   description: z.string().min(1),
   category: agentPresetCategorySchema,

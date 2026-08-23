@@ -271,9 +271,7 @@ describe('applyFilter', () => {
 
   it('pr_state — exact match', () => {
     const prView: FilterView = { labels: [], prState: 'ready_for_review' };
-    expect(
-      applyFilter(prView, { field: 'pr_state', value: 'ready_for_review' }),
-    ).toBe(true);
+    expect(applyFilter(prView, { field: 'pr_state', value: 'ready_for_review' })).toBe(true);
     expect(applyFilter(prView, { field: 'pr_state', value: 'draft' })).toBe(false);
   });
 
@@ -289,11 +287,9 @@ describe('applyFilter', () => {
   });
 
   it('pr_state — undefined prState fails for concrete values (webhook-side fail-closed)', () => {
-    expect(
-      applyFilter({ labels: [] }, { field: 'pr_state', value: 'draft' }),
-    ).toBe(false);
-    expect(
-      applyFilter({ labels: [] }, { field: 'pr_state', value: 'ready_for_review' }),
-    ).toBe(false);
+    expect(applyFilter({ labels: [] }, { field: 'pr_state', value: 'draft' })).toBe(false);
+    expect(applyFilter({ labels: [] }, { field: 'pr_state', value: 'ready_for_review' })).toBe(
+      false,
+    );
   });
 });

@@ -45,7 +45,10 @@ export function relativeUntil(
   return `in ${days}d`;
 }
 
-export function duration(start: string | Date | null | undefined, end?: string | Date | null): string {
+export function duration(
+  start: string | Date | null | undefined,
+  end?: string | Date | null,
+): string {
   if (!start) return '—';
   const s = typeof start === 'string' ? new Date(start) : start;
   const e = end ? (typeof end === 'string' ? new Date(end) : end) : new Date();

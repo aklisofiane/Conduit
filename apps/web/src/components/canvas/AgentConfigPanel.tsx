@@ -96,9 +96,7 @@ export function AgentConfigPanel({
     if (
       agent.instructions.trim() &&
       agent.instructions !== preset.instructions &&
-      !window.confirm(
-        `Replace this agent's instructions with the "${preset.name}" preset?`,
-      )
+      !window.confirm(`Replace this agent's instructions with the "${preset.name}" preset?`)
     ) {
       return;
     }
@@ -136,10 +134,7 @@ export function AgentConfigPanel({
       <div className="flex-1 overflow-y-auto px-5 py-4">
         <div className="space-y-5">
           <Field label="Name">
-            <Input
-              value={agent.name}
-              onChange={(e) => onChange({ name: e.target.value })}
-            />
+            <Input value={agent.name} onChange={(e) => onChange({ name: e.target.value })} />
           </Field>
 
           {presets.length > 0 && (
@@ -271,17 +266,14 @@ export function AgentConfigPanel({
           </Field>
 
           <Field label="MCP servers" hint="tools from external services">
-            <McpServerPicker
-              agent={agent}
-              workflowId={workflowId}
-              onChange={onChange}
-            />
+            <McpServerPicker agent={agent} workflowId={workflowId} onChange={onChange} />
           </Field>
 
           <Field label="Skills" hint="from .claude/skills/ + plugins">
             {providerSkills.length === 0 ? (
               <div className="font-mono text-small text-[var(--color-text-muted)]">
-                No skills discovered. Add SKILL.md files under .claude/skills/ on the worker or in a connected repo, or install a Claude Code plugin.
+                No skills discovered. Add SKILL.md files under .claude/skills/ on the worker or in a
+                connected repo, or install a Claude Code plugin.
               </div>
             ) : (
               <SkillPicker
@@ -353,9 +345,7 @@ function IssueWritebackControl({
   const { data: connections = [] } = useConnections();
   const boardConnection = connections.find((c) => c.id === boardConnectionId);
   const boardScope =
-    boardConnection?.scope.kind === 'github_projects_v2'
-      ? boardConnection.scope
-      : undefined;
+    boardConnection?.scope.kind === 'github_projects_v2' ? boardConnection.scope : undefined;
 
   const boardsQuery = useListProjectBoards({
     connectionId: boardConnectionId,
@@ -363,8 +353,7 @@ function IssueWritebackControl({
     owner: boardScope?.owner ?? '',
     enabled: enabled && !!trigger && !!boardConnectionId && !!boardScope,
   });
-  const matchedBoard =
-    boardsQuery.data?.find((b) => b.number === boardScope?.number) ?? null;
+  const matchedBoard = boardsQuery.data?.find((b) => b.number === boardScope?.number) ?? null;
   const statusOptions =
     matchedBoard?.fields.find((f) => f.name.toLowerCase() === 'status')?.options ?? [];
 
@@ -414,10 +403,7 @@ function IssueWritebackControl({
   return (
     <div className="space-y-2">
       <label className="flex cursor-pointer items-center gap-2 font-mono text-small">
-        <Checkbox
-          checked={enabled}
-          onCheckedChange={(checked) => toggle(checked === true)}
-        />
+        <Checkbox checked={enabled} onCheckedChange={(checked) => toggle(checked === true)} />
         <span>Allow updating issue/PR status &amp; labels</span>
       </label>
 
@@ -439,7 +425,7 @@ function IssueWritebackControl({
               label="Allowed statuses"
               empty={
                 !boardScope
-                  ? "Trigger has no project board — set one to pick statuses."
+                  ? 'Trigger has no project board — set one to pick statuses.'
                   : boardsQuery.isLoading
                     ? 'Loading…'
                     : statusOptions.length === 0
@@ -479,8 +465,8 @@ function IssueWritebackControl({
             // no `allowedPrStates` until the definition is re-parsed on save.
             (value.allowedPrStates?.length ?? 0) === 0 && (
               <div className="font-mono text-caption text-[var(--color-text-muted)]">
-                Pick at least one {isPr ? 'state' : 'status'} or label — without
-                selections, the writeback turn is skipped at run time.
+                Pick at least one {isPr ? 'state' : 'status'} or label — without selections, the
+                writeback turn is skipped at run time.
               </div>
             )}
         </div>

@@ -30,9 +30,7 @@ export async function dropConflictingWorktrees(
   target: string,
   branchName?: string,
 ): Promise<void> {
-  const list = await git(['worktree', 'list', '--porcelain'], { cwd: repoPath }).catch(
-    () => '',
-  );
+  const list = await git(['worktree', 'list', '--porcelain'], { cwd: repoPath }).catch(() => '');
   const worktrees = parseWorktreePorcelain(list);
   const pathMatches = worktrees.filter((w) => w.path === target);
   const branchMatches =
@@ -52,9 +50,7 @@ export async function dropConflictingWorktrees(
   const runsPrefix = `${runsRoot()}${path.sep}`;
   // Path-matches (own stale target) + dead branch-matches: safe to remove.
   for (const w of [...pathMatches, ...branchMatches]) {
-    await git(['worktree', 'remove', '--force', w.path], { cwd: repoPath }).catch(
-      () => undefined,
-    );
+    await git(['worktree', 'remove', '--force', w.path], { cwd: repoPath }).catch(() => undefined);
     if (w.path.startsWith(runsPrefix)) {
       await fs.rm(w.path, { recursive: true, force: true });
     }

@@ -61,9 +61,7 @@ export function AgentNode({ data, selected }: NodeProps) {
           )}
         >
           {agent.instructions ? (
-            <span className="line-clamp-3 whitespace-pre-wrap">
-              {agent.instructions}
-            </span>
+            <span className="line-clamp-3 whitespace-pre-wrap">{agent.instructions}</span>
           ) : (
             <span className="text-[var(--color-text-muted)]">
               No instructions yet — click to configure.
@@ -95,9 +93,7 @@ export function AgentNode({ data, selected }: NodeProps) {
                   {m.serverId}
                 </span>
               ))}
-              {agent.mcpServers.length > 3 && (
-                <span>+{agent.mcpServers.length - 3}</span>
-              )}
+              {agent.mcpServers.length > 3 && <span>+{agent.mcpServers.length - 3}</span>}
             </>
           )}
         </div>

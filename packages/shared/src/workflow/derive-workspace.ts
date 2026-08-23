@@ -43,9 +43,7 @@ export interface DerivedWorkflowDefinition extends WorkflowDefinition {
  * derivation), it is preserved as-is. Pre-1.0 dev DBs are wiped before
  * deploy, so this only matters during the cutover.
  */
-export function deriveWorkspaces(
-  definition: WorkflowDefinition,
-): DerivedWorkflowDefinition {
+export function deriveWorkspaces(definition: WorkflowDefinition): DerivedWorkflowDefinition {
   const triggersByName = new Map(definition.triggers.map((t) => [t.name, t]));
   const nodeNames = new Set(definition.nodes.map((n) => n.name));
   const incoming = buildIncomingMap(definition.edges, nodeNames, triggersByName);
@@ -133,10 +131,7 @@ function deriveOne(
 }
 
 /** Set of `start` plus all transitive agent ancestors. */
-function agentClosure(
-  start: string,
-  incoming: Map<string, NodeIncoming>,
-): Set<string> {
+function agentClosure(start: string, incoming: Map<string, NodeIncoming>): Set<string> {
   const result = new Set<string>([start]);
   const stack = [start];
   while (stack.length > 0) {

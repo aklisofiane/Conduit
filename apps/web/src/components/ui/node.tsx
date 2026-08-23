@@ -28,12 +28,9 @@ const nodeShellVariants = cva(
   {
     variants: {
       tone: {
-        claude:
-          'bg-[var(--color-claude-card)] border-[var(--color-claude-border)] font-sans',
-        codex:
-          'bg-[var(--color-codex-card)] border-[var(--color-codex-border)] font-mono',
-        trigger:
-          'bg-[var(--color-trigger-bg)] border-[var(--color-trigger-border)] font-mono',
+        claude: 'bg-[var(--color-claude-card)] border-[var(--color-claude-border)] font-sans',
+        codex: 'bg-[var(--color-codex-card)] border-[var(--color-codex-border)] font-mono',
+        trigger: 'bg-[var(--color-trigger-bg)] border-[var(--color-trigger-border)] font-mono',
       },
       selected: {
         true: 'shadow-[var(--shadow-focus),var(--shadow-node)]',
@@ -53,8 +50,7 @@ const nodeShellVariants = cva(
 );
 
 export interface NodeShellProps
-  extends React.HTMLAttributes<HTMLDivElement>,
-    VariantProps<typeof nodeShellVariants> {
+  extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof nodeShellVariants> {
   /** Render as the child element (e.g. the palette `<button>`) instead of a `<div>`. */
   asChild?: boolean;
 }
@@ -63,11 +59,7 @@ export const NodeShell = forwardRef<HTMLDivElement, NodeShellProps>(
   ({ className, tone, selected, asChild = false, ...props }, ref) => {
     const Comp = asChild ? Slot : 'div';
     return (
-      <Comp
-        ref={ref}
-        className={cn(nodeShellVariants({ tone, selected }), className)}
-        {...props}
-      />
+      <Comp ref={ref} className={cn(nodeShellVariants({ tone, selected }), className)} {...props} />
     );
   },
 );
@@ -101,8 +93,7 @@ const nodeIconTileVariants = cva('grid shrink-0 place-items-center', {
 });
 
 export interface NodeIconTileProps
-  extends React.HTMLAttributes<HTMLSpanElement>,
-    VariantProps<typeof nodeIconTileVariants> {}
+  extends React.HTMLAttributes<HTMLSpanElement>, VariantProps<typeof nodeIconTileVariants> {}
 
 export const NodeIconTile = forwardRef<HTMLSpanElement, NodeIconTileProps>(
   ({ className, tone, size, ...props }, ref) => (
@@ -139,8 +130,7 @@ const nodeTagVariants = cva(
 );
 
 export interface NodeTagProps
-  extends React.HTMLAttributes<HTMLSpanElement>,
-    VariantProps<typeof nodeTagVariants> {}
+  extends React.HTMLAttributes<HTMLSpanElement>, VariantProps<typeof nodeTagVariants> {}
 
 export const NodeTag = forwardRef<HTMLSpanElement, NodeTagProps>(
   ({ className, tone, ...props }, ref) => (
@@ -170,8 +160,7 @@ const nodePillVariants = cva(
 );
 
 export interface NodePillProps
-  extends React.HTMLAttributes<HTMLSpanElement>,
-    VariantProps<typeof nodePillVariants> {}
+  extends React.HTMLAttributes<HTMLSpanElement>, VariantProps<typeof nodePillVariants> {}
 
 export const NodePill = forwardRef<HTMLSpanElement, NodePillProps>(
   ({ className, tone, ...props }, ref) => (

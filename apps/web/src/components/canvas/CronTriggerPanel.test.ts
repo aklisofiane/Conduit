@@ -19,10 +19,7 @@ describe('branchPickerOptions', () => {
   });
 
   it('does not duplicate a typed value that is already a fetched branch', () => {
-    expect(branchPickerOptions(['main', 'develop'], 'develop')).toEqual([
-      'main',
-      'develop',
-    ]);
+    expect(branchPickerOptions(['main', 'develop'], 'develop')).toEqual(['main', 'develop']);
   });
 
   it('still offers a typed value when the branch list failed to load (empty)', () => {

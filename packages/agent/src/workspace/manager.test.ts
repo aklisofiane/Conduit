@@ -5,11 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { git } from './git';
 import { WorkspaceManager } from './manager';
 import { deriveSlug, formatBranchName } from './slug';
-import type {
-  ConnectionContext,
-  TicketBranchRow,
-  TicketBranchStore,
-} from './types';
+import type { ConnectionContext, TicketBranchRow, TicketBranchStore } from './types';
 
 const ORG_ID = 'org_manager_test';
 
@@ -118,10 +114,7 @@ describe('WorkspaceManager retry idempotency', () => {
     });
 
     await fs.mkdir(path.join(upstream.path, '.conduit'), { recursive: true });
-    await fs.writeFile(
-      path.join(upstream.path, '.conduit', 'Seed.md'),
-      '# Seed\nhandoff body\n',
-    );
+    await fs.writeFile(path.join(upstream.path, '.conduit', 'Seed.md'), '# Seed\nhandoff body\n');
 
     const sibling = await manager.resolve({
       runId,

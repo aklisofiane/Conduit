@@ -90,8 +90,9 @@ export function useCreateWorkflow() {
 export function useUpdateWorkflow(id: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: Partial<Pick<WorkflowRow, 'name' | 'description' | 'definition' | 'isActive'>>) =>
-      api.put<WorkflowRow>(`/workflows/${id}`, body),
+    mutationFn: (
+      body: Partial<Pick<WorkflowRow, 'name' | 'description' | 'definition' | 'isActive'>>,
+    ) => api.put<WorkflowRow>(`/workflows/${id}`, body),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: WORKFLOWS });
       void qc.invalidateQueries({ queryKey: workflowKey(id) });
@@ -118,8 +119,7 @@ export function useDuplicateWorkflow() {
 export function useWorkflowRuns(workflowId: string | undefined, limit = 50) {
   return useQuery({
     queryKey: workflowId ? runsKey(workflowId) : ['workflow', 'none', 'runs'],
-    queryFn: () =>
-      api.get<WorkflowRunListItem[]>(`/workflows/${workflowId!}/runs?limit=${limit}`),
+    queryFn: () => api.get<WorkflowRunListItem[]>(`/workflows/${workflowId!}/runs?limit=${limit}`),
     enabled: !!workflowId,
     refetchInterval: (q) => {
       const data = q.state.data as WorkflowRunListItem[] | undefined;
@@ -246,10 +246,8 @@ export function useCreateProviderConfig() {
 export function useUpdateProviderConfig() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (args: {
-      id: string;
-      body: { apiKey?: string; baseUrl?: string | null };
-    }) => api.put<ProviderConfig>(`/provider-configs/${args.id}`, args.body),
+    mutationFn: (args: { id: string; body: { apiKey?: string; baseUrl?: string | null } }) =>
+      api.put<ProviderConfig>(`/provider-configs/${args.id}`, args.body),
     onSuccess: () => qc.invalidateQueries({ queryKey: PROVIDER_CONFIGS }),
   });
 }
@@ -284,8 +282,7 @@ export function useUpsertModelPrice() {
 export function useDeleteModelPrice() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (model: string) =>
-      api.delete<void>(`/model-pricing/${encodeURIComponent(model)}`),
+    mutationFn: (model: string) => api.delete<void>(`/model-pricing/${encodeURIComponent(model)}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: MODEL_PRICES }),
   });
 }
@@ -382,8 +379,7 @@ export function useMarkAnalysisImported(connectionId: string) {
   return useMutation({
     mutationFn: (analysisId: string) =>
       api.post<void>(`/connections/${connectionId}/analysis/${analysisId}/imported`),
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: connectionAnalysisKey(connectionId) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: connectionAnalysisKey(connectionId) }),
   });
 }
 
@@ -406,11 +402,8 @@ export function useClearWebhookSecret(workflowId: string) {
 
 export function useIntrospectMcp() {
   return useMutation({
-    mutationFn: (body: {
-      transport: McpTransport;
-      workflowId?: string;
-      connectionId?: string;
-    }) => api.post<DiscoveredTool[]>('/mcp/introspect', body),
+    mutationFn: (body: { transport: McpTransport; workflowId?: string; connectionId?: string }) =>
+      api.post<DiscoveredTool[]>('/mcp/introspect', body),
   });
 }
 
@@ -423,7 +416,13 @@ export function useListProjectBoards(
   const { ownerType, owner, enabled, connectionId, credentialId } = args;
   const tokenId = connectionId ?? credentialId ?? '';
   return useQuery({
-    queryKey: ['project-boards', connectionId ?? null, credentialId ?? null, ownerType, owner] as const,
+    queryKey: [
+      'project-boards',
+      connectionId ?? null,
+      credentialId ?? null,
+      ownerType,
+      owner,
+    ] as const,
     queryFn: () =>
       api.post<ProjectBoardSummary[]>('/trigger/list-projects', {
         ...(connectionId ? { connectionId } : { credentialId }),
@@ -436,10 +435,7 @@ export function useListProjectBoards(
   });
 }
 
-export function useListViewerRepos(args: {
-  credentialId: string;
-  enabled: boolean;
-}) {
+export function useListViewerRepos(args: { credentialId: string; enabled: boolean }) {
   const { credentialId, enabled } = args;
   return useQuery({
     queryKey: ['repos', credentialId] as const,
@@ -453,15 +449,11 @@ export function useListViewerRepos(args: {
   });
 }
 
-export function useListViewerOrgs(args: {
-  credentialId: string;
-  enabled: boolean;
-}) {
+export function useListViewerOrgs(args: { credentialId: string; enabled: boolean }) {
   const { credentialId, enabled } = args;
   return useQuery({
     queryKey: ['viewer-orgs', credentialId] as const,
-    queryFn: () =>
-      api.post<ViewerOrgEntry[]>('/trigger/list-viewer-orgs', { credentialId }),
+    queryFn: () => api.post<ViewerOrgEntry[]>('/trigger/list-viewer-orgs', { credentialId }),
     enabled: enabled && !!credentialId,
     staleTime: 30_000,
     retry: false,
@@ -472,8 +464,7 @@ export function useListLabels(args: { connectionId: string; enabled: boolean }) 
   const { connectionId, enabled } = args;
   return useQuery({
     queryKey: ['labels', connectionId] as const,
-    queryFn: () =>
-      api.post<RepoLabel[]>('/trigger/list-labels', { connectionId }),
+    queryFn: () => api.post<RepoLabel[]>('/trigger/list-labels', { connectionId }),
     enabled: enabled && !!connectionId,
     staleTime: 30_000,
     retry: false,
@@ -489,8 +480,7 @@ export function useListLabels(args: { connectionId: string; enabled: boolean }) 
 export function useRepoBranches(connectionId: string) {
   return useQuery({
     queryKey: ['branches', connectionId] as const,
-    queryFn: () =>
-      api.post<string[]>('/trigger/list-branches', { connectionId }),
+    queryFn: () => api.post<string[]>('/trigger/list-branches', { connectionId }),
     enabled: !!connectionId,
     staleTime: 30_000,
     retry: false,
@@ -538,10 +528,7 @@ export function useAgentPresets() {
 export function useCreateFromTemplate() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (args: {
-      templateId: string;
-      bindings: Record<string, TemplateBinding>;
-    }) =>
+    mutationFn: (args: { templateId: string; bindings: Record<string, TemplateBinding> }) =>
       api.post<CreatedFromTemplate>(`/workflows/from-template/${args.templateId}`, {
         bindings: args.bindings,
       }),
@@ -552,10 +539,7 @@ export function useCreateFromTemplate() {
 export function useImportTemplate() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (args: {
-      template: TemplateFile;
-      bindings: Record<string, TemplateBinding>;
-    }) =>
+    mutationFn: (args: { template: TemplateFile; bindings: Record<string, TemplateBinding> }) =>
       api.post<CreatedFromTemplate>('/workflows/import', {
         template: args.template,
         bindings: args.bindings,

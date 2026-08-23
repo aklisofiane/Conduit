@@ -21,10 +21,7 @@ export function getThemePref(): ThemePref {
 }
 
 export function systemPrefersDark(): boolean {
-  return (
-    typeof window !== 'undefined' &&
-    window.matchMedia('(prefers-color-scheme: dark)').matches
-  );
+  return typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches;
 }
 
 export function resolveTheme(pref: ThemePref): ResolvedTheme {

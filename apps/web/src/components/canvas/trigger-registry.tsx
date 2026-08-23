@@ -156,7 +156,5 @@ export function triggerPanelComponent(
   type: TriggerType,
 ): ComponentType<TriggerPanelProps> | undefined {
   const entry = TRIGGER_REGISTRY[type];
-  return entry.addable
-    ? (entry.panelComponent as ComponentType<TriggerPanelProps>)
-    : undefined;
+  return entry.addable ? (entry.panelComponent as ComponentType<TriggerPanelProps>) : undefined;
 }

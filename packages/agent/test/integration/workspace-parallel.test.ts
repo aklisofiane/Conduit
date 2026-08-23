@@ -133,7 +133,17 @@ describe('parallel `inherit` + merge-back + .conduit copy', () => {
     for (const ws of [fix, doc]) {
       await git(ws.path, 'add', '-A');
       await git(ws.path, 'reset', '--quiet', 'HEAD', '--', '.conduit').catch(() => undefined);
-      await git(ws.path, '-c', 'user.email=a@b', '-c', 'user.name=Test', 'commit', '-q', '-m', 'change');
+      await git(
+        ws.path,
+        '-c',
+        'user.email=a@b',
+        '-c',
+        'user.name=Test',
+        'commit',
+        '-q',
+        '-m',
+        'change',
+      );
     }
 
     const fixHead = (await git(fix.path, 'rev-parse', 'HEAD')).trim();
@@ -223,7 +233,17 @@ describe('parallel `inherit` + merge-back + .conduit copy', () => {
     await fs.writeFile(path.join(doc.path, 'shared.txt'), 'doc version\n');
     for (const ws of [fix, doc]) {
       await git(ws.path, 'add', '-A');
-      await git(ws.path, '-c', 'user.email=a@b', '-c', 'user.name=Test', 'commit', '-q', '-m', 'change');
+      await git(
+        ws.path,
+        '-c',
+        'user.email=a@b',
+        '-c',
+        'user.name=Test',
+        'commit',
+        '-q',
+        '-m',
+        'change',
+      );
     }
 
     const fixHead = (await git(fix.path, 'rev-parse', 'HEAD')).trim();

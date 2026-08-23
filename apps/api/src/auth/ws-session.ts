@@ -15,9 +15,7 @@ export interface WsAuthResult {
  * authenticate WS handshakes without duplicating the cookie/headers
  * plumbing.
  */
-export async function resolveWsSession(
-  headers: IncomingHttpHeaders,
-): Promise<WsAuthResult | null> {
+export async function resolveWsSession(headers: IncomingHttpHeaders): Promise<WsAuthResult | null> {
   const result = await auth.api.getSession({
     headers: fromNodeHeaders(headers),
   });

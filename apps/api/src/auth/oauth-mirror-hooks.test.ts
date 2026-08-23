@@ -79,7 +79,11 @@ describe('createOAuthMirrorHooks — active-org attribution', () => {
     const expiresAt = new Date('2026-01-01T12:00:00.000Z');
 
     await hooks.update!.after!(
-      { ...(GITHUB_ACCOUNT as object), providerId: 'gitlab', accessTokenExpiresAt: expiresAt } as never,
+      {
+        ...(GITHUB_ACCOUNT as object),
+        providerId: 'gitlab',
+        accessTokenExpiresAt: expiresAt,
+      } as never,
       null,
     );
 
@@ -175,7 +179,10 @@ describe('createOAuthMirrorHooks — active-org attribution', () => {
   it('no-ops for an unknown provider', async () => {
     const { hooks, credentials } = makeHooks();
 
-    await hooks.update!.after!({ ...(GITHUB_ACCOUNT as object), providerId: 'discord' } as never, null);
+    await hooks.update!.after!(
+      { ...(GITHUB_ACCOUNT as object), providerId: 'discord' } as never,
+      null,
+    );
 
     expect(credentials.upsertOAuthDerived).not.toHaveBeenCalled();
   });

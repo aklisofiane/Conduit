@@ -34,9 +34,7 @@ interface RawGitlabIssue {
   labels: string[];
 }
 
-export async function fetchGitlabProjectIssues(
-  q: GitlabProjectQuery,
-): Promise<ProjectBoardItem[]> {
+export async function fetchGitlabProjectIssues(q: GitlabProjectQuery): Promise<ProjectBoardItem[]> {
   const f = q.fetchImpl ?? fetch;
   const base = gitlabApiUrl(q.hostUrl);
   const encoded = encodeURIComponent(q.projectPath);
@@ -49,9 +47,7 @@ export async function fetchGitlabProjectIssues(
       headers: gitlabAuthHeaders(q.token),
     });
     if (!resp.ok) {
-      throw new Error(
-        `GitLab REST HTTP ${resp.status}: ${await resp.text().catch(() => '')}`,
-      );
+      throw new Error(`GitLab REST HTTP ${resp.status}: ${await resp.text().catch(() => '')}`);
     }
     const batch = (await resp.json()) as RawGitlabIssue[];
     const { owner, name } = splitProjectPath(q.projectPath);
@@ -105,9 +101,7 @@ export async function fetchGitlabProjectMergeRequests(
       headers: gitlabAuthHeaders(q.token),
     });
     if (!resp.ok) {
-      throw new Error(
-        `GitLab REST HTTP ${resp.status}: ${await resp.text().catch(() => '')}`,
-      );
+      throw new Error(`GitLab REST HTTP ${resp.status}: ${await resp.text().catch(() => '')}`);
     }
     const batch = (await resp.json()) as RawGitlabMergeRequest[];
     const { owner, name } = splitProjectPath(q.projectPath);
@@ -149,9 +143,11 @@ interface RawGitlabProject {
   web_url: string;
 }
 
-export async function listAccessibleGitlabProjects(
-  q: { hostUrl: string; token: string; fetchImpl?: typeof fetch },
-): Promise<GitlabProjectSummary[]> {
+export async function listAccessibleGitlabProjects(q: {
+  hostUrl: string;
+  token: string;
+  fetchImpl?: typeof fetch;
+}): Promise<GitlabProjectSummary[]> {
   const f = q.fetchImpl ?? fetch;
   const base = gitlabApiUrl(q.hostUrl);
   const items: GitlabProjectSummary[] = [];
@@ -163,9 +159,7 @@ export async function listAccessibleGitlabProjects(
       headers: gitlabAuthHeaders(q.token),
     });
     if (!resp.ok) {
-      throw new Error(
-        `GitLab REST HTTP ${resp.status}: ${await resp.text().catch(() => '')}`,
-      );
+      throw new Error(`GitLab REST HTTP ${resp.status}: ${await resp.text().catch(() => '')}`);
     }
     const batch = (await resp.json()) as RawGitlabProject[];
     for (const raw of batch) {

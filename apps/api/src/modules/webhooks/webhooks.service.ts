@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  Logger,
-  NotFoundException,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import type { Request } from 'express';
 import { matchesTrigger, type WorkflowDefinition } from '@conduit/shared';
 import {
@@ -123,10 +118,7 @@ export class WebhooksService {
     return verifyGithubSignature(secret, rawBody, header);
   }
 
-  private verifyGitlab(
-    encryptedSecret: string | null,
-    header: string | undefined,
-  ): boolean {
+  private verifyGitlab(encryptedSecret: string | null, header: string | undefined): boolean {
     if (this.devSecret && header && header === this.devSecret) return true;
     if (!encryptedSecret || !header) return false;
     const secret = safeDecrypt(encryptedSecret);

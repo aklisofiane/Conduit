@@ -62,10 +62,7 @@ describe('StubProvider', () => {
 
   it('write-file steps land inside the workspace without emitting events', async () => {
     queueStubScript({
-      steps: [
-        { kind: 'write-file', path: 'out/hello.txt', content: 'hi' },
-        { kind: 'done' },
-      ],
+      steps: [{ kind: 'write-file', path: 'out/hello.txt', content: 'hi' }, { kind: 'done' }],
     });
     const session = new StubProvider().startSession(
       baseRequest({ workspacePath: workspace }),
@@ -179,9 +176,7 @@ describe('StubProvider', () => {
     const first = await collect(session.run('turn 1'));
     expect(first.map((e) => e.type)).toEqual(['tool_call', 'usage', 'done']);
 
-    await expect(collect(session.run('turn 2'))).rejects.toBeInstanceOf(
-      ConstraintExceededError,
-    );
+    await expect(collect(session.run('turn 2'))).rejects.toBeInstanceOf(ConstraintExceededError);
   });
 
   it('synthesizes `done` on extra run() calls after the scripted turns are exhausted', async () => {

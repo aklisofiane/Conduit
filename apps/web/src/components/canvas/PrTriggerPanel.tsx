@@ -39,10 +39,7 @@ export function PrTriggerPanel({
   dirty,
 }: PrTriggerPanelProps) {
   const { data: allConnections = [] } = useConnections();
-  const repoConnections = useMemo(
-    () => repoScopedConnections(allConnections),
-    [allConnections],
-  );
+  const repoConnections = useMemo(() => repoScopedConnections(allConnections), [allConnections]);
 
   const labelsQuery = useListLabels({
     connectionId: trigger.connectionId,
@@ -57,13 +54,17 @@ export function PrTriggerPanel({
 
       <div className="flex-1 overflow-y-auto px-5 py-4">
         <div className="space-y-5">
-          <Field label={trigger.platform === 'gitlab' ? 'Project' : 'Repo'} hint="source connection for events">
+          <Field
+            label={trigger.platform === 'gitlab' ? 'Project' : 'Repo'}
+            hint="source connection for events"
+          >
             <ConnectionSelect
               connections={repoConnections}
               value={trigger.connectionId}
               onChange={(id) => {
                 const conn = allConnections.find((c) => c.id === id);
-                const derived = conn?.scope.kind === 'gitlab_project' ? 'gitlab' as const : 'github' as const;
+                const derived =
+                  conn?.scope.kind === 'gitlab_project' ? ('gitlab' as const) : ('github' as const);
                 onChange({ connectionId: id, platform: derived });
               }}
               emptyHint={`No ${trigger.platform === 'gitlab' ? 'project' : 'repo'} connections yet — create one on the Connections page.`}
@@ -83,9 +84,7 @@ export function PrTriggerPanel({
                   })
                 }
               />
-              <span className="font-mono text-small text-[var(--color-text-muted)]">
-                sec
-              </span>
+              <span className="font-mono text-small text-[var(--color-text-muted)]">sec</span>
             </div>
           </Field>
 

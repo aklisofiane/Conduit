@@ -2,10 +2,7 @@ import { createHmac } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { NotFoundException, UnauthorizedException } from '@nestjs/common';
 import type { PrismaClient } from '@conduit/database';
-import {
-  WebhooksService,
-  type RawBodyRequest,
-} from '../../src/modules/webhooks/webhooks.service';
+import { WebhooksService, type RawBodyRequest } from '../../src/modules/webhooks/webhooks.service';
 import { encrypt } from '../../src/modules/credentials/crypto';
 import { PrismaService } from '../../src/common/prisma.service';
 import { WorkflowsService } from '../../src/modules/workflows/workflows.service';
@@ -62,10 +59,7 @@ describe('WebhooksService.handle dispatch state machine', () => {
   });
 
   /** Insert a workflow for orgA with an optional github webhook trigger. */
-  async function createWorkflow(opts: {
-    active: boolean;
-    configured: boolean;
-  }): Promise<string> {
+  async function createWorkflow(opts: { active: boolean; configured: boolean }): Promise<string> {
     const triggers = opts.configured
       ? [
           {
@@ -141,7 +135,10 @@ describe('WebhooksService.handle dispatch state machine', () => {
 
   it('throws NotFound for an unknown workflowId', async () => {
     await expect(
-      svc.handle('wf_does_not_exist', githubRequest({ event: 'issues', payload: issuesOpenedPayload() })),
+      svc.handle(
+        'wf_does_not_exist',
+        githubRequest({ event: 'issues', payload: issuesOpenedPayload() }),
+      ),
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(startRunCalls).toEqual([]);
   });
@@ -162,7 +159,11 @@ describe('WebhooksService.handle dispatch state machine', () => {
     await expect(
       svc.handle(
         id,
-        githubRequest({ event: 'issues', payload: issuesOpenedPayload(), signWith: 'the-wrong-secret' }),
+        githubRequest({
+          event: 'issues',
+          payload: issuesOpenedPayload(),
+          signWith: 'the-wrong-secret',
+        }),
       ),
     ).rejects.toBeInstanceOf(UnauthorizedException);
     expect(startRunCalls).toEqual([]);
@@ -171,7 +172,10 @@ describe('WebhooksService.handle dispatch state machine', () => {
   it('throws Unauthorized for a missing signature header and never dispatches', async () => {
     const id = await createWorkflow({ active: true, configured: true });
     await expect(
-      svc.handle(id, githubRequest({ event: 'issues', payload: issuesOpenedPayload(), omitSignature: true })),
+      svc.handle(
+        id,
+        githubRequest({ event: 'issues', payload: issuesOpenedPayload(), omitSignature: true }),
+      ),
     ).rejects.toBeInstanceOf(UnauthorizedException);
     expect(startRunCalls).toEqual([]);
   });

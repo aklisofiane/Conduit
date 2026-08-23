@@ -89,13 +89,10 @@ export function ForgotPasswordPage() {
       ) : (
         <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
           <label className="flex flex-col">
-            <Label asChild><span>Email</span></Label>
-            <Input
-              type="email"
-              autoComplete="email"
-              autoFocus
-              {...form.register('email')}
-            />
+            <Label asChild>
+              <span>Email</span>
+            </Label>
+            <Input type="email" autoComplete="email" autoFocus {...form.register('email')} />
             {form.formState.errors.email?.message && (
               <span className="mt-1 font-mono text-caption text-[var(--color-error)]">
                 {form.formState.errors.email.message}
@@ -119,7 +116,10 @@ export function ForgotPasswordPage() {
           </Button>
 
           <div className="flex justify-start font-mono text-small">
-            <Link to="/sign-in" className="text-[var(--color-text-2)] hover:text-[var(--color-text)]">
+            <Link
+              to="/sign-in"
+              className="text-[var(--color-text-2)] hover:text-[var(--color-text)]"
+            >
               Back to sign in
             </Link>
           </div>

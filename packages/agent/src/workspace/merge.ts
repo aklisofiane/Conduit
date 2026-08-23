@@ -96,15 +96,7 @@ export async function mergeBranchedWorktree(args: {
       // staged changes exist; fall through to commit
     }
     await git(
-      [
-        '-c',
-        'user.email=conduit@local',
-        '-c',
-        'user.name=Conduit',
-        'commit',
-        '-m',
-        message,
-      ],
+      ['-c', 'user.email=conduit@local', '-c', 'user.name=Conduit', 'commit', '-m', message],
       { cwd: targetWorkspacePath },
     );
   } catch (err) {

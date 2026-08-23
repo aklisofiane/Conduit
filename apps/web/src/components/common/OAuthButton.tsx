@@ -21,7 +21,9 @@ export function OAuthButton({
     await signIn.social({
       provider: provider as 'github',
       callbackURL: `${window.location.origin}${callbackURL}`,
-      errorCallbackURL: errorCallbackURL ? `${window.location.origin}${errorCallbackURL}` : undefined,
+      errorCallbackURL: errorCallbackURL
+        ? `${window.location.origin}${errorCallbackURL}`
+        : undefined,
     });
   };
   return (

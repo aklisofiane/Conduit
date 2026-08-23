@@ -31,7 +31,8 @@ export function InvitationsPage() {
           Invitations
         </h1>
         <p className="mt-2 font-mono text-small text-[var(--color-text-2)]">
-          Invitations sent to your email. Accepting joins you as a member; the active organization isn't changed.
+          Invitations sent to your email. Accepting joins you as a member; the active organization
+          isn't changed.
         </p>
       </div>
 
@@ -40,7 +41,9 @@ export function InvitationsPage() {
           <h2 className="font-mono text-base font-semibold">Pending</h2>
         </header>
         {isLoading && pending.length === 0 ? (
-          <div className="px-4 py-4 font-mono text-small text-[var(--color-text-muted)]">Loading…</div>
+          <div className="px-4 py-4 font-mono text-small text-[var(--color-text-muted)]">
+            Loading…
+          </div>
         ) : pending.length === 0 ? (
           <div className="px-4 py-4 font-mono text-small text-[var(--color-text-muted)]">
             No pending invitations.
@@ -79,7 +82,8 @@ function InvitationRow({ invitation }: { invitation: UserInvitation }) {
       setError,
     });
 
-  const orgLabel = invitation.organizationName ?? `Organization ${invitation.organizationId.slice(0, 8)}`;
+  const orgLabel =
+    invitation.organizationName ?? `Organization ${invitation.organizationId.slice(0, 8)}`;
 
   return (
     <li className="flex items-center justify-between gap-4 px-4 py-3">

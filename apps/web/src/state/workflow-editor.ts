@@ -83,9 +83,7 @@ export const useWorkflowEditor = create<WorkflowEditorState>((set) => ({
   updateMcpServer: (id, patch) =>
     set((state) => {
       if (!state.draft) return {};
-      const mcpServers = state.draft.mcpServers.map((s) =>
-        s.id === id ? { ...s, ...patch } : s,
-      );
+      const mcpServers = state.draft.mcpServers.map((s) => (s.id === id ? { ...s, ...patch } : s));
       return { draft: { ...state.draft, mcpServers }, dirty: true };
     }),
   removeMcpServer: (id) =>

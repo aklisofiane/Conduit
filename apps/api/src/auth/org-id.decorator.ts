@@ -1,8 +1,4 @@
-import {
-  ForbiddenException,
-  createParamDecorator,
-  type ExecutionContext,
-} from '@nestjs/common';
+import { ForbiddenException, createParamDecorator, type ExecutionContext } from '@nestjs/common';
 import type { Request } from 'express';
 
 /**
@@ -16,13 +12,11 @@ import type { Request } from 'express';
  * personal org and sets `activeOrganizationId` for every new user, but the
  * thrown error fails closed if a session predates the shim.
  */
-export const OrgId = createParamDecorator(
-  (_data: unknown, ctx: ExecutionContext): string => {
-    const req = ctx.switchToHttp().getRequest<Request>();
-    const orgId = req.session?.activeOrganizationId;
-    if (!orgId) {
-      throw new ForbiddenException('No active organization on session');
-    }
-    return orgId;
-  },
-);
+export const OrgId = createParamDecorator((_data: unknown, ctx: ExecutionContext): string => {
+  const req = ctx.switchToHttp().getRequest<Request>();
+  const orgId = req.session?.activeOrganizationId;
+  if (!orgId) {
+    throw new ForbiddenException('No active organization on session');
+  }
+  return orgId;
+});

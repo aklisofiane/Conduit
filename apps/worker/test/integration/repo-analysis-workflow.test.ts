@@ -93,7 +93,9 @@ describe('repoAnalysisWorkflow orchestration (TestWorkflowEnvironment)', () => {
           isBranchedWorktree: false,
         };
       },
-      async readComponentManifestActivity(input: { workspacePath: string }): Promise<ComponentManifest> {
+      async readComponentManifestActivity(input: {
+        workspacePath: string;
+      }): Promise<ComponentManifest> {
         calls.push({ name: 'readComponentManifestActivity', input });
         manifestAttempts += 1;
         if (behavior.manifestFailures && manifestAttempts <= behavior.manifestFailures) {
@@ -115,8 +117,14 @@ describe('repoAnalysisWorkflow orchestration (TestWorkflowEnvironment)', () => {
           rationale: 'why',
           scopeInstructions: `Scope review of ${component.name}: route security-relevant changes to Security and quality issues to Quality.`,
           reviewers: [
-            { name: 'Security', instructions: 'Review for auth bypasses and input-validation gaps.' },
-            { name: 'Quality', instructions: 'Review for logic errors and missing error handling.' },
+            {
+              name: 'Security',
+              instructions: 'Review for auth bypasses and input-validation gaps.',
+            },
+            {
+              name: 'Quality',
+              instructions: 'Review for logic errors and missing error handling.',
+            },
           ],
           cron: '0 2 * * *',
           paths: component.paths,
@@ -149,7 +157,10 @@ describe('repoAnalysisWorkflow orchestration (TestWorkflowEnvironment)', () => {
       systemWorkflowId: 'sys_int',
       orgId: 'org_int',
       connectionId: 'conn_int',
-      triggerEvent: buildAnalysisTriggerEvent({ platform: 'github', repo: { owner: 'acme', name: 'api' } }),
+      triggerEvent: buildAnalysisTriggerEvent({
+        platform: 'github',
+        repo: { owner: 'acme', name: 'api' },
+      }),
       presets: PRESETS,
     };
     await worker.runUntil(
@@ -162,8 +173,7 @@ describe('repoAnalysisWorkflow orchestration (TestWorkflowEnvironment)', () => {
   }
 
   const callsNamed = (name: string): ActivityCall[] => calls.filter((c) => c.name === name);
-  const phases = (): unknown[] =>
-    callsNamed('updateAnalysisPhaseActivity').map((c) => c.input);
+  const phases = (): unknown[] => callsNamed('updateAnalysisPhaseActivity').map((c) => c.input);
   const assembleInput = (): Record<string, unknown> | undefined =>
     callsNamed('assembleSuggestionsActivity')[0]?.input as Record<string, unknown> | undefined;
 
@@ -209,10 +219,16 @@ describe('repoAnalysisWorkflow orchestration (TestWorkflowEnvironment)', () => {
   });
 
   it('drops a component whose Design fails after retries, keeping the rest', async () => {
-    await runWorkflow({ manifest: manifest(['API', 'Web', 'Worker']), failDesignIndices: new Set([1]) });
+    await runWorkflow({
+      manifest: manifest(['API', 'Web', 'Worker']),
+      failDesignIndices: new Set([1]),
+    });
 
     const ai = assembleInput()!;
-    expect((ai.drafts as { component: string }[]).map((d) => d.component)).toEqual(['API', 'Worker']);
+    expect((ai.drafts as { component: string }[]).map((d) => d.component)).toEqual([
+      'API',
+      'Worker',
+    ]);
     const dropped = ai.dropped as { component: string }[];
     expect(dropped).toHaveLength(1);
     expect(dropped[0]!.component).toBe('Web');
@@ -246,9 +262,7 @@ describe('repoAnalysisWorkflow orchestration (TestWorkflowEnvironment)', () => {
     expect(discoverRuns).toHaveLength(3);
     expect(callsNamed('assembleSuggestionsActivity')).toHaveLength(0);
 
-    const failPhase = phases().find(
-      (p) => (p as { status?: string }).status === 'FAILED',
-    );
+    const failPhase = phases().find((p) => (p as { status?: string }).status === 'FAILED');
     expect(failPhase).toMatchObject({ status: 'FAILED' });
     const cleanup = callsNamed('cleanupRunActivity')[0]!.input as { status: string };
     expect(cleanup.status).toBe('FAILED');

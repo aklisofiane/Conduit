@@ -47,99 +47,73 @@ describe('normalizeHostUrl', () => {
     });
 
     it('lowercases the hostname', () => {
-      expect(normalizeHostUrl('GHE.Example.Com', 'GITHUB')).toBe(
-        'ghe.example.com',
-      );
+      expect(normalizeHostUrl('GHE.Example.Com', 'GITHUB')).toBe('ghe.example.com');
     });
 
     it('strips https:// prefix', () => {
-      expect(normalizeHostUrl('https://ghe.example.com', 'GITHUB')).toBe(
-        'ghe.example.com',
-      );
+      expect(normalizeHostUrl('https://ghe.example.com', 'GITHUB')).toBe('ghe.example.com');
     });
 
     it('strips http:// prefix', () => {
-      expect(normalizeHostUrl('http://ghe.example.com', 'GITHUB')).toBe(
-        'ghe.example.com',
-      );
+      expect(normalizeHostUrl('http://ghe.example.com', 'GITHUB')).toBe('ghe.example.com');
     });
 
     it('strips trailing slash', () => {
-      expect(normalizeHostUrl('ghe.example.com/', 'GITHUB')).toBe(
-        'ghe.example.com',
-      );
+      expect(normalizeHostUrl('ghe.example.com/', 'GITHUB')).toBe('ghe.example.com');
     });
 
     it('strips multiple trailing slashes', () => {
-      expect(normalizeHostUrl('ghe.example.com///', 'GITHUB')).toBe(
-        'ghe.example.com',
-      );
+      expect(normalizeHostUrl('ghe.example.com///', 'GITHUB')).toBe('ghe.example.com');
     });
 
     it('strips scheme AND trailing slash combined', () => {
-      expect(normalizeHostUrl('https://ghe.example.com/', 'GITHUB')).toBe(
-        'ghe.example.com',
-      );
+      expect(normalizeHostUrl('https://ghe.example.com/', 'GITHUB')).toBe('ghe.example.com');
     });
 
     it('accepts a valid bare hostname', () => {
-      expect(normalizeHostUrl('ghe.example.com', 'GITHUB')).toBe(
-        'ghe.example.com',
-      );
+      expect(normalizeHostUrl('ghe.example.com', 'GITHUB')).toBe('ghe.example.com');
     });
 
     it('accepts a valid hostname with port', () => {
-      expect(normalizeHostUrl('gitlab.acme.io:8443', 'GITLAB')).toBe(
-        'gitlab.acme.io:8443',
-      );
+      expect(normalizeHostUrl('gitlab.acme.io:8443', 'GITLAB')).toBe('gitlab.acme.io:8443');
     });
 
     it('accepts port 1 (minimum)', () => {
-      expect(normalizeHostUrl('host.example.com:1', 'GITHUB')).toBe(
-        'host.example.com:1',
-      );
+      expect(normalizeHostUrl('host.example.com:1', 'GITHUB')).toBe('host.example.com:1');
     });
 
     it('accepts port 65535 (maximum)', () => {
-      expect(normalizeHostUrl('host.example.com:65535', 'GITHUB')).toBe(
-        'host.example.com:65535',
-      );
+      expect(normalizeHostUrl('host.example.com:65535', 'GITHUB')).toBe('host.example.com:65535');
     });
 
     it('rejects port 0', () => {
-      expect(() =>
-        normalizeHostUrl('host.example.com:0', 'GITHUB'),
-      ).toThrow(/malformed hostname/);
+      expect(() => normalizeHostUrl('host.example.com:0', 'GITHUB')).toThrow(/malformed hostname/);
     });
 
     it('rejects port > 65535', () => {
-      expect(() =>
-        normalizeHostUrl('host.example.com:65536', 'GITHUB'),
-      ).toThrow(/port 65536 out of range/);
+      expect(() => normalizeHostUrl('host.example.com:65536', 'GITHUB')).toThrow(
+        /port 65536 out of range/,
+      );
     });
 
     it('rejects subpath deployments', () => {
-      expect(() =>
-        normalizeHostUrl('gitlab.example.com/gitlab', 'GITLAB'),
-      ).toThrow(/subpath deployments are not supported/);
+      expect(() => normalizeHostUrl('gitlab.example.com/gitlab', 'GITLAB')).toThrow(
+        /subpath deployments are not supported/,
+      );
     });
 
     it('rejects subpath even after scheme stripping', () => {
-      expect(() =>
-        normalizeHostUrl('https://gitlab.example.com/gitlab', 'GITLAB'),
-      ).toThrow(/subpath deployments are not supported/);
+      expect(() => normalizeHostUrl('https://gitlab.example.com/gitlab', 'GITLAB')).toThrow(
+        /subpath deployments are not supported/,
+      );
     });
 
     it('rejects invalid characters', () => {
-      expect(() =>
-        normalizeHostUrl('host_bad!.com', 'GITHUB'),
-      ).toThrow(/malformed hostname/);
+      expect(() => normalizeHostUrl('host_bad!.com', 'GITHUB')).toThrow(/malformed hostname/);
     });
 
     it('rejects hostname with leading hyphen in a label', () => {
-      expect(() =>
-        normalizeHostUrl('-bad.example.com', 'GITHUB'),
-      ).toThrow(/malformed hostname/);
+      expect(() => normalizeHostUrl('-bad.example.com', 'GITHUB')).toThrow(/malformed hostname/);
     });
   });
 

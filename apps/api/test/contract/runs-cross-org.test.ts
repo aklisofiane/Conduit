@@ -105,9 +105,7 @@ function fakeTemporal() {
   };
 }
 
-function fakeWorkflows(
-  calls: Array<{ orgId: string; workflowId: string; trigger: unknown }>,
-) {
+function fakeWorkflows(calls: Array<{ orgId: string; workflowId: string; trigger: unknown }>) {
   return {
     startRun: async (orgId: string, workflowId: string, trigger: unknown) => {
       calls.push({ orgId, workflowId, trigger });

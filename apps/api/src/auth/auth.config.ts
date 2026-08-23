@@ -35,8 +35,12 @@ function personalOrgFor(email: string): { name: string; slug: string } {
   // Cap matches the web's `slugify` (48) minus the 7-char `-${suffix}` we
   // append below, leaving headroom under any practical org-slug constraint
   // for long email localparts.
-  const cleanLocal =
-    (localpart.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'user').slice(0, 41);
+  const cleanLocal = (
+    localpart
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'user'
+  ).slice(0, 41);
   const suffix = Math.random().toString(36).slice(2, 8);
   return {
     name: `${localpart}'s workspace`,
@@ -175,9 +179,7 @@ const oauthMirrorHooks = createOAuthMirrorHooks({
 });
 
 const bootLogger = new Logger('AuthConfig');
-bootLogger.log(
-  `Better Auth rate-limit mode=${config.deployment} storage=secondary-storage(redis)`,
-);
+bootLogger.log(`Better Auth rate-limit mode=${config.deployment} storage=secondary-storage(redis)`);
 
 export const auth = betterAuth({
   database: prismaAdapter(prisma, { provider: 'postgresql' }),

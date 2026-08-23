@@ -16,7 +16,7 @@ window, and **routes** that change set to the right reviewers. The reviewers
 that fan out from Scope each only review what Scope hands them — so a vague or
 mis-routed Scope prompt wastes every downstream reviewer's run.
 
-You author the **`scopeInstructions`** string of the draft: the *substance* of
+You author the **`scopeInstructions`** string of the draft: the _substance_ of
 this agent's job, tailored to what the component actually is.
 
 ## The ScopeManifest routing concept
@@ -24,7 +24,7 @@ this agent's job, tailored to what the component actually is.
 Scope's deliverable is a routing file, `.conduit/ScopeManifest.md`, with **one
 `## <ReviewerName>` section per reviewer**. Under each heading it lists the
 changed files relevant to that reviewer, with a one-line focus note. Each
-reviewer later reads only *its* section. If nothing changed in the window, the
+reviewer later reads only _its_ section. If nothing changed in the window, the
 manifest is the single token `NO_CHANGES` and the reviewers stop.
 
 **You do not write the mechanical part of this.** Assemble code appends — onto
@@ -33,11 +33,11 @@ list you author), the path-scoping, the precise diff window (derived from the
 cron), and the `NO_CHANGES` rule. So **do not** restate the headings, the git
 mechanics, the window, or the file path. Instead, author the **judgment**:
 
-- What kinds of change matter in *this* component.
+- What kinds of change matter in _this_ component.
 - How to decide which reviewer a given change belongs to.
 - What context a reviewer needs in its section to do its job well.
 
-Write so your prose reads naturally *before* the appended mechanical block.
+Write so your prose reads naturally _before_ the appended mechanical block.
 
 ## Tailor to the component's nature
 
@@ -68,12 +68,12 @@ the component and let its nature drive the routing logic.
 Notice the contrast: the API scope thinks in endpoints, contracts, and trust
 boundaries; the web scope thinks in components, interactions, and shipped
 bundle weight. Your `scopeInstructions` should sound like it was written for
-*this* component specifically.
+_this_ component specifically.
 
 ## Checklist
 
 - [ ] Names the component and what kind of thing it is.
 - [ ] Explains, per reviewer, what changes route to it and why.
-- [ ] Gives the routing *judgment*, not the mechanical headings/paths/window
+- [ ] Gives the routing _judgment_, not the mechanical headings/paths/window
       (code appends those).
 - [ ] Reads naturally as the opening of a prompt.

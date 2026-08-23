@@ -31,9 +31,16 @@ export interface MergeWorktreeInput {
  * `.conduit/` is stripped on the target side — see merge.ts.
  */
 export async function mergeWorktreeActivity(input: MergeWorktreeInput): Promise<void> {
-  const { runId, orgId, sourceWorkspacePath, targetWorkspacePath, sourceNodeName, targetNodeName } = input;
+  const { runId, orgId, sourceWorkspacePath, targetWorkspacePath, sourceNodeName, targetNodeName } =
+    input;
   const log = (body: string, level?: 'WARN' | 'ERROR') =>
-    writeSystemLog(runId, orgId, targetNodeName, `merge ${sourceNodeName} → ${targetNodeName}: ${body}`, level);
+    writeSystemLog(
+      runId,
+      orgId,
+      targetNodeName,
+      `merge ${sourceNodeName} → ${targetNodeName}: ${body}`,
+      level,
+    );
 
   // Keep the target worktree's liveness heartbeat fresh — merges run between
   // node sessions, outside the run-agent-node heartbeater, and a concurrent

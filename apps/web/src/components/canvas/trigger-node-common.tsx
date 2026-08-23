@@ -28,8 +28,7 @@ export function TriggerNodeShell({
   platform: string;
   host?: string;
 }) {
-  const showHost =
-    host != null && !isCloudHost(platform.toUpperCase() as Platform, host);
+  const showHost = host != null && !isCloudHost(platform.toUpperCase() as Platform, host);
   return (
     <NodeShell
       tone="trigger"

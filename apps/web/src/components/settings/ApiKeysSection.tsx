@@ -151,13 +151,7 @@ export function ApiKeysSection() {
   );
 }
 
-function ProviderConfigRowView({
-  cfg,
-  onDelete,
-}: {
-  cfg: ProviderConfig;
-  onDelete: () => void;
-}) {
+function ProviderConfigRowView({ cfg, onDelete }: { cfg: ProviderConfig; onDelete: () => void }) {
   const update = useUpdateProviderConfig();
   const [rotating, setRotating] = useState(false);
   const [editingBaseUrl, setEditingBaseUrl] = useState(false);
@@ -227,11 +221,7 @@ function ProviderConfigRowView({
               onChange={(e) => setNewBaseUrl(e.target.value)}
               autoFocus
             />
-            <Button
-              variant="primary"
-              onClick={handleSaveBaseUrl}
-              disabled={update.isPending}
-            >
+            <Button variant="primary" onClick={handleSaveBaseUrl} disabled={update.isPending}>
               {update.isPending ? 'Saving…' : 'Save'}
             </Button>
             <Button
@@ -247,9 +237,7 @@ function ProviderConfigRowView({
       </div>
       {!rotating && !editingBaseUrl && (
         <>
-          <Button onClick={() => setRotating(true)}>
-            Rotate
-          </Button>
+          <Button onClick={() => setRotating(true)}>Rotate</Button>
           <Button
             onClick={() => {
               setNewBaseUrl(cfg.baseUrl ?? '');

@@ -38,14 +38,11 @@ describe('authorization enforcement: socket auth + webhook->run org chain', () =
       secret: 'ghp_stub_token_for_tests',
     });
     const fixture = await loadWorkflowFixture('phase2-webhook-issue');
-    const created = await orgA.post<{ id: string; definition: WorkflowDefinition }>(
-      '/workflows',
-      {
-        name: fixture.name,
-        description: fixture.description,
-        definition: fixture.definition,
-      },
-    );
+    const created = await orgA.post<{ id: string; definition: WorkflowDefinition }>('/workflows', {
+      name: fixture.name,
+      description: fixture.description,
+      definition: fixture.definition,
+    });
     workflowAId = created.id;
     const connection = await orgA.post<{ id: string }>('/connections', {
       name: 'acme/authz-tests',
@@ -80,7 +77,7 @@ describe('authorization enforcement: socket auth + webhook->run org chain', () =
     await harness?.stop();
   });
 
-  it("orgA webhook produced a run; orgB cannot read it via REST (404)", async () => {
+  it('orgA webhook produced a run; orgB cannot read it via REST (404)', async () => {
     // OrgA can read its own run.
     const ownRun = await orgA.get<{ id: string }>(`/runs/${runId}`);
     expect(ownRun.id).toBe(runId);
@@ -98,13 +95,10 @@ describe('authorization enforcement: socket auth + webhook->run org chain', () =
     const own = await orgA.get<Array<{ id: string }>>(`/workflows/${workflowAId}/runs`);
     expect(own.map((r) => r.id)).toContain(runId);
     // OrgB asking about orgA's workflow id sees an empty list.
-    const res = await fetch(
-      `${harness.apiUrl}/api/workflows/${workflowAId}/runs`,
-      {
-        method: 'GET',
-        headers: { 'content-type': 'application/json', cookie: orgBCookie },
-      },
-    );
+    const res = await fetch(`${harness.apiUrl}/api/workflows/${workflowAId}/runs`, {
+      method: 'GET',
+      headers: { 'content-type': 'application/json', cookie: orgBCookie },
+    });
     // Cross-org workflow id → 404 (service findFirst by workflowId+orgId → null).
     // The list endpoint may return [] or 404 depending on implementation; both
     // satisfy "no leak". Pin to whichever is current.

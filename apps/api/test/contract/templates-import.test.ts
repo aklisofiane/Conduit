@@ -91,8 +91,7 @@ describe('TemplatesService.importTemplate', () => {
       { name: 'Smuggled', definition: liveDefinition('conn_repo') },
       { aliasFor: () => 'repo' },
     );
-    file.workflows[0]!.definition.triggers[0]!.connectionId =
-      fixture.orgB.connectionId;
+    file.workflows[0]!.definition.triggers[0]!.connectionId = fixture.orgB.connectionId;
     await expect(
       svc.importTemplate(fixture.orgA.id, { template: file, bindings: {} }),
     ).rejects.toBeInstanceOf(BadRequestException);

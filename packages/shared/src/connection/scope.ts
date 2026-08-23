@@ -56,9 +56,7 @@ export function expectScopeKind<K extends ConnectionScopeKind>(
   kind: K,
 ): Extract<ConnectionScope, { kind: K }> {
   if (scope.kind !== kind) {
-    throw new Error(
-      `Expected connection scope kind "${kind}", got "${scope.kind}"`,
-    );
+    throw new Error(`Expected connection scope kind "${kind}", got "${scope.kind}"`);
   }
   return scope as Extract<ConnectionScope, { kind: K }>;
 }

@@ -1,11 +1,7 @@
 import { useEffect, useState } from 'react';
 import { MODEL_PRICING, PROVIDER_MODELS } from '@conduit/shared/agent';
 import type { ModelPriceRow } from '../../api/types.js';
-import {
-  useDeleteModelPrice,
-  useModelPrices,
-  useUpsertModelPrice,
-} from '../../api/hooks.js';
+import { useDeleteModelPrice, useModelPrices, useUpsertModelPrice } from '../../api/hooks.js';
 import { apiErrorMessage } from '../../api/client.js';
 import { relativeFromNow } from '../../lib/time.js';
 import { SettingsSection } from '../common/SettingsSection.js';
@@ -118,7 +114,9 @@ function ModelPriceRowView({
   return (
     <div className="grid grid-cols-[1fr_120px_120px_auto] items-center gap-4 border-b border-[var(--color-divider)] px-4 py-2.5 last:border-b-0">
       <div className="min-w-0">
-        <div className="truncate font-mono text-small font-medium text-[var(--color-text)]">{model}</div>
+        <div className="truncate font-mono text-small font-medium text-[var(--color-text)]">
+          {model}
+        </div>
         <div className="font-mono text-caption text-[var(--color-text-muted)]">
           {override ? `overridden · ${relativeFromNow(override.updatedAt)}` : 'default'}
         </div>

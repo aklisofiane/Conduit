@@ -98,9 +98,7 @@ export function AcceptInvitationPage() {
               {describeInvitationError(error)}
             </p>
             <div>
-              <Button
-                onClick={() => navigate('/account/invitations', { replace: true })}
-              >
+              <Button onClick={() => navigate('/account/invitations', { replace: true })}>
                 Back to invitations
               </Button>
             </div>
@@ -145,15 +143,12 @@ export function AcceptInvitationPage() {
             )}
 
             <p className="font-mono text-small text-[var(--color-text-2)]">
-              Accepting joins you as a member of this organization. Your active organization
-              won't change automatically — switch via the user menu when you're ready.
+              Accepting joins you as a member of this organization. Your active organization won't
+              change automatically — switch via the user menu when you're ready.
             </p>
 
             <div className="flex justify-end gap-2">
-              <Button
-                onClick={handleReject}
-                disabled={accept.isPending || reject.isPending}
-              >
+              <Button onClick={handleReject} disabled={accept.isPending || reject.isPending}>
                 {reject.isPending ? 'Rejecting…' : 'Reject'}
               </Button>
               <Button

@@ -19,8 +19,20 @@ import type { PrismaClient } from '@conduit/database';
  * orgId == Credential's orgId, etc.) is satisfied by construction.
  */
 export interface TwoOrgFixture {
-  orgA: { id: string; workflowId: string; credentialId: string; connectionId: string; runId: string };
-  orgB: { id: string; workflowId: string; credentialId: string; connectionId: string; runId: string };
+  orgA: {
+    id: string;
+    workflowId: string;
+    credentialId: string;
+    connectionId: string;
+    runId: string;
+  };
+  orgB: {
+    id: string;
+    workflowId: string;
+    credentialId: string;
+    connectionId: string;
+    runId: string;
+  };
 }
 
 export async function seedTwoOrgs(prisma: PrismaClient): Promise<TwoOrgFixture> {

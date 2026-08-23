@@ -27,27 +27,31 @@
             "presetId": "planner",
             "instructionsAppend": "Convention for this workflow: Dev owns production code only, Tests owns test files only. (Docs and QA run after the parallel group and are not part of your dispatch.) If this issue already has a linked draft pull/merge request carrying a \"changes requested\" review (a loop-back from Review), read that PR's latest review feedback first via the connected MCP server and scope Dev's and Tests' work to addressing it.",
             "mcpServers": [{ "serverId": "github-mcp" }],
-            "skills": []          },
+            "skills": []
+          },
           {
             "id": "agent-dev",
             "name": "Dev",
             "presetId": "developer",
             "instructionsAppend": "Sibling agent Tests runs in parallel — do not touch test files. Docs runs after you finish — do not touch user-facing documentation. Focus only on production code.",
             "mcpServers": [],
-            "skills": []          },
+            "skills": []
+          },
           {
             "id": "agent-tests",
             "name": "Tests",
             "presetId": "tests",
             "mcpServers": [],
-            "skills": []          },
+            "skills": []
+          },
           {
             "id": "agent-docs",
             "name": "Docs",
             "presetId": "docs",
             "instructionsAppend": "Your workspace already contains the merged output of Dev and Tests. Document only what was actually implemented — read the diff and `.conduit/` summaries from upstream agents before writing.",
             "mcpServers": [],
-            "skills": []          },
+            "skills": []
+          },
           {
             "id": "agent-qa",
             "name": "QA",

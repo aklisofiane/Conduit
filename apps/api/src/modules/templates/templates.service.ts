@@ -29,11 +29,7 @@ import { TemporalService, scheduleOptionsForTrigger } from '../../temporal/tempo
 import { resolveTemporalSlug } from '../../temporal/temporal-slug';
 import { AgentPresetsService } from '../agent-presets/agent-presets.service';
 import { loadTemplates, type LoadedTemplate } from './template-loader';
-import type {
-  CreateFromTemplateDto,
-  ImportTemplateDto,
-  TemplateBinding,
-} from './dto';
+import type { CreateFromTemplateDto, ImportTemplateDto, TemplateBinding } from './dto';
 
 export interface CreatedFromTemplate {
   templateId: string;
@@ -85,10 +81,7 @@ export class TemplatesService implements OnModuleInit {
    * the identical instantiation core — including the per-workflow
    * `assertDefinitionValid` guard inside the transaction.
    */
-  async importTemplate(
-    orgId: string,
-    dto: ImportTemplateDto,
-  ): Promise<CreatedFromTemplate> {
+  async importTemplate(orgId: string, dto: ImportTemplateDto): Promise<CreatedFromTemplate> {
     this.assertNoConcreteConnectionIds(dto.template);
     const placeholderDetails = collectTemplatePlaceholderDetails(dto.template);
     const loaded: LoadedTemplate = {
@@ -144,10 +137,7 @@ export class TemplatesService implements OnModuleInit {
       }[] = [];
 
       for (const wf of loaded.file.workflows) {
-        const resolved = resolveTemplate(
-          { ...loaded.file, workflows: [wf] },
-          aliasToConnId,
-        );
+        const resolved = resolveTemplate({ ...loaded.file, workflows: [wf] }, aliasToConnId);
         const resolvedDefinition = resolved[0]!.definition;
         for (const trigger of resolvedDefinition.triggers) {
           if (!trigger.connectionId) continue;
@@ -173,12 +163,8 @@ export class TemplatesService implements OnModuleInit {
           if (!conn) continue;
           const parsed = connectionScopeSchema.parse(conn.scope);
           const source = platformForScopeKind(parsed.kind);
-          const platform = source
-            ? (source.toUpperCase() as Platform)
-            : undefined;
-          const preset = platform
-            ? findMcpPresetByPlatform(platform)
-            : undefined;
+          const platform = source ? (source.toUpperCase() as Platform) : undefined;
+          const preset = platform ? findMcpPresetByPlatform(platform) : undefined;
           if (!preset) {
             throw new BadRequestException(
               `MCP server "${server.name}" is preset-backed, but the bound connection's scope kind "${parsed.kind}" has no matching MCP preset.`,
@@ -227,9 +213,7 @@ export class TemplatesService implements OnModuleInit {
             scheduleOptionsForTrigger(trigger, id, isActive, slug),
           );
         } catch (err) {
-          this.logger.warn(
-            `Upserting schedule for ${id} failed: ${errMessage(err)}`,
-          );
+          this.logger.warn(`Upserting schedule for ${id} failed: ${errMessage(err)}`);
         }
       }),
     );
@@ -271,9 +255,7 @@ export class TemplatesService implements OnModuleInit {
         .filter((p) => p.expectedScopeKinds.includes('github_projects_v2'))
         .map((p) => p.alias),
     );
-    const missing = loaded.placeholders.filter(
-      (p) => !bindings[p] && !boardAliases.has(p),
-    );
+    const missing = loaded.placeholders.filter((p) => !bindings[p] && !boardAliases.has(p));
     if (missing.length > 0) {
       throw new BadRequestException({
         message: `Missing connection bindings for placeholders: ${missing.map((m) => `<${m}>`).join(', ')}`,
@@ -320,20 +302,14 @@ export class TemplatesService implements OnModuleInit {
 
     const missingCreds = diff(credentialIds, credRows);
     if (missingCreds.length > 0) {
-      throw new BadRequestException(
-        `Unknown credentialId(s): ${missingCreds.join(', ')}`,
-      );
+      throw new BadRequestException(`Unknown credentialId(s): ${missingCreds.join(', ')}`);
     }
     const missingConns = diff(existingConnIds, connRows);
     if (missingConns.length > 0) {
-      throw new BadRequestException(
-        `Unknown connectionId(s): ${missingConns.join(', ')}`,
-      );
+      throw new BadRequestException(`Unknown connectionId(s): ${missingConns.join(', ')}`);
     }
 
-    const placeholderByAlias = new Map(
-      loaded.placeholderDetails.map((p) => [p.alias, p]),
-    );
+    const placeholderByAlias = new Map(loaded.placeholderDetails.map((p) => [p.alias, p]));
     const connKindById = new Map<string, ConnectionScopeKind>();
     for (const row of connRows) {
       const parsed = connectionScopeSchema.parse(row.scope);

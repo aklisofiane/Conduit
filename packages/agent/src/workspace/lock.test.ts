@@ -54,10 +54,7 @@ describe('withPathLock', () => {
       await bothStarted.promise;
     };
 
-    await Promise.all([
-      withPathLock('key-a', makeFn()),
-      withPathLock('key-b', makeFn()),
-    ]);
+    await Promise.all([withPathLock('key-a', makeFn()), withPathLock('key-b', makeFn())]);
 
     expect(started).toBe(2);
   });

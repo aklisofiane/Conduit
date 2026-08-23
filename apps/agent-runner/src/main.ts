@@ -155,11 +155,10 @@ async function ensureConduitSummaryPlaceholder(
   const file = path.join(workspacePath, CONDUIT_DIR, `${nodeName}.md`);
   await fs.mkdir(path.dirname(file), { recursive: true });
   try {
-    await fs.writeFile(
-      file,
-      `# ${nodeName}\n\n(Agent did not write a summary for this run.)\n`,
-      { encoding: 'utf8', flag: 'wx' },
-    );
+    await fs.writeFile(file, `# ${nodeName}\n\n(Agent did not write a summary for this run.)\n`, {
+      encoding: 'utf8',
+      flag: 'wx',
+    });
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
   }

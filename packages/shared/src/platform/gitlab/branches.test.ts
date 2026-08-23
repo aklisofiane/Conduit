@@ -4,9 +4,8 @@ import { listGitlabProjectBranches } from './branches';
 describe('listGitlabProjectBranches', () => {
   it('maps branch names and hits the project repository/branches endpoint', async () => {
     const calls: string[] = [];
-    const fakeFetch = makeFetch(
-      [[{ name: 'main' }, { name: 'release/2.0' }]],
-      (url) => calls.push(url),
+    const fakeFetch = makeFetch([[{ name: 'main' }, { name: 'release/2.0' }]], (url) =>
+      calls.push(url),
     );
 
     const branches = await listGitlabProjectBranches({
@@ -53,8 +52,7 @@ describe('listGitlabProjectBranches', () => {
   });
 
   it('throws with error shape on non-2xx response', async () => {
-    const fakeFetch: typeof fetch = async () =>
-      new Response('Forbidden', { status: 403 });
+    const fakeFetch: typeof fetch = async () => new Response('Forbidden', { status: 403 });
     await expect(
       listGitlabProjectBranches({
         hostUrl: 'gitlab.com',
@@ -66,8 +64,7 @@ describe('listGitlabProjectBranches', () => {
   });
 
   it('does not include upstream response body in the thrown error message', async () => {
-    const fakeFetch: typeof fetch = async () =>
-      new Response('Forbidden', { status: 403 });
+    const fakeFetch: typeof fetch = async () => new Response('Forbidden', { status: 403 });
 
     const err = await listGitlabProjectBranches({
       hostUrl: 'gitlab.com',
@@ -92,10 +89,7 @@ describe('listGitlabProjectBranches', () => {
   });
 });
 
-function makeFetch(
-  pages: unknown[],
-  onCall?: (url: string) => void,
-): typeof fetch {
+function makeFetch(pages: unknown[], onCall?: (url: string) => void): typeof fetch {
   let call = 0;
   return (async (url: string) => {
     onCall?.(url);

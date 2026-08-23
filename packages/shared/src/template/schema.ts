@@ -130,9 +130,7 @@ export const templateInputWorkflowDefinitionSchema = workflowDefinitionSchema
     nodes: z.array(templateAgentInputSchema),
     mcpServers: z.array(templateMcpServerInputSchema),
   });
-export type TemplateInputWorkflowDefinition = z.infer<
-  typeof templateInputWorkflowDefinitionSchema
->;
+export type TemplateInputWorkflowDefinition = z.infer<typeof templateInputWorkflowDefinitionSchema>;
 
 export const templateInputWorkflowSchema = z.object({
   name: z.string().min(1),

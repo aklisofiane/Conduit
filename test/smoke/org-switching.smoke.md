@@ -60,7 +60,7 @@ MCP against the dev stack (`npm run infra:up` + `npm run dev`).
      **Accept invitation**.
 7. Click **Accept invitation**.
    - Expect: redirected to `/account/organization`. The Members list now
-     contains User B as `member`. (User B's *active* org is still their
+     contains User B as `member`. (User B's _active_ org is still their
      personal workspace per spec — accepting does not auto-switch.)
 8. Open the user-menu pill in context 2. The Switch sub-list now contains
    the org User B was just invited to. Switch to it.
@@ -82,7 +82,7 @@ MCP against the dev stack (`npm run infra:up` + `npm run dev`).
 
 ## Notes
 
-- The pill *label* on the topbar must remain unchanged — short, single
+- The pill _label_ on the topbar must remain unchanged — short, single
   status dot, name/email truncated at 180px. Org context lives only in the
   popover.
 - The `Pending invitations` link inside the popover must be hidden (or the

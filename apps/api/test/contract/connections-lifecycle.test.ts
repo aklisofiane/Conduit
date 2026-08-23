@@ -75,12 +75,12 @@ describe('ConnectionsService lifecycle', () => {
         },
       });
 
-      await expect(
-        svc.delete(fixture.orgA.id, fixture.orgA.connectionId),
-      ).rejects.toBeInstanceOf(ConflictException);
-      await expect(
-        svc.delete(fixture.orgA.id, fixture.orgA.connectionId),
-      ).rejects.toThrow(/Trigger consumer/);
+      await expect(svc.delete(fixture.orgA.id, fixture.orgA.connectionId)).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+      await expect(svc.delete(fixture.orgA.id, fixture.orgA.connectionId)).rejects.toThrow(
+        /Trigger consumer/,
+      );
 
       const stillThere = await prisma.connection.findUnique({
         where: { id: fixture.orgA.connectionId },
@@ -99,12 +99,12 @@ describe('ConnectionsService lifecycle', () => {
         },
       });
 
-      await expect(
-        svc.delete(fixture.orgA.id, fixture.orgA.connectionId),
-      ).rejects.toBeInstanceOf(ConflictException);
-      await expect(
-        svc.delete(fixture.orgA.id, fixture.orgA.connectionId),
-      ).rejects.toThrow(/MCP consumer/);
+      await expect(svc.delete(fixture.orgA.id, fixture.orgA.connectionId)).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+      await expect(svc.delete(fixture.orgA.id, fixture.orgA.connectionId)).rejects.toThrow(
+        /MCP consumer/,
+      );
 
       const stillThere = await prisma.connection.findUnique({
         where: { id: fixture.orgA.connectionId },
@@ -115,9 +115,7 @@ describe('ConnectionsService lifecycle', () => {
     it('deletes an unreferenced connection and removes the row', async () => {
       // The seeded org-A workflow has an empty definition, so the connection
       // is unreferenced.
-      await expect(
-        svc.delete(fixture.orgA.id, fixture.orgA.connectionId),
-      ).resolves.toBeUndefined();
+      await expect(svc.delete(fixture.orgA.id, fixture.orgA.connectionId)).resolves.toBeUndefined();
 
       const gone = await prisma.connection.findUnique({
         where: { id: fixture.orgA.connectionId },

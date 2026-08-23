@@ -9,10 +9,6 @@ const handler = toNodeHandler(auth);
  * Node handler. Mounted in `main.ts` BEFORE `express.json()` so Better Auth
  * sees the raw request stream.
  */
-export function betterAuthMiddleware(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): void {
+export function betterAuthMiddleware(req: Request, res: Response, next: NextFunction): void {
   handler(req, res).catch(next);
 }

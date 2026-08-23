@@ -33,8 +33,16 @@ describe('discoverPluginSkillRoots', () => {
     const roots = await discoverPluginSkillRoots(home);
 
     expect(roots).toEqual([
-      { base: path.join('/abs/feature-flow/0.3.7', 'skills'), plugin: 'feature-flow', marketplace: 'nohjen' },
-      { base: path.join('/abs/vercel/0.44.0', 'skills'), plugin: 'vercel', marketplace: 'official' },
+      {
+        base: path.join('/abs/feature-flow/0.3.7', 'skills'),
+        plugin: 'feature-flow',
+        marketplace: 'nohjen',
+      },
+      {
+        base: path.join('/abs/vercel/0.44.0', 'skills'),
+        plugin: 'vercel',
+        marketplace: 'official',
+      },
     ]);
   });
 

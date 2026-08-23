@@ -74,10 +74,9 @@ export const workflowDraftSchema = z.object({
   reviewers: z
     .array(reviewerDraftSchema)
     .min(1)
-    .refine(
-      (reviewers) => new Set(reviewers.map((r) => r.name)).size === reviewers.length,
-      { message: 'Reviewer names must be unique within a draft' },
-    ),
+    .refine((reviewers) => new Set(reviewers.map((r) => r.name)).size === reviewers.length, {
+      message: 'Reviewer names must be unique within a draft',
+    }),
   /** 5-field POSIX cron cadence. Temporal does final semantic validation. */
   cron: z
     .string()

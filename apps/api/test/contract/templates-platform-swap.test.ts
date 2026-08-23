@@ -142,10 +142,7 @@ function injectTemplate(svc: TemplatesService, file: TemplateFile): void {
     placeholders: placeholderDetails.map((p) => p.alias),
     placeholderDetails,
   };
-  (svc as unknown as { templates: Map<string, LoadedTemplate> }).templates.set(
-    file.id,
-    loaded,
-  );
+  (svc as unknown as { templates: Map<string, LoadedTemplate> }).templates.set(file.id, loaded);
 }
 
 async function createConnection(

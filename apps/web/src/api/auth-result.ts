@@ -26,10 +26,7 @@ export class AuthClientError extends Error {
   }
 }
 
-export function unwrapAuthResult<T>(res: {
-  data: T | null;
-  error: AuthErrorShape | null;
-}): T {
+export function unwrapAuthResult<T>(res: { data: T | null; error: AuthErrorShape | null }): T {
   if (res.error) throw new AuthClientError(res.error);
   if (res.data === null || res.data === undefined) {
     throw new Error('Empty response');
@@ -37,9 +34,6 @@ export function unwrapAuthResult<T>(res: {
   return res.data;
 }
 
-export function unwrapAuthVoid(
-  res: { error: AuthErrorShape | null },
-  fallback: string,
-): void {
+export function unwrapAuthVoid(res: { error: AuthErrorShape | null }, fallback: string): void {
   if (res.error) throw new AuthClientError(res.error, fallback);
 }

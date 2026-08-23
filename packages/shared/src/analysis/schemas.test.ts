@@ -6,7 +6,13 @@ describe('componentManifestSchema', () => {
   it('accepts a well-formed manifest', () => {
     const result = componentManifestSchema.safeParse({
       components: [
-        { name: 'API', paths: ['apps/api/**'], rationale: 'service', criticality: 'high', churn: 12 },
+        {
+          name: 'API',
+          paths: ['apps/api/**'],
+          rationale: 'service',
+          criticality: 'high',
+          churn: 12,
+        },
       ],
     });
     expect(result.success).toBe(true);

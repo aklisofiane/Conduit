@@ -28,9 +28,7 @@ export function repoScopeKindFor(platform: string): ConnectionScopeKind {
  * trigger panels offer in their connection picker. Excludes board
  * (`github_projects_v2`) and unscoped (`none`) connections.
  */
-export function repoScopedConnections<T extends { scope: ConnectionScope }>(
-  connections: T[],
-): T[] {
+export function repoScopedConnections<T extends { scope: ConnectionScope }>(connections: T[]): T[] {
   return connections.filter(
     (c) => c.scope.kind === 'github_repo' || c.scope.kind === 'gitlab_project',
   );
@@ -56,10 +54,7 @@ export function ensureLabelTarget(
   connectionId: string,
 ): EnsureLabelTarget | undefined {
   const conn = connections.find((c) => c.id === connectionId);
-  if (
-    !conn ||
-    (conn.scope.kind !== 'github_repo' && conn.scope.kind !== 'gitlab_project')
-  ) {
+  if (!conn || (conn.scope.kind !== 'github_repo' && conn.scope.kind !== 'gitlab_project')) {
     return undefined;
   }
   return {
@@ -73,7 +68,8 @@ export function connectionLabel(c: {
   credential: { platform: string; hostUrl?: string | null };
 }): string {
   const host = c.credential.hostUrl;
-  const showHost = host != null && !isCloudHost(c.credential.platform.toUpperCase() as Platform, host);
+  const showHost =
+    host != null && !isCloudHost(c.credential.platform.toUpperCase() as Platform, host);
   const hostSuffix = showHost ? ` · ${host}` : '';
   return `${c.name} · ${c.credential.platform.toLowerCase()}${hostSuffix}`;
 }

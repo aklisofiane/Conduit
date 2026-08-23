@@ -67,10 +67,7 @@ function connection(overrides: Partial<ConnectionRow> = {}): ConnectionRow {
 
 describe('linkableProviders', () => {
   it('returns only providers the deployment advertises, in a stable order', () => {
-    expect(linkableProviders(['gitlab', 'github']).map((p) => p.id)).toEqual([
-      'github',
-      'gitlab',
-    ]);
+    expect(linkableProviders(['gitlab', 'github']).map((p) => p.id)).toEqual(['github', 'gitlab']);
   });
 
   it('gates each provider independently', () => {
@@ -136,7 +133,10 @@ describe('findLinkedAccount', () => {
 
 describe('findMirroredCredential', () => {
   it('pairs on metadata.accountRowId', () => {
-    const rows = [credential({ id: 'other', metadata: { source: 'oauth', accountRowId: 'zzz' } }), credential()];
+    const rows = [
+      credential({ id: 'other', metadata: { source: 'oauth', accountRowId: 'zzz' } }),
+      credential(),
+    ];
     expect(findMirroredCredential(rows, account(), 'GITLAB')?.id).toBe('cred-1');
   });
 
@@ -164,7 +164,11 @@ describe('findMirroredCredential', () => {
 
 describe('dependentConnections', () => {
   it('names every connection backed by the mirrored credential', () => {
-    const rows = [connection(), connection({ id: 'c2', name: 'acme/web' }), connection({ id: 'c3', credentialId: 'other' })];
+    const rows = [
+      connection(),
+      connection({ id: 'c2', name: 'acme/web' }),
+      connection({ id: 'c3', credentialId: 'other' }),
+    ];
     expect(dependentConnections(rows, 'cred-1').map((c) => c.name)).toEqual([
       'acme/api',
       'acme/web',

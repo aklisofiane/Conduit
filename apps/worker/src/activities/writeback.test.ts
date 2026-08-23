@@ -258,7 +258,11 @@ describe('resolveWritebackContext', () => {
 
   it('passes draft/ready PR states through on a PR run (pr-review template shape)', () => {
     const node = makeAgent({
-      issueWriteback: { allowedStatuses: [], allowedLabels: [], allowedPrStates: ['draft', 'ready'] },
+      issueWriteback: {
+        allowedStatuses: [],
+        allowedLabels: [],
+        allowedPrStates: ['draft', 'ready'],
+      },
     });
     const ctx = resolveWritebackContext(node, [PR_LABEL_TRIGGER], PR_EVENT);
     expect(ctx?.isPr).toBe(true);

@@ -135,8 +135,7 @@ export class WorkspaceManager {
       // Idempotency under Temporal retries: a previous attempt may have left
       // a worktree registration and/or a stranded directory at `target`.
       await dropConflictingWorktrees(upstreamPath, target);
-      const head =
-        upstreamHead ?? (await git(['rev-parse', 'HEAD'], { cwd: upstreamPath })).trim();
+      const head = upstreamHead ?? (await git(['rev-parse', 'HEAD'], { cwd: upstreamPath })).trim();
       await git(['worktree', 'add', '--detach', target, head], { cwd: upstreamPath });
       return head;
     });
@@ -187,9 +186,7 @@ async function unregisterRunWorktrees(root: string): Promise<void> {
     ).filter((b): b is string => b !== null),
   );
   await Promise.all(
-    [...bareClones].map((bare) =>
-      git(['worktree', 'prune'], { cwd: bare }).catch(() => undefined),
-    ),
+    [...bareClones].map((bare) => git(['worktree', 'prune'], { cwd: bare }).catch(() => undefined)),
   );
 }
 
@@ -203,9 +200,7 @@ async function unregisterRunWorktrees(root: string): Promise<void> {
  * mount for each run without duplicating the pointer-file parsing.
  */
 export async function bareCloneOf(workspacePath: string): Promise<string | null> {
-  const pointer = await fs
-    .readFile(path.join(workspacePath, '.git'), 'utf8')
-    .catch(() => null);
+  const pointer = await fs.readFile(path.join(workspacePath, '.git'), 'utf8').catch(() => null);
   const gitdir = pointer?.match(/^gitdir:\s*(.+?)\s*$/m)?.[1];
   const idx = gitdir?.indexOf('/worktrees/') ?? -1;
   return idx === -1 ? null : gitdir!.slice(0, idx);

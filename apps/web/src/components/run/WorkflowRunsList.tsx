@@ -91,9 +91,7 @@ function RunRow({ run }: { run: WorkflowRunListItem }) {
           <>
             <b className="text-[var(--color-text)]">{done}</b>
             <span className="text-[var(--color-text-muted)]">/{total}</span>{' '}
-            <span className="text-[var(--color-text-muted)]">
-              node{total === 1 ? '' : 's'}
-            </span>
+            <span className="text-[var(--color-text-muted)]">node{total === 1 ? '' : 's'}</span>
           </>
         ) : (
           <span className="text-[var(--color-text-muted)]">—</span>

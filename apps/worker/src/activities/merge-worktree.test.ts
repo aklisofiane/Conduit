@@ -40,7 +40,10 @@ interface Fixture {
   originalEnv: Record<string, string | undefined>;
 }
 
-async function setupWorktreePair(opts: { prefix: string; gitignore: string | null }): Promise<Fixture> {
+async function setupWorktreePair(opts: {
+  prefix: string;
+  gitignore: string | null;
+}): Promise<Fixture> {
   vi.clearAllMocks();
   const root = await fs.mkdtemp(path.join(os.tmpdir(), opts.prefix));
   const target = path.join(root, 'target');
@@ -236,9 +239,9 @@ describe('mergeWorktreeActivity — repo without a .gitignore', () => {
       targetNodeName: 'Triage',
     });
 
-    await expect(fs.readFile(path.join(target, '.conduit', 'Triage.md'), 'utf8')).resolves.toContain(
-      'upstream',
-    );
+    await expect(
+      fs.readFile(path.join(target, '.conduit', 'Triage.md'), 'utf8'),
+    ).resolves.toContain('upstream');
     await expect(fs.stat(path.join(target, '.conduit', 'Fix.md'))).rejects.toMatchObject({
       code: 'ENOENT',
     });

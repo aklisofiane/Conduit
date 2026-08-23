@@ -269,8 +269,10 @@ function CredentialRowView({ cred, onDelete }: { cred: CredentialRow; onDelete: 
               oauth
             </span>
           )}
-          <span>· ••••{cred.suffix} · {cred.connectionCount} connection
-          {cred.connectionCount === 1 ? '' : 's'} · rotated {relativeFromNow(cred.updatedAt)}</span>
+          <span>
+            · ••••{cred.suffix} · {cred.connectionCount} connection
+            {cred.connectionCount === 1 ? '' : 's'} · rotated {relativeFromNow(cred.updatedAt)}
+          </span>
           <OAuthCredentialStatus cred={cred} />
         </div>
         {rotating && (
@@ -300,18 +302,12 @@ function CredentialRowView({ cred, onDelete }: { cred: CredentialRow; onDelete: 
           </div>
         )}
       </div>
-      {!rotating && (
-        <Button onClick={() => setRotating(true)}>
-          Rotate
-        </Button>
-      )}
+      {!rotating && <Button onClick={() => setRotating(true)}>Rotate</Button>}
       <Button
         onClick={onDelete}
         disabled={cred.connectionCount > 0}
         title={
-          cred.connectionCount > 0
-            ? 'Detach all connections using this credential first'
-            : 'Delete'
+          cred.connectionCount > 0 ? 'Detach all connections using this credential first' : 'Delete'
         }
       >
         Delete

@@ -30,16 +30,12 @@ export function resolveRunnerMode(): RunnerMode {
   // Empty string counts as unset — `.env.example` ships `VAR=""` placeholders.
   const deployment = orUnset(process.env.CONDUIT_DEPLOYMENT) ?? 'local';
   if (deployment !== 'local' && deployment !== 'hosted') {
-    throw new Error(
-      `CONDUIT_DEPLOYMENT must be 'local' or 'hosted' (got "${deployment}")`,
-    );
+    throw new Error(`CONDUIT_DEPLOYMENT must be 'local' or 'hosted' (got "${deployment}")`);
   }
 
   const mode = orUnset(process.env.CONDUIT_RUNNER_MODE);
   if (mode !== undefined && mode !== 'docker' && mode !== 'host') {
-    throw new Error(
-      `CONDUIT_RUNNER_MODE must be 'docker' or 'host' (got "${mode}")`,
-    );
+    throw new Error(`CONDUIT_RUNNER_MODE must be 'docker' or 'host' (got "${mode}")`);
   }
 
   if (deployment === 'hosted') {

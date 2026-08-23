@@ -49,8 +49,7 @@ export function WorkflowHeaderPill({ workflowId }: WorkflowHeaderPillProps) {
       update.mutate(
         { name: trimmed },
         {
-          onError: (err) =>
-            alert(err instanceof Error ? err.message : String(err)),
+          onError: (err) => alert(err instanceof Error ? err.message : String(err)),
         },
       );
     },
@@ -185,7 +184,12 @@ function SwitcherPopover({ anchorEl, currentId, onClose }: SwitcherPopoverProps)
     navigate(`/workflows/${id}`);
   };
 
-  const handleNew = async (name: string, triggerType: PaletteTriggerType, connectionId?: string, platform?: 'github' | 'gitlab') => {
+  const handleNew = async (
+    name: string,
+    triggerType: PaletteTriggerType,
+    connectionId?: string,
+    platform?: 'github' | 'gitlab',
+  ) => {
     const created = await create.mutateAsync({ name, triggerType, connectionId, platform });
     setShowCreateDialog(false);
     onClose();
@@ -214,8 +218,7 @@ function SwitcherPopover({ anchorEl, currentId, onClose }: SwitcherPopoverProps)
     }
   };
 
-  const stop = (e: ReactMouseEvent | React.WheelEvent | React.PointerEvent) =>
-    e.stopPropagation();
+  const stop = (e: ReactMouseEvent | React.WheelEvent | React.PointerEvent) => e.stopPropagation();
 
   return createPortal(
     <div
@@ -322,8 +325,6 @@ function SwitcherRow({
 
 function EmptyRow({ text }: { text: string }) {
   return (
-    <div className="px-3 py-3 font-mono text-small text-[var(--color-text-muted)]">
-      {text}
-    </div>
+    <div className="px-3 py-3 font-mono text-small text-[var(--color-text-muted)]">{text}</div>
   );
 }

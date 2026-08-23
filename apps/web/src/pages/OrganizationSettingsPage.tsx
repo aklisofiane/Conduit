@@ -38,7 +38,9 @@ const ROLE_OPTIONS = ORG_ROLES.map((r) => ({ value: r, label: r }));
 export type InviteValues = z.infer<typeof inviteSchema>;
 
 interface InviteDeps {
-  inviteMember: (args: InviteValues) => Promise<{ id: string } | { error: { message?: string; status?: number } }>;
+  inviteMember: (
+    args: InviteValues,
+  ) => Promise<{ id: string } | { error: { message?: string; status?: number } }>;
   setError: UseFormSetError<InviteValues>;
   onSuccess: (invitationId: string) => void;
 }
@@ -63,7 +65,10 @@ export async function submitInvite(values: InviteValues, deps: InviteDeps): Prom
 }
 
 /** True iff the only remaining owner of an org with members is the user. */
-export function isSoleOwner(args: { members: OrganizationMember[]; userId: string | undefined }): boolean {
+export function isSoleOwner(args: {
+  members: OrganizationMember[];
+  userId: string | undefined;
+}): boolean {
   const { members, userId } = args;
   if (!userId) return false;
   if (members.length <= 1) return false;
@@ -201,11 +206,10 @@ function OrganizationHeader({
             </h1>
           )}
           <p className="mt-2 font-mono text-caption text-[var(--color-text-2)]">
-            Created {relativeFromNow(createdAt)} · {memberCount} member{memberCount === 1 ? '' : 's'}
+            Created {relativeFromNow(createdAt)} · {memberCount} member
+            {memberCount === 1 ? '' : 's'}
           </p>
-          {error && (
-            <p className="mt-1 font-mono text-small text-[var(--color-error)]">{error}</p>
-          )}
+          {error && <p className="mt-1 font-mono text-small text-[var(--color-error)]">{error}</p>}
         </div>
         <div className="flex shrink-0 flex-col items-end gap-2">
           {myRole && (
@@ -246,7 +250,9 @@ function MembersSection({
         <h2 className="font-mono text-base font-semibold">Members</h2>
       </header>
       {loading && members.length === 0 ? (
-        <div className="px-4 py-4 font-mono text-small text-[var(--color-text-muted)]">Loading…</div>
+        <div className="px-4 py-4 font-mono text-small text-[var(--color-text-muted)]">
+          Loading…
+        </div>
       ) : members.length === 0 ? (
         <div className="px-4 py-4 font-mono text-small text-[var(--color-text-muted)]">
           No members yet.
@@ -312,7 +318,10 @@ function MemberRow({
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <span className="truncate font-mono text-small text-[var(--color-text)]" title={display}>
+            <span
+              className="truncate font-mono text-small text-[var(--color-text)]"
+              title={display}
+            >
               {display}
             </span>
             {isMe && (
@@ -495,12 +504,10 @@ function InviteMemberSection() {
       <form onSubmit={onSubmit} className="flex flex-col gap-3 px-4 py-4" noValidate>
         <div className="grid grid-cols-[1fr_140px_auto] items-end gap-3">
           <label className="flex flex-col">
-            <Label asChild><span>Email</span></Label>
-            <Input
-              type="email"
-              autoComplete="email"
-              {...form.register('email')}
-            />
+            <Label asChild>
+              <span>Email</span>
+            </Label>
+            <Input type="email" autoComplete="email" {...form.register('email')} />
             {form.formState.errors.email?.message && (
               <span className="mt-1 font-mono text-caption text-[var(--color-error)]">
                 {form.formState.errors.email.message}
@@ -508,7 +515,9 @@ function InviteMemberSection() {
             )}
           </label>
           <label className="flex flex-col">
-            <Label asChild><span>Role</span></Label>
+            <Label asChild>
+              <span>Role</span>
+            </Label>
             <Controller
               name="role"
               control={form.control}
@@ -522,11 +531,7 @@ function InviteMemberSection() {
               )}
             />
           </label>
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={form.formState.isSubmitting}
-          >
+          <Button type="submit" variant="primary" disabled={form.formState.isSubmitting}>
             {form.formState.isSubmitting ? 'Sending…' : 'Send'}
           </Button>
         </div>
@@ -592,10 +597,7 @@ function DangerZoneSection({
   const [leaveError, setLeaveError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const soleOwner = useMemo(
-    () => isSoleOwner({ members, userId: myUserId }),
-    [members, myUserId],
-  );
+  const soleOwner = useMemo(() => isSoleOwner({ members, userId: myUserId }), [members, myUserId]);
   const orgCount = orgs.length;
   const canDelete = canDeleteOrganization({ myRole, orgCount });
   // Owner of their only org: show the delete affordance disabled with a reason
@@ -652,15 +654,14 @@ function DangerZoneSection({
                 Permanently delete this organization and everything inside it.
               </div>
               {!confirmingDelete && (
-                <Button onClick={() => setConfirmingDelete(true)}>
-                  Delete organization
-                </Button>
+                <Button onClick={() => setConfirmingDelete(true)}>Delete organization</Button>
               )}
             </div>
             {confirmingDelete && (
               <div className="flex flex-col gap-2 rounded-[var(--radius-sm)] border border-[var(--color-divider)] bg-[var(--color-bg)] p-3">
                 <div className="font-mono text-small text-[var(--color-text)]">
-                  Type <code className="text-[var(--color-claude-mark)]">{organizationName}</code> to confirm.
+                  Type <code className="text-[var(--color-claude-mark)]">{organizationName}</code>{' '}
+                  to confirm.
                 </div>
                 <Input
                   value={confirmName}
@@ -668,7 +669,9 @@ function DangerZoneSection({
                   autoFocus
                 />
                 {deleteError && (
-                  <div className="font-mono text-caption text-[var(--color-error)]">{deleteError}</div>
+                  <div className="font-mono text-caption text-[var(--color-error)]">
+                    {deleteError}
+                  </div>
                 )}
                 <div className="flex justify-end gap-2">
                   <Button

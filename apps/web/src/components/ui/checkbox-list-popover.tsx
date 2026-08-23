@@ -96,10 +96,7 @@ export function CheckboxListPopover<T>({
         : items,
     [items, q, getLabel, getDescription],
   );
-  const groups = useMemo(
-    () => (groupItems ? groupItems(filtered) : null),
-    [groupItems, filtered],
-  );
+  const groups = useMemo(() => (groupItems ? groupItems(filtered) : null), [groupItems, filtered]);
 
   const renderRow = (item: T) => {
     const id = getId(item);
@@ -217,11 +214,7 @@ function CheckboxRow({
         checked && searchSelectItemSelectedClass,
       )}
     >
-      <Checkbox
-        checked={checked}
-        onCheckedChange={onToggle}
-        className="mt-0.5 flex-shrink-0"
-      />
+      <Checkbox checked={checked} onCheckedChange={onToggle} className="mt-0.5 flex-shrink-0" />
       <div className="min-w-0 flex-1">
         <div className="truncate font-mono text-small">{label}</div>
         {description && (

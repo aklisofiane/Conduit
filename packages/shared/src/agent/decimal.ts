@@ -10,10 +10,7 @@ export function decimalToNumber(value: DecimalLike | null): number | null {
 }
 
 /** Convert Decimal-backed model pricing columns into runtime price values. */
-export function toModelPrice(row: {
-  inputPerM: DecimalLike;
-  outputPerM: DecimalLike;
-}): ModelPrice {
+export function toModelPrice(row: { inputPerM: DecimalLike; outputPerM: DecimalLike }): ModelPrice {
   return {
     inputPerM: decimalToNumber(row.inputPerM),
     outputPerM: decimalToNumber(row.outputPerM),

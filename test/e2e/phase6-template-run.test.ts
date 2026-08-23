@@ -42,10 +42,7 @@ interface TemplateSummary {
   placeholders: string[];
 }
 
-async function waitFor<T>(
-  check: () => Promise<T | null | false>,
-  timeoutMs: number,
-): Promise<T> {
+async function waitFor<T>(check: () => Promise<T | null | false>, timeoutMs: number): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const result = await check();
@@ -148,7 +145,11 @@ describe('Phase 6 — create workflows from template', () => {
       workflowScheduleId(wf.id, wf.temporalSlug ?? undefined),
     );
     await waitFor(
-      () => handle.describe().then(() => true).catch(() => false),
+      () =>
+        handle
+          .describe()
+          .then(() => true)
+          .catch(() => false),
       15_000,
     );
   }, 60_000);
@@ -205,7 +206,11 @@ describe('Phase 6 — create workflows from template', () => {
       workflowScheduleId(wf.id, wf.temporalSlug ?? undefined),
     );
     await waitFor(
-      () => handle.describe().then(() => true).catch(() => false),
+      () =>
+        handle
+          .describe()
+          .then(() => true)
+          .catch(() => false),
       15_000,
     );
   }, 45_000);

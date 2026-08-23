@@ -219,7 +219,9 @@ export function HomePage() {
                     ) : (
                       <>
                         <span className="font-semibold text-[var(--color-text)]">No repo</span>
-                        <span className="text-[var(--color-text-muted)]">· cron or unconfigured</span>
+                        <span className="text-[var(--color-text-muted)]">
+                          · cron or unconfigured
+                        </span>
                       </>
                     )}
                   </div>
