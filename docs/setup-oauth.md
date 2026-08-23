@@ -13,6 +13,20 @@ For the architecture behind the sign-in flow and the OAuth → `Credential` mirr
 - `BETTER_AUTH_URL` set in `.env` to the public origin your browser hits the API on. Defaults to `http://localhost:3000` in local dev. Every provider's callback URL is derived from this value.
 - `BETTER_AUTH_SECRET` set (any provider needs it to sign the session cookie).
 
+`BETTER_AUTH_URL` is the *only* input to the callback URL — because `auth.config.ts` passes an explicit `baseURL`, Better Auth never falls back to reading `x-forwarded-proto` / `x-forwarded-host` off the request. So the `redirect_uri` sent to a provider is exactly `BETTER_AUTH_URL` + `/api/auth/callback/<provider>`, and a provider rejecting the redirect URI always means that string differs from what you registered. Two ways it drifts:
+
+- **Scheme.** TLS terminated in front of the stack while `BETTER_AUTH_URL` still says `http://` — the providers require an exact match, scheme included.
+- **Port.** Locally, `scripts/preflight.ts` rewrites `BETTER_AUTH_URL` into `.env.local` with a new port whenever `:3000` is already taken, so the callback silently stops matching. Check `grep BETTER_AUTH_URL .env.local` while the stack is up.
+
+To see the exact value your deployment sends, ask it — the returned authorization URL carries the `redirect_uri` verbatim:
+
+```bash
+curl -s -X POST "$BETTER_AUTH_URL/api/auth/sign-in/social" \
+  -H 'content-type: application/json' -d '{"provider":"github","callbackURL":"/"}'
+```
+
+In a hosted deploy the API is path-routed under the same origin as the web app (`docker-compose.prod.yml`), so there is one origin for everything and `BETTER_AUTH_URL`, `VITE_API_URL`, and `CONDUIT_CORS_ORIGIN` all carry that same value.
+
 ## GitHub
 
 ### 1. Create the OAuth App

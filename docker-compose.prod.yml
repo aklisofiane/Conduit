@@ -4,6 +4,23 @@
 # Build from repo root:
 #   docker compose -f docker-compose.prod.yml build
 #   docker compose -f docker-compose.prod.yml up -d
+#
+# ---- Origin configuration ----
+# The whole stack is served from ONE public origin (see the api service's
+# routing note). Four values must agree exactly, scheme included — if TLS is
+# terminated in front of this stack, every one of them is `https://`:
+#
+#   WEB_DOMAIN           app.example.com        (host only, no scheme)
+#   BETTER_AUTH_URL      https://app.example.com
+#   VITE_API_URL         https://app.example.com   (build arg — baked into the bundle)
+#   CONDUIT_CORS_ORIGIN  https://app.example.com
+#
+# OAuth callbacks registered with GitHub/GitLab are then
+# `${BETTER_AUTH_URL}/api/auth/callback/{github,gitlab}`. A mismatch in any of
+# the four surfaces as the provider rejecting the redirect URI.
+#
+# There is no API_DOMAIN any more — a second domain was the source of both
+# cross-site cookie breakage and redirect_uri drift.
 
 services:
   # ---------- Infrastructure ----------
@@ -106,9 +123,25 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    # Single-origin routing: the API is path-routed under the SAME host as the
+    # web app rather than living on its own domain. This is what makes the
+    # Better Auth session cookie first-party — it defaults to host-only
+    # `SameSite=Lax`, which a browser drops on cross-site XHR (a split
+    # api./app. pair only works while both share a registrable domain, and
+    # not at all against a Coolify-generated host). One origin also means
+    # `BETTER_AUTH_URL` cannot disagree with the origin the browser hits,
+    # which is what the OAuth `redirect_uri` is derived from.
+    #
+    # `/socket.io` is listed explicitly: Nest's global prefix covers `/api`,
+    # but the socket.io adapter serves outside it.
+    #
+    # Priority beats the web router's catch-all `Host()` rule below — Traefik
+    # would already rank this rule higher on length, but ordering this
+    # important should not rest on that.
     labels:
       - traefik.enable=true
-      - traefik.http.routers.api.rule=Host(`${API_DOMAIN}`)
+      - traefik.http.routers.api.rule=Host(`${WEB_DOMAIN}`) && (PathPrefix(`/api`) || PathPrefix(`/socket.io`))
+      - traefik.http.routers.api.priority=100
       - traefik.http.routers.api.entrypoints=http
       - traefik.http.services.api.loadbalancer.server.port=3000
     environment:
@@ -199,9 +232,12 @@ services:
     depends_on:
       api:
         condition: service_healthy
+    # Catch-all for the same host: everything the api router above did not
+    # claim falls through to the SPA. Explicit low priority — see the note there.
     labels:
       - traefik.enable=true
       - traefik.http.routers.web.rule=Host(`${WEB_DOMAIN}`)
+      - traefik.http.routers.web.priority=1
       - traefik.http.routers.web.entrypoints=http
       - traefik.http.services.web.loadbalancer.server.port=80
     expose:
