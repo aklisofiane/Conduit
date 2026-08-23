@@ -6,15 +6,35 @@ import { config } from '../config';
 export type { RunUpdateMessage };
 
 /**
- * Better Auth's `secondaryStorage` interface. Reproduced here verbatim so
- * we don't take a build-time dependency on `@better-auth/core` for a shape
- * that's unlikely to drift (`get/set/delete` strings + ttl).
+ * Better Auth's `secondaryStorage` interface. Reproduced here rather than
+ * imported so we don't take a build-time dependency on `@better-auth/core`
+ * (a nested dependency of `better-auth`, not a direct one). Kept structurally
+ * compatible with the upstream shape — `auth.config.ts` passes the result of
+ * `createBetterAuthRedisStorage` straight into `betterAuth({ secondaryStorage })`,
+ * so any drift shows up as a typecheck failure there.
  */
 export interface BetterAuthSecondaryStorage {
   get(key: string): Promise<string | null>;
+  getAndDelete(key: string): Promise<string | null>;
+  increment(key: string, ttl: number): Promise<number>;
   set(key: string, value: string, ttl?: number): Promise<void>;
   delete(key: string): Promise<void>;
 }
+
+/**
+ * `INCR`, then set the expiry only on the call that created the key, so the
+ * counter expires a fixed window after it was *first* incremented rather than
+ * sliding forward on every hit. Lua keeps that read-modify-write atomic across
+ * API processes — which is the whole point of putting rate-limit counters in
+ * Redis instead of in-process memory.
+ */
+const INCREMENT_WITH_TTL = `
+local value = redis.call('INCR', KEYS[1])
+if value == 1 then
+  redis.call('EXPIRE', KEYS[1], ARGV[1])
+end
+return value
+`;
 
 /**
  * Adapt an `ioredis` client to Better Auth's `secondaryStorage` shape. Used
@@ -22,14 +42,26 @@ export interface BetterAuthSecondaryStorage {
  * the Redis client (not in `auth/`) so the Redis adapter logic lives with
  * the rest of the Redis surface.
  *
- * `set`'s `ttl` is in seconds (Better Auth's contract). We forward to
- * `EX` — a missing ttl writes a key without expiry, which is what
- * Better Auth wants for non-rate-limit values.
+ * All `ttl`s are in seconds (Better Auth's contract). `set` forwards to
+ * `EX` — a missing ttl writes a key without expiry, which is what Better
+ * Auth wants for non-rate-limit values.
  */
 export function createBetterAuthRedisStorage(redis: Redis): BetterAuthSecondaryStorage {
   return {
     async get(key) {
       return redis.get(key);
+    },
+    async getAndDelete(key) {
+      // Redis 8 (see `docker-compose*.yml`); `GETDEL` landed in 6.2.
+      return redis.getdel(key);
+    },
+    async increment(key, ttl) {
+      // Better Auth only ever calls this for rate-limit windows, which are
+      // always positive — the floor is belt-and-braces against `EXPIRE 0`
+      // deleting the key it just created.
+      const seconds = Math.max(1, Math.floor(ttl));
+      const value = await redis.eval(INCREMENT_WITH_TTL, 1, key, String(seconds));
+      return Number(value);
     },
     async set(key, value, ttl) {
       if (typeof ttl === 'number' && ttl > 0) {

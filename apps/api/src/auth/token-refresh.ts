@@ -40,12 +40,14 @@ export const REFRESHABLE_PROVIDERS: readonly string[] = Object.keys(OAUTH_PROVID
 
 /** The Better Auth `account` fields the sweep needs. */
 export interface ExpiringAccount {
-  /** `account.id` — the row id, and the lock key. */
+  /**
+   * `account.id` — the row id, the lock key, and (since Better Auth 1.7) the
+   * `accountId` selector `auth.api.refreshToken` matches on.
+   */
   id: string;
   userId: string;
+  /** Log/diagnostic only — no longer part of the refresh selector. */
   providerId: string;
-  /** The *provider-side* account id: what `auth.api.refreshToken` matches on. */
-  accountId: string;
 }
 
 export interface AccountScanner {
@@ -62,12 +64,12 @@ export interface AccountScanner {
 export interface TokenRefreshDeps {
   scanner: AccountScanner;
   lock: AccountLock;
-  /** Wraps `auth.api.refreshToken`; rejects on provider/HTTP failure. */
-  refresh: (input: {
-    providerId: string;
-    accountId: string;
-    userId: string;
-  }) => Promise<unknown>;
+  /**
+   * Wraps `auth.api.refreshToken`; rejects on provider/HTTP failure.
+   * `accountId` is the Better Auth `account` **row** id — 1.7 dropped the
+   * `(providerId, provider-side accountId)` selector for the row id alone.
+   */
+  refresh: (input: { accountId: string; userId: string }) => Promise<unknown>;
   logger?: Pick<Logger, 'log' | 'warn'>;
   /** Injectable clock for tests. */
   now?: () => Date;
@@ -105,11 +107,7 @@ export async function runTokenRefreshSweep(deps: TokenRefreshDeps): Promise<Swee
         result.skipped += 1;
         continue;
       }
-      await deps.refresh({
-        providerId: account.providerId,
-        accountId: account.accountId,
-        userId: account.userId,
-      });
+      await deps.refresh({ accountId: account.id, userId: account.userId });
       result.refreshed += 1;
     } catch (err) {
       result.failed += 1;
@@ -163,7 +161,7 @@ export function createPrismaAccountScanner(
         },
         orderBy: { accessTokenExpiresAt: 'asc' },
         take: limit,
-        select: { id: true, userId: true, providerId: true, accountId: true },
+        select: { id: true, userId: true, providerId: true },
       });
       return rows;
     },

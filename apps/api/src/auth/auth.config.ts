@@ -88,6 +88,29 @@ async function ensurePersonalOrgFor(userId: string): Promise<string> {
   return org.id;
 }
 
+/**
+ * Hosted deployments are invitation-only: a signup is allowed if the address
+ * is a configured seed email (or matches a seed domain) or has a live pending
+ * invitation. Local deployments are open. Throws `FORBIDDEN` otherwise, which
+ * Better Auth surfaces as the signup response.
+ */
+async function assertRegistrationAllowed(user: { email?: unknown }): Promise<void> {
+  if (config.deployment !== 'hosted') return;
+  const email = (typeof user.email === 'string' ? user.email : '').toLowerCase();
+  const seeded = config.seedEmails.some((s) =>
+    s.startsWith('@') ? email.endsWith(s) : s === email,
+  );
+  if (seeded) return;
+  const invited = await prisma.invitation.findFirst({
+    where: { email, status: 'pending', expiresAt: { gt: new Date() } },
+    select: { id: true },
+  });
+  if (invited) return;
+  throw new APIError('FORBIDDEN', {
+    message: 'Registration is by invitation only',
+  });
+}
+
 // Module-level Redis client used by Better Auth for `secondaryStorage`. We
 // don't reuse `RedisService` here because the Better Auth instance is itself
 // module-level (consumed by `better-auth.middleware.ts`, `session.guard.ts`,
@@ -233,23 +256,24 @@ export const auth = betterAuth({
   // very first cookie the client receives carries an active org and
   // `@OrgId()` resolves on the first authenticated request.
   databaseHooks: {
+    // Registration gate (hosted only) + the `emailVerified` stamp.
+    //
+    // There is no email transport yet, so `emailVerification.sendOnSignUp` and
+    // `emailAndPassword.requireEmailVerification` are both off and nothing
+    // could ever flip `emailVerified` — it would sit `false` for every user
+    // forever. Better Auth 1.7 turned that dormant field into a hard gate:
+    // `/organization/list-user-invitations` 403s on an unverified session
+    // unconditionally (no option disables it), which would break the pending-
+    // invitations list for everyone. Stamping it at insert time keeps the
+    // field meaning what it already effectively meant here. The actual
+    // registration control is `assertRegistrationAllowed` above — invitation
+    // rows, not verification state. Drop this stamp when real email
+    // verification lands.
     user: {
       create: {
         async before(user) {
-          if (config.deployment !== 'hosted') return;
-          const email = (typeof user.email === 'string' ? user.email : '').toLowerCase();
-          const seeded = config.seedEmails.some((s) =>
-            s.startsWith('@') ? email.endsWith(s) : s === email,
-          );
-          if (seeded) return;
-          const invited = await prisma.invitation.findFirst({
-            where: { email, status: 'pending', expiresAt: { gt: new Date() } },
-            select: { id: true },
-          });
-          if (invited) return;
-          throw new APIError('FORBIDDEN', {
-            message: 'Registration is by invitation only',
-          });
+          await assertRegistrationAllowed(user);
+          return { data: { ...user, emailVerified: true } };
         },
       },
     },

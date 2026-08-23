@@ -56,9 +56,18 @@ export function providerLabel(providerId: string | null | undefined): string {
 
 /** A row from Better Auth's `listAccounts()`. */
 export interface LinkedAccount {
-  /** The `account` table row id — what the mirror stores as `accountRowId`. */
+  /**
+   * The `account` table row id — what the mirror stores as `accountRowId`,
+   * and the only selector `unlinkAccount` accepts since Better Auth 1.7.
+   */
   id: string;
   providerId: string;
+  /**
+   * The issuer half of Better Auth 1.7's `(issuer, accountId)` identity.
+   * Synthetic for providers without one of their own: `local:oauth:github`,
+   * `local:oauth:gitlab`, `local:credential`.
+   */
+  issuer?: string;
   /** The provider-side user id. */
   accountId: string;
   scopes?: string[];
@@ -121,8 +130,7 @@ export function accountLogin(
 const LINK_ERROR_MESSAGES: Record<string, string> = {
   account_already_linked_to_different_user:
     'That identity is already linked to a different Conduit user. Sign in as that user and unlink it there first.',
-  "email_doesn't_match":
-    'That account uses a different email address than your Conduit account.',
+  "email_doesn't_match": 'That account uses a different email address than your Conduit account.',
   unable_to_link_account: 'The provider rejected the link request. Please try again.',
   invalid_code: 'The provider handshake expired before it completed. Please try again.',
   unable_to_get_user_info: 'Could not read your profile from the provider. Please try again.',

@@ -466,6 +466,11 @@ model Session {
 
 model Account {
   id                    String    @id
+  // Better Auth 1.7 keys provider identities on `(issuer, accountId)` rather
+  // than `providerId` alone. Providers without an issuer of their own get a
+  // synthetic one: `local:credential` for email/password, `local:oauth:github`
+  // / `local:oauth:gitlab` for our social providers.
+  issuer                String
   accountId             String
   providerId            String
   userId                String
@@ -480,6 +485,7 @@ model Account {
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
+  @@unique([issuer, accountId])
   @@index([userId])
   @@map("account")
 }

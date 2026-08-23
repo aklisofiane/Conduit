@@ -81,6 +81,10 @@ describe('OAuth token refresh', () => {
         id: params.id,
         userId,
         providerId: params.providerId,
+        // Better Auth 1.7 keys accounts on `(issuer, accountId)`. Social
+        // providers with no issuer of their own get this synthetic one — the
+        // same value `createOAuthAccountIssuer` writes on a real link.
+        issuer: `local:oauth:${params.providerId}`,
         accountId: params.accountId,
         accessToken: params.accessToken ?? 'token_v1',
         refreshToken: params.refreshToken === undefined ? 'refresh_v1' : params.refreshToken,
@@ -164,7 +168,7 @@ describe('OAuth token refresh', () => {
     const due = await scanner.findDue(new Date());
 
     expect(due.map((a) => a.id)).toEqual(['row_gitlab_due']);
-    expect(due[0]).toMatchObject({ providerId: 'gitlab', accountId: 'gl_1' });
+    expect(due[0]).toMatchObject({ providerId: 'gitlab', id: 'row_gitlab_due' });
   });
 
   it('isStillDue turns false once the row has been refreshed by someone else', async () => {
@@ -249,8 +253,10 @@ describe('OAuth token refresh', () => {
     const refreshedExpiry = new Date(Date.now() + 2 * 60 * 60_000);
     // Stands in for `auth.api.refreshToken` — same write it performs once the
     // provider has handed back a new token pair.
-    const refresh = vi.fn(async (input: { providerId: string; accountId: string; userId: string }) => {
-      expect(input).toEqual({ providerId: 'gitlab', accountId: 'gl_sweep', userId });
+    const refresh = vi.fn(async (input: { accountId: string; userId: string }) => {
+      // Since Better Auth 1.7 the selector is the `account` row id, not the
+      // provider-side id (`gl_sweep`).
+      expect(input).toEqual({ accountId: accountRowId, userId });
       await ctx.internalAdapter.updateAccount(accountRowId, {
         accessToken: 'gl_access_rotated',
         refreshToken: 'refresh_rotated',

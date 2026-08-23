@@ -19,9 +19,13 @@ export function useLinkedAccounts() {
 }
 
 export interface UnlinkAccountArgs {
-  providerId: string;
-  /** Disambiguates when a provider has more than one linked account. */
-  accountId?: string;
+  /**
+   * The Better Auth `account` **row** id — `LinkedAccount.id`, not the
+   * provider-side user id. Since 1.7 this is the only selector `/unlink-account`
+   * accepts: accounts are keyed on `(issuer, accountId)`, so `providerId` alone
+   * no longer identifies a row.
+   */
+  accountId: string;
 }
 
 /**

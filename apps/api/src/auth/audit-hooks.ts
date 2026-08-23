@@ -1,4 +1,4 @@
-import { createAuthMiddleware, getIp, isAPIError } from 'better-auth/api';
+import { createAuthMiddleware, getIP, isAPIError } from 'better-auth/api';
 import type { BetterAuthOptions } from 'better-auth';
 import type { OrganizationOptions } from 'better-auth/plugins';
 import type { AbuseSignalsService } from './abuse-signals';
@@ -12,7 +12,7 @@ interface AuditHookDeps {
 }
 
 /**
- * Read the actor IP off the live request via Better Auth's `getIp`. Falls
+ * Read the actor IP off the live request via Better Auth's `getIP`. Falls
  * back to `ctx.headers` when there's no underlying `Request` (e.g. internal
  * `auth.api.*` calls that pass headers but no Request object). The helper
  * applies the same `ipAddress.ipAddressHeaders` overrides Better Auth uses
@@ -22,10 +22,10 @@ interface AuditHookDeps {
 function actorIpOf(ctx: AuditHookCtx): string | null {
   const opts = ctx.context.options as BetterAuthOptions;
   if (ctx.request) {
-    return getIp(ctx.request, opts) ?? null;
+    return getIP(ctx.request, opts) ?? null;
   }
   if (ctx.headers) {
-    return getIp(ctx.headers, opts) ?? null;
+    return getIP(ctx.headers, opts) ?? null;
   }
   return null;
 }

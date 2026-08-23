@@ -78,10 +78,7 @@ export function LinkedAccountsSection() {
   const handleUnlink = async () => {
     if (!target) return;
     try {
-      await unlink.mutateAsync({
-        providerId: target.provider.id,
-        accountId: target.account.accountId,
-      });
+      await unlink.mutateAsync({ accountId: target.account.id });
       setTarget(null);
     } catch {
       // Rendered from `unlink.error` inside the dialog — the server is the

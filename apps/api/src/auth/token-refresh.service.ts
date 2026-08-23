@@ -67,11 +67,12 @@ export class TokenRefreshService implements OnModuleInit, OnModuleDestroy {
       return await runTokenRefreshSweep({
         scanner: this.scanner,
         lock: this.lock,
-        refresh: ({ providerId, accountId, userId }) =>
-          // `accountId` here is the provider-side id — what Better Auth's
-          // `/refresh-token` matches accounts on (`acc.accountId`), not the
-          // `account` row id.
-          auth.api.refreshToken({ body: { providerId, accountId, userId } }),
+        refresh: ({ accountId, userId }) =>
+          // `accountId` here is the `account` **row** id. Better Auth 1.7
+          // keys accounts on `(issuer, accountId)`, so `/refresh-token` takes
+          // the row id as its sole selector rather than the old
+          // `(providerId, provider-side accountId)` pair.
+          auth.api.refreshToken({ body: { accountId, userId } }),
         logger: this.logger,
       });
     } catch (err) {

@@ -17,7 +17,7 @@ import type { AccountLock } from './token-refresh-lock';
  */
 
 function acct(overrides: Partial<ExpiringAccount> = {}): ExpiringAccount {
-  return { id: 'acct_row_1', userId: 'user_1', providerId: 'gitlab', accountId: '42', ...overrides };
+  return { id: 'acct_row_1', userId: 'user_1', providerId: 'gitlab', ...overrides };
 }
 
 function makeDeps(
@@ -47,8 +47,8 @@ function makeDeps(
       calls.push(`release:${id}`);
     }),
   };
-  const refresh = vi.fn(async (input: { providerId: string; accountId: string }) => {
-    calls.push(`refresh:${input.providerId}:${input.accountId}`);
+  const refresh = vi.fn(async (input: { accountId: string; userId: string }) => {
+    calls.push(`refresh:${input.accountId}`);
   });
   const deps: TokenRefreshDeps = {
     scanner: scanner as unknown as AccountScanner,
@@ -61,34 +61,28 @@ function makeDeps(
 }
 
 describe('runTokenRefreshSweep', () => {
-  it('refreshes each due account by provider-side accountId and releases the lock', async () => {
+  it('refreshes each due account by its account row id and releases the lock', async () => {
     const { deps, refresh, lock, calls } = makeDeps([
-      acct({ id: 'row_a', accountId: 'gl_1', userId: 'u1' }),
-      acct({ id: 'row_b', providerId: 'github', accountId: 'gh_9', userId: 'u2' }),
+      acct({ id: 'row_a', userId: 'u1' }),
+      acct({ id: 'row_b', providerId: 'github', userId: 'u2' }),
     ]);
 
     const result = await runTokenRefreshSweep(deps);
 
     expect(result).toEqual({ scanned: 2, refreshed: 2, skipped: 0, failed: 0 });
-    expect(refresh).toHaveBeenNthCalledWith(1, {
-      providerId: 'gitlab',
-      accountId: 'gl_1',
-      userId: 'u1',
-    });
-    expect(refresh).toHaveBeenNthCalledWith(2, {
-      providerId: 'github',
-      accountId: 'gh_9',
-      userId: 'u2',
-    });
+    // Better Auth 1.7 selects the account by row id, not by
+    // `(providerId, provider-side accountId)`.
+    expect(refresh).toHaveBeenNthCalledWith(1, { accountId: 'row_a', userId: 'u1' });
+    expect(refresh).toHaveBeenNthCalledWith(2, { accountId: 'row_b', userId: 'u2' });
     // Lock is taken before the refresh and dropped after it, per account.
     expect(calls).toEqual([
       'acquire:row_a',
       'check:row_a',
-      'refresh:gitlab:gl_1',
+      'refresh:row_a',
       'release:row_a',
       'acquire:row_b',
       'check:row_b',
-      'refresh:github:gh_9',
+      'refresh:row_b',
       'release:row_b',
     ]);
     expect(lock.release).toHaveBeenNthCalledWith(1, 'row_a', 'tok_row_a');
@@ -119,10 +113,9 @@ describe('runTokenRefreshSweep', () => {
 
   it('logs and continues past a failing refresh, still releasing its lock', async () => {
     const warn = vi.fn();
-    const { deps, refresh, lock } = makeDeps(
-      [acct({ id: 'row_dead', accountId: 'gl_dead' }), acct({ id: 'row_ok', accountId: 'gl_ok' })],
-      { logger: { log: vi.fn(), warn } },
-    );
+    const { deps, refresh, lock } = makeDeps([acct({ id: 'row_dead' }), acct({ id: 'row_ok' })], {
+      logger: { log: vi.fn(), warn },
+    });
     refresh.mockRejectedValueOnce(new Error('Failed to refresh access token'));
 
     const result = await runTokenRefreshSweep(deps);
